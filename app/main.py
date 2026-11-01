@@ -38,15 +38,28 @@ clients: set[WebSocket] = set()
 started = time.time()
 
 
+CTX: dict[str, tuple[float, float, float]] = {}
+
+
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool) -> None:
     """Одне повідомлення каналу може містити кілька цілей — ділимо на сегменти й кожен веде в трекер."""
     segs = parser.segments(text)
-    whole = parser.parse(text, key)
+    # контекст для одноіменних сіл: усі пункти повідомлення разом + що канал називав останні 30 хв
+    prev = CTX.get(key)
+    pctx = (prev[1], prev[2]) if prev and 0 <= ts - prev[0] < 1800 else None
+    whole = parser.parse(text, key, pctx)
+    ctx = pctx
+    if whole.places:
+        la = sum(r.place.lat for r in whole.places) / len(whole.places)
+        lo = sum(r.place.lon for r in whole.places) / len(whole.places)
+        ctx = (la, lo)
+        CTX[key] = (ts, la, lo)
     msg_type = whole.type if len(segs) > 1 else None
     summary = bool(launch.SUMMARY_RX.search(text.lower()))
     useful = 0
+    trk.exclude = set()
     for seg in segs:
-        obs = parser.parse(seg, key)
+        obs = parser.parse(seg, key, ctx)
         if obs.type is None and msg_type and obs.places and not obs.close:
             obs.type = msg_type
         # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
@@ -60,9 +73,12 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
                 continue
         if obs.kind in ("track", "zone", "close", "filtered"):
             rec = trk.ingest(obs, key, ts, link)
+            if len(segs) > 1 and rec.get("track"):
+                trk.exclude.add(rec["track"])
             useful += 1
             if log:
                 brain.log_msg(ts, key, link, obs.kind, obs.type, obs.count, rec.get("places"), rec.get("track"), seg)
+    trk.exclude = set()
     if not useful:
         trk.ingest(parser.parse(text, key), key, ts, link)
 
@@ -117,7 +133,7 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.8",
+        "version": "2026-11-01.9",
         "push_subs": pushsvc.count(),
         "brain": brain.stats(),
     }

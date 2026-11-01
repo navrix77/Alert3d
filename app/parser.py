@@ -12,7 +12,7 @@ TYPES = [
     ("molniya", re.compile(r"молни|молні")),
     ("kab", re.compile(r"(^|[^а-яіїє])каб|бомб|авиабомб|авіабомб|керован[аі] авіа")),
     ("cruise", re.compile(r"ракет|крилат|крылат|калибр|калібр|х-101|х-59|х-69|х-22|бандерол")),
-    ("shahed", re.compile(r"шахед|мопед|бпла|беспилот|безпілот|герань|гербер|дрон")),
+    ("shahed", re.compile(r"шахед|мопед|бпла|беспилот|безпілот|герань|гербер|дрон|(^|[^а-яіїє])ударн(ий|ик|і|их|ого)\b|(^|[^а-яіїє])ударн(ый|ые|ых)\b")),
 ]
 CLOSE = re.compile(r"не фиксир|не фіксу|отбой|відбій|чисто")
 # Безпека: роботу ППО та влучання не публікуємо далі
@@ -100,7 +100,7 @@ class Parser:
             out.append(f"{seg} ({header})" if header else seg)
         return out or [text]
 
-    def parse(self, text: str, channel: str | None = None) -> Observation:
+    def parse(self, text: str, channel: str | None = None, ctx: tuple[float, float] | None = None) -> Observation:
         t = norm(text)
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         m = COUNT.search(t)
@@ -158,7 +158,7 @@ class Parser:
                     role = "f"
                 found.append((role, ids))
             i += used
-        obs.places = self._disambiguate(found, bbox)
+        obs.places = self._disambiguate(found, bbox, ctx)
         mc = COURSE.search(t)
         if mc:
             g = mc.group(1) or mc.group(2)
@@ -186,13 +186,15 @@ class Parser:
                 obs.places.insert(0, PlaceRef("p", city))
         return obs
 
-    def _disambiguate(self, found, bbox) -> list[PlaceRef]:
+    def _disambiguate(self, found, bbox, ctx=None) -> list[PlaceRef]:
         P = self.gaz.places
         uniq = [P[ids[0]] for _, ids in found if len(ids) == 1]
         if uniq:
             cen = (sum(p.lat for p in uniq) / len(uniq), sum(p.lon for p in uniq) / len(uniq))
+            if ctx:  # контекст усього повідомлення / недавніх повідомлень каналу
+                cen = ((cen[0] + ctx[0]) / 2, (cen[1] + ctx[1]) / 2)
         else:
-            cen = KH
+            cen = ctx or KH
         out: list[PlaceRef] = []
         for role, ids in found:
             cand = ids
@@ -204,7 +206,9 @@ class Parser:
             def score(i: int) -> float:
                 p = P[i]
                 d = math.hypot((p.lat - cen[0]) * 111, (p.lon - cen[1]) * 73)
-                return d - math.log10(1 + p.pop) * 6
+                # місто (≥20 тис.) майже завжди важливіше за одноіменне село, якщо контекст прямо не вказує на село
+                city = (25 if ctx or uniq else 70) if p.pop >= 20000 else 0
+                return d - math.log10(1 + p.pop) * (3 if ctx else 6) - city
 
             best = min(cand, key=score)
             out.append(PlaceRef(role, P[best]))

@@ -111,7 +111,8 @@ fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};}).catch(()=>{
 /* ---------- позиція цілі в момент часу ---------- */
 function posAt(tr,serverT){
   if(tr.status!=='active')return {p:[tr.lon,tr.lat],hd:tr.hd};
-  const km=tr.speed*Math.max(0,serverT-tr.ts)/3600;
+  let km=tr.speed*Math.max(0,serverT-tr.ts)/3600;
+  if(!tr.route.length){const cap=tr.speed*4/60-tr.speed*Math.max(0,tr.ts-tr.last)/3600;km=Math.min(km,Math.max(0,cap));}
   const pts=[xy([tr.lon,tr.lat]),...tr.route.map(xy)];
   if(pts.length===1){if(tr.hd==null)return {p:[tr.lon,tr.lat],hd:tr.hd};const r=tr.hd*D2R;return {p:ll([pts[0][0]+Math.sin(r)*km,pts[0][1]+Math.cos(r)*km]),hd:tr.hd};}
   let acc=0;for(let i=1;i<pts.length;i++){const d=dist(pts[i-1],pts[i]);if(acc+d>=km){const f=(km-acc)/(d||1);const q=[pts[i-1][0]+(pts[i][0]-pts[i-1][0])*f,pts[i-1][1]+(pts[i][1]-pts[i-1][1])*f];return {p:ll(q),hd:brg(pts[i-1],pts[i])};}acc+=d;}
@@ -155,7 +156,7 @@ function frame(now){
         const n=parseInt(TYPE_COLOR[tr.type].slice(1),16);
         fx.push({id:tr.id,p:d.p,sa,hd:d.hd,type:tr.type,col:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],weak,thr:!!(rel&&rel.rel),sel:sel===tr.id,tail:dots});}
       const c=TYPE_COLOR[tr.type];
-      if(active)trails.push({type:'Feature',properties:{c,o:0.95},geometry:{type:'LineString',coordinates:[...tr.trail.slice(-3).map(t=>[t[0],t[1]]),d.p]}});
+      if(false)trails.push({type:'Feature',properties:{c,o:0.95},geometry:{type:'LineString',coordinates:[...tr.trail.slice(-3).map(t=>[t[0],t[1]]),d.p]}});
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.route.length)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
     }
     // каша геть: показуємо лише активні цілі; цілі одного типу, що на екрані лягають одна на одну, — один значок ×N

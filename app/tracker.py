@@ -73,7 +73,8 @@ class Track:
             return along(self.path(), km)
         if self.heading is None:
             return (self.last.x, self.last.y)
-        return move((self.last.x, self.last.y), self.heading, km)
+        # без названого пункту не «відводимо» ціль далеко: максимум ~4 хв польоту від останньої фіксації
+        return move((self.last.x, self.last.y), self.heading, min(km, self.speed * 4 / 60))
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:
@@ -108,6 +109,7 @@ class Tracker:
         self.log: list[dict] = []
         self.last_update = 0.0
         self.launches = LaunchBook(brain)
+        self.exclude: set[str] = set()
 
     # ---------------- прийом повідомлення
     def ingest(self, obs: Observation, src: str, t: float | None = None, link: str | None = None) -> dict:
@@ -175,6 +177,7 @@ class Tracker:
                 tr.route = route
             elif pt is not None:
                 tr.route = [p for p in tr.route if dist_km(p.xy, pt) > 3]
+            tr.route = [p for p in tr.route if dist_km(p.xy, (tr.last.x, tr.last.y)) > 1.5]
             if tr.route:
                 tr.heading = bearing((tr.last.x, tr.last.y), tr.route[0].xy)
             elif obs.course is not None:
@@ -188,7 +191,7 @@ class Tracker:
                 # немає поточного місця: ставимо ціль у найімовірніший попередній пункт (вивчено з історії),
                 # інакше — у сам пункт призначення з невідомим курсом
                 X = route[0]
-                prev = self.brain.prev_place(obs.type, X.name) if self.brain else None
+                prev = None  # оцінка «звідки» за статистикою ставила різні цілі в одну точку — вимкнено
                 if prev:
                     from .geo import to_xy
                     px, py = to_xy(prev[2], prev[3])
@@ -230,13 +233,17 @@ class Tracker:
         names = {p.name for p in route}
         best, bs = None, 1e9
         for tr in self.tracks:
-            if tr.type != typ or tr.closed or t - tr.last.t > TYPES[typ]["life"]:
+            if tr.type != typ or tr.closed or t - tr.last.t > TYPES[typ]["life"] or tr.id in self.exclude:
                 continue
             shared = names & ({p.name for p in tr.route} | ({tr.course_to} if tr.course_to else set()))
             e = tr.est(t)
             d = min(dist_km(e, p.xy) for p in route)
-            if not shared and d > 60:
-                continue
+            if not shared:
+                # нова ціль-пункт має бути попереду (за курсом) і досяжна приблизно за 15 хв
+                if d > min(35, tr.speed * 0.25 + 15):
+                    continue
+                if tr.heading is not None and not tr.last.est and d > 8 and ang_diff(tr.heading, bearing(e, route[0].xy)) > 75:
+                    continue
             s = d - (40 if shared else 0)
             if s < bs:
                 best, bs = tr, s
@@ -245,7 +252,7 @@ class Tracker:
     def _best(self, typ: str, pt, t: float, names: set | None = None) -> Track | None:
         best, bs = None, 1e9
         for tr in self.tracks:
-            if tr.type != typ or tr.closed:
+            if tr.type != typ or tr.closed or tr.id in self.exclude:
                 continue
             dt = t - tr.last.t
             if dt > TYPES[typ]["life"] * 1.2:
