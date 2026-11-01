@@ -272,6 +272,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="NAVRYX SKY", lifespan=lifespan)
+from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)  # geojson і скрипти стискаються в 3-5 разів
 
 
 @app.get("/api/state")

@@ -590,7 +590,7 @@ function flyP(p,z){map.flyTo({center:p,zoom:Math.max(map.getZoom(),z||7),essenti
 const TNAME_PL={shahed:'Шахеди',jet:'Реактивні шахеди',molniya:'«Молнії»',cruise:'Крилаті ракети',ballistic:'Балістика',kab:'КАБи'};
 /* ---------- мої громади й області для сповіщень ---------- */
 const NZLV=new Map();
-function myZones(){const Z=PREF.zones||{obl:[],hrom:[]};if(!Z.obl.length&&!Z.hrom.length&&home&&window.OBLPOLY){const o=window.OBLPOLY(home[0],home[1]);if(o)return {obl:[o],hrom:[],auto:true};}return Z;}
+function myZones(){const Z=PREF.nz||{obl:[],hrom:[]};if(!Z.obl.length&&!Z.hrom.length&&home&&window.OBLPOLY){const o=window.OBLPOLY(home[0],home[1]);if(o)return {obl:[o],hrom:[],auto:true};}return Z;}
 function ringIn(r,x,y){let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];if(((a[1]>y)!==(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/((b[1]-a[1])||1e-12)+a[0]))c=!c;}return c;}
 function geomIn(g,x,y){const P=g.type==='Polygon'?[g.coordinates]:g.coordinates;return P.some(p=>ringIn(p[0],x,y));}
 function zoneOf(p){const Z=myZones();if(Z.obl.length&&window.OBLPOLY){const o=window.OBLPOLY(p[0],p[1]);if(o&&Z.obl.includes(o))return o+' обл.';}
@@ -599,20 +599,20 @@ function loadHP(){if(HPDATA||HPLOADING)return Promise.resolve(HPDATA);HPLOADING=
 function renderZones(){const ul=$('#st-zones-list');if(!ul)return;const Z=myZones();ul.innerHTML='';
   if(Z.auto)ul.innerHTML='<li><span style="opacity:.75;font-weight:500">Зараз: '+esc(Z.obl[0])+' обл. (за домом). Додайте свої громади або області:</span></li>';
   else if(!Z.obl.length&&!Z.hrom.length)ul.innerHTML='<li><span style="opacity:.75;font-weight:500">Не обрано — сповіщення лише про пуски й про загрози біля дому/моїх місць</span></li>';
-  if(!Z.auto){Z.obl.forEach(o=>{const li=document.createElement('li');li.innerHTML='<span>🗺 '+esc(o)+' обл.</span><button>✕</button>';li.querySelector('button').onclick=()=>{Z.obl=Z.obl.filter(x=>x!==o);PREF.zones=Z;savePref();renderZones();};ul.appendChild(li);});
-    Z.hrom.forEach(h=>{const li=document.createElement('li');li.innerHTML='<span>📍 '+esc(h.n)+' громада <small style="opacity:.6">'+esc(h.o)+' обл.</small></span><button>✕</button>';li.querySelector('button').onclick=()=>{Z.hrom=Z.hrom.filter(x=>x.id!==h.id);PREF.zones=Z;savePref();renderZones();};ul.appendChild(li);});}}
+  if(!Z.auto){Z.obl.forEach(o=>{const li=document.createElement('li');li.innerHTML='<span>🗺 '+esc(o)+' обл.</span><button>✕</button>';li.querySelector('button').onclick=()=>{Z.obl=Z.obl.filter(x=>x!==o);PREF.nz=Z;savePref();renderZones();};ul.appendChild(li);});
+    Z.hrom.forEach(h=>{const li=document.createElement('li');li.innerHTML='<span>📍 '+esc(h.n)+' громада <small style="opacity:.6">'+esc(h.o)+' обл.</small></span><button>✕</button>';li.querySelector('button').onclick=()=>{Z.hrom=Z.hrom.filter(x=>x.id!==h.id);PREF.nz=Z;savePref();renderZones();};ul.appendChild(li);});}}
 {const inp=$('#st-zone-in'),dl=$('#st-zone-dl'),add=$('#st-zone-add');
   const fill=()=>loadHP().then(d=>{if(!dl||dl.childElementCount)return;const opts=[];(OBLF||[]).forEach(f=>opts.push(f.properties.n+' обл.'));if(d)d.features.forEach(f=>opts.push(f.properties.n+' громада ('+f.properties.r+' р-н, '+f.properties.o+' обл.)'));dl.innerHTML=opts.map(o=>'<option value="'+esc(o)+'">').join('');});
   if(inp){inp.addEventListener('focus',fill);
-    const doAdd=()=>{const v=inp.value.trim();if(!v)return;const Z=myZones().auto?{obl:[],hrom:[]}:(PREF.zones||{obl:[],hrom:[]});
+    const doAdd=()=>{const v=inp.value.trim();if(!v)return;const Z=myZones().auto?{obl:[],hrom:[]}:(PREF.nz||{obl:[],hrom:[]});
       let m=v.match(/^(.+?) обл\.$/);if(m&&(OBLF||[]).some(f=>f.properties.n===m[1])){if(!Z.obl.includes(m[1]))Z.obl.push(m[1]);}
       else{m=v.match(/^(.+?) громада \((.+?) р-н, (.+?) обл\.\)$/);const f=m&&HPDATA&&HPDATA.features.find(x=>x.properties.n===m[1]&&x.properties.r===m[2]&&x.properties.o===m[3]);
         if(!f){toast('Оберіть зі списку підказок');return;}if(!Z.hrom.some(h=>h.id===f.id))Z.hrom.push({id:f.id,n:f.properties.n,o:f.properties.o});}
-      PREF.zones=Z;savePref();inp.value='';renderZones();NZLV.clear();toast('Додано');};
+      PREF.nz=Z;savePref();inp.value='';renderZones();NZLV.clear();toast('Додано');};
     add.onclick=doAdd;inp.addEventListener('keydown',e=>{if(e.key==='Enter')doAdd();});}
   const cl=$('#st-nlaunch'),ca=$('#st-nall');if(cl){cl.checked=PREF.nLaunch!==false;cl.onchange=()=>{PREF.nLaunch=cl.checked;savePref();};}
   if(ca){ca.checked=!!PREF.nAll;ca.onchange=()=>{PREF.nAll=ca.checked;savePref();};}
-  setTimeout(renderZones,1500);if((PREF.zones||{}).hrom&&PREF.zones.hrom.length)loadHP();}
+  setTimeout(renderZones,1500);if((PREF.nz||{}).hrom&&PREF.nz.hrom.length)loadHP();}
 function notesCheck(s){
   const first=!NBASE;NBASE=true;const now=s.now||Date.now()/1000;
   // 1) пуски — за налаштуванням (типово так: пуск стосується всієї країни)
