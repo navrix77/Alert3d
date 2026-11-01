@@ -18,7 +18,7 @@
 
 <header class="top">
   <div class="counters" id="counters"></div>
-  <div class="asof" id="asof">з'єднання…</div>
+  <div class="asof" id="asof"><i class="live-dot wait"></i>Підключення…</div>
 </header>
 
 <div class="banner" id="banner" hidden></div>
@@ -54,7 +54,7 @@
 </div>
 
 <div class="drawer" id="drawer" hidden>
-  <div class="dr-head"><h2>Стрічка</h2><button class="round" id="dr-close" aria-label="Закрити">✕</button></div>
+  <div class="dr-head"><h2>Стрічка</h2><small id="dr-tech"></small><button class="round" id="dr-close" aria-label="Закрити">✕</button></div>
   <ul id="feed"></ul>
 </div>
 
@@ -72,6 +72,7 @@
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="icons.js"></script>
 <script src="models3d.js"></script>
+<script src="glow.js"></script>
 <script src="app.js"></script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
 </body>

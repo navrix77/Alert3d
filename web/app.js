@@ -72,6 +72,8 @@ function addOverlays(){
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':1,'icon-allow-overlap':true,'text-field':'Дім','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['has','next'],['==',['get','active'],true]],layout:{'text-field':['concat','→ ',['get','next']],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[3,7,3,7],'text-anchor':'left','text-offset':[1.9,0.9],'icon-allow-overlap':false,'text-allow-overlap':false,'text-optional':false,'symbol-sort-key':['get','sk']},paint:{'text-color':'#fff'}});
   const TGS=['interpolate',['linear'],['zoom'],4,0.55,7,0.85,9,1.15,12,1.55];
+  try{if(window.GlowLayer&&!map.getLayer('glow'))map.addLayer(window.GlowLayer);}catch(e){console.warn('glow',e);}
+  map.addLayer({id:'ra-glow',type:'line',source:'ra',paint:{'line-color':'#FF3B4E','line-width':['interpolate',['linear'],['zoom'],5,2,9,5],'line-blur':['interpolate',['linear'],['zoom'],5,2,9,5],'line-opacity':['case',['==',LV,2],0.5,0]}});
   map.addLayer({id:'tg-sh',type:'symbol',source:'targets',filter:['==',['get','active'],true],layout:{'icon-image':['concat','t-',['get','type'],'-sh'],'icon-rotate':['get','sa'],'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS},paint:{'icon-opacity':0.9,'icon-translate':[14,22],'icon-translate-anchor':'viewport'}});
   map.addLayer({id:'tg',type:'symbol',source:'targets',layout:{'icon-image':['concat','t-',['get','type'],['case',['get','active'],'','-d']],'icon-rotate':['get','sa'],'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS,'symbol-sort-key':['get','sk']},paint:{'icon-opacity':['case',['get','weak'],0.6,1]}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['>',['get','count'],1],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-offset':[1.3,-1.2],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
@@ -135,6 +137,10 @@ function frame(now){
       f._p=P;shown.push(f);}
     feats.length=0;feats.push(...shown);
     map.getSource('targets').setData({type:'FeatureCollection',features:feats});
+    {const thr=new Set(threats.map(x=>x.tr.id)),z=map.getZoom(),sz=Math.max(18,Math.min(70,10+z*5));
+     window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
+       return {p:f.geometry.coordinates,c:t?[1,0.23,0.27]:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],a:f.properties.weak?0.3:0.7,s:t?sz*1.9:sz,ring:t};});}
+    if(map.getLayer('ra-glow')&&now-(frame.rg||0)>90){frame.rg=now;const k=0.25+0.45*(0.5+0.5*Math.sin(now/520));map.setPaintProperty('ra-glow','line-opacity',['case',['==',['coalesce',['feature-state','lvl'],0],2],k,0]);}
     if(map.getSource('chains')&&now-(frame.ch||0)>500){frame.ch=now;const ch=[],ls=new Map();
       for(const L of (SNAP.launches||[]))ls.set(L.site,{type:'Feature',properties:{est:false,l:'ПУСК · '+L.site.replace(/ \(.*\)/,'')+' '+fmt(L.t)+(L.count?' ×'+L.count:'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
@@ -186,14 +192,18 @@ function renderCounters(){
   const act=SNAP.tracks.filter(t=>t.status==='active');const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+(t.count||1));
   const order=['shahed','jet','cruise','ballistic','molniya'];
   $('#counters').innerHTML='';
-  order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];const c=CNTI[t]||(CNTI[t]=drawTarget(t,28));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);const b=document.createElement('b');b.textContent=by[t];d.appendChild(b);$('#counters').appendChild(d);});
+  order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];const c=CNTI[t]||(CNTI[t]=drawTarget(t,28));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);const b=document.createElement('b');b.textContent=by[t];if(renderCounters.prev&&renderCounters.prev[t]!==by[t])b.className='pop';d.appendChild(b);$('#counters').appendChild(d);});
+  renderCounters.prev=by;
   if(!act.length){const d=document.createElement('div');d.className='cnt';d.innerHTML='<b style="font-size:16px">Цілей не видно</b>';$('#counters').appendChild(d);}
 }
 function renderAsOf(){
+  // для людей: лише «наживо» і час; технічні деталі — у стрічці
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
-  if(!SNAP||age>20){el.className='asof stale';el.innerHTML=SNAP?'Немає звʼязку <b>'+Math.round(age)+' с</b> · це не відбій':'зʼєднання…';return;}
-  const h=SNAP.health;el.className='asof'+((!h.telegram&&!h.replay)?' stale':'');
-  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.version?'':' · <b style="color:#F5B83D">стара версія сервера — перезапустіть start.bat</b>')+(h.replay?' · ДЕМО: записана ніч 29→30.10':(h.channels?' · наживо: '+h.channels.live+'/'+h.channels.channels+' каналів'+(h.channels.all_every?' (головні що '+Math.round(h.channels.fast_every)+' с, усі за '+h.channels.all_every+' с)':''):''))+(h.alerts?' · тривоги: '+esc((SNAP.official&&SNAP.official.source)||'✓'):' · офіційні тривоги недоступні');
+  if(!SNAP){el.className='asof';el.innerHTML='<i class="live-dot wait"></i>Підключення…';return;}
+  if(age>20){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Немає звʼязку '+Math.round(age)+' с — це не відбій';return;}
+  const h=SNAP.health,ok=h.telegram||h.replay;
+  el.className='asof'+(ok?'':' stale');
+  el.innerHTML='<i class="live-dot'+(ok?'':' wait')+'"></i>'+(h.replay?'Демо':ok?'Наживо':'Дані затримуються')+' · '+fmt(SNAP.now);
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
 let SHELTER=+(localStorage.getItem('shelter')||3);$('#me-sh').textContent=SHELTER;
@@ -222,10 +232,16 @@ function renderBanner(threats){
   threats.sort((a,b)=>(a.rel.eta??999)-(b.rel.eta??999));const t=threats[0];
   b.hidden=false;b.innerHTML=esc(TYPE_NAME[t.tr.type])+(t.tr.count>1?' ×'+t.tr.count:'')+' · '+(t.rel.rel==='route'?'маршрут проходить біля дому':'курс на твій район')+(t.rel.eta!=null?' · ~'+Math.max(1,Math.round(t.rel.eta))+' хв':'')+'<small>'+Math.round(t.rel.d)+' км '+t.rel.from+(threats.length>1?' · ще '+(threats.length-1):'')+'</small>';
   b.onclick=()=>openSheet(t.tr.id);
+  // кінематографічний переліт: нова загроза дому — камера плавно показує і дім, і ціль (якщо користувач не крутить карту)
+  renderBanner.seen=renderBanner.seen||new Set();
+  if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);const d=DISP.get(t.tr.id);
+    if(d&&home&&Date.now()-(window.__touch||0)>20000){const b2=new maplibregl.LngLatBounds(home,home).extend(d.p);
+      const cam=map.cameraForBounds(b2,{padding:{top:140,bottom:160,left:80,right:380}});if(cam)map.flyTo({...cam,zoom:Math.min(cam.zoom,10),pitch:tilt?55:20,bearing:tilt?-18:0,curve:1.5,speed:0.7,essential:true});}}
 }
+['mousedown','touchstart','wheel'].forEach(ev=>document.getElementById('map').addEventListener(ev,()=>window.__touch=Date.now(),{passive:true}));
 
 /* ---------- картка цілі ---------- */
-function openSheet(id){sel=id;follow=false;$('#sh-follow').classList.remove('on');$('#sh-follow').textContent='Стежити за ціллю';$('#sheet').hidden=false;fillSheet(true);const d=DISP.get(id);if(d)map.easeTo({center:d.p,zoom:Math.max(map.getZoom(),8.5),duration:600});}
+function openSheet(id){sel=id;follow=false;$('#sh-follow').classList.remove('on');$('#sh-follow').textContent='Стежити за ціллю';$('#sheet').hidden=false;fillSheet(true);const d=DISP.get(id);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),8.5),curve:1.3,speed:1.1,essential:true});}
 function fillSheet(first){
   const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr){$('#sheet').hidden=true;sel=null;return;}
   if(first||!fillSheet.icon||fillSheet.icon!==tr.type){const c=drawTarget(tr.type,40);$('#sh-icon').innerHTML='';$('#sh-icon').appendChild(c);fillSheet.icon=tr.type;}
@@ -257,6 +273,7 @@ $('#sh-follow').onclick=()=>{follow=!follow;$('#sh-follow').classList.toggle('on
 /* ---------- стрічка ---------- */
 function renderFeed(){
   const kindTxt={launch:'Пуск',filtered:'Повідомлення про роботу ППО або влучання приховано фільтром безпеки.',close:'Ціль більше не фіксується',zone:'Загроза КАБ',info:'Без географічної привʼязки'};
+  {const h=SNAP.health||{},c=h.channels||{};$('#dr-tech').textContent=(c.channels?'Канали: '+c.live+'/'+c.channels+(c.all_every?' · повний обхід '+c.all_every+' с':''):'')+(SNAP.official&&SNAP.official.source?' · тривоги: '+SNAP.official.source:'')+(h.version?'':' · стара версія сервера');}
   const LS=(SNAP.launches||[]).slice().reverse();
   const lh=LS.length?'<li class="launches"><div class="m"><span>Пуски за 6 год</span></div>'+LS.map(L=>'<div>'+fmt(L.t)+' · <b>'+esc(L.site)+'</b>'+(L.type?' · '+esc(TYPE_NAME[L.type]||L.type):'')+(L.count?' ×'+L.count:'')+(L.carrier?' · '+esc(L.carrier):'')+(L.tracks?' · цілей звідти: '+L.tracks:'')+'</div>').join('')+'</li>':'';
   $('#feed').innerHTML=lh+SNAP.log.slice().reverse().map(r=>{const src=SNAP.sources[r.src]?.name||r.src;
