@@ -58,8 +58,7 @@ const EMPTY={type:'FeatureCollection',features:[]};
 function addRelief(){
   // об'єм: рельєф (висоти Terrarium/AWS) + тіньовий відмив + 3D-будівлі в містах
   try{
-    if(!map.getSource('dem'))map.addSource('dem',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:13,attribution:'Рельєф: Mapzen/AWS Terrain'});
-    if(!map.getSource('dem-hs'))map.addSource('dem-hs',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:13});
+    if(!map.getSource('dem-hs'))map.addSource('dem-hs',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:12,attribution:'Рельєф: Mapzen/AWS Terrain'});
     const firstSym=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
     const night=base!=='map'&&document.documentElement.dataset.theme!=='day';
     if(!map.getLayer('hillshade'))map.addLayer({id:'hillshade',type:'hillshade',source:'dem-hs',paint:{'hillshade-exaggeration':night?0.55:0.4,'hillshade-shadow-color':night?'#000000':'#3a3328','hillshade-highlight-color':night?'rgba(150,170,210,.35)':'#ffffff','hillshade-accent-color':night?'#05070c':'#5a4a36','hillshade-illumination-direction':315}},firstSym);
@@ -100,7 +99,7 @@ function addOverlays(){
   map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':1,'icon-allow-overlap':true,'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':'#FFE36B','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addSource('xr',{type:'geojson',data:EMPTY});
   map.addLayer({id:'xr-dim',type:'background',layout:{visibility:'none'},paint:{'background-color':'#02040A','background-opacity':0.62}});
-  map.addLayer({id:'xr-edge',type:'line',source:'xr',filter:['==',['geometry-type'],'LineString'],layout:{visibility:'none','line-cap':'round'},paint:{'line-color':['match',['get','k'],'confirm','#34C759','copy','#8892A6','assume','#B48CFF','contra','#F5B83D','#fff'],'line-width':['match',['get','k'],'confirm',2.5,1.6],'line-dasharray':['match',['get','k'],'confirm',['literal',[1,0]],'copy',['literal',[1,2]],['literal',[2.5,2]]],'line-opacity':0.9}});
+  map.addLayer({id:'xr-edge',type:'line',source:'xr',filter:['all',['==',['geometry-type'],'LineString'],['==',['get','k'],'confirm']],layout:{visibility:'none','line-cap':'round'},paint:{'line-color':['match',['get','k'],'confirm','#34C759','copy','#8892A6','assume','#B48CFF','contra','#F5B83D','#fff'],'line-width':['match',['get','k'],'confirm',2.5,1.6],'line-opacity':0.9}});map.addLayer({id:'xr-edge2',type:'line',source:'xr',filter:['all',['==',['geometry-type'],'LineString'],['!=',['get','k'],'confirm']],layout:{visibility:'none','line-cap':'round'},paint:{'line-dasharray':[1.5,2],'line-color':['match',['get','k'],'confirm','#34C759','copy','#8892A6','assume','#B48CFF','contra','#F5B83D','#fff'],'line-width':['match',['get','k'],'confirm',2.5,1.6],'line-opacity':0.9}});
   map.addLayer({id:'xr-node',type:'circle',source:'xr',filter:['==',['geometry-type'],'Point'],layout:{visibility:'none'},paint:{'circle-radius':['match',['get','k'],'prim',7,'copy',4.5,'now',6,5],'circle-color':['match',['get','k'],'prim','#34C759','copy','#8892A6','dest','rgba(0,0,0,0)','now','rgba(180,140,255,.25)','#B48CFF'],'circle-stroke-color':['match',['get','k'],'prim','#C8FFD6','copy','#C9D2E3','dest','#F5B83D','now','#B48CFF','#E3D4FF'],'circle-stroke-width':['match',['get','k'],'dest',2,'now',2,1.5]}});
   map.addLayer({id:'xr-t',type:'symbol',source:'xr',filter:['all',['==',['geometry-type'],'Point'],['has','l']],minzoom:6.5,layout:{visibility:'none','text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-offset':[0,1.2],'text-anchor':'top','text-allow-overlap':false,'text-max-width':12},paint:{'text-color':['match',['get','k'],'prim','#B8FFCB','copy','#AEB6C6','dest','#FFD27A','#D9C8FF'],'text-halo-color':'#000','text-halo-width':1.5}});
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
@@ -397,7 +396,7 @@ $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолок
 $('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D) — без перспективних спотворень; у 3D лише коротша тінь
   if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
-function set3d(on,anim){tilt=on;flat3d(on);try{map.setTerrain(on&&map.getSource('dem')?{source:'dem',exaggeration:2.6}:null);}catch(e){}localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
+function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-daily').onclick=()=>{location.href='/daily.html';};
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
@@ -443,7 +442,7 @@ window.__openWidget=openWidget;
 /* ---------- «Рентген неба» ---------- */
 let XRAY=false;
 function setXray(on){XRAY=on;document.body.classList.toggle('xray',on);$('#b-xray').classList.toggle('on',on);$('#xr-legend').hidden=!on;
-  for(const id of ['xr-dim','xr-edge','xr-node','xr-t'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none');
+  for(const id of ['xr-dim','xr-edge','xr-edge2','xr-node','xr-t'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none');
   for(const id of ['holo','holo-top','ra-glow'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');
   syncXray();toast(on?'Рентген неба: повідомлення → підтвердження → припущення':'Звичайна карта');}
 $('#b-xray').onclick=()=>setXray(!XRAY);
