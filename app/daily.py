@@ -16,10 +16,83 @@ import time
 from pathlib import Path
 
 log = logging.getLogger("daily")
-VER = 3
+VER = 4
 OUT = Path(__file__).resolve().parent.parent / "data" / "daily"
-BOOM = re.compile(r"вибух|взрыв|прил[іеё]т|влучан|попадан|детонац|пожеж|ураж")
-NOT_BOOM = re.compile(r"збит|сбит|мінус|минус|ппо працю|пво работ|роботу ппо|роботою ппо|роботою пво|не фіксу|відбій|наслідки .* \d+ жовтня|історі")
+BOOM = re.compile(r"вибух|взрыв|прил[іеё]т|влучан|попадан|детонац|пожеж|уламк|обломк|пошкодж|поврежд|руйнув|зруйн|постраждал|пострадал|загинул|загибл|поранен")
+# лише робота ППО без жодних наслідків — не «приліт»
+PPO_ONLY = re.compile(r"збит|сбит|мінус|минус|ппо|пво|не фіксу|відбій|історі|рік тому|роковин")
+DAMAGE = re.compile(r"уламк|обломк|пошкодж|поврежд|руйнув|зруйн|постраждал|пострадал|загинул|загибл|поранен|пожеж|влучан|приліт|прил[её]т|попадан")
+NOT_BOOM = PPO_ONLY  # сумісність
+CAPITAL = {"Київська": "Київ", "Харківська": "Харків", "Сумська": "Суми", "Полтавська": "Полтава", "Дніпропетровська": "Дніпро",
+           "Запорізька": "Запоріжжя", "Одеська": "Одеса", "Миколаївська": "Миколаїв", "Херсонська": "Херсон", "Чернігівська": "Чернігів",
+           "Черкаська": "Черкаси", "Житомирська": "Житомир", "Вінницька": "Вінниця", "Хмельницька": "Хмельницький", "Львівська": "Львів",
+           "Волинська": "Луцьк", "Рівненська": "Рівне", "Тернопільська": "Тернопіль", "Івано-Франківська": "Івано-Франківськ",
+           "Чернівецька": "Чернівці", "Кіровоградська": "Кропивницький", "Донецька": "Краматорськ", "Закарпатська": "Ужгород"}
+
+
+def is_impact(low: str) -> bool:
+    if not BOOM.search(low):
+        return False
+    return bool(DAMAGE.search(low)) or not PPO_ONLY.search(low)
+
+
+async def crawl_impacts(t0: float, t1: float, parser, max_pages: int = 40) -> list[dict]:
+    """Повна історія ВСІХ каналів за добу (новини, міські й регіональні канали) — саме там пишуть «у Києві вибухи»,
+    «уламки впали», «пошкоджено». Сторінки t.me/s/…?before=, чемно й паралельно по 6 каналів."""
+    import httpx
+    from . import config
+    from .parser import CHANNEL_CITY
+    from .tg_web import UA, parse_page
+    reg_of = config.CHANNEL_REGION
+    found: list[tuple[float, str, str, str]] = []
+    sem = asyncio.Semaphore(6)
+
+    async def one(cli, key, user):
+        before = None
+        async with sem:
+            for _ in range(max_pages):
+                try:
+                    r = await cli.get(f"https://t.me/s/{user}" + (f"?before={before}" if before else ""))
+                    msgs = parse_page(r.text)
+                except Exception:  # noqa: BLE001
+                    return
+                if not msgs:
+                    return
+                for mid, ts, text in msgs:
+                    if t0 <= ts < t1 and is_impact((text or "").lower()):
+                        found.append((ts, text, key, f"https://t.me/{user}/{mid}"))
+                before = min(m[0] for m in msgs)
+                if min(m[1] for m in msgs) < t0:
+                    return
+                await asyncio.sleep(0.6)
+    async with httpx.AsyncClient(timeout=20, headers=UA, follow_redirects=True) as cli:
+        await asyncio.gather(*(one(cli, k, u) for k, u, *_ in config.CHANNELS))
+    booms: dict[str, dict] = {}
+    for ts, text, key, link in sorted(found):
+        low = text.lower()
+        try:
+            o = parser.parse(text, key)
+        except Exception:  # noqa: BLE001
+            continue
+        pl = [r.place for r in o.places if r.role in ("p", "t")][:2]
+        if not pl:
+            city = CHANNEL_CITY.get(key) or CAPITAL.get(reg_of.get(key, ""))
+            if city:
+                ids = parser.gaz.lookup(city)
+                if ids:
+                    pl = [max((parser.gaz.places[i] for i in ids), key=lambda q: q.pop)]
+        for p in pl:
+            if not (44 <= p.lat <= 52.5 and 22 <= p.lon <= 40.3):
+                continue
+            b = booms.setdefault(p.name, {"n": p.name, "lat": p.lat, "lon": p.lon, "c": 0, "t": int(ts), "last": 0, "srcs": set(), "links": []})
+            if ts - b["last"] > 600:  # одна подія = повідомлення різних каналів у межах 10 хв
+                b["c"] += 1
+            b["last"] = ts
+            b["srcs"].add(key)
+            if len(b["links"]) < 3:
+                b["links"].append(link)
+    return [{"n": b["n"], "lat": b["lat"], "lon": b["lon"], "c": b["c"], "t": b["t"], "src": len(b["srcs"]), "links": b["links"]}
+            for b in booms.values()]
 SHOT = re.compile(r"збито/подавлено\s+(\d+)")
 
 
@@ -96,7 +169,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
                 if nxt >= t0:
                     sample(nxt)
                 nxt += 60
-            if kind == "filtered" and ts >= t0 and text and BOOM.search(text.lower()) and not NOT_BOOM.search(text.lower()):
+            if kind == "filtered" and ts >= t0 and text and is_impact(text.lower()):
                 o = parser.parse(text, src)
                 pl = [r.place for r in o.places[:2]]
                 if not pl and src in CHANNEL_CITY:  # «Вибух» у міському каналі — це його місто
@@ -218,24 +291,55 @@ class Daily:
         self.push = push
         self.cache: dict[str, dict] = {}
         self.ready: str | None = None
+        self.crawling: set[str] = set()
         self.lock = asyncio.Lock()
         OUT.mkdir(parents=True, exist_ok=True)
 
     async def get(self, day: str) -> dict:
         f = OUT / f"{day}.json"
-        if day in self.cache and self.cache[day].get("v") == VER and (self.cache[day]["final"] or time.time() - self.cache[day]["built"] < 300):
-            return self.cache[day]
+        c = self.cache.get(day)
+        if c and c.get("v") == VER and ((c["final"] and (c.get("crawl") or day in self.crawling)) or time.time() - c["built"] < 300):
+            c["crawling"] = day in self.crawling
+            return c
         if f.exists():
             d = json.loads(f.read_text(encoding="utf-8"))
-            if d.get("v") == VER:
+            if d.get("v") == VER and d.get("crawl"):
                 self.cache[day] = d
                 return d
         async with self.lock:
             d = await build(day, *self.args)
+        old = self.cache.get(day)
+        if old and old.get("crawl"):  # уже зібрані вибухи з повної історії каналів
+            d["booms"], d["crawl"] = old["booms"], old["crawl"]
         self.cache[day] = d
-        if d["final"]:
+        if d["final"] and d.get("crawl"):
             f.write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        if not d.get("crawl") and day not in self.crawling:
+            self.crawling.add(day)
+            asyncio.create_task(self._crawl(day))
+        d["crawling"] = day in self.crawling
         return d
+
+    async def _crawl(self, day: str) -> None:
+        try:
+            t0, t1 = window(day)
+            got = await crawl_impacts(t0, min(t1, time.time()), self.args[2])
+            d = self.cache.get(day)
+            if d is not None:
+                merged = {b["n"]: b for b in d.get("booms", [])}
+                for b in got:  # повна історія точніша за живий журнал
+                    m = merged.get(b["n"])
+                    merged[b["n"]] = b if not m or b["c"] >= m["c"] else m
+                d["booms"] = sorted(merged.values(), key=lambda b: -b["c"])
+                d["crawl"] = int(time.time())
+                d["crawling"] = False
+                if d["final"]:
+                    (OUT / f"{day}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+                log.info("мапа доби %s: вибухи з історії каналів — %d місць", day, len(got))
+        except Exception:  # noqa: BLE001
+            log.exception("impacts crawl")
+        finally:
+            self.crawling.discard(day)
 
     async def run(self) -> None:
         """Щоранку о 09:00 (Київ) — збирає мапу минулої доби й сповіщає застосунки."""
@@ -246,6 +350,10 @@ class Daily:
                 f = OUT / f"{day}.json"
                 if not f.exists() or json.loads(f.read_text(encoding="utf-8")).get("v") != VER:
                     d = await self.get(day)
+                    for _ in range(90):  # до 15 хв чекаємо, поки зберуться вибухи з історії каналів
+                        if not self.crawling:
+                            break
+                        await asyncio.sleep(10)
                     log.info("мапа доби %s: %d цілей, %d вибухів", day, len(d["tracks"]), len(d["booms"]))
                     hour = (time.time() / 3600 + kyiv_offset(time.time())) % 24
                     if self.push and d["tracks"] and 9 <= hour < 12:  # пуш лише вранці, не вночі після перезапуску

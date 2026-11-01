@@ -328,3 +328,4 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 @media (max-width:640px){.holo-hud{bottom:calc(150px + env(safe-area-inset-bottom));right:12px}.holo-hud video{width:72px;height:54px}}
 #st-holo-mode button{padding:6px 10px;font-size:12px}
 .dr-daily{margin-left:auto;margin-right:8px;text-decoration:none;color:var(--fg);background:rgba(255,255,255,.1);border-radius:12px;padding:6px 10px;font-weight:600;font-size:13px;white-space:nowrap}
+@media (max-width:640px){.dock{gap:2px!important;padding:5px!important;max-width:calc(100vw - 12px)}.dock button{width:min(40px,calc((100vw - 50px) / 10))!important}.dock svg{width:20px;height:20px}}
