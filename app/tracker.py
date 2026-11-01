@@ -79,14 +79,23 @@ class Track:
                 pts.append(p.xy)
         return pts
 
-    def est(self, now: float) -> tuple[float, float]:
+    def est(self, now: float, cap_min: float = 4) -> tuple[float, float]:
         km = self.speed * max(0.0, now - self.last.t) / 3600
         if self.route:
-            return along(self.path(), km)
+            pts = self.path()
+            tot = sum(dist_km(pts[i - 1], pts[i]) for i in range(1, len(pts)))
+            if km <= tot or self.heading is None:
+                return along(pts, km)
+            # пункт пройдено — летить далі тим самим курсом, доки не з'явиться нове повідомлення
+            hd = bearing(pts[-2], pts[-1]) if len(pts) > 1 else self.heading
+            return move(pts[-1], hd, min(km - tot, self.speed * cap_min / 60))
         if self.heading is None:
             return (self.last.x, self.last.y)
-        # без названого пункту не «відводимо» ціль далеко: максимум ~4 хв польоту від останньої фіксації
-        return move((self.last.x, self.last.y), self.heading, min(km, self.speed * 4 / 60))
+        # для зіставлення повідомлень — лише ~4 хв польоту; для показу на карті — довше (зона невизначеності росте)
+        return move((self.last.x, self.last.y), self.heading, min(km, self.speed * cap_min / 60))
+
+
+SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:
@@ -411,7 +420,7 @@ class Tracker:
             status = "closed" if tr.closed else ("lost" if age > life else "active")
             if status != "active" and age > life + 900:
                 continue
-            ex, ey = tr.est(now) if status == "active" else (tr.last.x, tr.last.y)
+            ex, ey = tr.est(now, SHOW_MIN) if status == "active" else (tr.last.x, tr.last.y)
             lat, lon = from_xy(ex, ey)
             km = tr.speed * min(age, life) / 3600
             rest = []

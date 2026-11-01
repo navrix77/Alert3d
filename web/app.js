@@ -133,11 +133,15 @@ fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};}).catch(()=>{
 function posAt(tr,serverT){
   if(tr.status!=='active')return {p:[tr.lon,tr.lat],hd:tr.hd};
   let km=tr.speed*Math.max(0,serverT-tr.ts)/3600;
-  if(!tr.route.length){const cap=tr.speed*4/60-tr.speed*Math.max(0,tr.ts-tr.last)/3600;km=Math.min(km,Math.max(0,cap));}
+  const SHOW=25;// хв: ціль рухається курсом, доки не прийде нове повідомлення (зона «де може бути» росте)
+  const cap=Math.max(0,tr.speed*SHOW/60-tr.speed*Math.max(0,tr.ts-tr.last)/3600);
+  if(!tr.route.length)km=Math.min(km,cap);
   const pts=[xy([tr.lon,tr.lat]),...tr.route.map(xy)];
   if(pts.length===1){if(tr.hd==null)return {p:[tr.lon,tr.lat],hd:tr.hd};const r=tr.hd*D2R;return {p:ll([pts[0][0]+Math.sin(r)*km,pts[0][1]+Math.cos(r)*km]),hd:tr.hd};}
   let acc=0;for(let i=1;i<pts.length;i++){const d=dist(pts[i-1],pts[i]);if(acc+d>=km){const f=(km-acc)/(d||1);const q=[pts[i-1][0]+(pts[i][0]-pts[i-1][0])*f,pts[i-1][1]+(pts[i][1]-pts[i-1][1])*f];return {p:ll(q),hd:brg(pts[i-1],pts[i])};}acc+=d;}
-  return {p:ll(pts[pts.length-1]),hd:tr.hd};
+  // пункт пройдено — далі тим самим курсом
+  const n=pts.length,h=brg(pts[n-2],pts[n-1]),r=h*D2R,ex=Math.min(km-acc,cap);
+  return {p:ll([pts[n-1][0]+Math.sin(r)*ex,pts[n-1][1]+Math.cos(r)*ex]),hd:h};
 }
 function homeRel(tr,p){
   if(!home)return null;const H=xy(home),P=xy(p);const d=dist(H,P);
