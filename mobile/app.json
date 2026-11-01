@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Тривога",
+    "slug": "tryvoga",
+    "scheme": "tryvoga",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#07090E",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#07090E"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ua.tryvoga.mobile",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        },
+        "NSLocalNetworkUsageDescription": "«Тривога» підключається до вашого сервера в локальній мережі Wi‑Fi."
+      }
+    },
+    "android": {
+      "package": "ua.tryvoga.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#07090E",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["VIBRATE", "POST_NOTIFICATIONS"],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-notifications",
+        {
+          "color": "#C8102E"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-dev-client"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

@@ -9,5 +9,5 @@ set REPLAY=
 set REPLAY_FROM_MIN=
 start "" http://localhost:8090
 echo Тривога (оновлення коду підхоплюються автоматично): живий моніторинг каналів і офіційних тривог. http://localhost:8090  (закрити - Ctrl+C)
-python -m uvicorn app.main:app --port 8090 --reload --reload-dir app
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8090 --reload --reload-dir app
 pause
