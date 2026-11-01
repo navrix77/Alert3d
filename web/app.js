@@ -269,8 +269,8 @@ $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Mat
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
 $('#b-layers').onclick=()=>{setBase(base==='sat'?'map':'sat');toast(base==='sat'?'Супутник':'Карта');};
-function flat3d(on){for(const id of ['tg','tg-sh']){if(!map.getLayer(id))continue;map.setLayoutProperty(id,'icon-rotate',on?['get','hd']:['get','sa']);map.setLayoutProperty(id,'icon-rotation-alignment',on?'map':'viewport');map.setLayoutProperty(id,'icon-pitch-alignment',on?'map':'viewport');}
-  if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[5,9]:[14,22]);map.setPaintProperty('tg-sh','icon-translate-anchor',on?'map':'viewport');map.setPaintProperty('tg-sh','icon-opacity',on?0.55:0.9);}}
+function flat3d(on){// значок завжди «дивиться» на екран (як у 2D) — без перспективних спотворень; у 3D лише коротша тінь
+  if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
 function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
