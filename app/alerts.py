@@ -24,6 +24,7 @@ class OfficialAlerts:
         self.ok = False
         self.error: str | None = None
         self.raion_levels: dict[str, int] = {}
+        self.hromada_levels: dict[int, int] = {}
         self.points: list[list] = []
         self.source = ""
 
@@ -141,6 +142,7 @@ class OfficialAlerts:
         sec = md[i:j if j > i else None]
         obl: dict[str, int] = {}
         areas: dict[str, int] = {}
+        area_obl: dict[str, str] = {}
         hrom = self._hromadas()
         for m in self.LINE.finditer(sec):
             name, rest = m.group(1).strip(), m.group(2)
@@ -155,8 +157,10 @@ class OfficialAlerts:
                 log.warning("alerts.in.ua: не розібрав райони для %s", name)
             for uk, lv in got:
                 areas[uk] = max(areas.get(uk, 0), lv)
+                area_obl[uk] = name
         raions: dict[str, int] = {}
         points: list[list] = []
+        hrom_poly: dict[int, int] = {}
         ap = lambda x: x.replace("’", "'").replace("ʼ", "'")
         rmap = {ap(r): r for r in hrom["_raions"]}
         for uk, lv in areas.items():
@@ -165,23 +169,63 @@ class OfficialAlerts:
                 raions[r] = max(raions.get(r, 0), lv)
             else:
                 key = uk.replace("м. ", "").strip()
+                # справжні межі громади (а не коло): назва громади або місто → його громада, у межах цієї області
+                ids = self.hromada_ids(key, area_obl.get(uk), uk.startswith("м. "))
+                if ids:
+                    for i in ids:
+                        hrom_poly[i] = max(hrom_poly.get(i, 0), lv)
                 hit = hrom.get(key)
                 if hit:
                     for lat, lon, ra in hit:
-                        points.append([lon, lat, uk, lv])
+                        points.append([lon, lat, uk, lv, 1 if ids else 0])
                 else:
                     from .geo import Gazetteer, norm
                     g = Gazetteer.load()
-                    ids = g.idx.get(norm(key)) or g.lookup(key)
-                    if ids:
-                        p = max((g.places[i] for i in ids), key=lambda q: q.pop)
-                        points.append([p.lon, p.lat, uk, lv])
+                    gids = g.idx.get(norm(key)) or g.lookup(key)
+                    if gids:
+                        p = max((g.places[i] for i in gids), key=lambda q: q.pop)
+                        points.append([p.lon, p.lat, uk, lv, 1 if ids else 0])
         self.oblast_levels, self.raion_levels, self.points = obl, raions, points
+        self.hromada_levels = hrom_poly
         self.raions = sorted(raions)
         self.updated, self.ok, self.error = time.time(), True, None
         self.source = "alerts.in.ua (відкрите зведення)"
 
     _H = None
+    _HP = None
+
+    @classmethod
+    def hromada_ids(cls, key: str, obl: str | None, city: bool) -> list[int]:
+        if cls._HP is None:
+            import json
+            from pathlib import Path
+            d = Path(__file__).resolve().parent.parent / "data"
+            try:
+                fc = json.loads((d / "hromadas.geojson").read_text(encoding="utf-8"))
+                ch = json.loads((d / "city_hromada.json").read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                fc, ch = {"features": []}, {}
+            q = lambda x: x.replace("’", "'").replace("ʼ", "'")
+            idx: dict[tuple, list[int]] = {}
+            for f in fc["features"]:
+                p = f["properties"]
+                idx.setdefault((q(p["n"]), p["o"]), []).append(f["id"])
+                idx.setdefault((q(p["n"]), q(p["r"]), p["o"]), []).append(f["id"])
+            ch = {q(k): [[q(h), q(r), o] for h, r, o in v] for k, v in ch.items()}
+            cls._HP = (idx, ch)
+        idx, ch = cls._HP
+        ap = lambda x: x.replace("’", "'").replace("ʼ", "'")
+        k = ap(key.replace(" територіальна громада", "").replace(" громада", "").strip())
+        out: list[int] = []
+        if not city:
+            out = idx.get((k, obl), []) if obl else []
+        if not out:
+            for h, r, o in ch.get(k, []):
+                if not obl or o == obl:
+                    out += idx.get((h, r, o), [])
+            if len({*out}) > 1 and not obl:
+                out = []  # тезки в різних областях — краще коло, ніж чужа громада
+        return sorted(set(out))
 
     @classmethod
     def _hromadas(cls) -> dict:
@@ -226,7 +270,7 @@ class OfficialAlerts:
             r.raise_for_status()
             st = r.json().get("states", {})
             self.oblast_levels = {self.short(k): 1 for k, v in st.items() if v.get("alertnow") and k != "Севастополь"}
-            self.raion_levels, self.points = {}, []
+            self.raion_levels, self.points, self.hromada_levels = {}, [], {}
             self.updated, self.ok, self.error = time.time(), True, None
             self.source = "ubilling (лише області)"
         except Exception as e:  # noqa: BLE001
@@ -278,5 +322,5 @@ class OfficialAlerts:
                 rl[r] = max(rl.get(r, 0), lvl)
             else:
                 rl.pop(r, None)
-        return {"levels": self.oblast_levels, "raions": sorted(rl), "raion_levels": rl, "points": self.points,
+        return {"levels": self.oblast_levels, "raions": sorted(rl), "raion_levels": rl, "points": self.points, "hromadas": self.hromada_levels,
                 "updated": self.updated, "ok": self.ok, "error": self.error, "source": self.source}
