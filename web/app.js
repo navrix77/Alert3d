@@ -23,7 +23,7 @@ const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,ka
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
 const INTRO=!sessionStorage.getItem('intro');
-const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[27,46]:[32.2,48.4],zoom:INTRO?3.1:5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65});window.tryvogaMap=map;
+const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65});window.tryvogaMap=map;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
@@ -149,13 +149,24 @@ function addOverlays(){
 }
 map.on('style.load',addOverlays);
 // кінематографічне інтро: з космосу — на Україну вночі, поки збираються дані
-let introDone=false;function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
-  const cam={center:home||[32.2,48.4],zoom:home?7.6:5.6,pitch:52,bearing:-14};
-  if(skip||!INTRO){if(el)el.remove();if(INTRO)map.jumpTo(cam);return;}
-  setTimeout(()=>el&&el.classList.add('out'),1900);setTimeout(()=>el&&el.remove(),3200);
-  map.flyTo({...cam,duration:5600,curve:1.65,essential:true});window.__introAt=Date.now();tilt=true;}
-map.once('idle',()=>setTimeout(()=>introFly(false),INTRO?700:0));
-setTimeout(()=>introFly(false),6000);
+let introDone=false,introT0=Date.now();if(INTRO)document.body.classList.add('intro');
+function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
+  const mob=innerWidth<640;
+  const cam={center:home||[31.4,48.6],zoom:home?(mob?7:7.6):(mob?4.75:5.6),pitch:mob?42:52,bearing:-14};
+  const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
+    ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
+  if(skip||!INTRO){if(el)el.remove();if(INTRO)map.jumpTo(cam);finish();return;}
+  // поки летимо — без підписів пусків і цілей (каша), вони з'являються в кінці польоту
+  ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
+  const wait=Math.max(0,2300-(Date.now()-introT0));   // логотип встигає зіграти
+  setTimeout(()=>{el&&el.classList.add('out');map.flyTo({...cam,duration:4200,curve:1.4,essential:true});window.__introAt=Date.now();tilt=true;
+    setTimeout(finish,2600);setTimeout(()=>el&&el.remove(),1800);},wait);}
+// живий статус у заставці
+{let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
+  if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;
+    st.textContent=(c.channels?c.live+' з '+c.channels+' джерел наживо · ':'')+(act?act+' цілей у небі':'небо поки чисте');}else st.textContent=['Підключаюсь до джерел…','Читаю монітори…','Збираю картину неба…'][n%3];},450);}
+map.once('idle',()=>introFly(false));
+setTimeout(()=>introFly(false),7000);
 {const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
 map.on('click',e=>{if(!setHomeMode)return;const f=map.queryRenderedFeatures(e.point,{layers:['tg-hit']});if(f.length)return;home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));setHomeMode=false;$('#b-home').classList.remove('on');syncHome();toast('Дім збережено');});
 fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};}).catch(()=>{}).finally(()=>setBase(base==='__init'?'night':base));
