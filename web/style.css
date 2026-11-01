@@ -310,3 +310,20 @@ body.xray .me{opacity:.85}
 .sheet .grip{top:-10px}
 .sheet .sh-head{top:-4px;background:var(--glass-strong,rgba(18,22,32,.85));margin:0 -18px;padding:6px 18px 8px;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
 @media (max-width:640px){.ev-list{max-height:none;overflow:visible}}
+
+/* ---------- Голостіл ---------- */
+.beta{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#C77DFF;border:1px solid rgba(199,125,255,.5);border-radius:6px;padding:1px 5px;margin-left:6px;vertical-align:middle}
+.holo-hud{position:fixed;left:12px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:8;display:flex;align-items:center;gap:10px;padding:8px;border-radius:16px;color:var(--fg);
+  background:var(--glass-strong,rgba(18,22,32,.7));border:1px solid var(--rim,rgba(255,255,255,.16));-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.holo-hud video{width:96px;height:72px;object-fit:cover;border-radius:10px;transform:scaleX(-1);background:#000}
+.holo-hud .hh-txt{display:flex;flex-direction:column;font-size:12px;max-width:170px}.holo-hud .hh-txt b{font-size:13px}.holo-hud .hh-txt span{color:var(--mute)}
+.holo-hud .hh-btn{display:flex;flex-direction:column;gap:6px}
+.holo-hud button{border:0;border-radius:10px;padding:6px 9px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.12);color:var(--fg)}
+.holo-cur{position:fixed;left:-22px;top:-22px;width:44px;height:44px;z-index:9;pointer-events:none;transition:opacity .2s}
+.holo-cur i{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,255,255,.85);box-shadow:0 0 18px rgba(120,190,255,.8);transition:transform .15s,border-color .15s}
+.holo-cur.pin i{transform:scale(.55);border-color:#2FE38A;box-shadow:0 0 22px #2FE38A}
+.holo-cur span{position:absolute;left:50%;top:48px;transform:translateX(-50%);font-size:11px;font-weight:700;white-space:nowrap;color:#2FE38A;opacity:0;text-shadow:0 1px 3px #000}
+.holo-cur.pin span{opacity:1}
+body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
+@media (max-width:640px){.holo-hud{bottom:calc(150px + env(safe-area-inset-bottom));right:12px}.holo-hud video{width:72px;height:54px}}
+#st-holo-mode button{padding:6px 10px;font-size:12px}

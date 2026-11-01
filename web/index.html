@@ -86,6 +86,10 @@
     <label class="sw"><input type="checkbox" id="st-ru"><span>Наші удари: куди летіли дрони й що уражено <small>(заяви МО РФ і Генштабу ЗСУ, постфактум)</small></span></label>
     <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>
     <label class="sw"><input type="checkbox" id="st-zones"><span>Зони КАБ</span></label></section>
+  <section><h3>Голостіл <small class="beta">експеримент</small></h3>
+    <label class="sw"><input type="checkbox" id="st-holo"><span>Екран як вікно в об'ємну карту</span></label>
+    <div class="row"><span>Керування</span><div class="seg small" id="st-holo-mode"><button data-v="cam">Камера: голова й руки</button><button data-v="tilt">Нахил телефона</button></div></div>
+    <p class="note">Камера: зсуньте голову — побачите макет з іншого боку; наблизьтеся — ближче. Зведіть великий і вказівний пальці — «захопили» карту й тягнете; двома руками — масштаб і поворот. Відео обробляється лише на цьому пристрої й нікуди не надсилається. На телефоні камера працює через адресу https з :8443.</p></section>
   <section><h3>Віджет для Windows</h3><button class="pill" id="st-widget">Віджет поверх усіх вікон</button>
     <p class="note">Маленьке вікно з вашим станом («Над вами чисто» / хвилини до загрози), яке завжди поверх інших програм. Щоб запускати віджет окремо від браузера — файл widget.bat у теці «Тривоги».</p></section>
   <section><h3>Відкрити на телефоні</h3><div class="qr-wrap"><div id="st-qr"></div><div><p class="note">Телефон у тій самій Wi‑Fi — наведіть камеру на код (адреса https://…:8443). Телефон один раз попередить про «незахищене з'єднання» — це ваш власний сертифікат: «Додатково → Перейти». Після цього працює і «Небо в камері». Потім «Поділитися → На початковий екран».</p><div id="st-urls" class="urls"></div></div></div></section>
@@ -111,6 +115,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="fx.js"></script>
 <script src="app.js"></script>
+<script src="holo.js"></script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>
