@@ -62,6 +62,7 @@ class Track:
     srcs: set[str] = field(default_factory=set)
     from_place: Place | None = None
     course_to: str | None = None
+    course_xy: tuple | None = None
     credited: set[str] = field(default_factory=set)
     evidence: list = field(default_factory=list)  # [{t, src, link, text, why, dest, pos, key}]
     pred_src: str | None = None
@@ -256,6 +257,12 @@ class Tracker:
         tr.srcs.add(src)
         if course_to:
             tr.course_to = course_to
+            tr.course_xy = route[-1].xy if route else None
+        elif pt is not None and tr.course_xy is not None:
+            # нова позиція без нового пункту: старе «→ X» лишаємо, лише якщо X досі попереду
+            d_c = dist_km(pt, tr.course_xy)
+            if d_c < 8 or (tr.heading is not None and abs((bearing(pt, tr.course_xy) - tr.heading + 540) % 360 - 180) > 100):
+                tr.course_to, tr.course_xy = None, None
         if obs.count:
             tr.count = max(tr.count or 0, obs.count) if t - tr.obs[0].t < 900 else obs.count
         rec["track"] = tr.id
