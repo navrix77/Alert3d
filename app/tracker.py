@@ -190,6 +190,10 @@ class Tracker:
                         tr.heading = bearing((prev.x, prev.y), X.xy)
                     route = route[1:]
             if route:
+                # пункт, до якого понад годину польоту, — це тезка з іншого кінця країни, не маршрут цієї цілі
+                here = tr.est(t)
+                route = [p for p in route if dist_km(here, p.xy) <= min(tr.speed * 1.0 + 60, 260 if tr.type == "shahed" else 900)]
+            if route:
                 # ціль змінила пункт призначення: послідовність «курсом на A» → «курсом на B» теж маршрут
                 old = tr.route[0] if tr.route else None
                 if self.brain and self.learn and old and old.name not in names:
