@@ -5,14 +5,14 @@
   const VS = `
     attribute vec2 a_merc; attribute vec2 a_corner; attribute vec2 a_off; attribute float a_size; attribute float a_rot;
     attribute vec4 a_col; attribute float a_kind;
-    uniform mat4 u_m; uniform vec2 u_vp;
+    uniform mat4 u_m; uniform vec2 u_vp; uniform float u_px;
     varying vec2 v_c; varying vec4 v_col; varying float v_kind;
     void main(){
-      vec4 p = u_m * vec4(a_merc, 0.0, 1.0);
+      // усе лежить у площині карти: кут — географічний курс (0 = північ), розмір — у пікселях на поточному масштабі
       float c = cos(a_rot), s = sin(a_rot);
-      vec2 k = vec2(a_corner.x * c + a_corner.y * s, -a_corner.x * s + a_corner.y * c);
-      p.xy += (k * a_size + a_off) * 2.0 / u_vp * p.w;
-      gl_Position = p; v_c = a_corner; v_col = a_col; v_kind = a_kind;
+      vec2 k = vec2(a_corner.x * c + a_corner.y * s, a_corner.x * s - a_corner.y * c);
+      vec2 m = a_merc + (k * a_size + a_off) * u_px;
+      gl_Position = u_m * vec4(m, 0.0, 1.0); v_c = a_corner; v_col = a_col; v_kind = a_kind;
     }`;
   const FS = `
     precision mediump float;
@@ -55,7 +55,7 @@
       this.p = p; this.buf = gl.createBuffer();
       const A = n => gl.getAttribLocation(p, n), U = n => gl.getUniformLocation(p, n);
       this.a = { merc: A('a_merc'), corner: A('a_corner'), off: A('a_off'), size: A('a_size'), rot: A('a_rot'), col: A('a_col'), kind: A('a_kind') };
-      this.u = { m: U('u_m'), vp: U('u_vp'), t: U('u_t'), tex: U('u_tex') };
+      this.u = { m: U('u_m'), vp: U('u_vp'), t: U('u_t'), tex: U('u_tex'), px: U('u_px') };
       for (const t of Object.keys(window.TYPE_COLOR)) {
         const img = new Image(); img.onload = () => {
           const tx = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tx);
@@ -109,6 +109,7 @@
       gl.useProgram(this.p);
       gl.uniformMatrix4fv(this.u.m, false, M);
       gl.uniform2f(this.u.vp, gl.drawingBufferWidth / devicePixelRatio, gl.drawingBufferHeight / devicePixelRatio);
+      gl.uniform1f(this.u.px, 1 / (512 * Math.pow(2, z)));
       gl.uniform1f(this.u.t, (performance.now() - this.t0) / 1000);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE);                       // адитивне світло
@@ -118,8 +119,8 @@
       for (const f of L) {
         const tx = this.tex[f.type]; if (!tx) continue;
         gl.bindTexture(gl.TEXTURE_2D, tx);
-        const r = (f.sa || 0) * Math.PI / 180, a = f.weak ? 0.6 : 1;
-        const q = [[f._m[0], f._m[1], spr, r, [1, 1, 1, a], 4, 0, 0, spr * 0.28, -spr * 0.42],
+        const r = (f.hd || 0) * Math.PI / 180, a = f.weak ? 0.6 : 1;
+        const q = [[f._m[0], f._m[1], spr, r, [1, 1, 1, a], 4, 0, 0, spr * 0.12, spr * 0.18],
                    [f._m[0], f._m[1], spr, r, [1, 1, 1, a], 3]];
         this.draw(gl, this.quads(q), 2);
       }
