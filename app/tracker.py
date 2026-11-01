@@ -20,7 +20,7 @@ from .launch import LaunchBook
 from .parser import Observation
 
 TYPES = {
-    "shahed": {"label": "Ш", "name": "Шахед/Гербера", "speed": 170, "life": 40 * 60},
+    "shahed": {"label": "Ш", "name": "Шахед/Гербера", "speed": 170, "life": 25 * 60},
     "jet": {"label": "РБ", "name": "Реактивний БпЛА", "speed": 450, "life": 15 * 60},
     "molniya": {"label": "М", "name": "«Молнія»", "speed": 120, "life": 20 * 60},
     "cruise": {"label": "КР", "name": "Крилата ракета", "speed": 800, "life": 8 * 60},
