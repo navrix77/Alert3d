@@ -38,7 +38,13 @@ def extract(doc: dict) -> dict:
         # DeepState пише координати як [lon, lat, 0] — третю складову прибираємо
         def strip(c):
             return [strip(x) for x in c] if isinstance(c[0], list) else c[:2]
-        feats.append({"type": "Feature", "properties": {"k": kind}, "geometry": {"type": g["type"], "coordinates": strip(g["coordinates"])}})
+        coords = strip(g["coordinates"])
+        ring = coords[0] if g["type"] == "Polygon" else coords[0][0]
+        clon = sum(p[0] for p in ring) / len(ring)
+        clat = sum(p[1] for p in ring) / len(ring)
+        if not (22 <= clon <= 40.5 and 44 <= clat <= 52.5):
+            continue  # лише Україна (відкидаємо Грузію, Молдову тощо, хоч би як вони були підписані)
+        feats.append({"type": "Feature", "properties": {"k": kind}, "geometry": {"type": g["type"], "coordinates": coords}})
     return {"type": "FeatureCollection", "features": feats, "properties": {"source": "DeepStateMap", "date": doc.get("datetime"), "fetched": int(time.time())}}
 
 
