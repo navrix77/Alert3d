@@ -369,7 +369,7 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;const agg=new Map();
     if(e.t>=a.t){a.t=e.t;a.per=PER(e.period);a.tot=e.total;a.nr=e.regions.length;}a.c+=r.cnt||0;agg.set(r.n,a);}
   // це НЕ пуски по Україні: це наші дрони над РФ, які МО РФ заявило «збитими» (постфактум)
   map.getSource('ru').setData({type:'FeatureCollection',features:[...agg.values()].map(a=>({type:'Feature',properties:{c:Math.min(12,a.c/4||3),
-    l:'Наші дрони над '+a.n.replace(' обл.',' обл.')+'\nМО РФ: '+(a.c?'збито '+a.c:'усього '+a.tot+' над '+a.nr+' регіонами')+(a.per?' · '+a.per:'')+' · '+fmt(a.t)},geometry:{type:'Point',coordinates:[a.lon,a.lat]}}))});}
+    l:'Наші дрони над '+a.n.replace(/(ськ|цьк|зьк)а обл\./,'$1ою обл.').replace(/ий край/,'им краєм').replace('Москва й область','Москвою й областю').replace(/ море$/,' морем').replace(/^(Татарстан|Крим)/,'$1ом').replace(/^Чувашія$/,'Чувашією').replace(/^Мордовія$/,'Мордовією').replace(/^Калмикія$/,'Калмикією')+'\nМО РФ: '+(a.c?'збито '+a.c:'усього '+a.tot+' над '+a.nr+' регіонами')+(a.per?' · '+a.per:'')+' · '+fmt(a.t)},geometry:{type:'Point',coordinates:[a.lon,a.lat]}}))});}
 setInterval(syncRu,5000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};
