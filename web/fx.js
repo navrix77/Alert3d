@@ -18,6 +18,10 @@
     precision mediump float;
     uniform float u_t; uniform sampler2D u_tex; uniform float u_pass;
     varying vec2 v_c; varying vec4 v_col; varying float v_kind;
+    float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+    float fbm(vec2 p){ return vn(p) * 0.55 + vn(p * 2.1 + 1.7) * 0.3 + vn(p * 4.3 + 3.9) * 0.15; }
     void main(){
       float r = length(v_c);
       if (v_kind < 0.5) {                       // ореол / крапля хвоста
@@ -30,15 +34,30 @@
         for (int i = 0; i < 2; i++) { float ph = fract(u_t * 0.5 + float(i) * 0.5);
           a += smoothstep(0.045, 0.0, abs(r - ph)) * (1.0 - ph); }
         a *= v_col.a; gl_FragColor = vec4(v_col.rgb * a, a);
-      } else if (v_kind > 5.5) {                // полум'я з сопла реактивного шахеда: тремтить і пульсує
-        float d = (0.95 - v_c.y) / 1.95;            // 0 — сопло, 1 — кінчик язика
+      } else if (v_kind > 5.5) {                // реактивний струмінь: ядро з «діамантами» Маха, турбулентний факел, мерехтіння
+        float d = (0.95 - v_c.y) / 1.95;            // 0 — зріз сопла, 1 — кінець квадрата
         if (d < 0.0 || d > 1.0) discard;
-        float fl = 0.5 + 0.5 * sin(u_t * 37.0 + v_col.a * 50.0) * sin(u_t * 23.0);
-        float L = 0.62 + 0.3 * fl;
-        float w = 0.42 * pow(max(0.0, 1.0 - d / L), 0.55) * (1.0 + 0.18 * sin(d * 18.0 - u_t * 45.0));
-        float a = smoothstep(w, w * 0.25, abs(v_c.x + 0.06 * sin(d * 9.0 - u_t * 30.0) * d)) * smoothstep(L, L * 0.5, d);
-        vec3 col = mix(vec3(1.0, 0.97, 0.8), mix(vec3(1.0, 0.55, 0.1), vec3(0.95, 0.15, 0.05), smoothstep(0.35, 0.9, d / L)), smoothstep(0.05, 0.35, d / L));
-        gl_FragColor = vec4(col * a, a);
+        float sd = v_col.a * 37.0;
+        float tt = u_t + sd;
+        float fl = 0.5 + 0.5 * sin(tt * 31.0) * sin(tt * 17.3 + 1.3);
+        float L = 0.78 + 0.14 * fl;                  // довжина факела «дихає»
+        float q = d / L;
+        float n1 = fbm(vec2(v_c.x * 7.0, d * 9.0 - tt * 16.0));
+        float n2 = fbm(vec2(v_c.x * 13.0 + 3.1, d * 17.0 - tt * 27.0));
+        float x = abs(v_c.x + (n1 - 0.5) * 0.10 * q);
+        // зовнішній факел: від сопла трохи розширюється, далі звужується й рветься на язики
+        float w = 0.17 * (1.0 + 0.9 * smoothstep(0.0, 0.35, q)) * pow(max(0.0, 1.0 - q), 0.75) * (0.75 + 0.55 * n2);
+        float outer = smoothstep(w, w * 0.35, x) * smoothstep(1.0, 0.55, q + (n1 - 0.5) * 0.35);
+        // гаряче ядро і ударні «діаманти» (майже нерухомі, лише тремтять)
+        float wc = 0.075 * (1.0 - smoothstep(0.0, 0.5, q));
+        float core = smoothstep(wc, wc * 0.2, x) * (1.0 - smoothstep(0.32, 0.5, q));
+        float dia = pow(0.5 + 0.5 * cos(q * 34.0 - 0.6 + sin(tt * 40.0) * 0.25), 3.0) * smoothstep(0.55, 0.05, q) * smoothstep(0.05, 0.0, x - 0.05);
+        vec3 cOut = mix(vec3(1.0, 0.62, 0.18), vec3(0.85, 0.12, 0.04), smoothstep(0.2, 0.9, q));
+        vec3 col = cOut * outer * (0.75 + 0.5 * n2)
+                 + vec3(1.0, 0.9, 0.7) * core * 0.85
+                 + vec3(0.8, 0.88, 1.0) * dia * 1.4;
+        float a = clamp(max(outer * 0.85, max(core, dia * 0.8)), 0.0, 1.0);
+        gl_FragColor = vec4(col, a);
       } else if (v_kind > 4.5) {                // радар навколо дому: кільця дальності + розгортка з шлейфом
         if (r > 1.0) discard;
         float ang = atan(v_c.x, v_c.y);
@@ -187,7 +206,9 @@
                    [f._m[0], f._m[1], sz, r, rc, 3 + (bank + 1) / 2 * 0.4]];
         this.draw(gl, this.quads(q), 2);
         if (f.type === 'jet') { // язик полум'я позаду сопла (сопло ≈ 0.88 напіврозміру від центру)
-          const fs = sz * 0.62, back = sz * 0.88 + fs * 0.95, seed = ((f.p[0] * 97 + f.p[1] * 31) % 1 + 1) % 1;
+          const fs = sz * 0.85, back = sz * 0.86 + fs * 0.95, seed = ((f.p[0] * 97 + f.p[1] * 31) % 1 + 1) % 1;
+          const nb = sz * 0.9, flick = 0.55 + 0.25 * Math.sin(tt * 29 + seed * 40) * Math.sin(tt * 13 + seed * 9);
+          fl.push([f._m[0], f._m[1], sz * 0.55, r, [1, 0.45, 0.12, 0.55 * flick], 0, 0, 0, -Math.sin(r) * nb, Math.cos(r) * nb]); // відсвіт від сопла
           fl.push([f._m[0], f._m[1], fs, r, [1, 1, 1, seed], 6, 0, 0, -Math.sin(r) * back, Math.cos(r) * back]);
         }
       }
