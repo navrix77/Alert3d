@@ -14,6 +14,8 @@ html,body{margin:0;height:100%;background:#05070B;color:var(--fg);font-family:In
 .head h1{margin:0;font-size:22px;line-height:1.15;font-weight:800;letter-spacing:-.01em;text-transform:uppercase}
 .head .sub{margin-top:4px;color:var(--mute);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .head .nav{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.head{padding-right:58px!important}.head .x{position:absolute;right:10px;top:10px;width:38px;height:38px;border-radius:50%;padding:0;font-size:16px;background:rgba(255,255,255,.14)}
+.sm{display:none}
 button{border:0;border-radius:11px;padding:7px 11px;font:600 13px inherit;font-family:inherit;color:var(--fg);background:rgba(255,255,255,.1);cursor:pointer}
 button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor:default}
 .legend{left:16px;bottom:16px;padding:12px 14px;min-width:230px}
@@ -38,14 +40,14 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
   .legend{left:10px;right:10px;bottom:calc(118px + env(safe-area-inset-bottom));min-width:0;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;column-gap:14px;border-radius:14px}
   .legend .r{margin:3px 0;font-size:12px;gap:7px}.legend .r i{width:18px}.legend small{display:none}
   .play{left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:auto;padding:8px 10px;border-radius:14px}
-  .wm{display:none}
+  .wm{display:none}.lg{display:none}.sm{display:inline}.head .x{width:34px;height:34px;right:8px;top:8px}
 }
 </style>
 </head>
 <body>
 <div id="map"></div>
-<div class="panel head"><h1>Мапа маршрутів БпЛА та ракет</h1><div class="sub" id="sub">…</div>
-  <div class="nav"><button id="prev">◀ Попередня доба</button><button id="next">Наступна ▶</button><button id="png">Зберегти зображення</button><button id="back">← До карти</button></div></div>
+<div class="panel head"><button id="back" class="x" aria-label="Закрити й повернутися до карти" title="До карти">✕</button><h1>Мапа маршрутів БпЛА та ракет</h1><div class="sub" id="sub">…</div>
+  <div class="nav"><button id="prev">◀ <span class="lg">Попередня доба</span><span class="sm">Попередня</span></button><button id="next"><span class="lg">Наступна</span><span class="sm">Наступна</span> ▶</button><button id="png">⤓ <span class="lg">Зберегти зображення</span><span class="sm">Зберегти</span></button></div></div>
 <div class="panel stats" id="stats"></div>
 <div class="panel legend" id="legend"></div>
 <div class="panel play"><button id="pl">▶</button><input type="range" id="tt" min="0" max="1000" value="1000"><span id="tl">09:00</span></div>
