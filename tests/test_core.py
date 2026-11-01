@@ -119,3 +119,20 @@ def test_tlk_slang():
     assert P.parse("По ударным", "TLK").kind == "close"
     assert P.parse("Развед. БПЛА над Изюмом⚠️", "TLK").kind == "info"
     assert [r.place.name for r in P.parse("Далее ЛГ/Залютино/ХГ⚠️", "TLK").places][0] == "Лиса Гора (Харків)"
+
+
+def test_missile_removed_after_explosion_and_silence():
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p, tr = Parser(), Tracker(SOURCES)
+    t0 = 1_800_000_000
+    o = p.parse("Ракета курсом на Харків", "ND")
+    tr.ingest(o, "ND", t0)
+    act = [x for x in tr.snapshot(t0 + 30)["tracks"] if x["status"] == "active" and x["type"] == "cruise"]
+    assert act
+    # вибухи в Харкові — ракету прибрано (саме повідомлення не публікується)
+    tr.ingest(p.parse("Вибухи в Харкові", "ND"), "ND", t0 + 60)
+    assert not [x for x in tr.snapshot(t0 + 70)["tracks"] if x["status"] == "active" and x["type"] == "cruise"]
+    # інша ракета, про яку мовчать, зникає за кілька хвилин
+    tr.ingest(p.parse("Ракета курсом на Полтаву", "ND"), "ND", t0 + 100)
+    assert not [x for x in tr.snapshot(t0 + 100 + 420)["tracks"] if x["status"] == "active" and x["type"] == "cruise"]

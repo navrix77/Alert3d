@@ -23,8 +23,8 @@ TYPES = {
     "shahed": {"label": "Ш", "name": "Шахед/Гербера", "speed": 170, "life": 40 * 60},
     "jet": {"label": "РБ", "name": "Реактивний БпЛА", "speed": 450, "life": 15 * 60},
     "molniya": {"label": "М", "name": "«Молнія»", "speed": 120, "life": 20 * 60},
-    "cruise": {"label": "КР", "name": "Крилата ракета", "speed": 800, "life": 12 * 60},
-    "ballistic": {"label": "Б", "name": "Балістика", "speed": 2000, "life": 5 * 60},
+    "cruise": {"label": "КР", "name": "Крилата ракета", "speed": 800, "life": 8 * 60},
+    "ballistic": {"label": "Б", "name": "Балістика", "speed": 2000, "life": 3 * 60},
 }
 ZONE_LIFE = 12 * 60
 
@@ -95,7 +95,9 @@ class Track:
         return move((self.last.x, self.last.y), self.heading, min(km, self.speed * cap_min / 60))
 
 
-SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення
+SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
+# ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
+SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1}
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:
@@ -143,6 +145,25 @@ class Tracker:
         self.log = self.log[-400:]
         places = obs.places
         if obs.kind == "filtered":
+            # «збито / вибухи / приліт» не публікуємо (безпека), але ціль після цього прибираємо з карти
+            fast = ("cruise", "ballistic") if obs.type is None else ((obs.type,) if obs.type in TYPES else ())
+            if fast:
+                done = 0
+                for tr in sorted(self.tracks, key=lambda x: -x.last.t):
+                    if tr.closed or tr.type not in fast or t - tr.last.t > TYPES[tr.type]["life"]:
+                        continue
+                    e = tr.est(t)
+                    ends = [e] + ([tr.route[-1].xy] if tr.route else [])
+                    if places:
+                        if not any(dist_km(p.place.xy, q) < 30 for p in places for q in ends):
+                            continue
+                    elif src not in tr.srcs or tr.type == "shahed":
+                        continue  # без місця — лише ракета, яку вів цей самий канал
+                    tr.closed = t
+                    done += 1
+                    if not places or tr.type == "shahed":
+                        break  # дрон у групі — лише один, найсвіжіший
+                rec["closed"] = done
             return rec
         if obs.kind == "close":
             n = 0
@@ -342,9 +363,13 @@ class Tracker:
         """Скільки ціль лишається «активною» без нових повідомлень. Долетіла до названого пункту і мовчить —
         прибираємо через 10 хв (як провідні сервіси), а не тримаємо 40 хв на місці."""
         base = TYPES[tr.type]["life"]
+        fast = tr.type in ("cruise", "ballistic")
         if tr.route:
             km = sum(dist_km(a, b) for a, b in itertools.pairwise(tr.path()))
-            return min(base, km / tr.speed * 3600 + 600)
+            # ракета долетіла до названого пункту і про неї мовчать — вона впала або збита: прибираємо за 3 хв
+            return min(base, km / tr.speed * 3600 + (180 if fast else 600))
+        if fast:
+            return min(base, 300)
         return min(base, 600 if tr.last.est or tr.heading is None else 900)
 
     def _ev_out(self, tr: Track, now: float, here) -> dict:
@@ -420,7 +445,7 @@ class Tracker:
             status = "closed" if tr.closed else ("lost" if age > life else "active")
             if status != "active" and age > life + 900:
                 continue
-            ex, ey = tr.est(now, SHOW_MIN) if status == "active" else (tr.last.x, tr.last.y)
+            ex, ey = tr.est(now, SHOW_BY_TYPE.get(tr.type, SHOW_MIN)) if status == "active" else (tr.last.x, tr.last.y)
             lat, lon = from_xy(ex, ey)
             km = tr.speed * min(age, life) / 3600
             rest = []
