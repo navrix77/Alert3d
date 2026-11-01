@@ -23,7 +23,7 @@ const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,ka
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
 const INTRO=!sessionStorage.getItem('intro');
-const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65});window.tryvogaMap=map;
+const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[-5,28],[75,68]]});window.tryvogaMap=map;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
@@ -94,7 +94,7 @@ function addOverlays(){
   map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.62,0.35]}});
   map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.8}});
   map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#E0405A','line-width':['interpolate',['linear'],['zoom'],5,1,9,2.2],'line-opacity':0.85}});
-  map.addSource('outside',{type:'geojson',data:'/data/outside.geojson'});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});syncOutside();
+  map.addSource('outside',{type:'geojson',data:'/data/outside.geojson',tolerance:0.2,buffer:256});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});syncOutside();
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
   map.addSource('ru',{type:'geojson',data:EMPTY});map.addSource('hits',{type:'geojson',data:EMPTY});
   if(!map.hasImage('hit')){const c=document.createElement('canvas');c.width=c.height=40;const x=c.getContext('2d');x.translate(20,20);
