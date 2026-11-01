@@ -23,18 +23,32 @@ PRIOR_W = 12.0  # «вага» апріорної довіри в спостер
 class Brain:
     def __init__(self, path: Path = DB) -> None:
         self.lock = threading.Lock()
-        self.db = sqlite3.connect(path, check_same_thread=False)
-        self.db.executescript(
-            """
-            PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS msg(t REAL, src TEXT, link TEXT, kind TEXT, type TEXT, cnt INT, places TEXT, track TEXT, text TEXT);
-            CREATE INDEX IF NOT EXISTS msg_t ON msg(t);
-            CREATE TABLE IF NOT EXISTS trans(type TEXT, a TEXT, b TEXT, n REAL, alat REAL, alon REAL, blat REAL, blon REAL, PRIMARY KEY(type, a, b));
-            CREATE TABLE IF NOT EXISTS rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
-            CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
-            CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
-            """
-        )
+        self.db = sqlite3.connect(path, check_same_thread=False, timeout=2)
+        try:
+            self.db.executescript(
+                """
+                PRAGMA journal_mode=WAL;
+                CREATE TABLE IF NOT EXISTS msg(t REAL, src TEXT, link TEXT, kind TEXT, type TEXT, cnt INT, places TEXT, track TEXT, text TEXT);
+                CREATE INDEX IF NOT EXISTS msg_t ON msg(t);
+                CREATE TABLE IF NOT EXISTS trans(type TEXT, a TEXT, b TEXT, n REAL, alat REAL, alon REAL, blat REAL, blon REAL, PRIMARY KEY(type, a, b));
+                CREATE TABLE IF NOT EXISTS rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
+                CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
+                CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
+                """
+            )
+        except sqlite3.Error:  # файл зайнятий іншим процесом — працюємо в пам'яті, моніторинг важливіший
+            self.db = sqlite3.connect(":memory:", check_same_thread=False)
+            self.db.executescript(
+                """
+                PRAGMA journal_mode=WAL;
+                CREATE TABLE IF NOT EXISTS msg(t REAL, src TEXT, link TEXT, kind TEXT, type TEXT, cnt INT, places TEXT, track TEXT, text TEXT);
+                CREATE INDEX IF NOT EXISTS msg_t ON msg(t);
+                CREATE TABLE IF NOT EXISTS trans(type TEXT, a TEXT, b TEXT, n REAL, alat REAL, alon REAL, blat REAL, blon REAL, PRIMARY KEY(type, a, b));
+                CREATE TABLE IF NOT EXISTS rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
+                CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
+                CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
+                """
+            )
         self.trans: dict[str, dict[str, dict[str, list]]] = {}  # type -> a -> b -> [n, blat, blon]
         self.pred: dict[str, dict[str, dict[str, list]]] = {}   # type -> b -> a -> [n, alat, alon]
         for typ, a, b, n, alat, alon, blat, blon in self.db.execute("SELECT * FROM trans"):
@@ -51,24 +65,39 @@ class Brain:
         if not link:
             return False
         with self.lock:
-            cur = self.db.execute("INSERT OR IGNORE INTO seen(link) VALUES(?)", (link,))
-            return cur.rowcount == 0
+            try:
+                cur = self.db.execute("INSERT OR IGNORE INTO seen(link) VALUES(?)", (link,))
+                return cur.rowcount == 0
+            except sqlite3.Error:
+                return False
 
     def log_msg(self, t, src, link, kind, typ, cnt, places, track, text) -> None:
         with self.lock:
-            self.db.execute("INSERT INTO msg VALUES(?,?,?,?,?,?,?,?,?)",
+            self._x("INSERT INTO msg VALUES(?,?,?,?,?,?,?,?,?)",
                             (t, src, link, kind, typ, cnt, json.dumps(places, ensure_ascii=False), track, (text or "")[:600]))
             self._tick()
 
     def _tick(self) -> None:
         self.pending += 1
         if self.pending >= 25:
-            self.db.commit()
+            try:
+                self.db.commit()
+            except sqlite3.Error:
+                pass
             self.pending = 0
+
+    def _x(self, sql, args=()):
+        try:
+            self.db.execute(sql, args)
+        except sqlite3.Error:
+            pass
 
     def flush(self) -> None:
         with self.lock:
-            self.db.commit()
+            try:
+                self.db.commit()
+            except sqlite3.Error:
+                pass
 
     # ---------------- маршрути
     def learn_step(self, typ: str, a, b, w: float = 1.0) -> None:
@@ -83,7 +112,7 @@ class Brain:
         prow = self.pred.setdefault(typ, {}).setdefault(b.name, {}).setdefault(a.name, [0.0, a.lat, a.lon])
         prow[0] += w
         with self.lock:
-            self.db.execute(
+            self._x(
                 "INSERT INTO trans VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(type,a,b) DO UPDATE SET n=n+excluded.n",
                 (typ, a.name, b.name, w, a.lat, a.lon, b.lat, b.lon))
             self._tick()
@@ -127,7 +156,7 @@ class Brain:
         st = self.rel_stats.setdefault(src, [0.0, 0.0])
         st[0 if confirmed else 1] += w
         with self.lock:
-            self.db.execute("INSERT INTO rel VALUES(?,?,?) ON CONFLICT(src) DO UPDATE SET ok=excluded.ok, bad=excluded.bad",
+            self._x("INSERT INTO rel VALUES(?,?,?) ON CONFLICT(src) DO UPDATE SET ok=excluded.ok, bad=excluded.bad",
                             (src, st[0], st[1]))
             self._tick()
 
@@ -138,7 +167,7 @@ class Brain:
             row = self.sites.setdefault(typ, {}).setdefault(e, {})
             row[site] = row.get(site, 0.0) + w
             with self.lock:
-                self.db.execute("INSERT INTO site VALUES(?,?,?,?) ON CONFLICT(type,site,entry) DO UPDATE SET n=n+excluded.n", (typ, site, e, w))
+                self._x("INSERT INTO site VALUES(?,?,?,?) ON CONFLICT(type,site,entry) DO UPDATE SET n=n+excluded.n", (typ, site, e, w))
                 self._tick()
 
     def site_stats(self, typ: str, entry: str | None) -> dict[str, float]:

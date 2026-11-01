@@ -1,7 +1,8 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-echo Зупиняю попередній сервер на порту 8080...
+echo Зупиняю попередній сервер (усі процеси Тривоги)...
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -match 'app.main:app' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8090 " ^| findstr LISTENING') do taskkill /F /PID %%p >nul 2>&1
 echo Встановлюю залежності...
 python -m pip install -q -r requirements.txt

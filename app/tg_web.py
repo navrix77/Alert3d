@@ -65,7 +65,10 @@ class WebMonitor:
         for mid, ts, text in sorted(msgs):
             if mid <= lid or (first and ts < max(cutoff, time.time() - 1800)):
                 continue
-            on_message(text, key, ts, f"https://t.me/{user}/{mid}")
+            try:
+                on_message(text, key, ts, f"https://t.me/{user}/{mid}")
+            except Exception:  # одне «погане» повідомлення не має зупиняти моніторинг
+                log.exception("помилка обробки поста %s/%s", user, mid)
         self.last_id[user] = max(m[0] for m in msgs)
 
     async def crawl_history(self, days: int = 7, max_pages: int = 60) -> list[tuple[float, str, str, str]]:
@@ -108,7 +111,10 @@ class WebMonitor:
                     self.errors[user] = str(e)[:120]
                 await asyncio.sleep(0.25)
             for ts, text, key, link in sorted(buf):
-                on_message(text, key, ts, link)
+                try:
+                    on_message(text, key, ts, link)
+                except Exception:
+                    log.exception("помилка обробки поста %s", link)
             log.info("t.me/s: стартово прочитано %d постів; усього каналів у моніторингу: %d", len(buf), len(chans))
             # Далі — безперервно: усі головні канали щоцикла, решта — широкими порціями; паралельно по 6 запитів
             fast = [(k, u) for k, u in chans if k in config.FAST]

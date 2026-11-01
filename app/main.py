@@ -88,14 +88,18 @@ async def learn_history() -> None:
         return
     shadow = Tracker(config.SOURCES, brain)
     n = 0
+    t_yield = time.monotonic()
     for ts, text, key, link in sorted(posts):
         if brain.seen(link):
             continue
         feed(shadow, text, key, ts, link, log=True)
-        shadow.snapshot(ts)  # прибирає старі треки й оновлює довіру
         n += 1
-        if n % 200 == 0:
-            await asyncio.sleep(0)
+        if n % 25 == 0:
+            shadow.snapshot(ts)  # прибирає старі треки й оновлює довіру
+        # навчання у фоні НЕ має гальмувати живий моніторинг: віддаємо цикл подій щонайменше кожні 20 мс
+        if time.monotonic() - t_yield > 0.02:
+            await asyncio.sleep(0.01)
+            t_yield = time.monotonic()
     brain.flush()
     log.info("історія: вивчено %d постів; модель маршрутів: %s", n, brain.stats())
 
@@ -113,7 +117,7 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.7",
+        "version": "2026-11-01.8",
         "push_subs": pushsvc.count(),
         "brain": brain.stats(),
     }
