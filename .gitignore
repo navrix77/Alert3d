@@ -7,3 +7,4 @@ data/gazetteer_osm.json
 data/brain.sqlite*
 data/push.sqlite*
 data/tls/
+data/occupied.geojson

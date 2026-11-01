@@ -61,18 +61,28 @@ function addOverlays(){
   const LV=['coalesce',['feature-state','lvl'],0];
   map.addSource('obl',{type:'geojson',data:'/data/oblasts.geojson',promoteId:'n'});
   map.addSource('ra',{type:'geojson',data:'/data/raions.geojson',generateId:true});
+  map.addSource('occ',{type:'geojson',data:'/data/occupied.geojson'});
+  if(!map.hasImage('hatch')){const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');x.strokeStyle='rgba(20,0,6,.55)';x.lineWidth=3;x.beginPath();x.moveTo(-4,20);x.lineTo(20,-4);x.moveTo(-4,4);x.lineTo(4,-4);x.moveTo(12,20);x.lineTo(20,12);x.stroke();map.addImage('hatch',x.getImageData(0,0,16,16),{pixelRatio:2});}
   map.addSource('sel',{type:'geojson',data:EMPTY});
   map.addSource('ticks',{type:'geojson',data:EMPTY});
-  map.addSource('holo',{type:'geojson',data:EMPTY});map.addSource('comets',{type:'geojson',data:EMPTY,lineMetrics:true});
+  map.addSource('holo',{type:'geojson',data:EMPTY});map.addSource('hrom',{type:'geojson',data:EMPTY});map.addSource('comets',{type:'geojson',data:EMPTY,lineMetrics:true});
   ['zones','trails','preds','targets','home','chains','lsites'].forEach(id=>map.addSource(id,{type:'geojson',data:EMPTY}));
   map.addLayer({id:'obl-fill',type:'fill',source:'obl',paint:{'fill-color':['match',LV,2,'#C8102E',1,'#E8B300','#000'],'fill-opacity':['match',LV,2,0.1,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.16,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':'#fff','line-opacity':['interpolate',['linear'],['zoom'],5.5,0.25,9,0.55],'line-width':['interpolate',['linear'],['zoom'],6,0.5,10,1.2]}});
+  map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.62,0.35]}});
+  map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.8}});
+  map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#E0405A','line-width':['interpolate',['linear'],['zoom'],5,1,9,2.2],'line-opacity':0.85}});
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
-  map.addSource('ru',{type:'geojson',data:EMPTY});
+  map.addSource('ru',{type:'geojson',data:EMPTY});map.addSource('hits',{type:'geojson',data:EMPTY});
+  if(!map.hasImage('hit')){const c=document.createElement('canvas');c.width=c.height=40;const x=c.getContext('2d');x.translate(20,20);
+    x.fillStyle='rgba(255,213,0,.25)';x.beginPath();x.arc(0,0,18,0,7);x.fill();x.strokeStyle='#FFD500';x.lineWidth=2.5;x.beginPath();x.arc(0,0,11,0,7);x.stroke();
+    x.beginPath();for(const a of [0,90,180,270]){const r=a*Math.PI/180;x.moveTo(Math.sin(r)*6,-Math.cos(r)*6);x.lineTo(Math.sin(r)*17,-Math.cos(r)*17);}x.stroke();x.fillStyle='#2F7BFF';x.beginPath();x.arc(0,0,4,0,7);x.fill();
+    x.setTransform(1,0,0,1,0,0);map.addImage('hit',x.getImageData(0,0,40,40),{pixelRatio:2});}
   map.addLayer({id:'ru-glow',type:'circle',source:'ru',minzoom:3,filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':1,'circle-opacity':0.22,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ru-dot',type:'circle',source:'ru',filter:['!',['has','sum']],paint:{'circle-radius':3.5,'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':2,'circle-opacity':0.85}});
   map.addLayer({id:'ru-t',type:'symbol',source:'ru',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['has','sum'],12,10.5],'text-max-width':16,'text-offset':['case',['has','sum'],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['has','sum'],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
+  map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':1,'icon-allow-overlap':true,'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':'#FFE36B','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['case',['get','est'],5,7],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
@@ -87,6 +97,8 @@ function addOverlays(){
   // голограма тривоги: об'єми над районами (червоні вищі), «дихають»
   const firstLbl=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
   map.addLayer({id:'holo',type:'fill-extrusion',source:'holo',paint:{'fill-extrusion-color':['match',['get','l'],2,'#FF2D3D','#FFB020'],'fill-extrusion-height':['match',['get','l'],2,12000,4500],'fill-extrusion-base':0,'fill-extrusion-opacity':0.26,'fill-extrusion-vertical-gradient':true}},firstLbl);
+  map.addLayer({id:'hrom',type:'circle',source:'hrom',paint:{'circle-radius':['interpolate',['exponential',2],['zoom'],5,3,8,22,11,170],'circle-color':['match',['get','l'],2,'#FF2D3D','#FFB020'],'circle-opacity':0.32,'circle-stroke-color':['match',['get','l'],2,'#FF6B76','#FFD27A'],'circle-stroke-width':1.2,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'hrom-t',type:'symbol',source:'hrom',minzoom:8,layout:{'text-field':['concat','тривога: ',['get','n']],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.4]},paint:{'text-color':'#FFD0D4','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4}});
   map.addLayer({id:'holo-top',type:'line',source:'holo',paint:{'line-color':['match',['get','l'],2,'#FF6B76','#FFD27A'],'line-width':1.2,'line-opacity':0.8}},firstLbl);
   map.addLayer({id:'ra-glow',type:'line',source:'ra',paint:{'line-color':'#FF3B4E','line-width':['interpolate',['linear'],['zoom'],5,2,9,5],'line-blur':['interpolate',['linear'],['zoom'],5,2,9,5],'line-opacity':['case',['==',LV,2],0.5,0]}});
   map.addLayer({id:'tg-hit',type:'circle',source:'targets',filter:['==',['get','active'],true],paint:{'circle-radius':22,'circle-opacity':0,'circle-stroke-opacity':0}});
@@ -213,7 +225,8 @@ function raionOf(lon,lat){if(!RA)return -1;for(const r of RA){if(lon<r.bb[0]||lo
 fetch('/data/raions.geojson').then(r=>r.json()).then(j=>{RA=j.features.map((f,i)=>{const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;let bb=[180,90,-180,-90];polys.forEach(pl=>pl[0].forEach(([x,y])=>{bb[0]=Math.min(bb[0],x);bb[1]=Math.min(bb[1],y);bb[2]=Math.max(bb[2],x);bb[3]=Math.max(bb[3],y);}));return {i,n:f.properties.n,polys,bb};});});
 function syncRaions(){
   if(!SNAP||!RA||!map.getSource('ra'))return;const lv={};const up=(i,v)=>{if(i>=0&&(lv[i]||0)<v)lv[i]=v;};
-  const O=SNAP.official||{};const rl=O.raion_levels||{};RA.forEach(r=>{if(rl[r.n])up(r.i,rl[r.n]);});(O.points||[]).forEach(([lo,la,_n,l])=>up(raionOf(lo,la),l));
+  const O=SNAP.official||{};const rl=O.raion_levels||{};RA.forEach(r=>{if(rl[r.n])up(r.i,rl[r.n]);});
+  if(map.getSource('hrom'))map.getSource('hrom').setData({type:'FeatureCollection',features:(O.points||[]).map(([lo,la,n,l])=>({type:'Feature',properties:{l,n},geometry:{type:'Point',coordinates:[lo,la]}}))});
   // райони фарбуються лише за офіційними тривогами (alerts.in.ua)
   const key=JSON.stringify(lv);if(key===lastRa)return;lastRa=key;
   RA.forEach(r=>{try{map.setFeatureState({source:'ra',id:r.i},{lvl:lv[r.i]||0});}catch(e){lastRa='';}});
@@ -403,7 +416,7 @@ function applyTheme(force){const th=effTheme();document.documentElement.dataset.
 function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
   $('#st-3d').checked=tilt;$('#st-sound').checked=!!PREF.sound;$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
-  vis(['ru-glow','ru-dot','ru-t'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones'],PREF.zones);}
+  vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones'],PREF.zones);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;
   // останнє зведення МО РФ: на карті — лише точки регіонів (з кількістю, якщо названа) і ОДИН підсумковий підпис
@@ -414,6 +427,10 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;
   F.push({type:'Feature',properties:{c:0,sum:true,l:'Наші дрони над РФ '+PER(ev.period)+': '+ev.total+' «збитих» за МО РФ · '+ev.regions.length+' рег. · '+fmt(ev.t)},geometry:{type:'Point',coordinates:[lo+1.5,la+0.6]}});
   map.getSource('ru').setData({type:'FeatureCollection',features:F});}
 setInterval(syncRu,5000);
+function syncHits(){if(!SNAP||!map.getSource('hits'))return;const seen=new Map();
+  for(const h of (SNAP.hits||[]).slice().sort((a,b)=>b.t-a.t)){const k=h.place+'|'+h.what;if(!seen.has(k))seen.set(k,h);}
+  map.getSource('hits').setData({type:'FeatureCollection',features:[...seen.values()].map(h=>({type:'Feature',properties:{l:'Уражено: '+h.what+'\n'+h.place+' · '+new Date(h.t*1000).toLocaleDateString('uk-UA',{day:'2-digit',month:'2-digit'}),link:h.link},geometry:{type:'Point',coordinates:[h.lon,h.lat]}}))});}
+setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};
 $('#st-close').onclick=()=>$('#settings').hidden=true;

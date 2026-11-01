@@ -30,12 +30,14 @@ from . import launch
 from .brain import Brain
 from .push import Push
 from .ru_strikes import RuStrikes
+from .strikes_ua import UaStrikes
 from .forecast import forecast as make_forecast
-from . import lan_tls
+from . import lan_tls, occupied
 
 brain = Brain()
 pushsvc = Push()
 ru = RuStrikes()
+hits = UaStrikes(parser.gaz)
 tracker = Tracker(config.SOURCES, brain)
 alerts = OfficialAlerts()
 alerts.on_threat = lambda ev: on_threat(ev)
@@ -186,6 +188,7 @@ def state() -> dict:
     snap["levels"] = dict(off["levels"])
     snap["official"] = off
     snap["ru"] = ru.state()
+    snap["hits"] = hits.state()
     global _FC
     if time.time() - _FC[0] > 20:
         try:
@@ -235,6 +238,8 @@ async def lifespan(app: FastAPI):
     tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     tasks.append(asyncio.create_task(pushsvc.run(state)))
     tasks.append(asyncio.create_task(ru.run()))
+    tasks.append(asyncio.create_task(occupied.run()))
+    tasks.append(asyncio.create_task(hits.run()))
     if os.getenv("LAN_TLS", "1") == "1":
         tasks.append(asyncio.create_task(lan_tls.run()))
     if os.getenv("REPLAY") != "1":
@@ -320,9 +325,10 @@ async def ws_endpoint(ws: WebSocket):
 
 @app.get("/data/{name}")
 def data_file(name: str):
-    allowed = {"oblasts.geojson", "raions.geojson"}
-    if name not in allowed:
-        return JSONResponse({"error": "not found"}, status_code=404)
+    allowed = {"oblasts.geojson", "raions.geojson", "occupied.geojson"}
+    if name not in allowed or not (ROOT / "data" / name).exists():
+        return JSONResponse({"type": "FeatureCollection", "features": []} if name == "occupied.geojson" else {"error": "not found"},
+                            status_code=200 if name == "occupied.geojson" else 404)
     return FileResponse(ROOT / "data" / name, media_type="application/geo+json")
 
 
