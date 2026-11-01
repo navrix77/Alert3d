@@ -305,7 +305,8 @@ function renderBanner(threats){
   b.onclick=()=>openSheet(t.tr.id);
   // кінематографічний переліт: нова загроза дому — камера плавно показує і дім, і ціль (якщо користувач не крутить карту)
   renderBanner.seen=renderBanner.seen||new Set();
-  if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);window.__beep&&window.__beep();const d=DISP.get(t.tr.id);
+  if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);window.__beep&&window.__beep();
+    note({k:'home:'+t.tr.id,lvl:'red',ic:'⚠️',title:TYPE_NAME[t.tr.type]+(t.tr.count>1?' ×'+t.tr.count:'')+' — '+(t.rel.rel==='route'?'маршрут біля вашого дому':'курс на ваш район'),sub:Math.round(t.rel.d)+' км '+t.rel.from+(t.rel.eta!=null?' · ~'+Math.max(1,Math.round(t.rel.eta))+' хв':''),go:()=>openSheet(t.tr.id)});const d=DISP.get(t.tr.id);
     if(d&&home&&introDone&&Date.now()-(window.__introAt||0)>9000&&Date.now()-(window.__touch||0)>20000){const b2=new maplibregl.LngLatBounds(home,home).extend(d.p);
       const cam=map.cameraForBounds(b2,{padding:{top:140,bottom:160,left:80,right:380}});if(cam)map.flyTo({...cam,zoom:Math.min(cam.zoom,10),pitch:tilt?55:20,bearing:tilt?-18:0,curve:1.5,speed:0.7,essential:true});}}
 }
@@ -373,7 +374,7 @@ $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 
 /* ---------- живий потік ---------- */
-function onSnap(s){LIVE=s;if(REPLAY)return;SNAP=s;recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
+function onSnap(s){LIVE=s;if(REPLAY)return;SNAP=s;try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
 let LIVE=null,REPLAY=null;
 /* ---------- прогноз ---------- */
 function renderForecast(){const el=$('#fc');if(!el)return;if(!SNAP||!SNAP.forecast||!SNAP.forecast.oblasts){el.innerHTML='';return;}const O=SNAP.forecast.oblasts;
@@ -454,7 +455,7 @@ function applyTheme(force){const th=effTheme();document.documentElement.dataset.
   const want=PREF.base||(th==='night'?'night':'map');if(force||want!==base)setBase(want);
   $('#st-theme-note').textContent=PREF.theme==='auto'?('Зараз: '+(th==='night'?'ніч':'день')+' — перемикається само за сходом і заходом сонця над вашим домом.'):'';syncSettingsUI();}
 function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
-  $('#st-3d').checked=tilt;$('#st-sound').checked=!!PREF.sound;$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
+  $('#st-3d').checked=tilt;$('#st-sound').checked=!!PREF.sound;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones'],PREF.zones);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
@@ -481,6 +482,7 @@ document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('clic
   else if(k==='shelter'){SHELTER=+v;localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;syncSettingsUI();}}));
 $('#st-3d').onchange=e=>set3d(e.target.checked,true);
 $('#st-sound').onchange=e=>{PREF.sound=e.target.checked;savePref();if(PREF.sound)beep();};
+$('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&Notification.permission!=='granted'){const r=await Notification.requestPermission();if(r!=='granted'){e.target.checked=false;toast('Браузер не дозволив сповіщення');}}PREF.sys=e.target.checked;savePref();};
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
 $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};
@@ -499,3 +501,47 @@ setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.d
 applyTheme(false);
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 })();
+
+/* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */
+const NOTE_CLR={red:'#FF4D57',orange:'#FF9F2E',green:'#2FE38A',blue:'#5AA2FF',violet:'#C77DFF'};
+const NSEEN=new Set();let NBASE=false,NHOMELV=null;
+function note(n){
+  if(NSEEN.has(n.k))return;NSEEN.add(n.k);
+  const box=$('#notes');if(!box)return;
+  const el=document.createElement('div');el.className='note-c';el.style.setProperty('--nc',NOTE_CLR[n.lvl]||NOTE_CLR.orange);
+  const tm=new Date((n.t||Date.now()/1000)*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+  el.innerHTML='<span class="ni">'+(n.ic||'🔔')+'</span><div><b>'+esc(n.title)+'</b>'+(n.sub?'<small>'+esc(n.sub)+'</small>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
+  const close=()=>{el.classList.add('out');setTimeout(()=>{el.remove();notesAll();},300);};
+  el.querySelector('.nx').onclick=e=>{e.stopPropagation();close();};
+  el.onclick=()=>{if(n.go)n.go();};
+  box.insertBefore(el,box.querySelector('.note-c'));
+  // на екрані щонайбільше 5 — найстаріші прибираються самі
+  const cs=box.querySelectorAll('.note-c');for(let i=5;i<cs.length;i++)cs[i].remove();
+  notesAll();
+  if(n.lvl==='red'||n.lvl==='orange'){window.__beep&&window.__beep();if(navigator.vibrate)try{navigator.vibrate([120,60,120]);}catch(e){}}
+  if(PREF.sys&&document.hidden&&'Notification' in window&&Notification.permission==='granted'){
+    try{const sn=new Notification(n.title,{body:n.sub||'',tag:n.k,icon:'icons/icon.svg',renotify:false});sn.onclick=()=>{window.focus();n.go&&n.go();sn.close();};}catch(e){}}
+}
+function notesAll(){const box=$('#notes');let a=box.querySelector('.all');const n=box.querySelectorAll('.note-c').length;
+  if(n>=2&&!a){a=document.createElement('button');a.className='all';a.textContent='Закрити всі';a.onclick=()=>{box.innerHTML='';};box.prepend(a);}
+  if(n<2&&a)a.remove();}
+function flyP(p,z){map.flyTo({center:p,zoom:Math.max(map.getZoom(),z||7),essential:true});}
+const TNAME_PL={shahed:'Шахеди',jet:'Реактивні шахеди',molniya:'«Молнії»',cruise:'Крилаті ракети',ballistic:'Балістика',kab:'КАБи'};
+function notesCheck(s){
+  const first=!NBASE;NBASE=true;const now=s.now||Date.now()/1000;
+  // 1) пуски
+  for(const L of (s.launches||[])){const k='L:'+L.site+':'+Math.round((L.t||0)/60);if(first||now-(L.t||now)>1200){NSEEN.add(k);continue;}
+    note({k,t:L.t,lvl:'red',ic:'🚀',title:'Пуск: '+L.site,sub:[L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',L.count?'×'+L.count:'',L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
+  // 2) нова швидка/небезпечна ціль: балістика, крилаті, «Молнії», реактивні
+  for(const t of (s.tracks||[])){if(t.status!=='active'||!['ballistic','cruise','jet'].includes(t.type))continue;const k='T:'+t.id;
+    if(first||(t.conf||0)<0.5){NSEEN.add(k);continue;}
+    note({k,lvl:t.type==='jet'?'orange':'red',ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':'🔥',title:(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(t.next?' → '+t.next:''),sub:'Нова ціль'+(t.launch&&t.launch.site&&!t.launch.est?' · запуск: '+t.launch.site:''),go:()=>openSheet(t.id)});}
+  // 3) тривога / відбій у моїй області
+  if(home&&window.OBLPOLY){const mine=window.OBLPOLY(home[0],home[1]);if(mine){const lv=(s.levels||{})[mine]||0;
+    if(NHOMELV!==null&&!first){if(!NHOMELV&&lv)note({k:'A:'+mine+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Повітряна тривога: '+mine+' обл.',sub:'Пройдіть в укриття',go:()=>flyP(home,8)});
+      else if(NHOMELV&&!lv)note({k:'O:'+mine+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій тривоги: '+mine+' обл.',sub:'У межах окремих громад тривога може ще тривати',go:()=>flyP(home,8)});}
+    NHOMELV=lv;}}
+  // 4) що вразили наші (офіційно)
+  for(const h of (s.hits||[])){const k='H:'+(h.link||'')+':'+h.place+':'+h.what;if(first){NSEEN.add(k);continue;}
+    note({k,t:h.t,lvl:'blue',ic:'🎯',title:'Уражено: '+h.what+' · '+h.place,sub:'Генштаб ЗСУ',go:()=>flyP([h.lon,h.lat],7)});}
+}

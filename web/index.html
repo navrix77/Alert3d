@@ -80,7 +80,8 @@
     <label class="sw"><input type="checkbox" id="st-3d"><span>Об'ємний вигляд (3D)</span></label></section>
   <section><h3>Мій дім</h3><div class="row"><button class="pill" id="st-geo">Визначити автоматично</button><button class="pill" id="st-pick">Поставити на карті</button><button class="pill ghost" id="st-clear">Прибрати</button></div>
     <div class="row"><span>До укриття йти</span><div class="seg small" data-pref="shelter"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button><button data-v="10">10</button></div><span>хв</span></div>
-    <label class="sw"><input type="checkbox" id="st-sound"><span>Звуковий сигнал, коли ціль іде на мій район</span></label></section>
+    <label class="sw"><input type="checkbox" id="st-sound"><span>Звуковий сигнал, коли ціль іде на мій район</span></label>
+    <label class="sw"><input type="checkbox" id="st-sys"><span>Сповіщення Windows / телефона, коли «Тривога» згорнута</span></label></section>
   <section><h3>Що показувати</h3>
     <label class="sw"><input type="checkbox" id="st-ru"><span>Наші удари: куди летіли дрони й що уражено <small>(заяви МО РФ і Генштабу ЗСУ, постфактум)</small></span></label>
     <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>
@@ -101,6 +102,7 @@
   <div><i class="n prim"></i>першоджерело (місце назвав канал)</div><div><i class="n copy"></i>копія / перепост</div><div><i class="n dest"></i>заявлений пункт призначення</div><div><i class="n est"></i>моя оцінка позиції</div>
   <div><i class="l confirm"></i>підтверджує</div><div><i class="l copy"></i>копіює</div><div><i class="l assume"></i>припущення</div><div><i class="l contra"></i>інша версія курсу</div></div>
 <div class="toast" id="toast" hidden></div>
+<div class="notes" id="notes" aria-live="assertive"></div>
 
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
