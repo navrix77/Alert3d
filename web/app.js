@@ -346,10 +346,10 @@ $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 function onSnap(s){LIVE=s;if(REPLAY)return;SNAP=s;recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
 let LIVE=null,REPLAY=null;
 /* ---------- прогноз ---------- */
-function renderForecast(){const el=$('#fc');if(!el||!SNAP||!SNAP.forecast||!SNAP.forecast.oblasts)return;const O=SNAP.forecast.oblasts;
+function renderForecast(){const el=$('#fc');if(!el)return;if(!SNAP||!SNAP.forecast||!SNAP.forecast.oblasts){el.innerHTML='';return;}const O=SNAP.forecast.oblasts;
   let mine=null;if(home&&window.OBLPOLY){mine=window.OBLPOLY(home[0],home[1]);}
   const rows=Object.entries(O).filter(([n,v])=>v.p60>=0.1).slice(0,4);if(mine&&O[mine]&&!rows.some(r=>r[0]===mine))rows.unshift([mine,O[mine]]);
-  if(!rows.length){el.innerHTML='<h4>Прогноз на годину</h4><p class="fc-calm">Нових загроз на найближчу годину не видно</p>';return;}
+  if(!rows.length){el.innerHTML=SNAP.tracks.some(t=>t.status==='active')?'':'<h4>Прогноз на годину</h4><p class="fc-calm">Нових загроз на найближчу годину не видно</p>';return;}
   el.innerHTML='<h4>Прогноз на годину <small>за курсами цілей і пусками</small></h4>'+rows.map(([n,v])=>{const p=Math.round(v.p60*100);const lv=p>=60?'hi':p>=30?'mid':'lo';
     return '<div class="fc-row'+(n===mine?' mine':'')+'"><span>'+esc(n)+(n===mine?' · ви тут':'')+'</span><i class="'+lv+'" style="width:'+Math.max(4,p)+'%"></i><b>'+p+'%</b></div>';}).join('');}
 fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{const P=j.features.map(f=>({n:f.properties.n,polys:f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates}));
