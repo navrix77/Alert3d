@@ -188,7 +188,8 @@ class Daily:
                 if not f.exists() or json.loads(f.read_text(encoding="utf-8")).get("v") != VER:
                     d = await self.get(day)
                     log.info("мапа доби %s: %d цілей, %d вибухів", day, len(d["tracks"]), len(d["booms"]))
-                    if self.push and d["tracks"]:
+                    hour = (time.time() / 3600 + kyiv_offset(time.time())) % 24
+                    if self.push and d["tracks"] and 9 <= hour < 12:  # пуш лише вранці, не вночі після перезапуску
                         n = sum(d["by_type"].values())
                         await self.push.broadcast("Мапа доби готова", f"За добу до 09:00 — {n} цілей. Маршрути, пуски й вибухи на одній мапі.", {"daily": day})
                 self.ready = day
