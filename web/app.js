@@ -66,13 +66,13 @@ function addRelief(){
     if(vs&&!map.getLayer('bld3d'))map.addLayer({id:'bld3d',type:'fill-extrusion',source:vs,'source-layer':'building',minzoom:12.5,
       paint:{// бетон/цегла: відтінок залежить від висоти (панельні багатоповерхівки світліші, приватний сектор тепліший)
         'fill-extrusion-color':night
-          ?['interpolate',['linear'],['coalesce',['get','render_height'],8],3,'#2a2d33',15,'#353a43',40,'#444b57',80,'#566070']
+          ?['interpolate',['linear'],['coalesce',['get','render_height'],8],3,'#4a4642',15,'#5b5955',40,'#6a6965',80,'#7a7b7d']
           :['interpolate',['linear'],['coalesce',['get','render_height'],8],3,'#cbbfae',15,'#d8d3cb',40,'#e2e1de',80,'#eceef0'],
         'fill-extrusion-height':['interpolate',['linear'],['zoom'],12.5,0,13.6,['coalesce',['get','render_height'],['get','height'],8]],
         'fill-extrusion-base':['coalesce',['get','render_min_height'],0],
         'fill-extrusion-opacity':1,'fill-extrusion-vertical-gradient':true}},firstSym);
     // освітлення як від низького сонця: чіткі затінені й освітлені грані
-    try{map.setLight({anchor:'map',position:[1.35,210,35],color:night?'#9fb4d8':'#fff3e0',intensity:night?0.35:0.55});}catch(e){}
+    try{map.setLight({anchor:'map',position:[1.35,210,35],color:night?'#fff1dc':'#fff3e0',intensity:night?0.42:0.55});}catch(e){}
   }catch(e){console.warn('relief',e);}
 }
 function addOverlays(){
