@@ -66,6 +66,25 @@ class OfficialAlerts:
 
     LINE = re.compile(r"^\*\*[^*]*\(([^)]*?) область\)\*\*(.*)$", re.M)
 
+    @staticmethod
+    def parse_areas(rest: str) -> list[tuple[str, int]]:
+        """Обидва формати зведення:
+        «A (А), B (Б) [yellow (drone level)]» і «red (...): A (А), B (Б); yellow (...): C (В)»."""
+        body = rest.split("affected:", 1)[-1].split("The most recent", 1)[0]
+        out = []
+        for grp in body.split(";"):
+            g = grp.strip()
+            m = re.match(r"(red|yellow)\s*\([^)]*\)\s*:", g)
+            if m:
+                lv, g = (2 if m.group(1) == "red" else 1), g[m.end():]
+            else:
+                ms = re.search(r"\[(red|yellow)", g)
+                lv = 2 if ms and ms.group(1) == "red" else 1
+                g = g.split("[", 1)[0]
+            for uk in re.findall(r"\(([^()]*[А-ЯІЇЄҐа-яіїєґ][^()]*)\)", g):
+                out.append((uk.strip(), lv))
+        return out
+
     def apply_md(self, md: str) -> None:
         """Розбір відкритого зведення alerts.in.ua (розділ «CURRENT WARNING STATUS»)."""
         i, j = md.find("## 3"), md.find("## 4")
@@ -77,16 +96,15 @@ class OfficialAlerts:
             name, rest = m.group(1).strip(), m.group(2)
             if name not in hrom["_oblasts"]:
                 continue  # області РФ теж є у зведенні — пропускаємо
-            groups = re.findall(r"((?:[^\[\]])+?)\[(red|yellow)", rest)
             if "areas affected" not in rest:
-                lv = 2 if "[red" in rest else 1
-                obl[name] = lv
+                obl[name] = 2 if re.search(r"level:\s*red|\[red", rest) else 1
                 continue
-            for chunk, lvl in groups:
-                lv = 2 if lvl == "red" else 1
-                for uk in re.findall(r"\(([^()]+)\)", chunk.split("affected:")[-1]):
-                    uk = uk.strip()
-                    areas[uk] = max(areas.get(uk, 0), lv)
+            got = self.parse_areas(rest)
+            if not got:  # формат знову змінився — краще залити всю область, ніж пропустити тривогу
+                obl[name] = 2 if "red" in rest else 1
+                log.warning("alerts.in.ua: не розібрав райони для %s", name)
+            for uk, lv in got:
+                areas[uk] = max(areas.get(uk, 0), lv)
         raions: dict[str, int] = {}
         points: list[list] = []
         ap = lambda x: x.replace("’", "'").replace("ʼ", "'")

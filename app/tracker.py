@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 
 from .geo import Place, ang_diff, bearing, dist_km, from_xy, move, oblasts
+from .launch import LaunchBook
 from .parser import Observation
 
 TYPES = {
@@ -106,6 +107,7 @@ class Tracker:
         self.counters: dict[str, int] = {}
         self.log: list[dict] = []
         self.last_update = 0.0
+        self.launches = LaunchBook(brain)
 
     # ---------------- прийом повідомлення
     def ingest(self, obs: Observation, src: str, t: float | None = None, link: str | None = None) -> dict:
@@ -342,6 +344,8 @@ class Tracker:
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),
                 "links": [o.link for o in tr.obs[-5:] if o.link],
                 "from": tr.from_place.name if tr.from_place else None, "ts": now,
+                "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4), tr.obs[0].label, int(tr.obs[0].t)],
+                "launch": self.launches.link(tr, now, hd) if status != "closed" or age < 1800 else None,
             })
         zones = []
         self.zones = [z for z in self.zones if now - z.t < ZONE_LIFE]
@@ -349,5 +353,5 @@ class Tracker:
             zones.append({"places": [[p.lon, p.lat, p.name] for p in z.places], "t": int(z.t), "platform": z.platform})
             for p in z.places:
                 up(obl.of(p.lon, p.lat), 2)
-        return {"now": now, "tracks": out, "zones": zones, "levels_tracker": levels, "last_update": self.last_update,
+        return {"now": now, "tracks": out, "zones": zones, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
                 "log": self.log[-60:]}

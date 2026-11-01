@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 
 parser = Parser()
+from . import launch
 from .brain import Brain
 
 brain = Brain()
@@ -38,12 +39,23 @@ started = time.time()
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool) -> None:
     """Одне повідомлення каналу може містити кілька цілей — ділимо на сегменти й кожен веде в трекер."""
     segs = parser.segments(text)
-    msg_type = parser.parse(text, key).type if len(segs) > 1 else None
+    whole = parser.parse(text, key)
+    msg_type = whole.type if len(segs) > 1 else None
+    summary = bool(launch.SUMMARY_RX.search(text.lower()))
     useful = 0
     for seg in segs:
         obs = parser.parse(seg, key)
         if obs.type is None and msg_type and obs.places and not obs.close:
             obs.type = msg_type
+        # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
+        sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type)
+        if sites:
+            trk.launches.add(sites, ltyp, obs.count, carrier, key, link, ts, summary)
+            useful += 1
+            if log:
+                brain.log_msg(ts, key, link, "launch", ltyp, obs.count, [{"r": "L", "n": s.name} for s in sites], None, seg)
+            if all(p.role == "f" for p in obs.places):  # «пуски з X» без місця в Україні — це не трек
+                continue
         if obs.kind in ("track", "zone", "close", "filtered"):
             rec = trk.ingest(obs, key, ts, link)
             useful += 1
@@ -99,7 +111,7 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.5",
+        "version": "2026-11-01.6",
         "brain": brain.stats(),
     }
     return snap

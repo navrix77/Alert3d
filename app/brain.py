@@ -32,6 +32,7 @@ class Brain:
             CREATE TABLE IF NOT EXISTS trans(type TEXT, a TEXT, b TEXT, n REAL, alat REAL, alon REAL, blat REAL, blon REAL, PRIMARY KEY(type, a, b));
             CREATE TABLE IF NOT EXISTS rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
             CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
+            CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
             """
         )
         self.trans: dict[str, dict[str, dict[str, list]]] = {}  # type -> a -> b -> [n, blat, blon]
@@ -40,6 +41,9 @@ class Brain:
             self.trans.setdefault(typ, {}).setdefault(a, {})[b] = [n, blat, blon]
             self.pred.setdefault(typ, {}).setdefault(b, {})[a] = [n, alat, alon]
         self.rel_stats = {s: [ok, bad] for s, ok, bad in self.db.execute("SELECT * FROM rel")}
+        self.sites: dict[str, dict[str, dict[str, float]]] = {}  # type -> entry('' = будь-де) -> site -> n
+        for typ, site, entry, n in self.db.execute("SELECT * FROM site"):
+            self.sites.setdefault(typ, {}).setdefault(entry, {})[site] = n
         self.pending = 0
 
     # ---------------- архів
@@ -111,7 +115,8 @@ class Brain:
 
     def stats(self) -> dict:
         return {"transitions": sum(len(v) for t in self.trans.values() for v in t.values()),
-                "places": len({a for t in self.trans.values() for a in t})}
+                "places": len({a for t in self.trans.values() for a in t}),
+                "launch_sites": sum(len(v) for t in self.sites.values() for v in t.values())}
 
     # ---------------- довіра до каналів
     def rel(self, src: str, prior: float) -> float:
@@ -125,3 +130,20 @@ class Brain:
             self.db.execute("INSERT INTO rel VALUES(?,?,?) ON CONFLICT(src) DO UPDATE SET ok=excluded.ok, bad=excluded.bad",
                             (src, st[0], st[1]))
             self._tick()
+
+    # ---------------- точки пуску
+    def learn_site(self, typ: str, site: str, entry: str | None, w: float = 1.0) -> None:
+        """Ціль цього типу стартувала з site (і зайшла через entry, якщо відомо)."""
+        for e in {"", entry or ""}:
+            row = self.sites.setdefault(typ, {}).setdefault(e, {})
+            row[site] = row.get(site, 0.0) + w
+            with self.lock:
+                self.db.execute("INSERT INTO site VALUES(?,?,?,?) ON CONFLICT(type,site,entry) DO UPDATE SET n=n+excluded.n", (typ, site, e, w))
+                self._tick()
+
+    def site_stats(self, typ: str, entry: str | None) -> dict[str, float]:
+        m = self.sites.get(typ, {})
+        out = {k: v * 0.3 for k, v in m.get("", {}).items()}
+        for k, v in m.get(entry or "\0", {}).items():
+            out[k] = out.get(k, 0) + v
+        return out

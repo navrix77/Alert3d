@@ -57,3 +57,21 @@ def test_replay_real_night():
     act = [x for x in snap["tracks"] if x["status"] == "active"]
     assert len(tr.tracks) > 20 and act, "мають бути активні треки"
     assert "Харківська" in snap["levels_tracker"]
+
+
+def test_alerts_mixed_levels():
+    from app.alerts import OfficialAlerts
+    rest = ("— air raid alert. 3 areas affected: red (missile / mass-strike level): Chuhuivskyi (Чугуївський), m. Kharkiv (м. Харків); "
+            "yellow (drone level): Kupyanskyi (Куп'янський). The most recent to go under alert was m. Kharkiv (м. Харків) at 19:07.")
+    assert OfficialAlerts.parse_areas(rest) == [("Чугуївський", 2), ("м. Харків", 2), ("Куп'янський", 1)]
+    old = "3 areas affected: Myrhorodskyi (Миргородський), Lubenskyi (Лубенський) [yellow (drone level)]."
+    assert OfficialAlerts.parse_areas(old) == [("Миргородський", 1), ("Лубенський", 1)]
+
+
+def test_launch_detect():
+    from app.launch import detect
+    assert [s.name for s in detect("Пуски шахедів з Приморсько-Ахтарська", "shahed")[0]] == ["Приморсько-Ахтарськ"]
+    assert detect("Зліт Ту-95МС з аеродрому Енгельс", None)[2] == "Ту-95МС/Ту-160"
+    assert detect("Вибухи в Бєлгороді", None)[0] == []
+    assert detect("З Орелі на Новомосковськ", None)[0] == []
+    assert detect("В ніч на 1 листопада атакував 98 БпЛА з напрямків: Курськ, Орел", "shahed")[3]
