@@ -52,18 +52,30 @@
         if (r > 1.0) discard;
         float a = smoothstep(0.08, 0.0, abs(r - 0.86)) * v_col.a;
         gl_FragColor = vec4(v_col.rgb * a, a);
-      } else {                                  // спрайт (3) або його тінь (4)
+      } else {                                  // спрайт (3.0–3.4, дробова частина — крен) або його тінь (4)
         vec2 uv = vec2(v_c.x, -v_c.y) * 0.5 + 0.5;
         vec4 t = texture2D(u_tex, uv);
-        if (v_kind > 3.5 && v_kind < 4.5) { gl_FragColor = vec4(0.0, 0.0, 0.0, t.a * 0.5); return; }
-        // чорний силует + яскравий контур кольору типу, щоб ціль було видно на будь-якій підкладці
+        if (v_kind > 3.5 && v_kind < 4.5) {     // м'яка тінь на землі
+          float sa = t.a * 0.4;
+          for (int i = 0; i < 6; i++) { float an = float(i) * 1.0472; sa += texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.03).a * 0.1; }
+          gl_FragColor = vec4(0.0, 0.0, 0.0, sa * 0.42 * v_col.a); return; }
+        float bank = (v_kind - 3.0) / 0.4 * 2.0 - 1.0;
+        // об'єм: нормаль з градієнта силуету (фаска по краях) + округлий фюзеляж + крен крил
+        float e = 0.02;
+        float ax = texture2D(u_tex, uv + vec2(e, 0.0)).a - texture2D(u_tex, uv - vec2(e, 0.0)).a;
+        float ay = texture2D(u_tex, uv - vec2(0.0, e)).a - texture2D(u_tex, uv + vec2(0.0, e)).a;
+        float fus = smoothstep(0.16, 0.0, abs(v_c.x));
+        vec3 n = normalize(vec3(-ax * 1.6 - v_c.x * 2.6 * fus + bank * 0.45 * (1.0 - fus), -ay * 1.6, 1.0));
+        vec3 L = normalize(vec3(-0.45, 0.55, 0.7));
+        float dif = clamp(dot(n, L), 0.0, 1.0);
+        float spec = pow(max(dot(reflect(-L, n), vec3(0.0, 0.0, 1.0)), 0.0), 22.0);
         float o = 0.0;
         for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236;
-          o = max(o, texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.034).a); }
-        float rim = clamp(o - t.a, 0.0, 1.0);
+          o = max(o, texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.03).a); }
+        float rim = clamp(o - t.a, 0.0, 1.0) * 0.85;
+        vec3 body = t.rgb * (0.38 + 0.82 * dif) + vec3(spec * 0.75);
         float a = max(t.a, rim);
-        vec3 col = t.rgb * t.a + v_col.rgb * rim;
-        gl_FragColor = vec4(col, a) * v_col.a;
+        gl_FragColor = vec4(body * t.a + v_col.rgb * rim, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -119,7 +131,7 @@
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
-      const spr = Math.max(13, Math.min(34, 5 + z * 3.1));      // напіврозмір спрайта, px
+      const spr = Math.max(9, Math.min(23, 3 + z * 2.1));       // напіврозмір спрайта, px (менші — як на радарі)
       const glow = [], top = [];
       const day = !!window.FXDAY;
       if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
@@ -163,13 +175,19 @@
       for (const f of L) {
         const tx = this.tex[f.type]; if (!tx) continue;
         gl.bindTexture(gl.TEXTURE_2D, tx);
-        const r = (f.hd || 0) * Math.PI / 180, a = f.weak ? 0.6 : 1, c = f.col;
+        // ціль «планує»: легке погойдування курсу з креном у бік повороту і повільна зміна висоти
+        const ph = ((f.p[0] * 131.7 + f.p[1] * 71.3) % 6.283 + 6.283) % 6.283, tt = (performance.now() - this.t0) / 1000;
+        const sw = Math.sin(tt * 0.55 + ph), alt = Math.sin(tt * 0.37 + ph * 1.7);
+        const fast = f.type === 'ballistic' || f.type === 'cruise';
+        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = f.weak ? 0.6 : 1, c = f.col;
+        const bank = Math.max(-1, Math.min(1, Math.cos(tt * 0.55 + ph) * 0.9));
+        const sz = spr * (1 + 0.035 * alt), sh = spr * (0.22 + 0.06 * alt);
         const rc = [Math.min(1, c[0] * 1.15 + 0.15), Math.min(1, c[1] * 1.15 + 0.15), Math.min(1, c[2] * 1.15 + 0.15), a];
-        const q = [[f._m[0], f._m[1], spr, r, [1, 1, 1, a], 4, 0, 0, spr * 0.12, spr * 0.18],
-                   [f._m[0], f._m[1], spr, r, rc, 3]];
+        const q = [[f._m[0], f._m[1], sz * 0.97, r, [1, 1, 1, a], 4, 0, 0, sh * 0.7, sh],
+                   [f._m[0], f._m[1], sz, r, rc, 3 + (bank + 1) / 2 * 0.4]];
         this.draw(gl, this.quads(q), 2);
         if (f.type === 'jet') { // язик полум'я позаду сопла (сопло ≈ 0.88 напіврозміру від центру)
-          const fs = spr * 0.62, back = spr * 0.88 + fs * 0.95, seed = ((f.p[0] * 97 + f.p[1] * 31) % 1 + 1) % 1;
+          const fs = sz * 0.62, back = sz * 0.88 + fs * 0.95, seed = ((f.p[0] * 97 + f.p[1] * 31) % 1 + 1) % 1;
           fl.push([f._m[0], f._m[1], fs, r, [1, 1, 1, seed], 6, 0, 0, -Math.sin(r) * back, Math.cos(r) * back]);
         }
       }
