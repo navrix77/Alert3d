@@ -254,6 +254,12 @@ async def lifespan(app: FastAPI):
     tasks.append(asyncio.create_task(hits.run()))
     if os.getenv("REPLAY") != "1":
         tasks.append(asyncio.create_task(daily.run()))
+    if os.getenv("PERSIST_DIR"):
+        async def _snap():
+            while True:
+                await asyncio.sleep(600)
+                await asyncio.to_thread(brain.snapshot)
+        tasks.append(asyncio.create_task(_snap()))
     if os.getenv("LAN_TLS", "1") == "1":
         tasks.append(asyncio.create_task(lan_tls.run()))
     if os.getenv("REPLAY") != "1":

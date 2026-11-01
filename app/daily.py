@@ -17,7 +17,7 @@ from pathlib import Path
 
 log = logging.getLogger("daily")
 VER = 5
-OUT = Path(__file__).resolve().parent.parent / "data" / "daily"
+OUT = (Path(__import__("os").environ["PERSIST_DIR"]) / "daily") if __import__("os").environ.get("PERSIST_DIR") else Path(__file__).resolve().parent.parent / "data" / "daily"
 BOOM = re.compile(r"вибух|взрыв|прил[іеё]т|влучан|попадан|детонац|пожеж|уламк|обломк|пошкодж|поврежд|руйнув|зруйн|постраждал|пострадал|загинул|загибл|поранен")
 # лише робота ППО без жодних наслідків — не «приліт»
 PPO_ONLY = re.compile(r"збит|сбит|мінус|минус|ппо|пво|не фіксу|відбій|історі|рік тому|роковин")

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import math
 import sqlite3
 import threading
@@ -17,12 +18,22 @@ import time
 from pathlib import Path
 
 DB = Path(__file__).resolve().parent.parent / "data" / "brain.sqlite"
+# у хмарі (Cloud Run) диск тимчасовий: PERSIST_DIR — змонтований бакет Cloud Storage. Працюємо з локальною копією,
+# а знімок бази кладемо в бакет раз на 10 хв і при старті відновлюємо (SQLite напряму на бакеті — повільно й ризиковано)
+PERSIST = Path(os.environ["PERSIST_DIR"]) if os.environ.get("PERSIST_DIR") else None
 PRIOR_W = 12.0  # «вага» апріорної довіри в спостереженнях
 
 
 class Brain:
     def __init__(self, path: Path = DB) -> None:
         self.lock = threading.Lock()
+        if PERSIST and (PERSIST / "brain.sqlite").exists() and not Path(path).exists():
+            try:
+                import shutil
+                Path(path).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(PERSIST / "brain.sqlite", path)
+            except Exception:  # noqa: BLE001
+                pass
         self.db = sqlite3.connect(path, check_same_thread=False, timeout=0.3)
         try:
             self.db.executescript(
@@ -107,6 +118,21 @@ class Brain:
             CREATE TABLE rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
             CREATE TABLE seen(link TEXT PRIMARY KEY);
             CREATE TABLE site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));""")
+
+    def snapshot(self) -> None:
+        """Знімок бази в постійне сховище (хмара)."""
+        if not PERSIST:
+            return
+        try:
+            PERSIST.mkdir(parents=True, exist_ok=True)
+            tmp = PERSIST / "brain.sqlite.tmp"
+            with self.lock:
+                dst = sqlite3.connect(tmp)
+                self.db.backup(dst)
+                dst.close()
+            os.replace(tmp, PERSIST / "brain.sqlite")
+        except Exception:  # noqa: BLE001
+            pass
 
     def flush(self) -> None:
         with self.lock:
