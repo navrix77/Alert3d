@@ -179,7 +179,7 @@ function frame(now){
      window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
        return {p:f.geometry.coordinates,c:t?[1,0.23,0.27]:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],a:f.properties.weak?0.3:0.7,s:t?sz*1.9:sz,ring:t};});}
     if(slow&&map.getSource('chains')){frame.ch=now;const ch=[],ls=new Map();
-      for(const L of (SNAP.launches||[]))ls.set(L.site,{type:'Feature',properties:{est:false,l:'ПУСК · '+L.site.replace(/ \(.*\)/,'')+' '+fmt(L.t)+(L.count?' ×'+L.count:'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});
+      for(const L of (SNAP.launches||[]))ls.set(L.site,{type:'Feature',properties:{est:false,l:'ПУСК по Україні: '+(L.type?({shahed:'Шахеди',jet:'Реактивні БпЛА',molniya:'«Молнії»',cruise:'Крилаті ракети',ballistic:'Балістика',kab:'КАБи'})[L.type]||'':'')+(L.count?' ×'+L.count:'')+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
         if(L.est&&!isSel)continue;
         ch.push({type:'Feature',properties:{c:L.est?'#FF8A8A':'#FF3B3B',o:isSel?0.95:(L.est?0.3:0.38),s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
@@ -364,8 +364,12 @@ function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))ma
   vis(['ru-glow','ru-dot','ru-t'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones'],PREF.zones);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;const agg=new Map();
-  for(const e of (SNAP.ru||[]))for(const r of e.regions){const a=agg.get(r.n)||{n:r.n,lat:r.lat,lon:r.lon,c:0,t:0};a.c+=r.cnt||0;a.t=Math.max(a.t,e.t);agg.set(r.n,a);}
-  map.getSource('ru').setData({type:'FeatureCollection',features:[...agg.values()].map(a=>({type:'Feature',properties:{c:Math.min(12,a.c/4||3),l:a.n+(a.c?' ×'+a.c:'')},geometry:{type:'Point',coordinates:[a.lon,a.lat]}}))});}
+  const PER=p=>!p?'':/ноч/.test(p)?'за ніч':/дня/.test(p)?'за день':/суток/.test(p)?'за добу':(p.match(/с ([\d.:]+)\s*мск до ([\d.:]+)/)||[]).slice(1).join('–')+' мск';
+  for(const e of (SNAP.ru||[]))for(const r of e.regions){const a=agg.get(r.n)||{n:r.n,lat:r.lat,lon:r.lon,c:0,t:0,tot:0,nr:0,per:''};
+    if(e.t>=a.t){a.t=e.t;a.per=PER(e.period);a.tot=e.total;a.nr=e.regions.length;}a.c+=r.cnt||0;agg.set(r.n,a);}
+  // це НЕ пуски по Україні: це наші дрони над РФ, які МО РФ заявило «збитими» (постфактум)
+  map.getSource('ru').setData({type:'FeatureCollection',features:[...agg.values()].map(a=>({type:'Feature',properties:{c:Math.min(12,a.c/4||3),
+    l:'Наші дрони над '+a.n.replace(' обл.',' обл.')+'\nМО РФ: '+(a.c?'збито '+a.c:'усього '+a.tot+' над '+a.nr+' регіонами')+(a.per?' · '+a.per:'')+' · '+fmt(a.t)},geometry:{type:'Point',coordinates:[a.lon,a.lat]}}))});}
 setInterval(syncRu,5000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};
