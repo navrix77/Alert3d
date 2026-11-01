@@ -129,7 +129,8 @@ class Parser:
         t = norm(text)
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         m = COUNT.search(t)
-        if ALERT_STATUS.search(t):
+        alert_status = bool(ALERT_STATUS.search(t))
+        if alert_status:
             typ = None
         if TYPE_CLOSE.match(t):
             typ = "jet" if re.search(r"шаболд|реактивн", t) else "shahed"
@@ -137,7 +138,7 @@ class Parser:
         obs = Observation(
             type=typ,
             count=int(m.group(1)) if m and 0 < int(m.group(1)) <= 15 else None,
-            close=bool(CLOSE.search(t)),
+            close=bool(CLOSE.search(t)) and not alert_status,  # «відбій тривоги в районі» — не про конкретну ціль
             safety=bool(SAFETY.search(t)),
             launch=bool(LAUNCH.search(t)),
             threat=bool(THREAT.search(t)),

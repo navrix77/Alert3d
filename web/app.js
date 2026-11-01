@@ -366,6 +366,8 @@ function play(on){clearInterval(tbTimer);$('#tb-play').textContent=on?'❚❚':'
 $('#tb-play').onclick=()=>play(!tbTimer||$('#tb-play').textContent==='▶');
 $('#tb-range').oninput=e=>{play(false);showFrame(+e.target.value);};
 $('#tb-live').onclick=()=>{play(false);REPLAY=null;$('#timebar').hidden=true;DISP.clear();lastLv='';lastRa='';if(LIVE)onSnap(LIVE);};
+/* ---------- телефон: панель стану згорнута, тап — розгорнути ---------- */
+$('#me').addEventListener('click',e=>{if(innerWidth>640||e.target.closest('li,button'))return;$('#me').classList.toggle('open');});
 /* ---------- віджет для Windows ---------- */
 if(new URLSearchParams(location.search).has('mini'))document.body.classList.add('mini');
 async function openWidget(){

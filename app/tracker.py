@@ -135,9 +135,9 @@ class Tracker:
                 if places and not any(dist_km(p.place.xy, e) < 45 for p in places):
                     continue
                 if not places:
-                    # «не фіксується» без місця: лише цілі регіону цього каналу (або ті, про які він сам писав)
-                    la, lo = from_xy(*e)
-                    if not (src in tr.srcs or (reg and obl.of(lo, la) == reg)):
+                    # «не фіксується» без місця стосується лише цілей, про які писав сам цей канал,
+                    # і не тих, що інші канали оновили щойно (інакше один пост гасить усю область)
+                    if src not in tr.srcs or (tr.last.src != src and t - tr.last.t < 180):
                         continue
                 tr.closed = t
                 n += 1
