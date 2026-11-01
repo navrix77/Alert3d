@@ -66,6 +66,30 @@ class WebMonitor:
             on_message(text, key, ts, f"https://t.me/{user}/{mid}")
         self.last_id[user] = max(m[0] for m in msgs)
 
+    async def crawl_history(self, days: int = 7, max_pages: int = 60) -> list[tuple[float, str, str, str]]:
+        """Історія головних каналів за N днів (сторінками ?before=). Повільно й чемно, у фоні."""
+        out = []
+        since = time.time() - days * 86400
+        async with httpx.AsyncClient(timeout=20, headers=UA, follow_redirects=True) as cli:
+            for key, user, *_ in config.CHANNELS:
+                if key not in config.FAST:
+                    continue
+                before = None
+                for _ in range(max_pages):
+                    try:
+                        r = await cli.get(f"https://t.me/s/{user}" + (f"?before={before}" if before else ""))
+                        msgs = parse_page(r.text)
+                    except Exception:  # noqa: BLE001
+                        break
+                    if not msgs:
+                        break
+                    out += [(ts, text, key, f"https://t.me/{user}/{mid}") for mid, ts, text in msgs if ts >= since]
+                    before = min(m[0] for m in msgs)
+                    if min(m[1] for m in msgs) < since:
+                        break
+                    await asyncio.sleep(1.2)
+        return out
+
     async def run(self, on_message) -> None:
         chans = [(k, u) for k, u, *_ in config.CHANNELS]
         # Перший прохід — дочитати останні 30 хв у хронологічному порядку по всіх каналах

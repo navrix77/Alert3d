@@ -1,5 +1,5 @@
 // Кеш оболонки застосунку; дані про цілі завжди з мережі (застарілі цілі гірші за відсутні).
-const C='tryvoga-v3';const SHELL=['/','/index.html','/style.css','/app.js','/icons.js','/models3d.js','/sprites/t-shahed.png','/sprites/t-jet.png','/sprites/t-cruise.png','/sprites/t-ballistic.png','/sprites/t-kab.png','/sprites/t-molniya.png','/manifest.webmanifest','/icons/icon.svg','/data/oblasts.geojson','/data/raions.geojson'];
+const C='tryvoga-v4';const SHELL=['/','/index.html','/style.css','/app.js','/icons.js','/models3d.js','/sprites/t-shahed.png','/sprites/t-jet.png','/sprites/t-cruise.png','/sprites/t-ballistic.png','/sprites/t-kab.png','/sprites/t-molniya.png','/manifest.webmanifest','/icons/icon.svg','/data/oblasts.geojson','/data/raions.geojson'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))));self.clients.claim();});
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);

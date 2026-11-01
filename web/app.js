@@ -225,7 +225,8 @@ function fillSheet(first){
   const serverT=Date.now()/1000+offset;const pos=DISP.get(tr.id);
   if(tr.route_names&&tr.route_names.length&&tr.route&&tr.route.length&&pos){let acc=0,prev=xy(pos.p);const items=tr.route.slice(0,tr.route_names.length).map((p,i)=>{const q=xy(p);acc+=dist(prev,q);prev=q;return '<li><b>~'+Math.max(1,Math.round(acc/tr.speed*60))+' хв</b> '+esc(tr.route_names[i])+'</li>';});
     if(home&&r&&r.eta!=null)items.push('<li class="home"><b>~'+Math.max(1,Math.round(r.eta))+' хв</b> ваш дім</li>');
-    $('#sh-route').innerHTML='<h4>Прогноз маршруту</h4><ol>'+items.join('')+'</ol>';}else $('#sh-route').innerHTML='';
+    const why=tr.pred==='learned'?' <small>· вивчено з історії'+(tr.pred_p?' ('+Math.round(tr.pred_p*100)+'%)':'')+'</small>':tr.pred==='channels'?' <small>· за каналами</small>':'';
+    $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо — позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'');}else $('#sh-route').innerHTML='';
   const n=tr.srcs.length;$('#sh-proof').innerHTML='<h4>Підтвердження: '+n+' '+(n===1?'канал':n<5?'канали':'каналів')+(n>=2?' · незалежно':' · лише одне джерело')+'</h4><div class="bar">'+[0,1,2,3].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</div><ul>'+tr.srcs.map(s=>{const L=tr.links.filter(l=>SNAP.sources[s]&&l.includes('/'+(SNAP.sources[s].url||'').split('/').pop()+'/')).pop();return '<li><span>'+esc(SNAP.sources[s]?.name||s)+'</span>'+(L?'<a href="'+esc(L)+'" target="_blank" rel="noopener">пост ↗</a>':'')+'</li>';}).join('')+'</ul>';
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }

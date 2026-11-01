@@ -25,15 +25,18 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 
 parser = Parser()
-tracker = Tracker(config.SOURCES)
+from .brain import Brain
+
+brain = Brain()
+tracker = Tracker(config.SOURCES, brain)
 alerts = OfficialAlerts()
 webmon = WebMonitor()
 clients: set[WebSocket] = set()
 started = time.time()
 
 
-def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
-    """Одне повідомлення каналу може містити кілька цілей — ділимо на сегменти."""
+def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool) -> None:
+    """Одне повідомлення каналу може містити кілька цілей — ділимо на сегменти й кожен веде в трекер."""
     segs = parser.segments(text)
     msg_type = parser.parse(text, key).type if len(segs) > 1 else None
     useful = 0
@@ -42,10 +45,45 @@ def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
         if obs.type is None and msg_type and obs.places and not obs.close:
             obs.type = msg_type
         if obs.kind in ("track", "zone", "close", "filtered"):
-            tracker.ingest(obs, key, ts, link)
+            rec = trk.ingest(obs, key, ts, link)
             useful += 1
+            if log:
+                brain.log_msg(ts, key, link, obs.kind, obs.type, obs.count, rec.get("places"), rec.get("track"), seg)
     if not useful:
-        tracker.ingest(parser.parse(text, key), key, ts, link)
+        trk.ingest(parser.parse(text, key), key, ts, link)
+
+
+def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
+    # повідомлення, яке вже бачили до перезапуску, відновлює трек, але не вчить модель вдруге
+    again = brain.seen(link)
+    tracker.learn = not again
+    feed(tracker, text, key, ts, link, log=not again)
+    tracker.learn = True
+
+
+async def learn_history() -> None:
+    """«Пилосос» по історії: тиждень постів головних каналів проганяється через тіньовий трекер,
+    щоб вивчити реальні маршрути цілей ще до першої живої тривоги."""
+    if os.getenv("REPLAY") == "1" or os.getenv("LEARN_HISTORY", "1") != "1":
+        return
+    await asyncio.sleep(25)  # спершу — живий моніторинг
+    try:
+        posts = await webmon.crawl_history(days=int(os.getenv("LEARN_DAYS", "7")))
+    except Exception as e:  # noqa: BLE001
+        log.warning("history crawl failed: %s", e)
+        return
+    shadow = Tracker(config.SOURCES, brain)
+    n = 0
+    for ts, text, key, link in sorted(posts):
+        if brain.seen(link):
+            continue
+        feed(shadow, text, key, ts, link, log=True)
+        shadow.snapshot(ts)  # прибирає старі треки й оновлює довіру
+        n += 1
+        if n % 200 == 0:
+            await asyncio.sleep(0)
+    brain.flush()
+    log.info("історія: вивчено %d постів; модель маршрутів: %s", n, brain.stats())
 
 
 def state() -> dict:
@@ -54,14 +92,15 @@ def state() -> dict:
     # Заливка регіонів — ЛИШЕ офіційні тривоги. Оцінка трекера йде окремо (levels_tracker) і регіони не фарбує.
     snap["levels"] = dict(off["levels"])
     snap["official"] = off
-    snap["sources"] = {k: {"name": s.name, "rel": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
+    snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
     snap["health"] = {
         "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1" or webmon.state()["live"] > 0,
         "channels": webmon.state(),
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.4",
+        "version": "2026-11-01.5",
+        "brain": brain.stats(),
     }
     return snap
 
@@ -87,6 +126,7 @@ async def lifespan(app: FastAPI):
     tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     if os.getenv("REPLAY") != "1":
         tasks.append(asyncio.create_task(telegram_src.run(on_message) if config.TG_SESSION else webmon.run(on_message)))
+        tasks.append(asyncio.create_task(learn_history()))
     log.info("Тривога запущена: %d каналів", len(config.CHANNELS))
     yield
     for t in tasks:

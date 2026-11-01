@@ -96,3 +96,5 @@
 .proof ul{list-style:none;margin:0;padding:0;font-size:13px}
 .proof li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
 .proof a{color:#7FB2FF;text-decoration:none}
+
+#sh-route small{font-weight:500;opacity:.6}#sh-route .est{margin:6px 0 0;font-size:12px;opacity:.7}
