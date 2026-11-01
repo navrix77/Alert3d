@@ -16,6 +16,7 @@ import { TacticalMap } from './src/components/TacticalMap';
 import { TargetSheet } from './src/components/TargetSheet';
 import { useHomeAlerts, prepareNotifications } from './src/hooks/useHomeAlerts';
 import { useLiveState } from './src/hooks/useLiveState';
+import { usePushRegistration } from './src/hooks/usePushRegistration';
 import { SettingsProvider, useSettings } from './src/hooks/useSettings';
 import { DISP } from './src/lib/display';
 import { C, R } from './src/lib/theme';
@@ -46,6 +47,7 @@ function Main() {
   const settingsSheet = useRef<BottomSheet>(null);
 
   useHomeAlerts(snap, home);
+  usePushRegistration(server, home);
 
   const say = useCallback((m: string) => {
     setToast(m);

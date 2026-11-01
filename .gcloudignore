@@ -1,0 +1,12 @@
+# Що НЕ вантажити в Cloud Build
+.git
+.gitignore
+mobile/
+tests/
+__pycache__/
+.pytest_cache/
+*.session
+.env
+data/*.sqlite*
+*.bat
+deploy/

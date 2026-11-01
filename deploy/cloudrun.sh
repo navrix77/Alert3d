@@ -11,6 +11,6 @@ gcloud run deploy "$SERVICE" \
   --allow-unauthenticated \
   --min-instances 1 --max-instances 1 \
   --no-cpu-throttling --cpu 1 --memory 1Gi \
-  --timeout 3600 --session-affinity \
-  --set-secrets "TG_API_ID=tg-api-id:latest,TG_API_HASH=tg-api-hash:latest,TG_SESSION=tg-session:latest,ALERTS_IN_UA_TOKEN=alerts-token:latest"
+  --timeout 3600 --session-affinity
+  
 # max-instances 1: один слухач Telegram, щоб не дублювати сесію; WebSocket-клієнтів витримує сотні.

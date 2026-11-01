@@ -77,3 +77,14 @@ def test_launch_detect():
     assert detect("В ніч на 1 листопада атакував 98 БпЛА з напрямків: Курськ, Орел", "shahed")[3]
     assert detect('Найближчим часом очікується передислокація Ту-95МС з аеродрому "Українка" на аеродром "Оленья".', "kab")[0] == []
     assert detect("Зліт Ту-95МС з Оленья, носії бомб", "kab")[1] == "cruise"
+
+
+def test_push_threat():
+    from app.geo import to_xy
+    from app.push import Push
+    H = to_xy(50.00, 36.23)  # Харків
+    tr = {"lat": 50.30, "lon": 36.23, "speed": 170, "hd": 180.0, "route": [[36.23, 49.90]], "type": "shahed", "count": 1}
+    r = Push.threat(tr, H)
+    assert r and r[2] == "півночі" and 9 < r[1] < 13
+    tr2 = dict(tr, hd=0.0, route=[])
+    assert Push.threat(tr2, H) is None

@@ -27,8 +27,10 @@ WEB = ROOT / "web"
 parser = Parser()
 from . import launch
 from .brain import Brain
+from .push import Push
 
 brain = Brain()
+pushsvc = Push()
 tracker = Tracker(config.SOURCES, brain)
 alerts = OfficialAlerts()
 webmon = WebMonitor()
@@ -111,7 +113,8 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.6",
+        "version": "2026-11-01.7",
+        "push_subs": pushsvc.count(),
         "brain": brain.stats(),
     }
     return snap
@@ -136,6 +139,7 @@ async def pusher() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
+    tasks.append(asyncio.create_task(pushsvc.run(state)))
     if os.getenv("REPLAY") != "1":
         tasks.append(asyncio.create_task(telegram_src.run(on_message) if config.TG_SESSION else webmon.run(on_message)))
         tasks.append(asyncio.create_task(learn_history()))
@@ -156,6 +160,18 @@ def api_state():
 @app.get("/api/config")
 def api_config():
     return {"vectorStyle": config.MAP_STYLE_VECTOR, "maptilerKey": config.MAPTILER_KEY or None}
+
+
+@app.post("/api/push/register")
+async def push_register(body: dict):
+    ok = pushsvc.register(str(body.get("token", "")), float(body.get("lon", 0)), float(body.get("lat", 0)))
+    return JSONResponse({"ok": ok}, status_code=200 if ok else 400)
+
+
+@app.post("/api/push/unregister")
+async def push_unregister(body: dict):
+    pushsvc.unregister(str(body.get("token", "")))
+    return {"ok": True}
 
 
 @app.get("/healthz")

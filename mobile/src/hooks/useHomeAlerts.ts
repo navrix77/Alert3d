@@ -8,13 +8,12 @@ import { homeRel } from '../lib/geo';
 import { ALERT_KM, TYPE_NAME } from '../lib/theme';
 import type { LonLat, Snapshot } from '../lib/types';
 
+// Застосунок відкритий: показуємо лише власні (локальні) сповіщення — серверний push про ту саму ціль не дублюємо.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (n) => {
+    const remote = (n.request.trigger as { type?: string } | null)?.type === 'push';
+    return { shouldShowBanner: !remote, shouldShowList: true, shouldPlaySound: !remote, shouldSetBadge: false };
+  },
 });
 
 const CHANNEL = 'threats';
