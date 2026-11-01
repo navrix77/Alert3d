@@ -94,7 +94,12 @@ function addOverlays(){
   map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.62,0.35]}});
   map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.8}});
   map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#E0405A','line-width':['interpolate',['linear'],['zoom'],5,1,9,2.2],'line-opacity':0.85}});
-  map.addSource('outside',{type:'geojson',data:'/data/outside.geojson',tolerance:0.2,buffer:256});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});syncOutside();
+  map.addSource('outside',{type:'geojson',data:'/data/outside.geojson',tolerance:0.2,buffer:256});
+  // напис навскіс, напівпрозоро — над територією РФ (у площині карти)
+  map.addSource('rf-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[39.2,53.6],[44.5,50.4],[36.2,56.9],[46.5,55.4]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});
+  map.addLayer({id:'rf-mark',type:'symbol',source:'rf-mark',maxzoom:7.5,layout:{'text-field':'ДЕРЖАВА-ТЕРОРИСТ','text-font':['Noto Sans Bold'],
+    'text-size':['interpolate',['exponential',1.6],['zoom'],3,13,5,26,7,46],'text-letter-spacing':0.18,'text-rotate':-22,'text-rotation-alignment':'map','text-pitch-alignment':'map',
+    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,90,90,0.22)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});syncOutside();
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
   map.addSource('ru',{type:'geojson',data:EMPTY});map.addSource('hits',{type:'geojson',data:EMPTY});
   if(!map.hasImage('hit')){const c=document.createElement('canvas');c.width=c.height=40;const x=c.getContext('2d');x.translate(20,20);
