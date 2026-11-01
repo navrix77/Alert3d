@@ -47,7 +47,9 @@ class WebMonitor:
     def state(self) -> dict:
         now = time.time()
         live = [u for u, t in self.last_ok.items() if now - t < 420]
-        return {"channels": len(config.CHANNELS), "live": len(live), "errors": dict(list(self.errors.items())[:5])}
+        return {"channels": len(config.CHANNELS), "live": len(live), "errors": dict(list(self.errors.items())[:5]),
+                "cycle": round(getattr(self, "cycle", 0), 1), "fast_every": config.TG_WEB_CYCLE_SEC,
+                "all_every": round(getattr(self, "full_rotation", 0))}
 
     async def poll(self, cli: httpx.AsyncClient, key: str, user: str, on_message, backfill_sec: float) -> None:
         r = await cli.get(f"https://t.me/s/{user}")
@@ -108,22 +110,32 @@ class WebMonitor:
             for ts, text, key, link in sorted(buf):
                 on_message(text, key, ts, link)
             log.info("t.me/s: стартово прочитано %d постів; усього каналів у моніторингу: %d", len(buf), len(chans))
-            # Далі — по колу; цикл ~ len(chans) * gap секунд
+            # Далі — безперервно: усі головні канали щоцикла, решта — широкими порціями; паралельно по 6 запитів
             fast = [(k, u) for k, u in chans if k in config.FAST]
             slow = [(k, u) for k, u in chans if k not in config.FAST]
-            per_cycle_slow = 6
-            gap = max(0.35, config.TG_WEB_CYCLE_SEC / max(1, len(fast) + per_cycle_slow))
+            per_cycle_slow = 30
+            sem = asyncio.Semaphore(6)
             si = 0
-            while True:
-                batch = fast + [slow[(si + n) % len(slow)] for n in range(min(per_cycle_slow, len(slow)))]
-                si = (si + per_cycle_slow) % max(1, len(slow))
-                for key, user in batch:
+
+            async def one(key, user):
+                async with sem:
                     try:
                         await self.poll(cli, key, user, on_message, 1800)
                     except httpx.HTTPStatusError as e:
                         self.errors[user] = f"HTTP {e.response.status_code}"
                         if e.response.status_code == 429:
-                            await asyncio.sleep(20)
+                            self.backoff = time.time() + 30
                     except Exception as e:  # noqa: BLE001
                         self.errors[user] = str(e)[:120]
-                    await asyncio.sleep(gap)
+
+            while True:
+                t0 = time.time()
+                if time.time() < getattr(self, "backoff", 0):
+                    await asyncio.sleep(5)
+                    continue
+                batch = fast + [slow[(si + n) % len(slow)] for n in range(min(per_cycle_slow, len(slow)))]
+                si = (si + per_cycle_slow) % max(1, len(slow))
+                await asyncio.gather(*(one(k, u) for k, u in batch))
+                self.cycle = time.time() - t0
+                self.full_rotation = (len(slow) / per_cycle_slow) * max(config.TG_WEB_CYCLE_SEC, self.cycle)
+                await asyncio.sleep(max(1.0, config.TG_WEB_CYCLE_SEC - self.cycle))

@@ -193,7 +193,7 @@ function renderAsOf(){
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
   if(!SNAP||age>20){el.className='asof stale';el.innerHTML=SNAP?'Немає звʼязку <b>'+Math.round(age)+' с</b> · це не відбій':'зʼєднання…';return;}
   const h=SNAP.health;el.className='asof'+((!h.telegram&&!h.replay)?' stale':'');
-  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.version?'':' · <b style="color:#F5B83D">стара версія сервера — перезапустіть start.bat</b>')+(h.replay?' · ДЕМО: записана ніч 29→30.10':(h.channels?' · наживо: '+h.channels.live+'/'+h.channels.channels+' каналів':''))+(h.alerts?' · тривоги: '+esc((SNAP.official&&SNAP.official.source)||'✓'):' · офіційні тривоги недоступні');
+  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.version?'':' · <b style="color:#F5B83D">стара версія сервера — перезапустіть start.bat</b>')+(h.replay?' · ДЕМО: записана ніч 29→30.10':(h.channels?' · наживо: '+h.channels.live+'/'+h.channels.channels+' каналів'+(h.channels.all_every?' (головні що '+Math.round(h.channels.fast_every)+' с, усі за '+h.channels.all_every+' с)':''):''))+(h.alerts?' · тривоги: '+esc((SNAP.official&&SNAP.official.source)||'✓'):' · офіційні тривоги недоступні');
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
 let SHELTER=+(localStorage.getItem('shelter')||3);$('#me-sh').textContent=SHELTER;
