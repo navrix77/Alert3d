@@ -114,6 +114,7 @@ class Parser:
             aviation=bool(AVIATION.search(t)),
         )
         bbox = None
+        self._chan_bbox = False
         for rx, name, bb in OBLAST_HINTS:
             if rx.search(t):
                 obs.oblast_hint, bbox = name, bb
@@ -126,6 +127,7 @@ class Parser:
                 for name, _polys, bb in oblasts().items:
                     if name == reg:
                         obs.oblast_hint, bbox = name, (bb[1] - 0.15, bb[3] + 0.15, bb[0] - 0.2, bb[2] + 0.2)
+                        self._chan_bbox = True
                         break
         words = [re.sub(r"[^\w'’\-]", "", w) for w in WORD_SPLIT.split(text)]
         words = [w for w in words if w]
@@ -187,6 +189,7 @@ class Parser:
         return obs
 
     def _disambiguate(self, found, bbox, ctx=None) -> list[PlaceRef]:
+        import math
         P = self.gaz.places
         uniq = [P[ids[0]] for _, ids in found if len(ids) == 1]
         if uniq:
@@ -200,6 +203,16 @@ class Parser:
             cand = ids
             if bbox:
                 inb = [i for i in ids if bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3]]
+                if not inb and getattr(self, "_chan_bbox", False):
+                    # регіональний канал назвав щось, чого в його регіоні немає (острів, урочище, вулиця) —
+                    # не «телепортуємо» ціль у тезку за сотні кілометрів
+                    def off(i):
+                        q = P[i]
+                        dy = max(bbox[0] - q.lat, 0, q.lat - bbox[1]) * 111
+                        dx = max(bbox[2] - q.lon, 0, q.lon - bbox[3]) * 72
+                        return math.hypot(dx, dy)
+                    if min(off(i) for i in ids) > 60:
+                        continue
                 cand = inb or ids
             import math
 
