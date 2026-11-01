@@ -101,3 +101,10 @@ def test_parser_real_world_cases():
     assert pl("БпЛА на Лозову")[0][1] == "Лозова" and P.parse("БпЛА на Лозову").places[0].place.lat < 49.2
     assert P.parse("Ударний на Безлюдівку", "M").type == "shahed"
     assert pl("Шахед над Трухановим островом", "kievreal1") == []
+
+
+def test_alerts_single_area_not_whole_oblast():
+    from app.alerts import OfficialAlerts
+    o = OfficialAlerts()
+    o.apply_md("## 3. X\n**Kharkivska oblast (Харківська область)** — air raid alert in effect since 20:20. 1 area affected: Iziumskyi (Ізюмський) [red (missile / mass-strike level)].\n## 4. Y")
+    assert o.oblast_levels == {} and o.raion_levels == {"Ізюмський": 2}

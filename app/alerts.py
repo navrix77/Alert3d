@@ -96,7 +96,7 @@ class OfficialAlerts:
             name, rest = m.group(1).strip(), m.group(2)
             if name not in hrom["_oblasts"]:
                 continue  # області РФ теж є у зведенні — пропускаємо
-            if "areas affected" not in rest:
+            if "affected:" not in rest:
                 obl[name] = 2 if re.search(r"level:\s*red|\[red", rest) else 1
                 continue
             got = self.parse_areas(rest)
