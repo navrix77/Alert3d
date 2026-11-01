@@ -28,7 +28,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 .stats .big{font-size:26px;font-weight:800}
 .stats ul{list-style:none;margin:6px 0 0;padding:0;max-height:34vh;overflow:auto}.stats li{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
 .play{right:16px;bottom:16px;padding:10px 12px;display:flex;align-items:center;gap:10px;width:min(420px,calc(100% - 32px));box-sizing:border-box}
-.play input{flex:1;accent-color:#FFB020}.play span{font-variant-numeric:tabular-nums;font-weight:700;min-width:44px;text-align:right}
+.play input{flex:1;accent-color:#FFB020}.play #spd{white-space:nowrap;font-variant-numeric:tabular-nums;min-width:72px}.play span{font-variant-numeric:tabular-nums;font-weight:700;min-width:44px;text-align:right}
 .wm{position:fixed;z-index:2;right:18px;bottom:76px;color:rgba(255,255,255,.55);font-weight:800;font-size:15px;pointer-events:none}
 .loading[hidden]{display:none}.loading{position:fixed;inset:0;display:grid;place-items:center;z-index:5;background:rgba(5,7,11,.6);font-weight:700}
 @media (max-width:700px){
@@ -50,7 +50,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
   <div class="nav"><button id="prev">◀ <span class="lg">Попередня доба</span><span class="sm">Попередня</span></button><button id="next"><span class="lg">Наступна</span><span class="sm">Наступна</span> ▶</button><button id="png">⤓ <span class="lg">Зберегти зображення</span><span class="sm">Зберегти</span></button></div></div>
 <div class="panel stats" id="stats"></div>
 <div class="panel legend" id="legend"></div>
-<div class="panel play"><button id="pl">▶</button><input type="range" id="tt" min="0" max="1000" value="1000"><span id="tl">09:00</span></div>
+<div class="panel play"><button id="pl">▶</button><button id="spd" title="Швидкість відтворення: скільки секунд триває одна година доби">5 с/год</button><input type="range" id="tt" min="0" max="1000" value="1000"><span id="tl">09:00</span></div>
 <div class="wm">Тривога</div>
 <div class="loading" id="ld">Збираю маршрути доби…</div>
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
@@ -150,8 +150,11 @@ function stats(){const o=D.official;
   $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+
     (D.booms.length?'<h3 class="bh" style="margin-top:12px">Найбільше вибухів</h3><ul>'+D.booms.slice(0,12).map(b=>'<li><span>'+b.n+'</span><b>'+b.c+'</b></li>').join('')+'</ul>':'');}
 $('#tt').oninput=e=>{playing=false;$('#pl').textContent='▶';draw(e.target.value/1000);};
+const SPD=[1,2.5,5,10,20,40];let spd=2;try{const v=+localStorage.getItem('dspd');if(v>=0&&v<SPD.length)spd=v;}catch(e){}
+const spdLbl=()=>{$('#spd').textContent=SPD[spd]+' с/год';};spdLbl();
+$('#spd').onclick=()=>{spd=(spd+1)%SPD.length;spdLbl();try{localStorage.setItem('dspd',spd);}catch(e){}};
 $('#pl').onclick=()=>{playing=!playing;$('#pl').textContent=playing?'❚❚':'▶';if(playing&&CUR>=1)CUR=0;let last=performance.now();
-  const step=now=>{if(!playing)return;CUR=Math.min(1,CUR+(now-last)/24000);last=now;$('#tt').value=CUR*1000;draw(CUR);if(CUR>=1){playing=false;$('#pl').textContent='▶';return;}requestAnimationFrame(step);};requestAnimationFrame(step);};
+  const step=now=>{if(!playing)return;CUR=Math.min(1,CUR+(now-last)/(SPD[spd]*24*1000));last=now;$('#tt').value=CUR*1000;draw(CUR);if(CUR>=1){playing=false;$('#pl').textContent='▶';return;}requestAnimationFrame(step);};requestAnimationFrame(step);};
 $('#prev').onclick=e=>load(e.currentTarget.dataset.d);$('#next').onclick=e=>load(e.currentTarget.dataset.d);
 $('#back').onclick=()=>location.href='/';
 $('#png').onclick=()=>{const mc=map.getCanvas(),c=document.createElement('canvas');c.width=mc.width;c.height=mc.height;const g=c.getContext('2d'),k=mc.width/innerWidth;g.drawImage(mc,0,0);
