@@ -23,7 +23,7 @@ PRIOR_W = 12.0  # «вага» апріорної довіри в спостер
 class Brain:
     def __init__(self, path: Path = DB) -> None:
         self.lock = threading.Lock()
-        self.db = sqlite3.connect(path, check_same_thread=False, timeout=2)
+        self.db = sqlite3.connect(path, check_same_thread=False, timeout=0.3)
         try:
             self.db.executescript(
                 """
@@ -69,6 +69,7 @@ class Brain:
                 cur = self.db.execute("INSERT OR IGNORE INTO seen(link) VALUES(?)", (link,))
                 return cur.rowcount == 0
             except sqlite3.Error:
+                self._to_memory()
                 return False
 
     def log_msg(self, t, src, link, kind, typ, cnt, places, track, text) -> None:
@@ -83,14 +84,27 @@ class Brain:
             try:
                 self.db.commit()
             except sqlite3.Error:
-                pass
+                self._to_memory()
             self.pending = 0
 
     def _x(self, sql, args=()):
         try:
             self.db.execute(sql, args)
         except sqlite3.Error:
-            pass
+            self._to_memory()
+
+    def _to_memory(self) -> None:
+        """Файл БД заблоковано (наприклад, завислим старим процесом): не чекаємо — далі пишемо в пам'ять."""
+        if getattr(self, "mem", False):
+            return
+        self.mem = True
+        self.db = sqlite3.connect(":memory:", check_same_thread=False)
+        self.db.executescript("""
+            CREATE TABLE msg(t REAL, src TEXT, link TEXT, kind TEXT, type TEXT, cnt INT, places TEXT, track TEXT, text TEXT);
+            CREATE TABLE trans(type TEXT, a TEXT, b TEXT, n REAL, alat REAL, alon REAL, blat REAL, blon REAL, PRIMARY KEY(type, a, b));
+            CREATE TABLE rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
+            CREATE TABLE seen(link TEXT PRIMARY KEY);
+            CREATE TABLE site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));""")
 
     def flush(self) -> None:
         with self.lock:
