@@ -159,3 +159,14 @@ def test_new_adjective_is_not_village_nove():
     from app.parser import Parser
     o = Parser().parse("🛵Новий реактивний БпЛА з т.о.Криму в бік Одещини", None)
     assert not any(r.place.name == "Нове" for r in o.places)
+
+
+def test_alert_lines_and_fpv_are_not_targets():
+    from app.parser import Parser
+    p = Parser()
+    for ch, t in [("UkraineAlarmSignal", "🛸 Ворожба (Сумська обл.)"), ("UkraineAlarmSignal", "◻️ 00:10 Нікополь"),
+                  ("kherson_non_drone", "[🗺] У районі селища Білозерка — активність дрона типу «FPV», повідомляють очевидці")]:
+        o = p.parse(t, ch)
+        assert o.kind != "track" and o.no_target, t
+    assert p.parse("🔴 Шахед на Полтаву", None).kind == "track"
+    assert p.parse("💥 Харків", None).kind == "filtered"

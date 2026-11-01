@@ -73,9 +73,9 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     trk.prefer = last[2] if cont and last and ts - last[0] < 420 else None
     for seg in segs:
         obs = parser.parse(seg, key, ctx)
-        if obs.type is None and msg_type and obs.places and not obs.close:
+        if obs.type is None and msg_type and obs.places and not obs.close and not obs.no_target:
             obs.type = msg_type
-        if obs.type is None and obs.places and not obs.close and trk.prefer and last:
+        if obs.type is None and obs.places and not obs.close and not obs.no_target and trk.prefer and last:
             obs.type = last[1]
         # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
         sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type)

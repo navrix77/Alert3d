@@ -64,8 +64,15 @@ function addRelief(){
     if(!map.getLayer('hillshade'))map.addLayer({id:'hillshade',type:'hillshade',source:'dem-hs',paint:{'hillshade-exaggeration':night?0.55:0.4,'hillshade-shadow-color':night?'#000000':'#3a3328','hillshade-highlight-color':night?'rgba(150,170,210,.35)':'#ffffff','hillshade-accent-color':night?'#05070c':'#5a4a36','hillshade-illumination-direction':315}},firstSym);
     const vs=Object.keys(map.getStyle().sources).find(k=>map.getStyle().sources[k].type==='vector');
     if(vs&&!map.getLayer('bld3d'))map.addLayer({id:'bld3d',type:'fill-extrusion',source:vs,'source-layer':'building',minzoom:12.5,
-      paint:{'fill-extrusion-color':night?'#1b2333':'#d9d4cc','fill-extrusion-height':['coalesce',['get','render_height'],['get','height'],8],'fill-extrusion-base':['coalesce',['get','render_min_height'],0],
-        'fill-extrusion-opacity':['interpolate',['linear'],['zoom'],12.5,0,13.5,night?0.75:0.85],'fill-extrusion-vertical-gradient':true}},firstSym);
+      paint:{// бетон/цегла: відтінок залежить від висоти (панельні багатоповерхівки світліші, приватний сектор тепліший)
+        'fill-extrusion-color':night
+          ?['interpolate',['linear'],['coalesce',['get','render_height'],8],3,'#2a2d33',15,'#353a43',40,'#444b57',80,'#566070']
+          :['interpolate',['linear'],['coalesce',['get','render_height'],8],3,'#cbbfae',15,'#d8d3cb',40,'#e2e1de',80,'#eceef0'],
+        'fill-extrusion-height':['interpolate',['linear'],['zoom'],12.5,0,13.6,['coalesce',['get','render_height'],['get','height'],8]],
+        'fill-extrusion-base':['coalesce',['get','render_min_height'],0],
+        'fill-extrusion-opacity':1,'fill-extrusion-vertical-gradient':true}},firstSym);
+    // освітлення як від низького сонця: чіткі затінені й освітлені грані
+    try{map.setLight({anchor:'map',position:[1.35,210,35],color:night?'#9fb4d8':'#fff3e0',intensity:night?0.35:0.55});}catch(e){}
   }catch(e){console.warn('relief',e);}
 }
 function addOverlays(){
@@ -410,8 +417,8 @@ function renderForecast(){const el=$('#fc');if(!el)return;if(!SNAP||!SNAP.foreca
   let mine=null;if(home&&window.OBLPOLY){mine=window.OBLPOLY(home[0],home[1]);}
   const rows=Object.entries(O).filter(([n,v])=>v.p60>=0.1).slice(0,4);if(mine&&O[mine]&&!rows.some(r=>r[0]===mine))rows.unshift([mine,O[mine]]);
   if(!rows.length){el.innerHTML=SNAP.tracks.some(t=>t.status==='active')?'':'<h4>Прогноз на годину</h4><p class="fc-calm">Нових загроз на найближчу годину не видно</p>';return;}
-  el.innerHTML='<h4>Прогноз на годину <small>за курсами цілей і пусками</small></h4>'+rows.map(([n,v])=>{const p=Math.round(v.p60*100);const lv=p>=60?'hi':p>=30?'mid':'lo';
-    return '<div class="fc-row'+(n===mine?' mine':'')+'"><span>'+esc(n)+(n===mine?' · ви тут':'')+'</span><i class="'+lv+'" style="width:'+Math.max(4,p)+'%"></i><b>'+p+'%</b></div>';}).join('');}
+  el.innerHTML='<h4>Прогноз на годину <small>імовірність · ≈ скільки цілей</small></h4>'+rows.map(([n,v])=>{const p=Math.round(v.p60*100);const lv=p>=60?'hi':p>=30?'mid':'lo';
+    return '<div class="fc-row'+(n===mine?' mine':'')+'"><span>'+esc(n)+(n===mine?' · ви тут':'')+'</span><i class="'+lv+'" style="width:'+Math.max(4,p)+'%"></i><b>'+p+'%'+(v.n60>=1?'<small title="очікувана кількість цілей за годину"> ≈'+Math.round(v.n60)+'</small>':'')+'</b></div>';}).join('');}
 fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{const P=j.features.map(f=>({n:f.properties.n,polys:f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates}));
   window.OBLPOLY=(lo,la)=>{for(const o of P)for(const pl of o.polys)if(inRing(pl[0],lo,la))return o.n;return null;};});
 /* ---------- машина часу ---------- */

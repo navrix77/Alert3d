@@ -49,17 +49,13 @@ def _rays(start, heading, route_xy, speed, horizon=120, step=5):
 
 def forecast(snap: dict, launches: list[dict], brain=None, gaz=None) -> dict:
     obl = oblasts()
-    acc: dict[str, dict[int, float]] = {}  # область -> горизонт -> Π(1-p)
+    acc: dict[str, dict[int, float]] = {}  # область -> горизонт -> Π(1-p) по НЕЗАЛЕЖНИХ цілях
+    exp_n: dict[str, dict[int, float]] = {}  # очікувана кількість цілей
 
-    def add(name, minute, p):
-        if not name or p <= 0:
-            return
-        row = acc.setdefault(name, {h: 1.0 for h in HORIZONS})
-        for h in HORIZONS:
-            if minute <= h:
-                row[h] *= (1 - min(0.95, p))
-
-    def fan(start, heading, route_xy, speed, base):
+    def fan(start, heading, route_xy, speed, conf, count=1):
+        """Промені віяла — АЛЬТЕРНАТИВИ однієї цілі (вона полетить лише одним із них), тож їхні ваги додаються,
+        а між різними цілями ймовірності поєднуються як незалежні. Так прогноз не «насичується» до 100%."""
+        per: dict[str, dict[int, float]] = {}
         for w, pts in _rays(start, heading, route_xy, speed):
             seen = set()
             for t, x, y in pts:
@@ -67,7 +63,18 @@ def forecast(snap: dict, launches: list[dict], brain=None, gaz=None) -> dict:
                 o = obl.of(lo, la)
                 if o and o not in seen:
                     seen.add(o)
-                    add(o, t, base * w * math.exp(-t / SURVIVE_MIN))
+                    surv = math.exp(-t / SURVIVE_MIN)
+                    row = per.setdefault(o, {h: 0.0 for h in HORIZONS})
+                    for h in HORIZONS:
+                        if t <= h:
+                            row[h] += w * surv
+        for o, row in per.items():
+            A = acc.setdefault(o, {h: 1.0 for h in HORIZONS})
+            E = exp_n.setdefault(o, {h: 0.0 for h in HORIZONS})
+            for h in HORIZONS:
+                q = min(0.9, row[h]) * conf          # одна ціль
+                A[h] *= (1 - q) ** max(1, count)     # група з count цілей
+                E[h] += q * max(1, count)
 
     linked: dict[str, int] = {}
     for tr in snap.get("tracks", []):
@@ -75,7 +82,7 @@ def forecast(snap: dict, launches: list[dict], brain=None, gaz=None) -> dict:
             continue
         start = to_xy(tr["lat"], tr["lon"])
         route = [to_xy(la, lo) for lo, la in tr.get("route") or []]
-        fan(start, tr.get("hd"), route, tr.get("speed") or 170, tr.get("conf", 0.5) * min(3, tr.get("count") or 1) ** 0.5)
+        fan(start, tr.get("hd"), route, tr.get("speed") or 170, tr.get("conf", 0.5), min(6, tr.get("count") or 1))
         L = tr.get("launch")
         if L and not L.get("est") and L.get("id"):
             linked[L["id"]] = linked.get(L["id"], 0) + (tr.get("count") or 1)
@@ -98,10 +105,11 @@ def forecast(snap: dict, launches: list[dict], brain=None, gaz=None) -> dict:
         target = to_xy(49.0, 31.5)  # центр України — якщо досвіду ще немає
         heads = heads or [bearing(site, target)]
         for hd in heads:
-            fan(site, hd, [], speed, min(1.0, n / 3) * 0.6)
+            fan(site, hd, [], speed, 0.5, min(6, n))
 
     out = {}
     for name, row in acc.items():
         out[name] = {f"p{h}": round(1 - row[h], 2) for h in HORIZONS}
+        out[name].update({f"n{h}": round(exp_n[name][h], 1) for h in HORIZONS})
     top = sorted(out.items(), key=lambda kv: -kv[1]["p60"])
-    return {"oblasts": dict(top), "model": "fan-v1"}
+    return {"oblasts": dict(top), "model": "fan-v2"}
