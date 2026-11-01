@@ -35,12 +35,12 @@ _C = [
     ("KR", "kramatorsk_radar", "Краматорськ радар", 0.65, False, "Донецька", True),
 ]
 _SLOW = {
-    None: "UkraineAlarmSignal alarmua tryvoga_chomu eRadarrua monikppy povitryanatrivogaaa radar_raketaa radar_top_ua raketa_trevoga UkraineRadar_24_7 rozvidkaneba Ukrainian_Intelligence war_monitor veselyy_pivden pivden_varta Shturval_media sectorv666 totallzrada vibuxaviasia deraketaua admiralbukhta newspn zahidnimonitoring monitoring_zaxid",
-    "Вінницька": "vinnradar vinytsa_radar ppo_vinnytsa vin_info_ppo",
+    None: "UkraineAlarmSignal alarmua tryvoga_chomu eRadarrua monikppy povitryanatrivogaaa radar_raketaa radar_top_ua raketa_trevoga UkraineRadar_24_7 rozvidkaneba Ukrainian_Intelligence war_monitor veselyy_pivden pivden_varta Shturval_media sectorv666 totallzrada vibuxaviasia deraketaua admiralbukhta newspn zahidnimonitoring monitoring_zaxid truexanewsua operativnoZSU novini_ukrtg suspilnenews tgsn_ua zahid_golovne_ua",
+    "Вінницька": "vinnradar ppo_vinnytsa vin_info_ppo",  # vinytsa_radar: веб-версія закрита (перевірено 01.11.2026)
     "Волинська": "lutsk_radar lutsk_info volynblog",
     "Житомирська": "zhytomyr_operativ zhitomirtrivoga Angry_Pol korostentoday",
     "Івано-Франківська": "ifalarm",
-    "Київська": "KyivCityOfficial ppo_kiev kyivradar kyiv_alarm kyev_radar kyiv_nebo kiev_nebo kyiv_airdef monitoring_kyiv shahedradar kievinform_ua1 nebo_raketa k_dvizh",
+    "Київська": "truexakyiv kievreal1 kievinfo_kyiv kiev_levyy_bereg kyiv_golovne KyivCityOfficial ppo_kiev kyivradar kyiv_alarm kyev_radar kyiv_nebo kiev_nebo kyiv_airdef monitoring_kyiv shahedradar kievinform_ua1 nebo_raketa k_dvizh",
     "Кіровоградська": "krop_vanek",
     "Львівська": "lviv_raketna rocket_danger_lviv",
     "Полтавська": "ppo_poltava poltava_alarm PoltavaRanger ppopoltavanightfighters kremen_sv region_poltava_syrena",
@@ -59,7 +59,7 @@ _SLOW = {
     "Харківська": "Karkivw kharkivlife kharkov_media kuptg place_kharkiv tlknewsua",
     "Херсонська": "kherson_monitoring kherson_non_drone",
 }
-_NEWS = {"newspn", "kharkivlife", "kharkov_media", "place_kharkiv", "tlknewsua", "kievinform_ua1", "odessa_infonews", "xydessa_live",
+_NEWS = {"truexanewsua", "operativnoZSU", "novini_ukrtg", "suspilnenews", "tgsn_ua", "zahid_golovne_ua", "truexakyiv", "kievreal1", "kievinfo_kyiv", "kiev_levyy_bereg", "kyiv_golovne", "newspn", "kharkivlife", "kharkov_media", "place_kharkiv", "tlknewsua", "kievinform_ua1", "odessa_infonews", "xydessa_live",
          "lutsk_info", "volynblog", "korostentoday", "sumyregion", "krolevetsnews", "svessainfo", "info_zp", "zaborzp", "odessa_inform", "kuptg", "Karkivw"}
 _seen = {u.lower() for _, u, *_ in _C}
 for region, names in _SLOW.items():
