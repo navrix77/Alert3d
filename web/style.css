@@ -285,3 +285,4 @@ body.pip .me{position:static!important;margin:8px;width:auto!important}
 body.xray .me{opacity:.85}
 @media (max-width:640px){.xr-legend{bottom:calc(140px + env(safe-area-inset-bottom));font-size:11px}}
 .ev-list li{display:block!important}.ev-list q{white-space:normal}
+.tb-hint{font-size:11px;color:var(--mute);white-space:nowrap}

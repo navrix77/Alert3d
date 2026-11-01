@@ -386,7 +386,8 @@ $('#b-time').onclick=()=>{fetch('/api/history').then(r=>r.json()).then(j=>{HISTF
   $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;r.value=0;showFrame(0);play(true);});};
 function showFrame(i){const f=HISTF[i];if(!f)return;$('#tb-range').value=i;$('#tb-time').textContent=new Date(f.t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
   REPLAY=f;SNAP=Object.assign({},LIVE||{},{now:f.t,levels:f.levels,official:Object.assign({},(LIVE&&LIVE.official)||{},{raion_levels:f.raions,points:[]}),
-    tracks:f.tracks.map(t=>Object.assign({status:'active',speed:0,route:[],trail:[],route_names:[],srcs:[],links:[],first:f.t,last:f.t,ts:f.t,entry:[t.lon,t.lat,'',f.t]},t)),launches:[],zones:[],ru:[]});
+    tracks:f.tracks.map(t=>Object.assign({status:'active',speed:0,route:[],trail:[],route_names:[],srcs:(t.ev&&t.ev.prim)||[],links:[],first:f.t,last:f.t,ts:f.t,entry:[t.lon,t.lat,'',f.t],ev:{pubs:0,prim:[],items:[],contra:[],age:0}},t)),launches:[],zones:[],ru:[]});
+  $('#tb-time').title='Що було відомо на цей момент';if(XRAY)syncXray();
   offset=f.t-Date.now()/1000;recvAt=Date.now();DISP.clear();renderCounters();syncLevels();syncRaions();}
 function play(on){clearInterval(tbTimer);$('#tb-play').textContent=on?'❚❚':'▶';if(!on)return;tbTimer=setInterval(()=>{const r=$('#tb-range');const i=+r.value+1;if(i>=HISTF.length){play(false);return;}showFrame(i);},140);}
 $('#tb-play').onclick=()=>play(!tbTimer||$('#tb-play').textContent==='▶');

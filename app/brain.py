@@ -34,6 +34,7 @@ class Brain:
                 CREATE TABLE IF NOT EXISTS rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
                 CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
                 CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
+                CREATE TABLE IF NOT EXISTS hist(t REAL PRIMARY KEY, j TEXT);
                 """
             )
         except sqlite3.Error:  # файл зайнятий іншим процесом — працюємо в пам'яті, моніторинг важливіший
@@ -47,6 +48,7 @@ class Brain:
                 CREATE TABLE IF NOT EXISTS rel(src TEXT PRIMARY KEY, ok REAL, bad REAL);
                 CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
                 CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
+                CREATE TABLE IF NOT EXISTS hist(t REAL PRIMARY KEY, j TEXT);
                 """
             )
         self.trans: dict[str, dict[str, dict[str, list]]] = {}  # type -> a -> b -> [n, blat, blon]
@@ -190,3 +192,16 @@ class Brain:
         for k, v in m.get(entry or "\0", {}).items():
             out[k] = out.get(k, 0) + v
         return out
+
+    # ---------------- машина часу (переживає перезапуск)
+    def hist_add(self, frame: dict) -> None:
+        with self.lock:
+            self._x("INSERT OR REPLACE INTO hist VALUES(?,?)", (frame["t"], json.dumps(frame, ensure_ascii=False, separators=(",", ":"))))
+            self._x("DELETE FROM hist WHERE t < ?", (frame["t"] - 12 * 3600,))
+            self._tick()
+
+    def hist_load(self, since: float) -> list[dict]:
+        try:
+            return [json.loads(j) for _t, j in self.db.execute("SELECT t, j FROM hist WHERE t >= ? ORDER BY t", (since,))]
+        except Exception:  # noqa: BLE001
+            return []

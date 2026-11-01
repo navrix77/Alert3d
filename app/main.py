@@ -180,7 +180,7 @@ async def learn_history() -> None:
 
 
 _FC = (0.0, {})
-HIST: list[dict] = []
+HIST: list[dict] = brain.hist_load(time.time() - 12 * 3600)
 
 
 def state() -> dict:
@@ -200,9 +200,15 @@ def state() -> dict:
     snap["forecast"] = _FC[1]
     # машина часу: кадр раз на хвилину, 12 годин
     if not HIST or snap["now"] - HIST[-1]["t"] >= 60:
-        HIST.append({"t": int(snap["now"]), "levels": snap.get("levels", {}), "raions": snap["official"].get("raion_levels", {}),
-                     "tracks": [{"id": t["id"], "type": t["type"], "lat": t["lat"], "lon": t["lon"], "hd": t["hd"], "count": t["count"], "conf": t["conf"], "next": t["next"]}
-                                for t in snap["tracks"] if t["status"] == "active"]})
+        fr = {"t": int(snap["now"]), "levels": snap.get("levels", {}), "raions": snap["official"].get("raion_levels", {}),
+              "tracks": [{"id": t["id"], "type": t["type"], "lat": t["lat"], "lon": t["lon"], "hd": t["hd"], "count": t["count"], "conf": t["conf"], "next": t["next"],
+                          "route": t["route"][:3],
+                          # що було ВІДОМО в цей момент: докази на ту хвилину
+                          "ev": {"pubs": t["ev"]["pubs"], "prim": t["ev"]["prim"], "indep": t["ev"]["indep"], "age": t["ev"]["age"], "contra": t["ev"]["contra"],
+                                 "items": [{k: i[k] for k in ("t", "src", "p", "pt", "copy", "dest", "why")} for i in t["ev"]["items"][-8:]]}}
+                         for t in snap["tracks"] if t["status"] == "active"]}
+        HIST.append(fr)
+        brain.hist_add(fr)
         while HIST and snap["now"] - HIST[0]["t"] > 12 * 3600:
             HIST.pop(0)
     snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
