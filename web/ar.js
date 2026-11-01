@@ -97,9 +97,10 @@
     // світ (горизонт, цілі) крутимо проти крену телефона, компас — ні
     cx.save(); cx.translate(W / 2, H / 2); cx.rotate(cam.roll * D2R); cx.translate(-W / 2, -H / 2);
     const hy = H / 2 + el / vf * H;
-    const gr = cx.createLinearGradient(0, hy - 2, 0, hy + 60 * k); gr.addColorStop(0, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-    cx.fillStyle = gr; cx.fillRect(-W, hy, W * 3, 60 * k);
-    cx.strokeStyle = 'rgba(255,255,255,.45)'; cx.lineWidth = k; cx.beginPath(); cx.moveTo(-W, hy); cx.lineTo(2 * W, hy); cx.stroke();
+    // земля трохи темніша, горизонт — тонка світла лінія з легким сяйвом
+    cx.fillStyle = 'rgba(0,0,0,.28)'; cx.fillRect(-W, hy, W * 3, H * 2);
+    cx.shadowColor = 'rgba(140,180,255,.9)'; cx.shadowBlur = 10 * k;
+    cx.strokeStyle = 'rgba(200,220,255,.7)'; cx.lineWidth = 1.2 * k; cx.beginPath(); cx.moveTo(-W, hy); cx.lineTo(2 * W, hy); cx.stroke(); cx.shadowBlur = 0;
     // сторони світу на горизонті
     cx.font = `700 ${12 * k}px Inter Tight, sans-serif`; cx.textAlign = 'center'; cx.fillStyle = 'rgba(255,255,255,.75)';
     for (const [a, n] of [[0, 'ПІВНІЧ'], [90, 'СХІД'], [180, 'ПІВДЕНЬ'], [270, 'ЗАХІД']]) { const [x] = proj(a, 0); if (x > -50 && x < W + 50) cx.fillText(n, x, hy - 8 * k); }
@@ -122,6 +123,12 @@
         marks.push({ tAz, c: COL[tr.type], thr: eta != null });
       }
       list.sort((a, b) => b.d - a.d); // ближчі — поверх
+      const boxes = []; // підписи не налазять: пріоритет — загрози й ближчі
+      const prio = list.slice().sort((a, b) => (a.eta == null) - (b.eta == null) || a.d - b.d);
+      const showLabel = new Set();
+      for (const o of prio) { const [x, y] = proj(o.tAz, o.tEl); const s = Math.max(30, Math.min(96, 1100 / o.d)) * k;
+        const bx = [x + s * 0.6, y - 22 * k, x + s * 0.6 + 230 * k, y + 20 * k];
+        if (!boxes.some(b => bx[0] < b[2] && bx[2] > b[0] && bx[1] < b[3] && bx[3] > b[1])) { boxes.push(bx); showLabel.add(o); } }
       for (const o of list) {
         const { tr, d, tAz, tEl, eta } = o;
         const [x, y] = proj(tAz, tEl);
@@ -148,6 +155,7 @@
         if (IMG[tr.type] && IMG[tr.type].complete) cx.drawImage(IMG[tr.type], -s / 2, -s / 2, s, s);
         cx.restore(); cx.globalAlpha = 1;
         // підпис
+        if (!showLabel.has(o)) { if (best && tr === best.tr && Math.hypot(x - W / 2, y - H / 2) < 60 * k) aimed = true; continue; }
         cx.textAlign = 'left'; cx.lineJoin = 'round'; cx.lineWidth = 5 * k; cx.strokeStyle = 'rgba(0,0,0,.85)';
         const l1 = NAME[tr.type] + (tr.count > 1 ? ' ×' + tr.count : '') + ' · ' + Math.round(d) + ' км';
         const l2 = (eta != null ? '~' + Math.max(1, Math.round(eta)) + ' хв до вас' : (tr.hd != null ? 'не на вас' : 'курс невідомий')) + (tr.next ? ' · → ' + tr.next : '');
