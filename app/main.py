@@ -30,6 +30,7 @@ from . import launch
 from .brain import Brain
 from .push import Push
 from .ru_strikes import RuStrikes
+from .forecast import forecast as make_forecast
 
 brain = Brain()
 pushsvc = Push()
@@ -162,6 +163,10 @@ async def learn_history() -> None:
     log.info("історія: вивчено %d постів; модель маршрутів: %s", n, brain.stats())
 
 
+_FC = (0.0, {})
+HIST: list[dict] = []
+
+
 def state() -> dict:
     snap = tracker.snapshot()
     off = alerts.state()
@@ -169,6 +174,20 @@ def state() -> dict:
     snap["levels"] = dict(off["levels"])
     snap["official"] = off
     snap["ru"] = ru.state()
+    global _FC
+    if time.time() - _FC[0] > 20:
+        try:
+            _FC = (time.time(), make_forecast(snap, tracker.launches.snapshot(snap["now"]), brain, parser.gaz))
+        except Exception:  # noqa: BLE001
+            log.exception("forecast")
+    snap["forecast"] = _FC[1]
+    # машина часу: кадр раз на хвилину, 12 годин
+    if not HIST or snap["now"] - HIST[-1]["t"] >= 60:
+        HIST.append({"t": int(snap["now"]), "levels": snap.get("levels", {}), "raions": snap["official"].get("raion_levels", {}),
+                     "tracks": [{"id": t["id"], "type": t["type"], "lat": t["lat"], "lon": t["lon"], "hd": t["hd"], "count": t["count"], "conf": t["conf"], "next": t["next"]}
+                                for t in snap["tracks"] if t["status"] == "active"]})
+        while HIST and snap["now"] - HIST[0]["t"] > 12 * 3600:
+            HIST.pop(0)
     snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
     snap["health"] = {
         "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1" or webmon.state()["live"] > 0,
@@ -236,6 +255,11 @@ async def push_register(body: dict):
 async def push_unregister(body: dict):
     pushsvc.unregister(str(body.get("token", "")))
     return {"ok": True}
+
+
+@app.get("/api/history")
+def api_history():
+    return JSONResponse({"frames": HIST})
 
 
 @app.get("/api/lan")

@@ -28,6 +28,7 @@
   <div class="me-head"><span class="me-dot" id="me-dot"></span><b id="me-word">Мій дім</b><button class="me-set" id="me-set" title="Скільки хвилин до укриття">🏃 <span id="me-sh">3</span> хв</button></div>
   <p class="me-sub" id="me-sub">Позначте дім кнопкою ⌂ — і тут буде ваш особистий таймер.</p>
   <ul class="me-list" id="me-list"></ul>
+  <div class="fc" id="fc"></div>
 </section>
 
 <div class="sheet" id="sheet" hidden>
@@ -65,6 +66,8 @@
   <button id="b-layers" title="Підкладка"><svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button>
   <button id="b-3d" title="3D">3D</button>
   <button id="b-feed" title="Стрічка"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  <button id="b-time" title="Машина часу"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></button>
+  <button id="b-ar" title="Небо в камері"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg></button>
   <button id="b-set" title="Налаштування"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M4.2 7.5l2.2 1.3M17.6 15.2l2.2 1.3M4.2 16.5l2.2-1.3M17.6 8.8l2.2-1.3"/></svg></button>
 </nav>
 
@@ -81,10 +84,18 @@
     <label class="sw"><input type="checkbox" id="st-ru"><span>Куди летіли наші дрони <small>(регіони РФ за заявами МО РФ, постфактум)</small></span></label>
     <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>
     <label class="sw"><input type="checkbox" id="st-zones"><span>Зони КАБ</span></label></section>
+  <section><h3>Віджет для Windows</h3><button class="pill" id="st-widget">Віджет поверх усіх вікон</button>
+    <p class="note">Маленьке вікно з вашим станом («Над вами чисто» / хвилини до загрози), яке завжди поверх інших програм. Щоб запускати віджет окремо від браузера — файл widget.bat у теці «Тривоги».</p></section>
   <section><h3>Відкрити на телефоні</h3><div class="qr-wrap"><div id="st-qr"></div><div><p class="note">Телефон у тій самій Wi‑Fi — наведіть камеру на код. Потім «Поділитися → На початковий екран», і «Тривога» стане окремою іконкою.</p><div id="st-urls" class="urls"></div></div></div></section>
   <section><h3>Про дані</h3><p class="note" id="st-tech"></p></section>
 </aside>
 
+<div class="timebar" id="timebar" hidden>
+  <button class="round" id="tb-play" aria-label="Відтворити">▶</button>
+  <input type="range" id="tb-range" min="0" max="0" value="0">
+  <b id="tb-time">—</b>
+  <button class="pill" id="tb-live">Наживо</button>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>

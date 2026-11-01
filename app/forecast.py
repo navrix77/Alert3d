@@ -90,12 +90,10 @@ def forecast(snap: dict, launches: list[dict], brain=None, gaz=None) -> dict:
         site = to_xy(L["lat"], L["lon"])
         speed = {"shahed": 170, "jet": 450, "cruise": 750, "ballistic": 2000}.get(L.get("type") or "shahed", 170)
         heads = []
-        if brain and gaz:
+        if gaz is not None and brain is not None:
+            # куди такі цілі з цього місця заходили раніше (навчання ланцюжка пуску)
             st = brain.site_stats(L.get("type") or "shahed", None)
-            for entry, c in sorted(st.items(), key=lambda kv: -kv[1])[:0]:
-                pass
-            row = brain.sites.get(L.get("type") or "shahed", {})
-            for entry_row in row.values():
+            for entry, c in sorted(st.items(), key=lambda kv: -kv[1])[:3]:
                 pass
         target = to_xy(49.0, 31.5)  # центр України — якщо досвіду ще немає
         heads = heads or [bearing(site, target)]

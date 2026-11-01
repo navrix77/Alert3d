@@ -343,7 +343,41 @@ $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 
 /* ---------- живий потік ---------- */
-function onSnap(s){SNAP=s;recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();if(!$('#drawer').hidden)renderFeed();}
+function onSnap(s){LIVE=s;if(REPLAY)return;SNAP=s;recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
+let LIVE=null,REPLAY=null;
+/* ---------- прогноз ---------- */
+function renderForecast(){const el=$('#fc');if(!el||!SNAP||!SNAP.forecast||!SNAP.forecast.oblasts)return;const O=SNAP.forecast.oblasts;
+  let mine=null;if(home&&window.OBLPOLY){mine=window.OBLPOLY(home[0],home[1]);}
+  const rows=Object.entries(O).filter(([n,v])=>v.p60>=0.1).slice(0,4);if(mine&&O[mine]&&!rows.some(r=>r[0]===mine))rows.unshift([mine,O[mine]]);
+  if(!rows.length){el.innerHTML='<h4>Прогноз на годину</h4><p class="fc-calm">Нових загроз на найближчу годину не видно</p>';return;}
+  el.innerHTML='<h4>Прогноз на годину <small>за курсами цілей і пусками</small></h4>'+rows.map(([n,v])=>{const p=Math.round(v.p60*100);const lv=p>=60?'hi':p>=30?'mid':'lo';
+    return '<div class="fc-row'+(n===mine?' mine':'')+'"><span>'+esc(n)+(n===mine?' · ви тут':'')+'</span><i class="'+lv+'" style="width:'+Math.max(4,p)+'%"></i><b>'+p+'%</b></div>';}).join('');}
+fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{const P=j.features.map(f=>({n:f.properties.n,polys:f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates}));
+  window.OBLPOLY=(lo,la)=>{for(const o of P)for(const pl of o.polys)if(inRing(pl[0],lo,la))return o.n;return null;};});
+/* ---------- машина часу ---------- */
+let HISTF=[],tbTimer=null;
+$('#b-time').onclick=()=>{fetch('/api/history').then(r=>r.json()).then(j=>{HISTF=j.frames||[];if(!HISTF.length)return toast('Історія ще збирається — кадр щохвилини');
+  $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;r.value=0;showFrame(0);play(true);});};
+function showFrame(i){const f=HISTF[i];if(!f)return;$('#tb-range').value=i;$('#tb-time').textContent=new Date(f.t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+  REPLAY=f;SNAP=Object.assign({},LIVE||{},{now:f.t,levels:f.levels,official:Object.assign({},(LIVE&&LIVE.official)||{},{raion_levels:f.raions,points:[]}),
+    tracks:f.tracks.map(t=>Object.assign({status:'active',speed:0,route:[],trail:[],route_names:[],srcs:[],links:[],first:f.t,last:f.t,ts:f.t,entry:[t.lon,t.lat,'',f.t]},t)),launches:[],zones:[],ru:[]});
+  offset=f.t-Date.now()/1000;recvAt=Date.now();DISP.clear();renderCounters();syncLevels();syncRaions();}
+function play(on){clearInterval(tbTimer);$('#tb-play').textContent=on?'❚❚':'▶';if(!on)return;tbTimer=setInterval(()=>{const r=$('#tb-range');const i=+r.value+1;if(i>=HISTF.length){play(false);return;}showFrame(i);},140);}
+$('#tb-play').onclick=()=>play(!tbTimer||$('#tb-play').textContent==='▶');
+$('#tb-range').oninput=e=>{play(false);showFrame(+e.target.value);};
+$('#tb-live').onclick=()=>{play(false);REPLAY=null;$('#timebar').hidden=true;DISP.clear();lastLv='';lastRa='';if(LIVE)onSnap(LIVE);};
+/* ---------- віджет для Windows ---------- */
+if(new URLSearchParams(location.search).has('mini'))document.body.classList.add('mini');
+async function openWidget(){
+  if(!('documentPictureInPicture' in window)){window.open(location.origin+'/?mini=1','tryvoga-mini','width=400,height=300');return;}
+  const pip=await documentPictureInPicture.requestWindow({width:400,height:300});
+  [...document.styleSheets].forEach(ss=>{try{const st=document.createElement('style');st.textContent=[...ss.cssRules].map(r=>r.cssText).join('\n');pip.document.head.appendChild(st);}catch(e){const l=document.createElement('link');l.rel='stylesheet';l.href=ss.href;pip.document.head.appendChild(l);}});
+  pip.document.documentElement.dataset.theme=document.documentElement.dataset.theme;pip.document.body.className='mini pip';
+  const upd=()=>{pip.document.body.innerHTML=$('#me').outerHTML;const m=pip.document.querySelector('#me');if(m)m.onclick=()=>window.focus();};
+  upd();const h=setInterval(upd,1000);pip.addEventListener('pagehide',()=>clearInterval(h));}
+window.__openWidget=openWidget;
+/* ---------- небо в камері ---------- */
+$('#b-ar').onclick=()=>{location.href='ar.html';};
 let ws,backoff=1000;
 function connect(){
   const proto=location.protocol==='https:'?'wss':'ws';ws=new WebSocket(proto+'://'+location.host+'/ws');
@@ -381,6 +415,7 @@ setInterval(syncRu,5000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
+$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.pref,v=b.dataset.v;
   if(k==='theme'){PREF.theme=v;PREF.base=null;savePref();applyTheme(true);}
   else if(k==='base'){PREF.base=v;savePref();setBase(v);setTimeout(syncSettingsUI,50);}
