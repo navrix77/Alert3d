@@ -6,3 +6,4 @@ data/gazetteer_osm.json
 .pytest_cache/
 data/brain.sqlite*
 data/push.sqlite*
+data/tls/

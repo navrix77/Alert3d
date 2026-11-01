@@ -31,6 +31,7 @@ from .brain import Brain
 from .push import Push
 from .ru_strikes import RuStrikes
 from .forecast import forecast as make_forecast
+from . import lan_tls
 
 brain = Brain()
 pushsvc = Push()
@@ -232,6 +233,8 @@ async def lifespan(app: FastAPI):
     tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     tasks.append(asyncio.create_task(pushsvc.run(state)))
     tasks.append(asyncio.create_task(ru.run()))
+    if os.getenv("LAN_TLS", "1") == "1":
+        tasks.append(asyncio.create_task(lan_tls.run()))
     if os.getenv("REPLAY") != "1":
         tasks.append(asyncio.create_task(telegram_src.run(on_message) if config.TG_SESSION else webmon.run(on_message)))
         tasks.append(asyncio.create_task(learn_history()))
@@ -291,7 +294,7 @@ def api_lan():
     # спершу домашня Wi‑Fi (192.168.*, 10.*), віртуальні адаптери (172.16–31.*: WSL/Hyper‑V) — в кінці
     rank = lambda i: 0 if i.startswith("192.168.") else 1 if i.startswith("10.") else 2
     ips = sorted((i for i in ips if not i.startswith("127.") and not i.startswith("169.254.")), key=lambda i: (rank(i), i))
-    return {"urls": [f"http://{i}:8090" for i in ips]}
+    return {"urls": [f"http://{i}:8090" for i in ips], "secure": [f"https://{i}:{lan_tls.PORT}" for i in ips] if (lan_tls.DIR / "tryvoga.crt").exists() else []}
 
 
 @app.get("/healthz")
