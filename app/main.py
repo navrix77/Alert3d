@@ -63,6 +63,7 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
+        "version": "2026-11-01.4",
     }
     return snap
 
