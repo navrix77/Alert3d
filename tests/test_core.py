@@ -136,3 +136,11 @@ def test_missile_removed_after_explosion_and_silence():
     # інша ракета, про яку мовчать, зникає за кілька хвилин
     tr.ingest(p.parse("Ракета курсом на Полтаву", "ND"), "ND", t0 + 100)
     assert not [x for x in tr.snapshot(t0 + 100 + 420)["tracks"] if x["status"] == "active" and x["type"] == "cruise"]
+
+
+def test_continuation_word_is_not_a_place():
+    from app.parser import Parser
+    o = Parser().parse("🟧 Дальше курс на Печенеги/Чугуев  ✅ Підпишись на СХІД", None)
+    names = [r.place.name for r in o.places]
+    assert "Дальнє" not in names and not any(r.role == "p" for r in o.places)
+    assert names[:2] == ["Печеніги", "Чугуїв"]
