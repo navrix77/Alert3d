@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config, replay, telegram_src
+from .tg_web import WebMonitor
 from .alerts import OfficialAlerts
 from .parser import Parser
 from .tracker import Tracker
@@ -26,13 +27,25 @@ WEB = ROOT / "web"
 parser = Parser()
 tracker = Tracker(config.SOURCES)
 alerts = OfficialAlerts()
+webmon = WebMonitor()
 clients: set[WebSocket] = set()
 started = time.time()
 
 
 def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
-    obs = parser.parse(text)
-    tracker.ingest(obs, key, ts, link)
+    """Одне повідомлення каналу може містити кілька цілей — ділимо на сегменти."""
+    segs = parser.segments(text)
+    msg_type = parser.parse(text, key).type if len(segs) > 1 else None
+    useful = 0
+    for seg in segs:
+        obs = parser.parse(seg, key)
+        if obs.type is None and msg_type and obs.places and not obs.close:
+            obs.type = msg_type
+        if obs.kind in ("track", "zone", "close", "filtered"):
+            tracker.ingest(obs, key, ts, link)
+            useful += 1
+    if not useful:
+        tracker.ingest(parser.parse(text, key), key, ts, link)
 
 
 def state() -> dict:
@@ -45,7 +58,8 @@ def state() -> dict:
     snap["official"] = off
     snap["sources"] = {k: {"name": s.name, "rel": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
     snap["health"] = {
-        "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1",
+        "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1" or webmon.state()["live"] > 0,
+        "channels": webmon.state(),
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
@@ -71,7 +85,9 @@ async def pusher() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(telegram_src.run(on_message)), asyncio.create_task(replay.run(tracker))]
+    tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
+    if os.getenv("REPLAY") != "1":
+        tasks.append(asyncio.create_task(telegram_src.run(on_message) if config.TG_SESSION else webmon.run(on_message)))
     log.info("Тривога запущена: %d каналів", len(config.CHANNELS))
     yield
     for t in tasks:

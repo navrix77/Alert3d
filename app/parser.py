@@ -20,11 +20,24 @@ SAFETY = re.compile(r"пво|ппо|сбит|збит|мінус|минус|вз
 LAUNCH = re.compile(r"пуск|запуск|вылет|зліт|взлет|злет")
 THREAT = re.compile(r"угроз|загроз")
 AVIATION = re.compile(r"су-34|су-35|ту-95|ту-160|ту-22|миг-31|міг-31")
-COUNT = re.compile(r"(\d+)\s*[хx]?\s*(?:реактив|шахед|бпла|ракет|бомб|каб|мопед|ціл|цел|молн|баліст|баллист|дрон)")
+COUNT = re.compile(r"(\d+)\s*[хx]?\s*(?:реактив|шахед|бпла|ракет|бомб|каб|мопед|ціл|цел|молн|баліст|баллист|дрон|ударн)")
+DIRS = {"північно-захід": 315, "північно-схід": 45, "південно-захід": 225, "південно-схід": 135, "северо-запад": 315, "северо-восток": 45, "юго-запад": 225, "юго-восток": 135,
+        "північ": 0, "південь": 180, "півден": 180, "схід": 90, "сход": 90, "захід": 270, "заход": 270, "север": 0, "юг": 180, "восток": 90, "запад": 270}
+COURSE = re.compile(r"(?:(?:курс(?:ом)?|куром|в бік|в сторону|у напрямку|в напрямку)\s+(?:на\s+)?(північно-захід|північно-схід|південно-захід|південно-схід|северо-запад|северо-восток|юго-запад|юго-восток|північ|південь|півден|схід|сход|захід|заход|север|юг|восток|запад)|на\s+(північно-захід|північно-схід|південно-захід|південно-схід|северо-запад|северо-восток|юго-запад|юго-восток|північ|південь|півден|схід|сход|захід|заход|север|юг|восток|запад)[а-яіїє-]*\s+напрям)")
+REL = re.compile(r"на\s+(півн|північ|півдн|сход|заход|север|юге|восток|запад)[а-яіїє]*\s+(?:від|от)\s+(\S+)")
+REL_AZ = {"півн": 0, "північ": 0, "север": 0, "півдн": 180, "юге": 180, "сход": 90, "восток": 90, "заход": 270, "запад": 270}
+REGION_RX = re.compile(r"(щин|ччин|чин)[аиіуою]?$|щині$|ччині$")
+DIR_WORDS = {"схід", "сході", "сходу", "захід", "заході", "заходу", "північ", "півночі", "південь", "півдні", "півдня", "восток", "запад", "север", "юг", "центр", "центрі"}
+CITY_WORDS = re.compile(r"над містом|по місту|над городом|по городу|для міста|для города|в місті|в городе")
+# Канали, для яких «місто» означає Харків
+CHANNEL_CITY = {"M": "Харків", "R": "Харків", "D": "Харків", "CX": "Харків", "SU": "Суми", "PL": "Полтава", "DN": "Дніпро", "KR": "Краматорськ"}
+HEADER = re.compile(r"^\s*([А-ЯІЇЄҐ][а-яіїєґ'’]+(?:щина|ччина|еччина|ччини|щини))\s*:", re.M)
+SEG_SPLIT = re.compile(r"\n+|(?=🛵)|(?=🚀)|(?=💥)|(?=🟠)|(?=🟡)|(?=🔴)|(?=🟢)|;\s*|\s+-\s+")
 SKIP = {
     "реактивний", "реактивный", "реактивні", "реактивних", "реактивные", "реактивных", "шахед", "шахеды", "шахеда",
     "ракета", "ракеты", "ракети", "угроза", "загроза", "молния", "молнія", "ціль", "відбій", "перебувайте", "ударный",
     "ударний", "балістика", "баллистика", "бомбы", "бомби", "увага", "внимание", "курсом", "обстановка", "кабы",
+    "ударних", "ударных", "ситуація", "ситуация", "общее", "загальна", "ймовірно", "вероятно", "підпишись",
 }
 POS_PREV = {"районе", "районі", "над", "біля", "возле", "повз", "через", "около", "поблизу", "район"}
 FROM_PREV = {"из", "з", "со", "от", "від"}
@@ -49,6 +62,7 @@ class Observation:
     threat: bool = False
     aviation: bool = False
     oblast_hint: str | None = None
+    course: float | None = None
 
     @property
     def kind(self) -> str:
@@ -67,7 +81,23 @@ class Parser:
     def __init__(self, gaz: Gazetteer | None = None) -> None:
         self.gaz = gaz or Gazetteer.load()
 
-    def parse(self, text: str) -> Observation:
+    def segments(self, text: str) -> list[str]:
+        """Ділить зведення на окремі повідомлення про цілі; заголовок області («Полтавщина:») переносить на наступні рядки."""
+        out, header = [], ""
+        for raw in SEG_SPLIT.split(text):
+            seg = (raw or "").strip(" \t-•–—")
+            if not seg:
+                continue
+            m = HEADER.match(seg)
+            if m:
+                header = m.group(1)
+                seg = seg[m.end():].strip()
+                if not seg:
+                    continue
+            out.append(f"{seg} ({header})" if header else seg)
+        return out or [text]
+
+    def parse(self, text: str, channel: str | None = None) -> Observation:
         t = norm(text)
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         m = COUNT.search(t)
@@ -85,7 +115,8 @@ class Parser:
             if rx.search(t):
                 obs.oblast_hint, bbox = name, bb
                 break
-        words = [w for w in WORD_SPLIT.split(text) if w]
+        words = [re.sub(r"[^\w'’\-]", "", w) for w in WORD_SPLIT.split(text)]
+        words = [w for w in words if w]
         found: list[tuple[str, list[int]]] = []
         i = 0
         while i < len(words):
@@ -93,7 +124,7 @@ class Parser:
             prev = norm(words[i - 1]) if i > 0 else ""
             prev2 = norm(words[i - 2]) if i > 1 else ""
             starts_upper = w[:1].isupper()
-            if not starts_upper and prev not in POS_PREV | {"в", "на", "у"}:
+            if not starts_upper or REGION_RX.search(norm(w)) or norm(w) in DIR_WORDS:
                 i += 1
                 continue
             nxt = norm(words[i + 1]) if i + 1 < len(words) else ""
@@ -116,6 +147,31 @@ class Parser:
                 found.append((role, ids))
             i += used
         obs.places = self._disambiguate(found, bbox)
+        mc = COURSE.search(t)
+        if mc:
+            g = mc.group(1) or mc.group(2)
+            for k, az in DIRS.items():
+                if g.startswith(k):
+                    obs.course = float(az)
+                    break
+        # «на сході від Харкова» — позиція за 20 км у вказаному напрямку від пункту
+        mr = REL.search(t)
+        if mr:
+            ids = self.gaz.lookup(mr.group(2))
+            if ids:
+                base = self._disambiguate([("p", ids)], bbox)[0].place
+                from .geo import from_xy, move
+                az = next(v for k, v in REL_AZ.items() if mr.group(1).startswith(k))
+                lat, lon = from_xy(*move(base.xy, az, 20))
+                rel = Place(f"{base.name} ({['пн', '', 'сх', '', 'пд', '', 'зх'][az // 45]})", lat, lon, base.kind, base.pop)
+                obs.places = [p for p in obs.places if p.place.name != base.name or p.role != "f"]
+                obs.places.insert(0, PlaceRef("p", rel))
+        # «над містом» у міському каналі
+        if channel in CHANNEL_CITY and CITY_WORDS.search(t) and not any(p.role == "p" for p in obs.places):
+            ids = self.gaz.lookup(CHANNEL_CITY[channel])
+            if ids:
+                city = max((self.gaz.places[i] for i in ids), key=lambda p: p.pop)
+                obs.places.insert(0, PlaceRef("p", city))
         return obs
 
     def _disambiguate(self, found, bbox) -> list[PlaceRef]:

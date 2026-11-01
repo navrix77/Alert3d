@@ -147,6 +147,8 @@ class Tracker:
             tr.route = route or [p for p in tr.route if dist_km(p.xy, pt) > 3]
             if tr.route:
                 tr.heading = bearing(pt, tr.route[0].xy)
+            elif obs.course is not None:
+                tr.heading = obs.course
             elif d > 3:
                 tr.heading = bearing(prev, pt)
         else:
@@ -156,6 +158,8 @@ class Tracker:
             tr.route = route
             if route:
                 tr.heading = bearing(pt, route[0].xy)
+            elif obs.course is not None:
+                tr.heading = obs.course
             elif frm and dist_km(frm.place.xy, pt) > 3:
                 tr.heading = bearing(frm.place.xy, pt)
             tr.from_place = frm.place if frm else None

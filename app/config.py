@@ -11,15 +11,25 @@ TG_SESSION = os.getenv("TG_SESSION", "")  # StringSession, створюєтьс�
 ALERTS_TOKEN = os.getenv("ALERTS_IN_UA_TOKEN", "")  # https://alerts.in.ua/api-request
 ALERTS_POLL_SEC = int(os.getenv("ALERTS_POLL_SEC", "15"))
 PUSH_SEC = float(os.getenv("PUSH_SEC", "2"))
+TG_WEB_CYCLE_SEC = float(os.getenv("TG_WEB_CYCLE_SEC", "12"))  # повний обхід усіх каналів
 MAP_STYLE_VECTOR = os.getenv("MAP_STYLE_VECTOR", "https://tiles.openfreemap.org/styles/liberty")
 MAPTILER_KEY = os.getenv("MAPTILER_KEY", "")
 
 # Вайтлист каналів: ключ -> (username, назва, апріорна довіра, офіційний)
 CHANNELS = [
+    # ключ, username, назва, апріорна довіра, офіційний
     ("K", "kpszsu", "Повітряні Сили ЗСУ", 0.95, True),
     ("D", "Nablydatel_Dozor", "Наблюдатель · Ночной Дозор", 0.80, False),
     ("M", "monitor1654", "monitor 1654", 0.80, False),
     ("R", "radar_kharkov", "Радар Харків", 0.70, False),
+    ("CX", "cxidua", "Схід (Харків)", 0.65, False),
+    ("MU", "mon1tor_ua", "Монітор UA", 0.75, False),
+    ("KL", "kudy_letyt", "Куди летить", 0.70, False),
+    ("WM", "war_monitor", "War Monitor", 0.70, False),
+    ("SU", "sumy_monitor", "Суми монітор", 0.70, False),
+    ("PL", "PoltavaRadar", "Полтава радар", 0.65, False),
+    ("DN", "dnipro_alerts", "Дніпро тривоги", 0.65, False),
+    ("KR", "kramatorsk_radar", "Краматорськ радар", 0.65, False),
 ]
 extra = os.getenv("TG_CHANNELS_EXTRA", "")  # "key:username:Назва:0.7,..."
 for item in filter(None, extra.split(",")):
