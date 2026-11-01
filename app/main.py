@@ -137,6 +137,8 @@ def raion_centroid(n: str):
 
 
 def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
+    if time.time() - ts < 300:
+        alerts.fast_signal(text, ts)  # швидкий старт/відбій тривоги з ретрансляцій каналів
     # повідомлення, яке вже бачили до перезапуску, відновлює трек, але не вчить модель вдруге
     again = brain.seen(link)
     tracker.learn = not again

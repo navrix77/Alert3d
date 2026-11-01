@@ -218,7 +218,7 @@ class OfficialAlerts:
                     log.warning("alerts.in.ua md failed: %s", e)
                     if fails >= 2:
                         await self.ubilling_once(cli)
-                await asyncio.sleep(20)
+                await asyncio.sleep(7)  # зведення оновлюється приблизно щохвилини — ловимо зміни якнайшвидше
 
     async def ubilling_once(self, cli) -> None:
         try:
@@ -248,6 +248,35 @@ class OfficialAlerts:
                     log.warning("ubilling poll failed: %s", e)
                 await asyncio.sleep(max(15, config.ALERTS_POLL_SEC))
 
+    FAST_RX = re.compile(r"([А-ЯІЇЄҐ][а-яіїєґ'’ʼ]+(?:ський|цький|зький))\s+(?:район|р-н)[^\n]{0,6}?[—–-]\s*(повітряна тривога|відбій|тривога скасована)([^\n]*)", re.I)
+    overrides: dict = {}
+
+    def fast_signal(self, text: str, ts: float) -> int:
+        """Канали ретранслюють «Сумський район — повітряна тривога / відбій» раніше, ніж оновиться зведення:
+        застосовуємо одразу на 2 хв, далі знову головне джерело — офіційне зведення."""
+        n = 0
+        names = self._hromadas()["_raions"]
+        ap = lambda x: x.replace("’", "'").replace("ʼ", "'")
+        for m in self.FAST_RX.finditer(text):
+            nm, what, rest = m.group(1), m.group(2).lower(), m.group(3).lower()
+            r = next((x for x in names if ap(x) == ap(nm)), None)
+            if not r:
+                continue
+            lvl = 0 if what != "повітряна тривога" else (1 if "жовт" in rest else 2)
+            self.overrides[r] = (lvl, ts)
+            n += 1
+        return n
+
     def state(self) -> dict:
-        return {"levels": self.oblast_levels, "raions": self.raions, "raion_levels": self.raion_levels, "points": self.points,
+        rl = dict(self.raion_levels)
+        now = time.time()
+        for r, (lvl, ts) in list(self.overrides.items()):
+            if now - ts > 120:
+                self.overrides.pop(r, None)
+                continue
+            if lvl:
+                rl[r] = max(rl.get(r, 0), lvl)
+            else:
+                rl.pop(r, None)
+        return {"levels": self.oblast_levels, "raions": sorted(rl), "raion_levels": rl, "points": self.points,
                 "updated": self.updated, "ok": self.ok, "error": self.error, "source": self.source}
