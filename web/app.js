@@ -500,7 +500,6 @@ window.__beep=()=>{if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
 applyTheme(false);
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
-})();
 
 /* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */
 const NOTE_CLR={red:'#FF4D57',orange:'#FF9F2E',green:'#2FE38A',blue:'#5AA2FF',violet:'#C77DFF'};
@@ -545,3 +544,6 @@ function notesCheck(s){
   for(const h of (s.hits||[])){const k='H:'+(h.link||'')+':'+h.place+':'+h.what;if(first){NSEEN.add(k);continue;}
     note({k,t:h.t,lvl:'blue',ic:'🎯',title:'Уражено: '+h.what+' · '+h.place,sub:'Генштаб ЗСУ',go:()=>flyP([h.lon,h.lat],7)});}
 }
+
+window.__note=note;
+})();
