@@ -177,6 +177,18 @@ class Tracker:
                     self.brain.learn_step(tr.type, prev.place, pos.place, 0.6 if prev.est else 1.0)
                 if d > 3 and not route and obs.course is None:
                     tr.heading = bearing((prev.x, prev.y), pt)
+            elif route:
+                # «на X» від каналу, що веде ціль щохвилини: ціль уже біля X (так показують провідні сервіси).
+                # Переносимо її в X, якщо X досяжний за час від останньої фіксації; курс — звідки прийшла.
+                X = route[0]
+                e = tr.est(t)
+                reach = tr.speed * max(60.0, t - tr.last.t) / 3600 * 1.6 + 12
+                if dist_km(e, X.xy) <= reach:
+                    prev = tr.last
+                    tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
+                    if dist_km((prev.x, prev.y), X.xy) > 3:
+                        tr.heading = bearing((prev.x, prev.y), X.xy)
+                    route = route[1:]
             if route:
                 # ціль змінила пункт призначення: послідовність «курсом на A» → «курсом на B» теж маршрут
                 old = tr.route[0] if tr.route else None

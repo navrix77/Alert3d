@@ -29,9 +29,11 @@ parser = Parser()
 from . import launch
 from .brain import Brain
 from .push import Push
+from .ru_strikes import RuStrikes
 
 brain = Brain()
 pushsvc = Push()
+ru = RuStrikes()
 tracker = Tracker(config.SOURCES, brain)
 alerts = OfficialAlerts()
 alerts.on_threat = lambda ev: on_threat(ev)
@@ -166,6 +168,7 @@ def state() -> dict:
     # Заливка регіонів — ЛИШЕ офіційні тривоги. Оцінка трекера йде окремо (levels_tracker) і регіони не фарбує.
     snap["levels"] = dict(off["levels"])
     snap["official"] = off
+    snap["ru"] = ru.state()
     snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
     snap["health"] = {
         "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1" or webmon.state()["live"] > 0,
@@ -200,6 +203,7 @@ async def pusher() -> None:
 async def lifespan(app: FastAPI):
     tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     tasks.append(asyncio.create_task(pushsvc.run(state)))
+    tasks.append(asyncio.create_task(ru.run()))
     if os.getenv("REPLAY") != "1":
         tasks.append(asyncio.create_task(telegram_src.run(on_message) if config.TG_SESSION else webmon.run(on_message)))
         tasks.append(asyncio.create_task(learn_history()))
@@ -232,6 +236,27 @@ async def push_register(body: dict):
 async def push_unregister(body: dict):
     pushsvc.unregister(str(body.get("token", "")))
     return {"ok": True}
+
+
+@app.get("/api/lan")
+def api_lan():
+    """Адреси цього комп'ютера в локальній мережі — щоб відкрити «Тривогу» на телефоні (QR у налаштуваннях)."""
+    import socket
+    ips = set()
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("10.255.255.255", 1))
+        ips.add(s.getsockname()[0])
+        s.close()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ips.add(info[4][0])
+    except Exception:  # noqa: BLE001
+        pass
+    ips = sorted(i for i in ips if not i.startswith("127.") and not i.startswith("169.254."))
+    return {"urls": [f"http://{i}:8090" for i in ips]}
 
 
 @app.get("/healthz")

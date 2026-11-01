@@ -100,7 +100,8 @@ def test_parser_real_world_cases():
     assert pl("Ракетний удар по Харкову", "M")[0][1] == "Харків"
     assert pl("БпЛА на Лозову")[0][1] == "Лозова" and P.parse("БпЛА на Лозову").places[0].place.lat < 49.2
     assert P.parse("Ударний на Безлюдівку", "M").type == "shahed"
-    assert pl("Шахед над Трухановим островом", "kievreal1") == []
+    assert pl("Шахед над Трухановим островом", "kievreal1") == [("p", "Труханів острів (Київ)")]
+    assert [r.place.name for r in P.parse("Ударний на Холодну Гору", "M").places] == ["Холодна Гора (Харків)"]
 
 
 def test_alerts_single_area_not_whole_oblast():
