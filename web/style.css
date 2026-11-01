@@ -171,3 +171,44 @@
 .cnt{padding:6px 12px 6px 8px!important}.cnt b{font-size:22px!important}.cnt canvas{width:22px!important;height:22px!important}
 @media (max-width:640px){.me{left:12px;right:12px!important;width:auto;top:auto;bottom:calc(84px + env(safe-area-inset-bottom))}.top{right:12px}}
 .maplibregl-ctrl-attrib{opacity:.55}
+
+/* ===================== Налаштування ===================== */
+.settings{position:fixed;right:0;top:0;bottom:0;width:min(420px,100%);z-index:9;overflow-y:auto;padding:calc(14px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
+  background:linear-gradient(170deg,rgba(255,255,255,.09),rgba(255,255,255,.015) 30%),var(--glass-strong);backdrop-filter:var(--glass-fx);-webkit-backdrop-filter:var(--glass-fx);
+  border-left:1px solid var(--rim);box-shadow:-20px 0 60px rgba(0,0,0,.45);animation:drawerIn .6s var(--spring) both}
+.st-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}.st-head h2{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.settings section{padding:14px 0;border-top:1px solid rgba(127,127,127,.18)}
+.settings h3{margin:0 0 10px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:700}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:rgba(127,127,127,.14)}
+.seg button{flex:1;border:0;border-radius:10px;padding:9px 6px;background:none;color:var(--fg);font:600 14px var(--f);cursor:pointer;transition:background .25s,transform .4s var(--spring)}
+.seg button.on{background:var(--fg);color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.seg button:active{transform:scale(.94)}
+.seg.small button{padding:6px 0;min-width:30px}
+.settings .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pill{border:1px solid var(--rim);background:rgba(127,127,127,.12);color:var(--fg);border-radius:12px;padding:8px 12px;font:600 13px var(--f);cursor:pointer}
+.pill.ghost{background:none;color:var(--mute)}
+.sw{display:flex;gap:12px;align-items:flex-start;margin-top:12px;cursor:pointer;font-size:14px;line-height:1.35}
+.sw small{color:var(--mute)}
+.sw input{appearance:none;flex:none;width:44px;height:26px;border-radius:13px;background:rgba(127,127,127,.35);position:relative;cursor:pointer;transition:background .3s;margin:0}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .45s var(--spring)}
+.sw input:checked{background:#34C759}.sw input:checked::after{transform:translateX(18px)}
+.note{color:var(--mute);font-size:13px;line-height:1.45;margin:8px 0 0}
+.qr-wrap{display:flex;gap:14px;align-items:flex-start}#st-qr{flex:none;background:#fff;padding:8px;border-radius:14px}#st-qr img,#st-qr canvas{display:block}
+.urls code{display:block;font-size:13px;margin-top:6px;color:var(--fg);user-select:all}
+
+/* ===================== День ===================== */
+:root[data-theme="day"]{--ink:#EEF2F8;--fg:#0B1220;--mute:#556073;--line:rgba(10,20,40,.10);--glass:rgba(255,255,255,.55);--glass-strong:rgba(255,255,255,.78);--rim:rgba(255,255,255,.9);color-scheme:light}
+:root[data-theme="day"] body{background:#EEF2F8}
+:root[data-theme="day"] .cnt,:root[data-theme="day"] .asof,:root[data-theme="day"] .dock,:root[data-theme="day"] .me,:root[data-theme="day"] .sheet,:root[data-theme="day"] .drawer,:root[data-theme="day"] .toast{
+  background:linear-gradient(160deg,rgba(255,255,255,.75),rgba(255,255,255,.35) 45%,rgba(255,255,255,.2)),var(--glass)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 18px 50px rgba(20,40,80,.18)!important;border-color:rgba(255,255,255,.8)!important;color:var(--fg)}
+:root[data-theme="day"] .me-sub{color:#3A4558!important}
+:root[data-theme="day"] .dock button{color:#0B1220}
+:root[data-theme="day"] .dock button.on{background:rgba(10,20,40,.08)}
+:root[data-theme="day"] .sh-icon{background:radial-gradient(circle at 50% 35%,#fff,#e6ebf3)!important}
+:root[data-theme="day"] .sheet .grid>div{background:rgba(255,255,255,.55);border-color:rgba(10,20,40,.06)}
+:root[data-theme="day"] .maplibregl-ctrl-attrib{background:rgba(255,255,255,.6)!important;color:#334}
+:root[data-theme="day"] .cta{background:linear-gradient(180deg,#0B1220,#26324a);color:#fff}
+:root[data-theme="day"] .seg button.on{background:#0B1220;color:#fff}
+:root[data-theme="day"] .me-set{background:rgba(10,20,40,.08);color:#0B1220;border-color:rgba(10,20,40,.1)}
+:root[data-theme="day"] .round{background:rgba(10,20,40,.08)!important;color:#0B1220!important}

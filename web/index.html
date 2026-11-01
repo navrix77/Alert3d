@@ -65,7 +65,25 @@
   <button id="b-layers" title="Підкладка"><svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button>
   <button id="b-3d" title="3D">3D</button>
   <button id="b-feed" title="Стрічка"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  <button id="b-set" title="Налаштування"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M4.2 7.5l2.2 1.3M17.6 15.2l2.2 1.3M4.2 16.5l2.2-1.3M17.6 8.8l2.2-1.3"/></svg></button>
 </nav>
+
+<aside class="settings" id="settings" hidden>
+  <div class="st-head"><h2>Налаштування</h2><button class="round" id="st-close" aria-label="Закрити">✕</button></div>
+  <section><h3>Тема</h3><div class="seg" data-pref="theme"><button data-v="auto">Авто</button><button data-v="day">День</button><button data-v="night">Ніч</button></div>
+    <p class="note" id="st-theme-note"></p></section>
+  <section><h3>Карта</h3><div class="seg" data-pref="base"><button data-v="night">Нічні вогні</button><button data-v="sat">Супутник</button><button data-v="map">Схема</button></div>
+    <label class="sw"><input type="checkbox" id="st-3d"><span>Об'ємний вигляд (3D)</span></label></section>
+  <section><h3>Мій дім</h3><div class="row"><button class="pill" id="st-geo">Визначити автоматично</button><button class="pill" id="st-pick">Поставити на карті</button><button class="pill ghost" id="st-clear">Прибрати</button></div>
+    <div class="row"><span>До укриття йти</span><div class="seg small" data-pref="shelter"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button><button data-v="10">10</button></div><span>хв</span></div>
+    <label class="sw"><input type="checkbox" id="st-sound"><span>Звуковий сигнал, коли ціль іде на мій район</span></label></section>
+  <section><h3>Що показувати</h3>
+    <label class="sw"><input type="checkbox" id="st-ru"><span>Куди летіли наші дрони <small>(регіони РФ за заявами МО РФ, постфактум)</small></span></label>
+    <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>
+    <label class="sw"><input type="checkbox" id="st-zones"><span>Зони КАБ</span></label></section>
+  <section><h3>Відкрити на телефоні</h3><div class="qr-wrap"><div id="st-qr"></div><div><p class="note">Телефон у тій самій Wi‑Fi — наведіть камеру на код. Потім «Поділитися → На початковий екран», і «Тривога» стане окремою іконкою.</p><div id="st-urls" class="urls"></div></div></div></section>
+  <section><h3>Про дані</h3><p class="note" id="st-tech"></p></section>
+</aside>
 
 <div class="toast" id="toast" hidden></div>
 
@@ -73,6 +91,7 @@
 <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
 <script src="icons.js"></script>
 <script src="models3d.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="fx.js"></script>
 <script src="app.js"></script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>

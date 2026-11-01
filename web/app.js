@@ -16,6 +16,7 @@ const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(
 let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base2')||'night';
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
+const PREFL=()=>{try{return Object.assign({launch:true},JSON.parse(localStorage.getItem('pref')||'{}'));}catch(e){return {launch:true};}};
 const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,kab:600})[t]||200;
 
 /* ---------- карта ---------- */
@@ -68,6 +69,10 @@ function addOverlays(){
   map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.16,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':'#fff','line-opacity':['interpolate',['linear'],['zoom'],5.5,0.25,9,0.55],'line-width':['interpolate',['linear'],['zoom'],6,0.5,10,1.2]}});
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
+  map.addSource('ru',{type:'geojson',data:EMPTY});
+  map.addLayer({id:'ru-glow',type:'circle',source:'ru',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':0.9,'circle-opacity':0.45,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'ru-dot',type:'circle',source:'ru',paint:{'circle-radius':5,'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':3}});
+  map.addLayer({id:'ru-t',type:'symbol',source:'ru',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,1.3],'text-anchor':'top','text-allow-overlap':false},paint:{'text-color':'#FFE36B','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['case',['get','est'],5,7],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
@@ -106,7 +111,7 @@ map.once('idle',()=>setTimeout(()=>introFly(false),INTRO?700:0));
 setTimeout(()=>introFly(false),6000);
 {const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
 map.on('click',e=>{if(!setHomeMode)return;const f=map.queryRenderedFeatures(e.point,{layers:['tg-hit']});if(f.length)return;home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));setHomeMode=false;$('#b-home').classList.remove('on');syncHome();toast('Дім збережено');});
-fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};}).catch(()=>{}).finally(()=>setBase(base));
+fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};}).catch(()=>{}).finally(()=>setBase(base==='__init'?'night':base));
 
 /* ---------- позиція цілі в момент часу ---------- */
 function posAt(tr,serverT){
@@ -166,6 +171,8 @@ function frame(now){
       f._p=P;shown.push(f);}
     feats.length=0;feats.push(...shown);
     const vis=new Set(shown.map(f=>f.properties.id));window.FX=fx.filter(f=>vis.has(f.id));
+    window.FXHOME=home?{p:home,state:$('#me').classList.contains('danger')?'danger':$('#me').classList.contains('watch')?'watch':'calm'}:null;
+    if(slow)window.FXBEACONS=PREFL().launch?(SNAP.launches||[]).filter(L=>serverT-L.t<3*3600).map(L=>({p:[L.lon,L.lat]})):[];
     if(slow)map.getSource('targets').setData({type:'FeatureCollection',features:feats});
     if(false){const thr=new Set(threats.map(x=>x.tr.id)),z=map.getZoom(),sz=Math.max(18,Math.min(70,10+z*5));
      window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
@@ -269,7 +276,7 @@ function renderBanner(threats){
   b.onclick=()=>openSheet(t.tr.id);
   // кінематографічний переліт: нова загроза дому — камера плавно показує і дім, і ціль (якщо користувач не крутить карту)
   renderBanner.seen=renderBanner.seen||new Set();
-  if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);const d=DISP.get(t.tr.id);
+  if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);window.__beep&&window.__beep();const d=DISP.get(t.tr.id);
     if(d&&home&&introDone&&Date.now()-(window.__introAt||0)>9000&&Date.now()-(window.__touch||0)>20000){const b2=new maplibregl.LngLatBounds(home,home).extend(d.p);
       const cam=map.cameraForBounds(b2,{padding:{top:140,bottom:160,left:80,right:380}});if(cam)map.flyTo({...cam,zoom:Math.min(cam.zoom,10),pitch:tilt?55:20,bearing:tilt?-18:0,curve:1.5,speed:0.7,essential:true});}}
 }
@@ -320,7 +327,7 @@ function renderFeed(){
 $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Довге натискання — змінити дім');return;}setHomeMode=!setHomeMode;$('#b-home').classList.toggle('on',setHomeMode);toast(setHomeMode?'Торкніться карти, щоб позначити дім':'Скасовано');};
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
-$('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
+$('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D) — без перспективних спотворень; у 3D лише коротша тінь
   if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
 function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
@@ -339,5 +346,50 @@ function connect(){
 }
 connect();
 setInterval(()=>{if(ws&&ws.readyState===1)ws.send('ping');},20000);
+
+/* ---------- налаштування, теми, шари ---------- */
+const PREF=Object.assign({theme:'auto',base:null,sound:false,ru:true,launch:true,zones:true},(()=>{try{return JSON.parse(localStorage.getItem('pref')||'{}');}catch(e){return {};}})());
+const savePref=()=>{try{localStorage.setItem('pref',JSON.stringify(PREF));}catch(e){}};
+function sunNight(){const p=home||[31.5,49];const d=new Date();const doy=Math.floor((d-new Date(d.getFullYear(),0,0))/864e5);
+  const decl=23.44*Math.sin(2*Math.PI*(284+doy)/365)*D2R,lat=p[1]*D2R;const h0=Math.acos(Math.max(-1,Math.min(1,(Math.sin(-0.83*D2R)-Math.sin(lat)*Math.sin(decl))/(Math.cos(lat)*Math.cos(decl)))))/D2R;
+  const noonUTC=12-p[0]/15;const rise=noonUTC-h0/15,set=noonUTC+h0/15;const u=d.getUTCHours()+d.getUTCMinutes()/60;return !(u>rise&&u<set);}
+function effTheme(){return PREF.theme==='auto'?(sunNight()?'night':'day'):PREF.theme;}
+function applyTheme(force){const th=effTheme();document.documentElement.dataset.theme=th;window.FXDAY=th==='day';
+  const want=PREF.base||(th==='night'?'night':'map');if(force||want!==base)setBase(want);
+  $('#st-theme-note').textContent=PREF.theme==='auto'?('Зараз: '+(th==='night'?'ніч':'день')+' — перемикається само за сходом і заходом сонця над вашим домом.'):'';syncSettingsUI();}
+function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
+  $('#st-3d').checked=tilt;$('#st-sound').checked=!!PREF.sound;$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
+function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
+  vis(['ru-glow','ru-dot','ru-t'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones'],PREF.zones);}
+map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
+function syncRu(){if(!SNAP||!map.getSource('ru'))return;const agg=new Map();
+  for(const e of (SNAP.ru||[]))for(const r of e.regions){const a=agg.get(r.n)||{n:r.n,lat:r.lat,lon:r.lon,c:0,t:0};a.c+=r.cnt||0;a.t=Math.max(a.t,e.t);agg.set(r.n,a);}
+  map.getSource('ru').setData({type:'FeatureCollection',features:[...agg.values()].map(a=>({type:'Feature',properties:{c:Math.min(12,a.c/4||3),l:a.n+(a.c?' · ×'+a.c:'')+' · '+fmt(a.t)},geometry:{type:'Point',coordinates:[a.lon,a.lat]}}))});}
+setInterval(syncRu,5000);
+$('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
+  const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};
+$('#st-close').onclick=()=>$('#settings').hidden=true;
+document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.pref,v=b.dataset.v;
+  if(k==='theme'){PREF.theme=v;PREF.base=null;savePref();applyTheme(true);}
+  else if(k==='base'){PREF.base=v;savePref();setBase(v);setTimeout(syncSettingsUI,50);}
+  else if(k==='shelter'){SHELTER=+v;localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;syncSettingsUI();}}));
+$('#st-3d').onchange=e=>set3d(e.target.checked,true);
+$('#st-sound').onchange=e=>{PREF.sound=e.target.checked;savePref();if(PREF.sound)beep();};
+$('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
+$('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
+$('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};
+$('#st-geo').onclick=()=>{$('#b-locate').click();};
+$('#st-pick').onclick=()=>{$('#settings').hidden=true;setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');};
+$('#st-clear').onclick=()=>{home=null;localStorage.removeItem('home');syncHome();toast('Дім прибрано');};
+let lanDone=false;function loadLan(){if(lanDone)return;fetch('/api/lan').then(r=>r.json()).then(j=>{lanDone=true;const urls=j.urls||[];const host=location.hostname;
+  const best=(host!=='localhost'&&host!=='127.0.0.1')?location.origin:(urls[0]||location.origin);
+  $('#st-urls').innerHTML=(urls.length?urls:[location.origin]).map(u=>'<code>'+esc(u)+'</code>').join('');
+  try{$('#st-qr').innerHTML='';new QRCode($('#st-qr'),{text:best,width:132,height:132,colorDark:'#0B0F17',colorLight:'#ffffff'});}catch(e){$('#st-qr').textContent=best;}}).catch(()=>{});}
+let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.type='sine';o.frequency.value=880;o.connect(g);g.connect(actx.destination);
+  const t=actx.currentTime;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.3,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.5);o.start(t);o.stop(t+0.55);
+  const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
+window.__beep=()=>{if(PREF.sound)beep();};
+setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
+applyTheme(false);
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 })();

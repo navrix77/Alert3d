@@ -30,6 +30,15 @@
         for (int i = 0; i < 2; i++) { float ph = fract(u_t * 0.5 + float(i) * 0.5);
           a += smoothstep(0.045, 0.0, abs(r - ph)) * (1.0 - ph); }
         a *= v_col.a; gl_FragColor = vec4(v_col.rgb * a, a);
+      } else if (v_kind > 4.5) {                // радар навколо дому: кільця дальності + розгортка з шлейфом
+        if (r > 1.0) discard;
+        float ang = atan(v_c.x, v_c.y);
+        float ph = mod(ang - u_t * 1.1, 6.2831853) / 6.2831853;
+        float sweep = pow(1.0 - ph, 10.0) * 0.55 + smoothstep(0.012, 0.0, 1.0 - ph) * 0.6;
+        float rings = 0.0;
+        for (int i = 1; i <= 3; i++) rings += smoothstep(0.012, 0.0, abs(r - float(i) / 3.0)) * 0.28;
+        float a = (sweep * (1.0 - r * 0.35) + rings) * v_col.a * smoothstep(1.0, 0.92, r) + exp(-r * r * 60.0) * 0.5 * v_col.a;
+        gl_FragColor = vec4(v_col.rgb * a, a);
       } else if (v_kind < 2.5) {                // кільце вибору
         if (r > 1.0) discard;
         float a = smoothstep(0.08, 0.0, abs(r - 0.86)) * v_col.a;
@@ -37,7 +46,7 @@
       } else {                                  // спрайт (3) або його тінь (4)
         vec2 uv = vec2(v_c.x, -v_c.y) * 0.5 + 0.5;
         vec4 t = texture2D(u_tex, uv);
-        if (v_kind > 3.5) gl_FragColor = vec4(0.0, 0.0, 0.0, t.a * 0.5);
+        if (v_kind > 3.5 && v_kind < 4.5) gl_FragColor = vec4(0.0, 0.0, 0.0, t.a * 0.5);
         else gl_FragColor = vec4(t.rgb * t.a, t.a) * v_col.a;
       }
     }`;
@@ -89,12 +98,27 @@
       gl.drawArrays(gl.TRIANGLES, 0, n * 6);
     },
     render(gl, args) {
-      const L = window.FX || []; if (!L.length) return;
+      const L = window.FX || [], H = window.FXHOME, B = window.FXBEACONS || [];
+      if (!L.length && !H && !B.length) return;
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
       const spr = Math.max(13, Math.min(34, 5 + z * 3.1));      // напіврозмір спрайта, px
       const glow = [], top = [];
+      const day = !!window.FXDAY;
+      if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
+        const hm = mc(H.p), mpp = 40075016.686 * Math.cos(H.p[1] * Math.PI / 180) / (512 * Math.pow(2, z));
+        const c = H.state === 'danger' ? [1, 0.23, 0.3] : H.state === 'watch' ? [1, 0.72, 0.2] : [0.2, 0.95, 0.55];
+        glow.push([hm[0], hm[1], Math.max(40, 25000 / mpp), 0, [c[0], c[1], c[2], day ? 0.55 : 0.8], 5]);
+        // світловий потік від кожної загрози до дому
+        const tnow = performance.now() / 1000;
+        for (const f of L) if (f.thr) { const tm = mc(f.p);
+          for (let k = 0; k < 7; k++) { const u = (tnow * 0.45 + k / 7) % 1;
+            glow.push([tm[0] + (hm[0] - tm[0]) * u, tm[1] + (hm[1] - tm[1]) * u, spr * 0.35, 0, [1, 0.3, 0.35, 0.8 * Math.sin(u * Math.PI)], 0]); } }
+      }
+      for (const b of B) { const bm = mc(b.p); // маяки місць пуску
+        glow.push([bm[0], bm[1], spr * 1.2, 0, [1, 0.2, 0.25, 0.9], 0]);
+        glow.push([bm[0], bm[1], spr * 4, 0, [1, 0.2, 0.25, 0.8], 1]); }
       for (const f of L) {
         const m = mc(f.p), c = f.col, a = f.weak ? 0.45 : 1;
         // хвіст: краплі світла вздовж пройденого шляху, тануть до кінця
@@ -112,7 +136,7 @@
       gl.uniform1f(this.u.px, 1 / (512 * Math.pow(2, z)));
       gl.uniform1f(this.u.t, (performance.now() - this.t0) / 1000);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE);                       // адитивне світло
+      if (day) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendFunc(gl.ONE, gl.ONE); // уночі — адитивне світло
       this.draw(gl, this.quads(glow), glow.length);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);        // тіні, спрайти, кільця
       gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.u.tex, 0);

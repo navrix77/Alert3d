@@ -255,7 +255,9 @@ def api_lan():
             ips.add(info[4][0])
     except Exception:  # noqa: BLE001
         pass
-    ips = sorted(i for i in ips if not i.startswith("127.") and not i.startswith("169.254."))
+    # спершу домашня Wi‑Fi (192.168.*, 10.*), віртуальні адаптери (172.16–31.*: WSL/Hyper‑V) — в кінці
+    rank = lambda i: 0 if i.startswith("192.168.") else 1 if i.startswith("10.") else 2
+    ips = sorted((i for i in ips if not i.startswith("127.") and not i.startswith("169.254.")), key=lambda i: (rank(i), i))
     return {"urls": [f"http://{i}:8090" for i in ips]}
 
 
