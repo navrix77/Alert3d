@@ -30,6 +30,15 @@
         for (int i = 0; i < 2; i++) { float ph = fract(u_t * 0.5 + float(i) * 0.5);
           a += smoothstep(0.045, 0.0, abs(r - ph)) * (1.0 - ph); }
         a *= v_col.a; gl_FragColor = vec4(v_col.rgb * a, a);
+      } else if (v_kind > 5.5) {                // полум'я з сопла реактивного шахеда: тремтить і пульсує
+        float d = (0.95 - v_c.y) / 1.95;            // 0 — сопло, 1 — кінчик язика
+        if (d < 0.0 || d > 1.0) discard;
+        float fl = 0.5 + 0.5 * sin(u_t * 37.0 + v_col.a * 50.0) * sin(u_t * 23.0);
+        float L = 0.62 + 0.3 * fl;
+        float w = 0.42 * pow(max(0.0, 1.0 - d / L), 0.55) * (1.0 + 0.18 * sin(d * 18.0 - u_t * 45.0));
+        float a = smoothstep(w, w * 0.25, abs(v_c.x + 0.06 * sin(d * 9.0 - u_t * 30.0) * d)) * smoothstep(L, L * 0.5, d);
+        vec3 col = mix(vec3(1.0, 0.97, 0.8), mix(vec3(1.0, 0.55, 0.1), vec3(0.95, 0.15, 0.05), smoothstep(0.35, 0.9, d / L)), smoothstep(0.05, 0.35, d / L));
+        gl_FragColor = vec4(col * a, a);
       } else if (v_kind > 4.5) {                // радар навколо дому: кільця дальності + розгортка з шлейфом
         if (r > 1.0) discard;
         float ang = atan(v_c.x, v_c.y);
@@ -46,8 +55,15 @@
       } else {                                  // спрайт (3) або його тінь (4)
         vec2 uv = vec2(v_c.x, -v_c.y) * 0.5 + 0.5;
         vec4 t = texture2D(u_tex, uv);
-        if (v_kind > 3.5 && v_kind < 4.5) gl_FragColor = vec4(0.0, 0.0, 0.0, t.a * 0.5);
-        else gl_FragColor = vec4(t.rgb * t.a, t.a) * v_col.a;
+        if (v_kind > 3.5 && v_kind < 4.5) { gl_FragColor = vec4(0.0, 0.0, 0.0, t.a * 0.5); return; }
+        // чорний силует + яскравий контур кольору типу, щоб ціль було видно на будь-якій підкладці
+        float o = 0.0;
+        for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236;
+          o = max(o, texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.034).a); }
+        float rim = clamp(o - t.a, 0.0, 1.0);
+        float a = max(t.a, rim);
+        vec3 col = t.rgb * t.a + v_col.rgb * rim;
+        gl_FragColor = vec4(col, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -143,14 +159,21 @@
       this.draw(gl, this.quads(glow), glow.length);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);        // тіні, спрайти, кільця
       gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.u.tex, 0);
+      const fl = [];
       for (const f of L) {
         const tx = this.tex[f.type]; if (!tx) continue;
         gl.bindTexture(gl.TEXTURE_2D, tx);
-        const r = (f.hd || 0) * Math.PI / 180, a = f.weak ? 0.6 : 1;
+        const r = (f.hd || 0) * Math.PI / 180, a = f.weak ? 0.6 : 1, c = f.col;
+        const rc = [Math.min(1, c[0] * 1.15 + 0.15), Math.min(1, c[1] * 1.15 + 0.15), Math.min(1, c[2] * 1.15 + 0.15), a];
         const q = [[f._m[0], f._m[1], spr, r, [1, 1, 1, a], 4, 0, 0, spr * 0.12, spr * 0.18],
-                   [f._m[0], f._m[1], spr, r, [1, 1, 1, a], 3]];
+                   [f._m[0], f._m[1], spr, r, rc, 3]];
         this.draw(gl, this.quads(q), 2);
+        if (f.type === 'jet') { // язик полум'я позаду сопла (сопло ≈ 0.88 напіврозміру від центру)
+          const fs = spr * 0.62, back = spr * 0.88 + fs * 0.95, seed = ((f.p[0] * 97 + f.p[1] * 31) % 1 + 1) % 1;
+          fl.push([f._m[0], f._m[1], fs, r, [1, 1, 1, seed], 6, 0, 0, -Math.sin(r) * back, Math.cos(r) * back]);
+        }
       }
+      if (fl.length) { gl.blendFunc(gl.ONE, gl.ONE); this.draw(gl, this.quads(fl), fl.length); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
       if (top.length) this.draw(gl, this.quads(top), top.length);
       map.triggerRepaint();
     },
