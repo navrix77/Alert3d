@@ -57,7 +57,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
 <script>
 'use strict';
-const T={shahed:['Шахеди / Герані','#FFB020'],jet:['Реактивні БпЛА','#FF4FA3'],molniya:['«Молнії»','#6CFF7A'],cruise:['Крилаті ракети','#A47BFF'],ballistic:['Балістичні ракети','#FF3B30'],kab:['КАБи','#3FD0F0']};
+const T={shahed:['Шахеди / Герані','#FFB020'],jet:['Реактивні БпЛА','#2EE6E6'],molniya:['«Молнії»','#6CFF7A'],cruise:['Крилаті ракети','#B07CFF'],ballistic:['Балістичні ракети','#FF5A3C'],kab:['КАБи','#FF8A3D']};
 const $=s=>document.querySelector(s);
 const q=new URLSearchParams(location.search);let DAY=q.get('d')||null,D=null,CUR=1,playing=false;
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -81,7 +81,7 @@ function flame(){const c=document.createElement('canvas'),s=64;c.width=c.height=
 map.on('load',async()=>{
   map.addImage('flame',flame(),{pixelRatio:2});
   for(const [id,url] of [['obl','/data/oblasts.geojson'],['occ','/data/occupied.geojson']])map.addSource(id,{type:'geojson',data:url});
-  map.addLayer({id:'occ',type:'fill',source:'occ',paint:{'fill-color':'#5a1a26','fill-opacity':0.5}});
+  map.addLayer({id:'occ',type:'fill',source:'occ',paint:{'fill-color':'#7A2A36','fill-opacity':0.45}});
   map.addLayer({id:'obl',type:'line',source:'obl',paint:{'line-color':'rgba(255,255,255,.28)','line-width':0.8}});
   map.addSource('tr',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'tr-glow',type:'line',source:'tr',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':9,'line-blur':8,'line-opacity':0.12}});
