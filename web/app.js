@@ -580,7 +580,7 @@ function note(n){
   notesAll();
   if(n.lvl==='red'||n.lvl==='orange'){window.__beep&&window.__beep();if(navigator.vibrate)try{navigator.vibrate([120,60,120]);}catch(e){}}
   if(PREF.sys&&document.hidden&&'Notification' in window&&Notification.permission==='granted'){
-    try{const sn=new Notification(n.title,{body:n.sub||'',tag:n.k,icon:'icons/icon.svg',renotify:false});sn.onclick=()=>{window.focus();n.go&&n.go();sn.close();};}catch(e){}}
+    try{const sn=new Notification(n.title,{body:n.sub||'',tag:n.k,icon:'brand/icon-192.png',renotify:false});sn.onclick=()=>{window.focus();n.go&&n.go();sn.close();};}catch(e){}}
 }
 function notesAll(){const box=$('#notes');let a=box.querySelector('.all');const n=box.querySelectorAll('.note-c').length;
   if(n>=2&&!a){a=document.createElement('button');a.className='all';a.textContent='Закрити всі';a.onclick=()=>{box.innerHTML='';};box.prepend(a);}

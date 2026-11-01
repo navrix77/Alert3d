@@ -265,7 +265,7 @@ async def lifespan(app: FastAPI):
         t.cancel()
 
 
-app = FastAPI(title="Тривога", lifespan=lifespan)
+app = FastAPI(title="NAVRYX SKY", lifespan=lifespan)
 
 
 @app.get("/api/state")

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0B0F17">
-<title>Тривога</title>
+<title>NAVRYX SKY — повітряна обстановка наживо</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -16,9 +16,9 @@
 <body>
 <div id="map"></div>
 <div id="intro">
-  <div class="radar"><i class="r1"></i><i class="r2"></i><i class="r3"></i><i class="sweep"></i><b class="bl b1"></b><b class="bl b2"></b><b class="bl b3"></b><span class="core"></span></div>
-  <div class="wm" aria-label="Тривога"><span>Т</span><span>Р</span><span>И</span><span>В</span><span>О</span><span>Г</span><span>А</span></div>
-  <p>Повітряна обстановка над Україною · наживо</p>
+  <div class="radar"><i class="r1"></i><i class="sweep"></i><b class="bl b1"></b><b class="bl b2"></b><b class="bl b3"></b><img class="emb" src="brand/emblem.png" alt=""></div>
+  <div class="wm" aria-label="NAVRYX SKY"><div class="w1"><span>N</span><span>A</span><span>V</span><span>R</span><span>Y</span><span>X</span></div><div class="w2"><span>S</span><span>K</span><span>Y</span></div></div>
+  <p>Повітряна обстановка наживо</p>
   <div class="ld"><div class="bar"><i></i></div><small id="intro-st">Підключаюсь до джерел…</small></div>
 </div>
 
@@ -87,7 +87,7 @@
   <section><h3>Мій дім</h3><div class="row"><button class="pill" id="st-geo">Визначити автоматично</button><button class="pill" id="st-pick">Поставити на карті</button><button class="pill ghost" id="st-clear">Прибрати</button></div>
     <div class="row"><span>До укриття йти</span><div class="seg small" data-pref="shelter"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button><button data-v="10">10</button></div><span>хв</span></div>
     <label class="sw"><input type="checkbox" id="st-sound"><span>Звуковий сигнал, коли ціль іде на мій район</span></label>
-    <label class="sw"><input type="checkbox" id="st-sys"><span>Сповіщення Windows / телефона, коли «Тривога» згорнута</span></label></section>
+    <label class="sw"><input type="checkbox" id="st-sys"><span>Сповіщення Windows / телефона, коли NAVRYX SKY згорнутий</span></label></section>
   <section><h3>Мої місця</h3>
     <p class="note">Крім дому: дача, робота, батьки, школа дітей. Про загрози біля кожного місця — окреме попередження (радіус — як у «Стеж за мною»).</p>
     <ul class="places" id="st-places"></ul>
@@ -95,7 +95,7 @@
   <section><h3>Стеж за мною</h3>
     <label class="sw"><input type="checkbox" id="st-follow"><span>Попереджати про загрози біля того місця, де я зараз (за геолокацією пристрою)</span></label>
     <div class="row"><span>Радіус</span><div class="seg small" id="st-radius"><button data-v="5">5</button><button data-v="10">10</button><button data-v="20">20</button><button data-v="30">30</button></div><span>км</span></div>
-    <p class="note">Працює, поки «Тривога» відкрита (на телефоні — поки сторінка не закрита). Місце не надсилається на сервер: перевірка йде на самому пристрої.</p></section>
+    <p class="note">Працює, поки NAVRYX SKY відкритий (на телефоні — поки сторінка не закрита). Місце не надсилається на сервер: перевірка йде на самому пристрої.</p></section>
   <section><h3>Що показувати</h3>
     <label class="sw"><input type="checkbox" id="st-ru"><span>Наші удари: куди летіли дрони й що уражено <small>(заяви МО РФ і Генштабу ЗСУ, постфактум)</small></span></label>
     <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>

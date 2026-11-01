@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Тривога",
+    "name": "NAVRYX SKY",
     "slug": "tryvoga",
     "scheme": "tryvoga",
     "version": "1.0.0",
@@ -21,7 +21,7 @@
           "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true
         },
-        "NSLocalNetworkUsageDescription": "«Тривога» підключається до вашого сервера в локальній мережі Wi‑Fi."
+        "NSLocalNetworkUsageDescription": "NAVRYX SKY підключається до вашого сервера в локальній мережі Wi‑Fi."
       }
     },
     "android": {
@@ -32,7 +32,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "permissions": ["VIBRATE", "POST_NOTIFICATIONS"],
+      "permissions": [
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "plugins": [

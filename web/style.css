@@ -366,3 +366,17 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 .pl-ask{position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:20;width:min(340px,calc(100% - 32px));padding:16px;border-radius:18px;color:var(--fg);background:var(--glass-strong,rgba(18,22,32,.9));border:1px solid var(--rim,rgba(255,255,255,.16));-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:10px}
 .pl-ask input{font:600 16px var(--f);padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--fg);outline:none}
 .pl-ask .row{display:flex;gap:8px;justify-content:flex-end}
+
+/* ---------- NAVRYX SKY: заставка з емблемою ---------- */
+#intro .radar .emb{position:absolute;inset:-6%;width:112%;height:112%;object-fit:contain;filter:drop-shadow(0 0 22px rgba(60,140,255,.35));animation:embIn 1.3s cubic-bezier(.2,.8,.1,1) both}
+#intro .radar .core{display:none}
+#intro .radar .sweep{opacity:.55}
+#intro .radar{width:clamp(180px,46vw,280px)}
+#intro .wm{flex-direction:column;align-items:center;gap:clamp(4px,1vh,10px)}
+#intro .wm .w1,#intro .wm .w2{display:flex;gap:clamp(4px,1.6vw,18px)}
+#intro .wm .w1{font:500 clamp(34px,10vw,96px)/1 var(--f);letter-spacing:.06em}
+#intro .wm .w1 span{background:linear-gradient(180deg,#ffffff 8%,#c9d1dc 45%,#7d8794 70%,#e9eef4 100%);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 2px 10px rgba(0,0,0,.6))}
+#intro .wm .w2{font:800 clamp(30px,9vw,84px)/1 var(--f);gap:clamp(22px,9vw,90px)}
+#intro .wm .w2 span{background:linear-gradient(180deg,#7cc4ff 0%,#2a8cff 55%,#0b5fe0 100%);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 0 18px rgba(40,140,255,.55))}
+#intro .wm .w2 span:nth-child(1){animation-delay:.75s}#intro .wm .w2 span:nth-child(2){animation-delay:.85s}#intro .wm .w2 span:nth-child(3){animation-delay:.95s}
+@keyframes embIn{from{opacity:0;transform:scale(.7) rotate(-25deg);filter:blur(12px)}to{opacity:1}}

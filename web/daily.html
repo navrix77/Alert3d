@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Мапа доби · Тривога</title>
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css">
+<title>Мапа доби · NAVRYX SKY</title>
+<link rel="icon" href="brand/icon-192.png"><link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css">
 <style>
 :root{--fg:#F2F5FA;--mute:#9AA4B6;--glass:rgba(12,15,22,.72);--rim:rgba(255,255,255,.12)}
 html,body{margin:0;height:100%;background:#05070B;color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -52,7 +52,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 <div class="panel stats" id="stats"></div>
 <div class="panel legend" id="legend"></div>
 <div class="panel play"><button id="pl">▶</button><button id="spd" title="Швидкість відтворення: скільки секунд триває одна година доби">5 с/год</button><input type="range" id="tt" min="0" max="1000" value="1000"><span id="tl">09:00</span></div>
-<div class="wm">Тривога</div>
+<div class="wm">NAVRYX <b style="color:#3b9bff">SKY</b></div>
 <div class="loading" id="ld">Збираю маршрути доби…</div>
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
 <script>
@@ -165,7 +165,7 @@ $('#png').onclick=()=>{const mc=map.getCanvas(),c=document.createElement('canvas
   for(const kk of Object.keys(T).filter(x=>cnt[x])){g.fillStyle=T[kk][1];g.fillRect(24*k,y-6*k,26*k,4*k);g.fillStyle='#fff';g.font='700 '+Math.round(14*k)+'px Inter,system-ui,sans-serif';g.fillText(T[kk][0]+' — '+cnt[kk],58*k,y);y+=22*k;}
   g.fillText('🔥 Вибухи за повідомленнями — '+D.booms.length,24*k,y);
   if(D.official){g.font='800 '+Math.round(15*k)+'px Inter,system-ui,sans-serif';g.textAlign='right';g.fillText('ПС ЗСУ: збито/подавлено '+D.official.shot,c.width-24*k,44*k);}
-  g.textAlign='right';g.fillStyle='rgba(255,255,255,.6)';g.font='800 '+Math.round(15*k)+'px Inter,system-ui,sans-serif';g.fillText('Тривога',c.width-24*k,c.height-24*k);
+  g.textAlign='right';g.fillStyle='rgba(255,255,255,.6)';g.font='800 '+Math.round(15*k)+'px Inter,system-ui,sans-serif';g.fillText('NAVRYX SKY',c.width-24*k,c.height-24*k);
   const a=document.createElement('a');a.download='tryvoga-doba-'+DAY+'.png';a.href=c.toDataURL('image/png');a.click();};
 </script>
 </body>
