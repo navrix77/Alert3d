@@ -97,6 +97,13 @@
     <div class="row"><span>До укриття йти</span><div class="seg small" data-pref="shelter"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button><button data-v="10">10</button></div><span>хв</span></div>
     <label class="sw"><input type="checkbox" id="st-sound"><span>Звуковий сигнал, коли ціль іде на мій район</span></label>
     <label class="sw"><input type="checkbox" id="st-sys"><span>Сповіщення Windows / телефона, коли NAVRYX SKY згорнутий</span></label></section>
+  <section><h3>Сповіщення: мої громади й області</h3>
+    <p class="note">Про нові цілі, тривоги й відбої сповіщаю лише для обраних зон — і коли ціль за курсом увійде в них протягом 30 хв. Київ не турбуватиме, якщо ви в Харкові.</p>
+    <ul class="places" id="st-zones-list"></ul>
+    <div class="row"><input id="st-zone-in" list="st-zone-dl" placeholder="Почніть вводити: Харківська, Мерефʼянська…" style="flex:1;min-width:0;font:600 14px var(--f);padding:9px 11px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.2);color:var(--fg)"><button class="pill" id="st-zone-add">Додати</button></div>
+    <datalist id="st-zone-dl"></datalist>
+    <label class="sw"><input type="checkbox" id="st-nlaunch"><span>Пуски — завжди (стосуються всієї країни)</span></label>
+    <label class="sw"><input type="checkbox" id="st-nall"><span>Нові ракети й реактивні по всій Україні</span></label></section>
   <section><h3>Мої місця</h3>
     <p class="note">Крім дому: дача, робота, батьки, школа дітей. Про загрози біля кожного місця — окреме попередження (радіус — як у «Стеж за мною»).</p>
     <ul class="places" id="st-places"></ul>

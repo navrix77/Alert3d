@@ -588,20 +588,59 @@ function notesAll(){const box=$('#notes');let a=box.querySelector('.all');const 
   if(n<2&&a)a.remove();}
 function flyP(p,z){map.flyTo({center:p,zoom:Math.max(map.getZoom(),z||7),essential:true});}
 const TNAME_PL={shahed:'Шахеди',jet:'Реактивні шахеди',molniya:'«Молнії»',cruise:'Крилаті ракети',ballistic:'Балістика',kab:'КАБи'};
+/* ---------- мої громади й області для сповіщень ---------- */
+const NZLV=new Map();
+function myZones(){const Z=PREF.zones||{obl:[],hrom:[]};if(!Z.obl.length&&!Z.hrom.length&&home&&window.OBLPOLY){const o=window.OBLPOLY(home[0],home[1]);if(o)return {obl:[o],hrom:[],auto:true};}return Z;}
+function ringIn(r,x,y){let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];if(((a[1]>y)!==(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/((b[1]-a[1])||1e-12)+a[0]))c=!c;}return c;}
+function geomIn(g,x,y){const P=g.type==='Polygon'?[g.coordinates]:g.coordinates;return P.some(p=>ringIn(p[0],x,y));}
+function zoneOf(p){const Z=myZones();if(Z.obl.length&&window.OBLPOLY){const o=window.OBLPOLY(p[0],p[1]);if(o&&Z.obl.includes(o))return o+' обл.';}
+  if(Z.hrom.length&&HPDATA){for(const h of Z.hrom){const f=HPDATA.features[h.id];if(f&&geomIn(f.geometry,p[0],p[1]))return h.n;}}return null;}
+function loadHP(){if(HPDATA||HPLOADING)return Promise.resolve(HPDATA);HPLOADING=true;return fetch('/data/hromadas.geojson').then(r=>r.json()).then(d=>{HPDATA=d;if(map.getSource('hp'))map.getSource('hp').setData(d);HPPREV={};return d;}).catch(()=>{HPLOADING=false;});}
+function renderZones(){const ul=$('#st-zones-list');if(!ul)return;const Z=myZones();ul.innerHTML='';
+  if(Z.auto)ul.innerHTML='<li><span style="opacity:.75;font-weight:500">Зараз: '+esc(Z.obl[0])+' обл. (за домом). Додайте свої громади або області:</span></li>';
+  else if(!Z.obl.length&&!Z.hrom.length)ul.innerHTML='<li><span style="opacity:.75;font-weight:500">Не обрано — сповіщення лише про пуски й про загрози біля дому/моїх місць</span></li>';
+  if(!Z.auto){Z.obl.forEach(o=>{const li=document.createElement('li');li.innerHTML='<span>🗺 '+esc(o)+' обл.</span><button>✕</button>';li.querySelector('button').onclick=()=>{Z.obl=Z.obl.filter(x=>x!==o);PREF.zones=Z;savePref();renderZones();};ul.appendChild(li);});
+    Z.hrom.forEach(h=>{const li=document.createElement('li');li.innerHTML='<span>📍 '+esc(h.n)+' громада <small style="opacity:.6">'+esc(h.o)+' обл.</small></span><button>✕</button>';li.querySelector('button').onclick=()=>{Z.hrom=Z.hrom.filter(x=>x.id!==h.id);PREF.zones=Z;savePref();renderZones();};ul.appendChild(li);});}}
+{const inp=$('#st-zone-in'),dl=$('#st-zone-dl'),add=$('#st-zone-add');
+  const fill=()=>loadHP().then(d=>{if(!dl||dl.childElementCount)return;const opts=[];(OBLF||[]).forEach(f=>opts.push(f.properties.n+' обл.'));if(d)d.features.forEach(f=>opts.push(f.properties.n+' громада ('+f.properties.r+' р-н, '+f.properties.o+' обл.)'));dl.innerHTML=opts.map(o=>'<option value="'+esc(o)+'">').join('');});
+  if(inp){inp.addEventListener('focus',fill);
+    const doAdd=()=>{const v=inp.value.trim();if(!v)return;const Z=myZones().auto?{obl:[],hrom:[]}:(PREF.zones||{obl:[],hrom:[]});
+      let m=v.match(/^(.+?) обл\.$/);if(m&&(OBLF||[]).some(f=>f.properties.n===m[1])){if(!Z.obl.includes(m[1]))Z.obl.push(m[1]);}
+      else{m=v.match(/^(.+?) громада \((.+?) р-н, (.+?) обл\.\)$/);const f=m&&HPDATA&&HPDATA.features.find(x=>x.properties.n===m[1]&&x.properties.r===m[2]&&x.properties.o===m[3]);
+        if(!f){toast('Оберіть зі списку підказок');return;}if(!Z.hrom.some(h=>h.id===f.id))Z.hrom.push({id:f.id,n:f.properties.n,o:f.properties.o});}
+      PREF.zones=Z;savePref();inp.value='';renderZones();NZLV.clear();toast('Додано');};
+    add.onclick=doAdd;inp.addEventListener('keydown',e=>{if(e.key==='Enter')doAdd();});}
+  const cl=$('#st-nlaunch'),ca=$('#st-nall');if(cl){cl.checked=PREF.nLaunch!==false;cl.onchange=()=>{PREF.nLaunch=cl.checked;savePref();};}
+  if(ca){ca.checked=!!PREF.nAll;ca.onchange=()=>{PREF.nAll=ca.checked;savePref();};}
+  setTimeout(renderZones,1500);if((PREF.zones||{}).hrom&&PREF.zones.hrom.length)loadHP();}
 function notesCheck(s){
   const first=!NBASE;NBASE=true;const now=s.now||Date.now()/1000;
-  // 1) пуски
-  for(const L of (s.launches||[])){const k='L:'+L.site+':'+Math.round((L.t||0)/60);if(first||now-(L.t||now)>1200){NSEEN.add(k);continue;}
+  // 1) пуски — за налаштуванням (типово так: пуск стосується всієї країни)
+  for(const L of (s.launches||[])){const k='L:'+L.site+':'+Math.round((L.t||0)/60);if(first||now-(L.t||now)>1200||PREF.nLaunch===false){NSEEN.add(k);continue;}
     note({k,t:L.t,lvl:'red',ic:'🚀',title:'Пуск: '+L.site,sub:[L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',L.count?'×'+L.count:'',L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
-  // 2) нова швидка/небезпечна ціль: балістика, крилаті, «Молнії», реактивні
-  for(const t of (s.tracks||[])){if(t.status!=='active'||!['ballistic','cruise','jet'].includes(t.type))continue;const k='T:'+t.id;
+  // 2) нові цілі — лише ті, що в моїх громадах/областях або летять туди протягом 30 хв (або всі, якщо так обрано)
+  const serverT=Date.now()/1000+offset;
+  for(const t of (s.tracks||[])){if(t.status!=='active')continue;const k='T:'+t.id;
     if(first||(t.conf||0)<0.5){NSEEN.add(k);continue;}
-    note({k,lvl:t.type==='jet'?'orange':'red',ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':'🔥',title:(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(t.next?' → '+t.next:''),sub:'Нова ціль'+(t.launch&&t.launch.site&&!t.launch.est?' · запуск: '+t.launch.site:''),go:()=>openSheet(t.id)});}
-  // 3) тривога / відбій у моїй області
-  if(home&&window.OBLPOLY){const mine=window.OBLPOLY(home[0],home[1]);if(mine){const lv=(s.levels||{})[mine]||0;
-    if(NHOMELV!==null&&!first){if(!NHOMELV&&lv)note({k:'A:'+mine+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Повітряна тривога: '+mine+' обл.',sub:'Пройдіть в укриття',go:()=>flyP(home,8)});
-      else if(NHOMELV&&!lv)note({k:'O:'+mine+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій тривоги: '+mine+' обл.',sub:'У межах окремих громад тривога може ще тривати',go:()=>flyP(home,8)});}
-    NHOMELV=lv;}}
+    if(NSEEN.has(k))continue;
+    const fast=['ballistic','cruise','jet'].includes(t.type);
+    let z=null;const p0=(DISP.get(t.id)||{p:[t.lon,t.lat]}).p;z=zoneOf(p0);let eta=0;
+    if(!z){for(let m=5;m<=30;m+=5){const q=posAt(t,serverT+m*60).p;z=zoneOf(q);if(z){eta=m;break;}}}
+    if(!z&&!(PREF.nAll&&fast))continue;   // не моя зона — мовчимо
+    note({k,lvl:z?'red':(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
+      title:(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(t.next?' → '+t.next:''),
+      sub:z?(eta?'за ~'+eta+' хв буде в зоні «'+z+'»':'у зоні «'+z+'»'):'Нова ціль'+(t.launch&&t.launch.site&&!t.launch.est?' · запуск: '+t.launch.site:''),go:()=>openSheet(t.id)});}
+  // 3) тривога / відбій у моїх областях і громадах
+  const Z=myZones();
+  for(const o of Z.obl){const lv=(s.levels||{})[o]||0,pv=NZLV.get('o:'+o);
+    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'A:'+o+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Повітряна тривога: '+o+' обл.',sub:'Пройдіть в укриття'});
+      else if(pv&&!lv)note({k:'O:'+o+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій тривоги: '+o+' обл.',sub:'У межах окремих громад тривога може ще тривати'});}
+    NZLV.set('o:'+o,lv);}
+  const HL=((s.official||{}).hromadas)||{};
+  for(const h of Z.hrom){const lv=HL[h.id]||((s.levels||{})[h.o]?1:0),pv=NZLV.get('h:'+h.id);
+    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'AH:'+h.id+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Тривога: '+h.n+' громада',sub:h.o+' обл. · пройдіть в укриття'});
+      else if(pv&&!lv)note({k:'OH:'+h.id+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій: '+h.n+' громада',sub:h.o+' обл.'});}
+    NZLV.set('h:'+h.id,lv);}
   // 0) мапа доби о 09:00
   if(s.daily){let seen=null;try{seen=localStorage.getItem('dailySeen');}catch(e){}
     if(seen!==s.daily){try{localStorage.setItem('dailySeen',s.daily);}catch(e){}
