@@ -84,7 +84,7 @@ function addOverlays(){
   map.addSource('ra',{type:'geojson',data:'/data/raions.geojson',generateId:true});
   map.addSource('occ',{type:'geojson',data:'/data/occupied.geojson'});
   if(!map.hasImage('hatch')){const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');x.strokeStyle='rgba(20,0,6,.55)';x.lineWidth=3;x.beginPath();x.moveTo(-4,20);x.lineTo(20,-4);x.moveTo(-4,4);x.lineTo(4,-4);x.moveTo(12,20);x.lineTo(20,12);x.stroke();map.addImage('hatch',x.getImageData(0,0,16,16),{pixelRatio:2});}
-  map.addSource('sel',{type:'geojson',data:EMPTY});map.addSource('mepos',{type:'geojson',data:EMPTY});
+  map.addSource('sel',{type:'geojson',data:EMPTY});map.addSource('mepos',{type:'geojson',data:EMPTY});map.addSource('myplaces',{type:'geojson',data:EMPTY});
   map.addSource('ticks',{type:'geojson',data:EMPTY});
   map.addSource('holo',{type:'geojson',data:EMPTY});map.addSource('hrom',{type:'geojson',data:EMPTY});map.addSource('comets',{type:'geojson',data:EMPTY,lineMetrics:true});
   ['zones','trails','preds','targets','home','chains','lsites'].forEach(id=>map.addSource(id,{type:'geojson',data:EMPTY}));
@@ -141,7 +141,9 @@ function addOverlays(){
   map.addLayer({id:'me-ring-l',type:'line',source:'mepos',filter:['==',['geometry-type'],'Polygon'],paint:{'line-color':'#5AB0FF','line-width':1.4,'line-dasharray':[2,2],'line-opacity':0.85}});
   map.addLayer({id:'me-dot-h',type:'circle',source:'mepos',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':16,'circle-color':'#3B9BFF','circle-opacity':0.22,'circle-blur':0.6}});
   map.addLayer({id:'me-dot',type:'circle',source:'mepos',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':6.5,'circle-color':'#2F8BFF','circle-stroke-color':'#fff','circle-stroke-width':2.2}});
-  lastLv='';lastRa='';syncHome();syncMe();
+  map.addLayer({id:'myplaces',type:'circle',source:'myplaces',paint:{'circle-radius':6,'circle-color':'#B07CFF','circle-stroke-color':'#fff','circle-stroke-width':2}});
+  map.addLayer({id:'myplaces-t',type:'symbol',source:'myplaces',layout:{'text-field':['get','n'],'text-font':['Noto Sans Bold'],'text-size':12.5,'text-offset':[0,1.2],'text-anchor':'top','text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(40,10,70,.9)','text-halo-width':1.8}});
+  lastLv='';lastRa='';syncHome();syncMe();syncPlaces();
   if(tilt)set3d(true,'keep');
   if(!map._scaleAdded){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
 }
@@ -609,23 +611,51 @@ function followOn(){
   if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().then(r=>{if(r==='granted'){PREF.sys=true;savePref();}});
   return true;}
 function followOff(){if(FOL.watch!=null)navigator.geolocation.clearWatch(FOL.watch);FOL.watch=null;FOL.pos=null;FOL.fired.clear();syncMe();}
+/* ---------- «Мої місця»: власні точки з назвами (дача, робота, батьки…) ---------- */
+let PLACES=[];try{PLACES=JSON.parse(localStorage.getItem('places')||'[]');}catch(e){PLACES=[];}
+const savePlaces=()=>{try{localStorage.setItem('places',JSON.stringify(PLACES));}catch(e){}syncPlaces();renderPlaces();};
+function syncPlaces(){if(map.getSource('myplaces'))map.getSource('myplaces').setData({type:'FeatureCollection',features:PLACES.map(p=>({type:'Feature',properties:{n:p.name},geometry:{type:'Point',coordinates:[p.lon,p.lat]}}))});}
+function renderPlaces(){const ul=$('#st-places');if(!ul)return;ul.innerHTML=PLACES.length?'':'<li><span style="font-weight:500;opacity:.7">Ще немає жодного місця</span></li>';
+  PLACES.forEach(p=>{const li=document.createElement('li');li.innerHTML='<span>📍 '+esc(p.name)+'</span><button data-a="ren">Назва</button><button data-a="del">✕</button>';
+    li.querySelector('span').onclick=()=>{$('#settings').hidden=true;map.flyTo({center:[p.lon,p.lat],zoom:Math.max(map.getZoom(),10)});};
+    li.querySelector('[data-a=ren]').onclick=()=>askName(p.name,n=>{p.name=n;savePlaces();});
+    li.querySelector('[data-a=del]').onclick=()=>{PLACES=PLACES.filter(x=>x!==p);savePlaces();toast('Видалено');};ul.appendChild(li);});}
+function askName(def,cb){const box=$('#pl-ask'),inp=$('#pl-name');box.hidden=false;inp.value=def||'';setTimeout(()=>inp.focus(),50);
+  const done=ok=>{box.hidden=true;$('#pl-ok').onclick=$('#pl-cancel').onclick=inp.onkeydown=null;if(ok&&inp.value.trim())cb(inp.value.trim().slice(0,40));};
+  $('#pl-ok').onclick=()=>done(true);$('#pl-cancel').onclick=()=>done(false);inp.onkeydown=e=>{if(e.key==='Enter')done(true);if(e.key==='Escape')done(false);};}
+let addPlaceMode=false;
+function addPlaceAt(lon,lat){askName('',n=>{PLACES.push({id:Date.now(),name:n,lon:+lon.toFixed(5),lat:+lat.toFixed(5)});savePlaces();toast('📍 «'+n+'» додано — стежу за загрозами поруч');});}
+map.on('click',e=>{if(!addPlaceMode)return;addPlaceMode=false;map.getCanvas().style.cursor='';addPlaceAt(e.lngLat.lng,e.lngLat.lat);});
+if($('#st-place-add'))$('#st-place-add').onclick=()=>{$('#settings').hidden=true;addPlaceMode=true;map.getCanvas().style.cursor='crosshair';toast('Торкніться карти, де це місце');};
+if($('#st-place-here'))$('#st-place-here').onclick=()=>{if(FOL.pos)return addPlaceAt(FOL.pos[0],FOL.pos[1]);if(!navigator.geolocation)return toast('Геолокація недоступна');
+  navigator.geolocation.getCurrentPosition(p=>addPlaceAt(p.coords.longitude,p.coords.latitude),()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:10000});};
+renderPlaces();
+
+// перевірка загроз: поточне місце (якщо «Стеж за мною») + усі «Мої місця»
 setInterval(()=>{
-  if(!PREF.follow||!FOL.pos||!SNAP||REPLAY)return;
-  const R=PREF.radius||10,P=xy(FOL.pos),serverT=Date.now()/1000+offset,now=Date.now();
+  if(!SNAP||REPLAY)return;
+  const pts=[];if(PREF.follow&&FOL.pos)pts.push({k:'me',label:'від вас',pos:FOL.pos});
+  PLACES.forEach(p=>pts.push({k:'p'+p.id,label:'від «'+p.name+'»',pos:[p.lon,p.lat]}));
+  if(!pts.length)return;
+  const R=PREF.radius||10,serverT=Date.now()/1000+offset,now=Date.now();
   for(const tr of SNAP.tracks){
     if(tr.status!=='active'||tr.conf<0.5)continue;
-    const d0=DISP.get(tr.id);const p0=d0?d0.p:[tr.lon,tr.lat];const d=dist(P,xy(p0));
-    let eta=null;if(d>R){for(let m=1;m<=15;m++){const q=posAt(tr,serverT+m*60).p;if(dist(P,xy(q))<=R){eta=m;break;}}}
-    const inside=d<=R;
-    if(!inside&&eta==null){const f=FOL.fired.get(tr.id);if(f&&now-f.t>5*60000)FOL.fired.delete(tr.id);continue;}
-    const f=FOL.fired.get(tr.id);const level=inside?2:1;
-    if(f&&f.level>=level&&now-f.t<10*60000)continue;   // уже попередили; повтор не частіше ніж раз на 10 хв або коли ціль ще ближче
-    FOL.fired.set(tr.id,{t:now,level});
-    const side=FROM[Math.round(brg(P,xy(p0))/45)%8];
-    note({k:'F:'+tr.id+':'+level+':'+Math.floor(now/600000),lvl:'red',ic:inside?'🚨':'⚠️',
-      title:(TYPE_NAME[tr.type]||'Ціль')+(tr.count>1?' ×'+tr.count:'')+(inside?' — '+Math.max(1,Math.round(d))+' км від вас':' — за ~'+eta+' хв буде в радіусі '+R+' км'),
-      sub:Math.round(d)+' км '+side+(tr.next?' · курс → '+tr.next:'')+' · пройдіть в укриття',go:()=>openSheet(tr.id)});
-    if(navigator.vibrate)try{navigator.vibrate(inside?[300,120,300,120,300]:[200,100,200]);}catch(e){}
+    const d0=DISP.get(tr.id);const p0=d0?d0.p:[tr.lon,tr.lat];
+    const fut=[];for(let m=1;m<=15;m++)fut.push(posAt(tr,serverT+m*60).p);
+    for(const W of pts){
+      const P=xy(W.pos),d=dist(P,xy(p0));let eta=null;
+      if(d>R){for(let m=0;m<fut.length;m++)if(dist(P,xy(fut[m]))<=R){eta=m+1;break;}}
+      const key=W.k+':'+tr.id,inside=d<=R;
+      if(!inside&&eta==null){const f=FOL.fired.get(key);if(f&&now-f.t>5*60000)FOL.fired.delete(key);continue;}
+      const f=FOL.fired.get(key),level=inside?2:1;
+      if(f&&f.level>=level&&now-f.t<10*60000)continue;   // повтор не частіше ніж раз на 10 хв або коли ціль ще ближче
+      FOL.fired.set(key,{t:now,level});
+      const side=FROM[Math.round(brg(P,xy(p0))/45)%8];
+      note({k:'F:'+key+':'+level+':'+Math.floor(now/600000),lvl:'red',ic:inside?'🚨':'⚠️',
+        title:(TYPE_NAME[tr.type]||'Ціль')+(tr.count>1?' ×'+tr.count:'')+(inside?' — '+Math.max(1,Math.round(d))+' км '+W.label:' — за ~'+eta+' хв у '+R+' км '+W.label),
+        sub:Math.round(d)+' км '+side+(tr.next?' · курс → '+tr.next:'')+(W.k==='me'?' · пройдіть в укриття':''),go:()=>openSheet(tr.id)});
+      if(W.k==='me'&&navigator.vibrate)try{navigator.vibrate(inside?[300,120,300,120,300]:[200,100,200]);}catch(e){}
+    }
   }
 },3000);
 {const cb=$('#st-follow'),seg=$('#st-radius');

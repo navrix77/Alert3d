@@ -334,3 +334,9 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 .cnt .cw{display:flex;flex-direction:column;align-items:flex-start;line-height:1}
 .cnt .cw small{font-size:10.5px;font-weight:700;color:var(--tc,var(--mute));letter-spacing:.02em;margin-top:2px;white-space:nowrap}
 @media (max-width:640px){.cnt .cw small{font-size:9px}}
+
+.places{list-style:none;margin:6px 0;padding:0}.places li{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.places li span{flex:1;font-weight:600;cursor:pointer}.places li button{border:0;background:rgba(255,255,255,.08);color:var(--fg);border-radius:9px;padding:4px 8px;cursor:pointer;font:600 12px var(--f)}
+.pl-ask{position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:20;width:min(340px,calc(100% - 32px));padding:16px;border-radius:18px;color:var(--fg);background:var(--glass-strong,rgba(18,22,32,.9));border:1px solid var(--rim,rgba(255,255,255,.16));-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:10px}
+.pl-ask input{font:600 16px var(--f);padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--fg);outline:none}
+.pl-ask .row{display:flex;gap:8px;justify-content:flex-end}
