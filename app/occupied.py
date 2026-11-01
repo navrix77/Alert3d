@@ -45,13 +45,18 @@ def extract(doc: dict) -> dict:
         if not (22 <= clon <= 40.5 and 44 <= clat <= 52.5):
             continue  # лише Україна (відкидаємо Грузію, Молдову тощо, хоч би як вони були підписані)
         feats.append({"type": "Feature", "properties": {"k": kind}, "geometry": {"type": g["type"], "coordinates": coords}})
-    return {"type": "FeatureCollection", "features": feats, "properties": {"source": "DeepStateMap", "date": doc.get("datetime"), "fetched": int(time.time())}}
+    return {"type": "FeatureCollection", "features": feats, "properties": {"source": "DeepStateMap", "date": doc.get("datetime"), "fetched": int(time.time()), "v": 2}}
 
 
 async def run() -> None:
     async with httpx.AsyncClient(timeout=40, headers={"User-Agent": "tryvoga/1.0 (civil-defence aggregator)"}) as cli:
         while True:
-            fresh = OUT.exists() and time.time() - OUT.stat().st_mtime < 12 * 3600
+            fresh = False
+            if OUT.exists() and time.time() - OUT.stat().st_mtime < 12 * 3600:
+                try:
+                    fresh = json.loads(OUT.read_text(encoding="utf-8")).get("properties", {}).get("v") == 2
+                except Exception:  # noqa: BLE001
+                    fresh = False
             if not fresh:
                 try:
                     r = await cli.get(URL)
