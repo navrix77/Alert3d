@@ -29,7 +29,17 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 .play input{flex:1;accent-color:#FFB020}.play span{font-variant-numeric:tabular-nums;font-weight:700;min-width:44px;text-align:right}
 .wm{position:fixed;z-index:2;right:18px;bottom:76px;color:rgba(255,255,255,.55);font-weight:800;font-size:15px;pointer-events:none}
 .loading[hidden]{display:none}.loading{position:fixed;inset:0;display:grid;place-items:center;z-index:5;background:rgba(5,7,11,.6);font-weight:700}
-@media (max-width:700px){.head h1{font-size:16px}.stats{top:auto;bottom:150px;right:12px;max-width:46%}.stats ul{display:none}.legend{bottom:76px;left:12px;min-width:0}.legend small{display:none}.play{left:12px;right:12px;bottom:12px;width:auto}.wm{display:none}}
+@media (max-width:700px){
+  .head{left:10px;right:10px;top:max(10px,env(safe-area-inset-top));max-width:none;padding:10px 12px;border-radius:16px}
+  .head h1{font-size:15px}.head .sub{font-size:11px;margin-top:2px}
+  .head .nav{gap:5px;margin-top:8px;flex-wrap:nowrap;overflow-x:auto}.head .nav button{padding:6px 9px;font-size:12px;white-space:nowrap;flex:none}
+  .stats{top:auto;left:10px;right:10px;bottom:calc(64px + env(safe-area-inset-bottom));max-width:none;padding:8px 12px;display:flex;align-items:center;gap:10px;border-radius:14px}
+  .stats h3{margin:0;font-size:10px}.stats .big{font-size:20px}.stats ul,.stats .bh{display:none}.stats>div:not(.big){font-size:12px;line-height:1.2}
+  .legend{left:10px;right:10px;bottom:calc(118px + env(safe-area-inset-bottom));min-width:0;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;column-gap:14px;border-radius:14px}
+  .legend .r{margin:3px 0;font-size:12px;gap:7px}.legend .r i{width:18px}.legend small{display:none}
+  .play{left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:auto;padding:8px 10px;border-radius:14px}
+  .wm{display:none}
+}
 </style>
 </head>
 <body>
@@ -93,11 +103,16 @@ async function load(day){
   DAY=D.day;history.replaceState(null,'','?d='+DAY);
   $('#sub').textContent=fd(D.t0)+' – '+fd(D.t1)+' '+new Date(D.t1*1000).getFullYear()+' · з 09:00 до 09:00'+(D.final?'':' · доба ще триває');
   for(const t of D.tracks)t.sp=smoothPts(t.pts);
-  draw(1);legend();stats();
+  draw(1);legend();stats();fit();
   const nx=new Date(new Date(DAY).getTime()+864e5).toISOString().slice(0,10);
   $('#next').disabled=!D.final;$('#next').dataset.d=nx;
   $('#prev').dataset.d=new Date(new Date(DAY).getTime()-864e5).toISOString().slice(0,10);
 }
+function fit(){// уся Україна в кадрі, з урахуванням панелей
+  const m=mobile(),hh=document.querySelector('.head').offsetHeight;
+  const bot=m?(document.querySelector('.legend').offsetHeight+130):40;
+  map.fitBounds([[22.1,44.3],[40.2,52.4]],{padding:{top:hh+(m?20:30),bottom:bot,left:m?6:40,right:m?6:(document.querySelector('.stats').offsetWidth+40)},duration:0});}
+addEventListener('resize',()=>{if(D)fit();});
 function draw(f){CUR=f;const T1=D.t0+(Math.min(D.t1,D.built)-D.t0)*f;const F=[],Hd=[];
   for(const t of D.tracks){const c=(T[t.type]||T.shahed)[1];
     let pts=t.sp;if(f<1){const tl=t.pts;if(tl[0][2]>T1)continue;const k=tl.findIndex(p=>p[2]>T1);if(k>0){const frac=(k)/(tl.length);pts=t.sp.slice(0,Math.max(2,Math.round(t.sp.length*frac)));}
@@ -115,7 +130,7 @@ function legend(){const cnt={};for(const t of D.tracks)cnt[t.type]=(cnt[t.type]|
     '<small>Число — кількість відновлених маршрутів, а не точна кількість цілей. Маршрути відтворено з повідомлень моніторів і приблизні; вибухи — з точністю до населеного пункту, публікуються лише після завершення доби.</small>';}
 function stats(){const o=D.official;
   $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+
-    (D.booms.length?'<h3 style="margin-top:12px">Найбільше вибухів</h3><ul>'+D.booms.slice(0,12).map(b=>'<li><span>'+b.n+'</span><b>'+b.c+'</b></li>').join('')+'</ul>':'');}
+    (D.booms.length?'<h3 class="bh" style="margin-top:12px">Найбільше вибухів</h3><ul>'+D.booms.slice(0,12).map(b=>'<li><span>'+b.n+'</span><b>'+b.c+'</b></li>').join('')+'</ul>':'');}
 $('#tt').oninput=e=>{playing=false;$('#pl').textContent='▶';draw(e.target.value/1000);};
 $('#pl').onclick=()=>{playing=!playing;$('#pl').textContent=playing?'❚❚':'▶';if(playing&&CUR>=1)CUR=0;let last=performance.now();
   const step=now=>{if(!playing)return;CUR=Math.min(1,CUR+(now-last)/24000);last=now;$('#tt').value=CUR*1000;draw(CUR);if(CUR>=1){playing=false;$('#pl').textContent='▶';return;}requestAnimationFrame(step);};requestAnimationFrame(step);};
