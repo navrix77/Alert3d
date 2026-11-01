@@ -48,6 +48,7 @@ class Track:
     heading: float | None = None
     srcs: set[str] = field(default_factory=set)
     from_place: Place | None = None
+    course_to: str | None = None
     closed: float | None = None
 
     @property
@@ -133,6 +134,7 @@ class Tracker:
         frm = next((p for p in places if p.role == "f"), None)
         route = [p.place for p in places if p.role == "t" and p is not pos]
         pt = pos.place.xy
+        course_to = pos.place.name if pos.role == "t" and not route else (route[-1].name if route else None)
         tr = self._best(obs.type, pt, t)
         if tr:
             d = dist_km((tr.last.x, tr.last.y), pt)
@@ -165,6 +167,8 @@ class Tracker:
             tr.from_place = frm.place if frm else None
             self.tracks.append(tr)
         tr.srcs.add(src)
+        if course_to:
+            tr.course_to = course_to
         if obs.count:
             tr.count = obs.count
         rec["track"] = tr.id
@@ -242,7 +246,7 @@ class Tracker:
             out.append({
                 "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"], "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
-                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else None,
+                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to,
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),
