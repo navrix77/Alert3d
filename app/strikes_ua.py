@@ -62,7 +62,7 @@ class UaStrikes:
         return None
 
     def parse(self, text: str) -> list[dict]:
-        if "уражен" not in text.lower():
+        if not re.search(r"уражен|урази|вразил|знищен", text.lower()) or "оперативна інформація" in text.lower():
             return []
         out = []
         for m in BULLET.finditer(text):
