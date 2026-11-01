@@ -96,14 +96,15 @@ map.on('load',async()=>{
   await load(DAY);
 });
 async function load(day){
-  $('#ld').hidden=false;
+  if(!D||D.day!==day)$('#ld').hidden=false;
   for(let i=0;i<6;i++){try{const r=await fetch('/api/daily'+(day?'?d='+day:''));D=await r.json();break;}catch(e){$('#ld').textContent='Сервер перезапускається… повторюю';await new Promise(r=>setTimeout(r,4000));}}
   $('#ld').hidden=true;if(!D){$('#sub').textContent='Не вдалося завантажити';return;}
   if(D.error){$('#sub').textContent=D.error;return;}
   DAY=D.day;history.replaceState(null,'','?d='+DAY);
   $('#sub').textContent=fd(D.t0)+' – '+fd(D.t1)+' '+new Date(D.t1*1000).getFullYear()+' · з 09:00 до 09:00'+(D.final?'':' · доба ще триває');
   for(const t of D.tracks)t.sp=smoothPts(t.pts);
-  draw(1);legend();stats();fit();
+  draw(1);legend();stats();if(!load.fitted||load.fitted!==DAY){fit();load.fitted=DAY;}
+  clearTimeout(load.poll);if(D.crawling)load.poll=setTimeout(()=>load(DAY),20000);
   const nx=new Date(new Date(DAY).getTime()+864e5).toISOString().slice(0,10);
   $('#next').disabled=!D.final;$('#next').dataset.d=nx;
   $('#prev').dataset.d=new Date(new Date(DAY).getTime()-864e5).toISOString().slice(0,10);
@@ -126,7 +127,7 @@ function draw(f){CUR=f;const T1=D.t0+(Math.min(D.t1,D.built)-D.t0)*f;const F=[],
   $('#tl').textContent=f>=1?'усе':hm(T1);}
 function legend(){const cnt={};for(const t of D.tracks)cnt[t.type]=(cnt[t.type]||0)+1;
   $('#legend').innerHTML=Object.keys(T).filter(k=>cnt[k]).map(k=>'<div class="r"><i style="background:'+T[k][1]+';color:'+T[k][1]+'"></i>'+T[k][0]+'<b>'+cnt[k]+'</b></div>').join('')+
-    '<div class="r"><span style="width:26px;text-align:center">🔥</span>Вибухи за повідомленнями<b>'+D.booms.length+'</b></div><div class="r"><span style="width:26px;text-align:center">🚀</span>Місця пусків<b>'+D.sites.length+'</b></div>'+
+    '<div class="r"><span style="width:26px;text-align:center">🔥</span>Вибухи'+(D.crawling?' <small style="display:inline;margin:0">· збираю з історії каналів…</small>':'')+'<b>'+D.booms.length+'</b></div><div class="r"><span style="width:26px;text-align:center">🚀</span>Місця пусків<b>'+D.sites.length+'</b></div>'+
     '<small>Число — кількість відновлених маршрутів, а не точна кількість цілей. Маршрути відтворено з повідомлень моніторів і приблизні; вибухи — з точністю до населеного пункту, публікуються лише після завершення доби.</small>';}
 function stats(){const o=D.official;
   $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+
