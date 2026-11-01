@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0F17">
+<title>Тривога</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map"></div>
+
+<header class="top">
+  <div class="counters" id="counters"></div>
+  <div class="asof" id="asof">з'єднання…</div>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="grip"></div>
+  <div class="sh-head">
+    <div class="sh-icon" id="sh-icon"></div>
+    <div class="sh-title"><h2 id="sh-name"></h2><p id="sh-course"></p></div>
+    <button class="round" id="sh-close" aria-label="Закрити">✕</button>
+  </div>
+  <div class="grid">
+    <div><span>До дому</span><b id="sh-dist">—</b></div>
+    <div><span>Орієнтовно до дому</span><b id="sh-eta">—</b></div>
+    <div><span>Помічено о</span><b id="sh-first">—</b></div>
+    <div><span>Джерело</span><b id="sh-src">—</b></div>
+    <div><span>Звідки заходить</span><b id="sh-from">—</b></div>
+    <div><span>Довіра</span><b id="sh-conf">—</b></div>
+  </div>
+  <p class="hint">Ціль може змінити курс будь-якої миті. Прогноз будується за повідомленнями моніторів.</p>
+  <div class="sh-actions">
+    <button class="primary" id="sh-follow">Стежити за ціллю</button>
+    <a class="round" id="sh-post" target="_blank" rel="noopener" aria-label="Відкрити пост">↗</a>
+  </div>
+</div>
+
+<div class="drawer" id="drawer" hidden>
+  <div class="dr-head"><h2>Стрічка</h2><button class="round" id="dr-close" aria-label="Закрити">✕</button></div>
+  <ul id="feed"></ul>
+</div>
+
+<nav class="dock">
+  <button id="b-home" title="Мій дім"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></button>
+  <button id="b-locate" title="Де я"><svg viewBox="0 0 24 24"><path d="M12 2 4 21l8-4 8 4z"/></svg></button>
+  <button id="b-layers" title="Підкладка"><svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button>
+  <button id="b-3d" title="3D">3D</button>
+  <button id="b-feed" title="Стрічка"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+</nav>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
+<script src="icons.js"></script>
+<script src="app.js"></script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>
