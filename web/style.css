@@ -304,3 +304,9 @@ body.xray .me{opacity:.85}
 @keyframes noteIn{from{opacity:0;transform:translateX(40px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes noteOut{to{opacity:0;transform:translateX(40px);height:0;margin:-4px 0;padding-top:0;padding-bottom:0}}
 @media (max-width:640px){.notes{top:calc(max(8px,env(safe-area-inset-top)) + 58px);left:12px;right:12px;width:auto}}
+/* картка цілі не вилазить за верх екрана: гортається всередині, заголовок із ✕ завжди видно */
+.sheet{max-height:calc(100dvh - max(12px,env(safe-area-inset-top)) - 8px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.sheet .grip,.sheet .sh-head{position:sticky;z-index:2}
+.sheet .grip{top:-10px}
+.sheet .sh-head{top:-4px;background:var(--glass-strong,rgba(18,22,32,.85));margin:0 -18px;padding:6px 18px 8px;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+@media (max-width:640px){.ev-list{max-height:none;overflow:visible}}
