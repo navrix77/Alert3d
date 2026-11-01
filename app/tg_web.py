@@ -46,7 +46,7 @@ class WebMonitor:
 
     def state(self) -> dict:
         now = time.time()
-        live = [u for u, t in self.last_ok.items() if now - t < 120]
+        live = [u for u, t in self.last_ok.items() if now - t < 420]
         return {"channels": len(config.CHANNELS), "live": len(live), "errors": dict(list(self.errors.items())[:5])}
 
     async def poll(self, cli: httpx.AsyncClient, key: str, user: str, on_message, backfill_sec: float) -> None:
