@@ -109,3 +109,13 @@ def test_alerts_single_area_not_whole_oblast():
     o = OfficialAlerts()
     o.apply_md("## 3. X\n**Kharkivska oblast (Харківська область)** — air raid alert in effect since 20:20. 1 area affected: Iziumskyi (Ізюмський) [red (missile / mass-strike level)].\n## 4. Y")
     assert o.oblast_levels == {} and o.raion_levels == {"Ізюмський": 2}
+
+
+def test_tlk_slang():
+    from app.parser import Parser
+    P = Parser()
+    assert P.parse("Р. Шаболда на Изюм⚠️", "TLK").type == "jet"
+    assert P.parse("Ударный на Дергачи⚠️", "TLK").type == "shahed"
+    assert P.parse("По ударным", "TLK").kind == "close"
+    assert P.parse("Развед. БПЛА над Изюмом⚠️", "TLK").kind == "info"
+    assert [r.place.name for r in P.parse("Далее ЛГ/Залютино/ХГ⚠️", "TLK").places][0] == "Лиса Гора (Харків)"

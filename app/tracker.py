@@ -110,6 +110,7 @@ class Tracker:
         self.last_update = 0.0
         self.launches = LaunchBook(brain)
         self.exclude: set[str] = set()
+        self.prefer: str | None = None
 
     # ---------------- прийом повідомлення
     def ingest(self, obs: Observation, src: str, t: float | None = None, link: str | None = None) -> dict:
@@ -262,6 +263,8 @@ class Tracker:
             shared = names & ({p.name for p in tr.route} | ({tr.course_to} if tr.course_to else set()))
             e = tr.est(t)
             d = min(dist_km(e, p.xy) for p in route)
+            if tr.id == self.prefer and d < 80:
+                return tr  # канал прямо пише «далі …» про ту саму ціль
             if not shared:
                 # нова ціль-пункт має бути попереду (за курсом) і досяжна приблизно за 15 хв
                 if d > min(35, tr.speed * 0.25 + 15):

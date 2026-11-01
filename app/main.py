@@ -44,6 +44,7 @@ started = time.time()
 
 
 CTX: dict[str, tuple[float, float, float]] = {}
+LASTC: dict[str, tuple[float, str, str]] = {}
 
 
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool) -> None:
@@ -63,10 +64,16 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     summary = bool(launch.SUMMARY_RX.search(text.lower()))
     useful = 0
     trk.exclude = set()
+    # «Далее Алексеевка/Сортировка» — продовження тієї самої цілі, про яку канал писав щойно
+    cont = bool(re.match(r"^\W*(далее|дальше|далі|дали|потім|затем|потом)\b", text.lower()))
+    last = LASTC.get(key)
+    trk.prefer = last[2] if cont and last and ts - last[0] < 420 else None
     for seg in segs:
         obs = parser.parse(seg, key, ctx)
         if obs.type is None and msg_type and obs.places and not obs.close:
             obs.type = msg_type
+        if obs.type is None and obs.places and not obs.close and trk.prefer and last:
+            obs.type = last[1]
         # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
         sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type)
         if sites:
@@ -78,6 +85,8 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
                 continue
         if obs.kind in ("track", "zone", "close", "filtered"):
             rec = trk.ingest(obs, key, ts, link)
+            if rec.get("track") and obs.kind == "track":
+                LASTC[key] = (ts, obs.type, rec["track"])
             if len(segs) > 1 and rec.get("track"):
                 trk.exclude.add(rec["track"])
             useful += 1
