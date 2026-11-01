@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 log = logging.getLogger("daily")
-VER = 4
+VER = 5
 OUT = Path(__file__).resolve().parent.parent / "data" / "daily"
 BOOM = re.compile(r"вибух|взрыв|прил[іеё]т|влучан|попадан|детонац|пожеж|уламк|обломк|пошкодж|поврежд|руйнув|зруйн|постраждал|пострадал|загинул|загибл|поранен")
 # лише робота ППО без жодних наслідків — не «приліт»
@@ -28,6 +28,23 @@ CAPITAL = {"Київська": "Київ", "Харківська": "Харків
            "Черкаська": "Черкаси", "Житомирська": "Житомир", "Вінницька": "Вінниця", "Хмельницька": "Хмельницький", "Львівська": "Львів",
            "Волинська": "Луцьк", "Рівненська": "Рівне", "Тернопільська": "Тернопіль", "Івано-Франківська": "Івано-Франківськ",
            "Чернівецька": "Чернівці", "Кіровоградська": "Кропивницький", "Донецька": "Краматорськ", "Закарпатська": "Ужгород"}
+
+
+COMMON = {"Українка", "Українець", "Зелень", "Середи", "Слава", "Сіль", "Вороне", "Кушніри", "Мирне", "Миру", "Світло", "Вогні",
+          "Нова Гута", "Росільна", "Щасливе", "Тиха", "Робота", "Удар", "Дача", "Поле", "Вишневе"}
+
+
+_TR = str.maketrans("єїЄЇ", "ііІІ")
+
+
+class CAPMID:
+    """Назва з великої літери не на початку речення (з урахуванням відмінків: Київ → у Києві)."""
+    def __init__(self, stem: str):
+        st = stem.translate(_TR)
+        self.rx = re.compile(r"(?<![.!?…»\n]\s)(?<!^)(?<!\n)\b" + re.escape(st[0].upper() + st[1:]))
+
+    def search(self, text: str):
+        return self.rx.search(text.translate(_TR))
 
 
 def is_impact(low: str) -> bool:
@@ -45,7 +62,7 @@ async def crawl_impacts(t0: float, t1: float, parser, max_pages: int = 40) -> li
     from .tg_web import UA, parse_page
     reg_of = config.CHANNEL_REGION
     found: list[tuple[float, str, str, str]] = []
-    sem = asyncio.Semaphore(6)
+    sem = asyncio.Semaphore(8)
 
     async def one(cli, key, user):
         before = None
@@ -64,7 +81,7 @@ async def crawl_impacts(t0: float, t1: float, parser, max_pages: int = 40) -> li
                 before = min(m[0] for m in msgs)
                 if min(m[1] for m in msgs) < t0:
                     return
-                await asyncio.sleep(0.6)
+                await asyncio.sleep(0.4)
     async with httpx.AsyncClient(timeout=20, headers=UA, follow_redirects=True) as cli:
         await asyncio.gather(*(one(cli, k, u) for k, u, *_ in config.CHANNELS))
     booms: dict[str, dict] = {}
@@ -82,17 +99,24 @@ async def crawl_impacts(t0: float, t1: float, parser, max_pages: int = 40) -> li
                 if ids:
                     pl = [max((parser.gaz.places[i] for i in ids), key=lambda q: q.pop)]
         for p in pl:
-            if not (44 <= p.lat <= 52.5 and 22 <= p.lon <= 40.3):
+            if not (44 <= p.lat <= 52.5 and 22 <= p.lon <= 40.3) or p.name in COMMON:
                 continue
-            b = booms.setdefault(p.name, {"n": p.name, "lat": p.lat, "lon": p.lon, "c": 0, "t": int(ts), "last": 0, "srcs": set(), "links": []})
+            base = p.name.split(" (")[0]
+            stem = base[:max(3, len(base) - 2)]
+            # назва має стояти в тексті з великої літери не на початку речення — інакше це звичайне слово
+            # («українці», «зелень», «Слава Україні»); виняток — місто каналу, підставлене без згадки
+            if p.kind != "D" and not CAPMID(stem).search(text) and p.name not in (CHANNEL_CITY.get(key), CAPITAL.get(reg_of.get(key, ""))):
+                continue
+            b = booms.setdefault(p.name, {"n": p.name, "lat": p.lat, "lon": p.lon, "c": 0, "t": int(ts), "last": 0, "srcs": set(), "links": [], "pop": p.pop})
             if ts - b["last"] > 600:  # одна подія = повідомлення різних каналів у межах 10 хв
                 b["c"] += 1
             b["last"] = ts
             b["srcs"].add(key)
             if len(b["links"]) < 3:
                 b["links"].append(link)
+    # село з одним джерелом — надто ненадійно (тезки, загальні слова); місто або ≥2 незалежні канали — так
     return [{"n": b["n"], "lat": b["lat"], "lon": b["lon"], "c": b["c"], "t": b["t"], "src": len(b["srcs"]), "links": b["links"]}
-            for b in booms.values()]
+            for b in booms.values() if b["pop"] >= 20000 or len(b["srcs"]) >= 2]
 SHOT = re.compile(r"збито/подавлено\s+(\d+)")
 
 
