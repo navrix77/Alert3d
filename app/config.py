@@ -23,6 +23,7 @@ _C = [
     ("D", "Nablydatel_Dozor", "Наблюдатель · Ночной Дозор", 0.80, False, "Харківська", True),
     ("M", "monitor1654", "monitor 1654", 0.80, False, "Харківська", True),
     ("R", "radar_kharkov", "Радар Харків", 0.80, False, "Харківська", True),
+    ("TRK", "tryvoga_rakety", "Радар Ракета | Шахеди", 0.55, False, None, True),
     ("TLK", "tlknewsua", "TLK News Харків", 0.88, False, "Харківська", True),
     ("KM", "kharkov_media", "Харьков INFO", 0.75, False, "Харківська", True),
     ("ND", "NochnojDozorKh", "Ночной Дозор Харків", 0.75, False, "Харківська", True),
