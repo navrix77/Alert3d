@@ -23,6 +23,9 @@ let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
 const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#0B0F17'}}]},center:[33.5,48.6],zoom:5.2,attributionControl:{compact:true},maxPitch:65});window.tryvogaMap=map;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
+  // підписи українською: name:uk → name (OSM) замість латиниці
+  const UK=['coalesce',['get','name:uk'],['get','name']];
+  vec.layers.forEach(l=>{if(l.type==='symbol'&&l.layout&&l.layout['text-field']&&JSON.stringify(l.layout['text-field']).includes('name'))l.layout['text-field']=UK;});
   if(kind==='map')return vec;
   // супутник + підписи й дороги з векторної карти
   const keep=vec.layers.filter(l=>l.type==='symbol'||/boundary|road_(trunk|motorway|primary)|highway/.test(l.id)).map(l=>{
@@ -137,8 +140,8 @@ function renderCounters(){
 function renderAsOf(){
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
   if(!SNAP||age>20){el.className='asof stale';el.innerHTML=SNAP?'Немає звʼязку <b>'+Math.round(age)+' с</b> · це не відбій':'зʼєднання…';return;}
-  const h=SNAP.health;el.className='asof'+((!h.telegram||!h.alerts)?' stale':'');
-  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(!h.telegram?' · Telegram не підключено':'')+(!h.alerts?' · офіційні тривоги недоступні':'');
+  const h=SNAP.health;el.className='asof'+((!h.telegram&&!h.replay)?' stale':'');
+  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.replay?' · демо: записана ніч 29→30.10':(!h.telegram?' · Telegram не підключено':''))+(!h.alerts?' · рівні областей лише за трекером':'');
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
 function renderBanner(threats){
