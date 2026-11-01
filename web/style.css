@@ -52,3 +52,6 @@
 #feed .m a{margin-left:auto;color:#7FB2FF;text-decoration:none}
 #feed .f{color:var(--mute);font-style:italic}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom));background:#fff;color:#111;border-radius:14px;padding:10px 16px;font-weight:600;z-index:9;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+
+.maplibregl-ctrl-scale{background:transparent;border-color:#fff;color:#fff;font:700 13px var(--f);text-shadow:0 1px 3px #000;border-width:0 2px 2px}
+.maplibregl-ctrl-bottom-left{bottom:calc(84px + env(safe-area-inset-bottom))}
