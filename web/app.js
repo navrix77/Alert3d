@@ -125,9 +125,15 @@ function frame(now){
       if(!unk){const P=xy(d.p),r=d.hd*D2R;const A=map.project(d.p),B=map.project(ll([P[0]+Math.sin(r)*3,P[1]+Math.cos(r)*3]));sa=Math.atan2(B.x-A.x,-(B.y-A.y))/D2R;}
       feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
       const c=TYPE_COLOR[tr.type];
-      trails.push({type:'Feature',properties:{c,o:active?0.95:0.35},geometry:{type:'LineString',coordinates:[...tr.trail.slice(-3).map(t=>[t[0],t[1]]),d.p]}});
+      if(active)trails.push({type:'Feature',properties:{c,o:0.95},geometry:{type:'LineString',coordinates:[...tr.trail.slice(-3).map(t=>[t[0],t[1]]),d.p]}});
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.route.length)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
     }
+    // каша геть: показуємо лише активні цілі; цілі одного типу, що на екрані лягають одна на одну, — один значок ×N
+    const shown=[];for(const f of feats.filter(f=>f.properties.active).sort((a,b)=>(b.properties.weak?0:1)-(a.properties.weak?0:1))){
+      const P=map.project(f.geometry.coordinates);const near=shown.find(g=>g.properties.type===f.properties.type&&Math.hypot(g._p.x-P.x,g._p.y-P.y)<34);
+      if(near&&f.properties.id!==sel){near.properties.count+=f.properties.count;near.properties.merged=(near.properties.merged||1)+1;continue;}
+      f._p=P;shown.push(f);}
+    feats.length=0;feats.push(...shown);
     map.getSource('targets').setData({type:'FeatureCollection',features:feats});
     if(map.getSource('chains')&&now-(frame.ch||0)>500){frame.ch=now;const ch=[],ls=new Map();
       for(const L of (SNAP.launches||[]))ls.set(L.site,{type:'Feature',properties:{est:false,l:'ПУСК · '+L.site.replace(/ \(.*\)/,'')+' '+fmt(L.t)+(L.count?' ×'+L.count:'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});
@@ -262,7 +268,9 @@ $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Mat
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
 $('#b-layers').onclick=()=>{setBase(base==='sat'?'map':'sat');toast(base==='sat'?'Супутник':'Карта');};
-function set3d(on,anim){tilt=on;if(map.getLayer('tg-sh'))map.setPaintProperty('tg-sh','icon-translate',on?[26,44]:[14,22]);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
+function flat3d(on){for(const id of ['tg','tg-sh']){if(!map.getLayer(id))continue;map.setLayoutProperty(id,'icon-rotate',on?['get','hd']:['get','sa']);map.setLayoutProperty(id,'icon-rotation-alignment',on?'map':'viewport');map.setLayoutProperty(id,'icon-pitch-alignment',on?'map':'viewport');}
+  if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[5,9]:[14,22]);map.setPaintProperty('tg-sh','icon-translate-anchor',on?'map':'viewport');map.setPaintProperty('tg-sh','icon-opacity',on?0.55:0.9);}}
+function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
