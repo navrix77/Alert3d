@@ -137,7 +137,7 @@ function stats(){const o=D.official;
 $('#tt').oninput=e=>{playing=false;$('#pl').textContent='▶';draw(e.target.value/1000);};
 $('#pl').onclick=()=>{playing=!playing;$('#pl').textContent=playing?'❚❚':'▶';if(playing&&CUR>=1)CUR=0;let last=performance.now();
   const step=now=>{if(!playing)return;CUR=Math.min(1,CUR+(now-last)/24000);last=now;$('#tt').value=CUR*1000;draw(CUR);if(CUR>=1){playing=false;$('#pl').textContent='▶';return;}requestAnimationFrame(step);};requestAnimationFrame(step);};
-$('#prev').onclick=e=>load(e.target.dataset.d);$('#next').onclick=e=>load(e.target.dataset.d);
+$('#prev').onclick=e=>load(e.currentTarget.dataset.d);$('#next').onclick=e=>load(e.currentTarget.dataset.d);
 $('#back').onclick=()=>location.href='/';
 $('#png').onclick=()=>{const mc=map.getCanvas(),c=document.createElement('canvas');c.width=mc.width;c.height=mc.height;const g=c.getContext('2d'),k=mc.width/innerWidth;g.drawImage(mc,0,0);
   g.fillStyle='#fff';g.font='800 '+Math.round(26*k)+'px Inter,system-ui,sans-serif';g.fillText('МАПА МАРШРУТІВ БПЛА ТА РАКЕТ',24*k,44*k);
