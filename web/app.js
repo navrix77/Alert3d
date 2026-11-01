@@ -55,7 +55,22 @@ function addImages(){
   if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.88)';x.beginPath();x.roundRect(2,2,s-4,s-4,14);x.fill();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
 }
 const EMPTY={type:'FeatureCollection',features:[]};
+function addRelief(){
+  // об'єм: рельєф (висоти Terrarium/AWS) + тіньовий відмив + 3D-будівлі в містах
+  try{
+    if(!map.getSource('dem'))map.addSource('dem',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:13,attribution:'Рельєф: Mapzen/AWS Terrain'});
+    if(!map.getSource('dem-hs'))map.addSource('dem-hs',{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],encoding:'terrarium',tileSize:256,maxzoom:13});
+    const firstSym=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
+    const night=base!=='map'&&document.documentElement.dataset.theme!=='day';
+    if(!map.getLayer('hillshade'))map.addLayer({id:'hillshade',type:'hillshade',source:'dem-hs',paint:{'hillshade-exaggeration':night?0.55:0.4,'hillshade-shadow-color':night?'#000000':'#3a3328','hillshade-highlight-color':night?'rgba(150,170,210,.35)':'#ffffff','hillshade-accent-color':night?'#05070c':'#5a4a36','hillshade-illumination-direction':315}},firstSym);
+    const vs=Object.keys(map.getStyle().sources).find(k=>map.getStyle().sources[k].type==='vector');
+    if(vs&&!map.getLayer('bld3d'))map.addLayer({id:'bld3d',type:'fill-extrusion',source:vs,'source-layer':'building',minzoom:12.5,
+      paint:{'fill-extrusion-color':night?'#1b2333':'#d9d4cc','fill-extrusion-height':['coalesce',['get','render_height'],['get','height'],8],'fill-extrusion-base':['coalesce',['get','render_min_height'],0],
+        'fill-extrusion-opacity':['interpolate',['linear'],['zoom'],12.5,0,13.5,night?0.75:0.85],'fill-extrusion-vertical-gradient':true}},firstSym);
+  }catch(e){console.warn('relief',e);}
+}
 function addOverlays(){
+  addRelief();
   const st=map.getStyle();if(!st||!st.glyphs||map.getSource('obl'))return;
   addImages();
   const LV=['coalesce',['feature-state','lvl'],0];
@@ -382,7 +397,7 @@ $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолок
 $('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D) — без перспективних спотворень; у 3D лише коротша тінь
   if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
-function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
+function set3d(on,anim){tilt=on;flat3d(on);try{map.setTerrain(on&&map.getSource('dem')?{source:'dem',exaggeration:2.6}:null);}catch(e){}localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-daily').onclick=()=>{location.href='/daily.html';};
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
