@@ -161,7 +161,7 @@ function renderAsOf(){
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
   if(!SNAP||age>20){el.className='asof stale';el.innerHTML=SNAP?'Немає звʼязку <b>'+Math.round(age)+' с</b> · це не відбій':'зʼєднання…';return;}
   const h=SNAP.health;el.className='asof'+((!h.telegram&&!h.replay)?' stale':'');
-  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.replay?' · демо: записана ніч 29→30.10':(!h.telegram?' · Telegram не підключено':''))+(!h.alerts?' · рівні областей лише за трекером':'');
+  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.replay?' · ДЕМО: записана ніч 29→30.10':(h.channels?' · наживо: '+h.channels.live+'/'+h.channels.channels+' каналів':''))+(h.alerts?' · офіційні тривоги ✓':' · офіційні тривоги недоступні');
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
 function renderBanner(threats){
