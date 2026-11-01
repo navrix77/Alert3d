@@ -212,3 +212,14 @@
 :root[data-theme="day"] .seg button.on{background:#0B1220;color:#fff}
 :root[data-theme="day"] .me-set{background:rgba(10,20,40,.08);color:#0B1220;border-color:rgba(10,20,40,.1)}
 :root[data-theme="day"] .round{background:rgba(10,20,40,.08)!important;color:#0B1220!important}
+/* особистий радар: великі хвилини */
+.big{position:relative;width:96px;height:96px;float:left;margin:4px 14px 6px 0}
+.big svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.big .trk{fill:none;stroke:rgba(127,127,127,.25);stroke-width:7}
+.big .arc{fill:none;stroke:var(--red);stroke-width:7;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(229,72,77,.8));transition:stroke-dasharray 1s}
+.me.watch .big .arc{stroke:var(--yellow);filter:drop-shadow(0 0 6px rgba(245,184,61,.7))}
+.big b{position:absolute;inset:0;display:grid;place-items:center;font:800 40px/1 var(--f);letter-spacing:-.04em;padding-bottom:12px}
+.big i{position:absolute;left:0;right:0;bottom:22px;text-align:center;font:600 12px var(--f);font-style:normal;color:var(--mute)}
+.big-t{font-size:15px;line-height:1.35;padding-top:10px}.big-t b{font-weight:800}.big-t span{color:var(--mute);font-size:13px}
+.big-a{clear:both;margin:8px 0 0;font-weight:700;font-size:13px}
+.me.danger .big-a{color:#FF6B70}

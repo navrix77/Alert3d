@@ -70,9 +70,9 @@ function addOverlays(){
   map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':'#fff','line-opacity':['interpolate',['linear'],['zoom'],5.5,0.25,9,0.55],'line-width':['interpolate',['linear'],['zoom'],6,0.5,10,1.2]}});
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
   map.addSource('ru',{type:'geojson',data:EMPTY});
-  map.addLayer({id:'ru-glow',type:'circle',source:'ru',minzoom:3,paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':1,'circle-opacity':0.22,'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'ru-dot',type:'circle',source:'ru',paint:{'circle-radius':3.5,'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':2,'circle-opacity':0.85}});
-  map.addLayer({id:'ru-t',type:'symbol',source:'ru',minzoom:5.5,layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
+  map.addLayer({id:'ru-glow',type:'circle',source:'ru',minzoom:3,filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':1,'circle-opacity':0.22,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'ru-dot',type:'circle',source:'ru',filter:['!',['has','sum']],paint:{'circle-radius':3.5,'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':2,'circle-opacity':0.85}});
+  map.addLayer({id:'ru-t',type:'symbol',source:'ru',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['has','sum'],12,10.5],'text-max-width':16,'text-offset':['case',['has','sum'],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['has','sum'],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['case',['get','est'],5,7],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
@@ -261,7 +261,13 @@ function renderMe(threats){
   if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
   else if(first){const m=Math.max(0,(first.r.eta||0)-SHELTER);cls=m<=3?'me danger':'me watch';word=m<=0?'В укриття зараз':m<=3?'Виходь в укриття':'Увага';
     sub=(m<=0?'Ціль прибуде раніше, ніж ви дійдете до укриття. Правило двох стін.':'Маєте <b>~'+Math.floor(m)+' хв</b>, щоб зібратися, потім '+SHELTER+' хв до укриття.');}
-  box.className=cls;$('#me-word').textContent=word;$('#me-sub').innerHTML=sub;
+  box.className=cls;$('#me-word').textContent=word;
+  // ГОЛОВНЕ: скільки хвилин саме у вас — великим числом з кільцем
+  if(first&&!isStale&&first.r.eta!=null){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
+    sub='<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
+      '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> над вашим домом приблизно через '+eta+' хв<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+'</span></div>'+
+      '<p class="big-a">'+(eta-SHELTER<=0?'Ідіть в укриття зараз. Якщо не встигаєте — правило двох стін.':'Маєте ~'+Math.floor(eta-SHELTER)+' хв, щоб зібратися; '+SHELTER+' хв — дорога до укриття.')+'</p>';}
+  $('#me-sub').innerHTML=sub;
   $('#me-list').innerHTML='';
   (thr.length?thr:near).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
     const c=MEI[t.type]||(MEI[t.type]=drawTarget(t.type,22));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
@@ -363,13 +369,14 @@ function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
   vis(['ru-glow','ru-dot','ru-t'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones'],PREF.zones);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
-function syncRu(){if(!SNAP||!map.getSource('ru'))return;const agg=new Map();
-  const PER=p=>!p?'':/ноч/.test(p)?'за ніч':/дня/.test(p)?'за день':/суток/.test(p)?'за добу':(p.match(/с ([\d.:]+)\s*мск до ([\d.:]+)/)||[]).slice(1).join('–')+' мск';
-  for(const e of (SNAP.ru||[]))for(const r of e.regions){const a=agg.get(r.n)||{n:r.n,lat:r.lat,lon:r.lon,c:0,t:0,tot:0,nr:0,per:''};
-    if(e.t>=a.t){a.t=e.t;a.per=PER(e.period);a.tot=e.total;a.nr=e.regions.length;}a.c+=r.cnt||0;agg.set(r.n,a);}
-  // це НЕ пуски по Україні: це наші дрони над РФ, які МО РФ заявило «збитими» (постфактум)
-  map.getSource('ru').setData({type:'FeatureCollection',features:[...agg.values()].map(a=>({type:'Feature',properties:{c:Math.min(12,a.c/4||3),
-    l:'Наші дрони над '+a.n.replace(/(ськ|цьк|зьк)а обл\./,'$1ою обл.').replace(/ий край/,'им краєм').replace('Москва й область','Москвою й областю').replace(/ море$/,' морем').replace(/^(Татарстан|Крим)/,'$1ом').replace(/^Чувашія$/,'Чувашією').replace(/^Мордовія$/,'Мордовією').replace(/^Калмикія$/,'Калмикією')+'\nМО РФ: '+(a.c?'збито '+a.c:'усього '+a.tot+' над '+a.nr+' регіонами')+(a.per?' · '+a.per:'')+' · '+fmt(a.t)},geometry:{type:'Point',coordinates:[a.lon,a.lat]}}))});}
+function syncRu(){if(!SNAP||!map.getSource('ru'))return;
+  // останнє зведення МО РФ: на карті — лише точки регіонів (з кількістю, якщо названа) і ОДИН підсумковий підпис
+  const ev=(SNAP.ru||[]).slice().sort((a,b)=>b.t-a.t)[0];if(!ev){map.getSource('ru').setData(EMPTY);return;}
+  const PER=p=>!p?'':/ноч/.test(p)?'за ніч':/дня/.test(p)?'за день':/суток/.test(p)?'за добу':'';
+  const F=ev.regions.map(r=>({type:'Feature',properties:{c:r.cnt?Math.min(12,r.cnt/3):3,l:r.cnt?'×'+r.cnt:''},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}));
+  const lo=ev.regions.reduce((s,r)=>s+r.lon,0)/ev.regions.length,la=ev.regions.reduce((s,r)=>s+r.lat,0)/ev.regions.length;
+  F.push({type:'Feature',properties:{c:0,sum:true,l:'Наші дрони над РФ '+PER(ev.period)+': '+ev.total+' «збитих» за МО РФ · '+ev.regions.length+' рег. · '+fmt(ev.t)},geometry:{type:'Point',coordinates:[lo+1.5,la+0.6]}});
+  map.getSource('ru').setData({type:'FeatureCollection',features:F});}
 setInterval(syncRu,5000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};

@@ -65,7 +65,7 @@ class Push:
                 best, cum = dd, acc + math.sqrt(L2) * t
             acc += math.sqrt(L2)
         side = FROM[round(bearing(H, P) / 45) % 8]
-        if best < 15:
+        if best < 15 and d < 150 and cum / tr["speed"] * 60 <= 45:
             return d, cum / tr["speed"] * 60, side
         hd = tr.get("hd")
         if hd is not None and d < 150 and abs((bearing(P, H) - hd + 180) % 360 - 180) < 18:
