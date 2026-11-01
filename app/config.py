@@ -77,4 +77,5 @@ for item in filter(None, extra.split(",")):
     CHANNELS.append((k, u, n, float(r), False))
 
 SOURCES = {k: Source(k, n, r, off, f"https://t.me/{u}") for k, u, n, r, off in CHANNELS}
+SOURCES["AIU"] = Source("AIU", "Повітряні сили / alerts.in.ua", 0.92, True, "https://alerts.in.ua")
 BY_USERNAME = {u.lower(): k for k, u, *_ in CHANNELS}

@@ -64,6 +64,56 @@ class OfficialAlerts:
                     log.warning("alerts poll failed: %s", e)
                 await asyncio.sleep(config.ALERTS_POLL_SEC)
 
+    on_threat = None
+    _seen_threats: set = set()
+    THREAT = re.compile(r"^- \*\*(\d{1,2}):(\d{2}) — ([^*]+?)\*\* over ([^—]+?) — (.*)$", re.M)
+    DIRW = [("north-east", 45), ("north-west", 315), ("south-east", 135), ("south-west", 225), ("northeast", 45), ("northwest", 315),
+            ("southeast", 135), ("southwest", 225), ("north", 0), ("south", 180), ("east", 90), ("west", 270)]
+
+    def threats(self, md: str) -> list[dict]:
+        """Розділ «THREAT ACTIVITY»: офіційні/моніторингові фіксації цілей із місцем і курсом."""
+        import datetime as _dt
+        from zoneinfo import ZoneInfo
+        i, j = md.find("## 4."), md.find("## 5.")
+        if i < 0:
+            return []
+        out = []
+        now = _dt.datetime.now(ZoneInfo("Europe/Kyiv"))
+        for m in self.THREAT.finditer(md[i:j if j > i else None]):
+            hh, mm, what, where, desc = m.groups()
+            key = m.group(0)
+            if key in self._seen_threats:
+                continue
+            self._seen_threats.add(key)
+            w, d = what.lower(), desc.lower()
+            if "bomb" in w:
+                typ = "kab"
+            elif "ballistic" in w or "ballistic" in d:
+                typ = "ballistic"
+            elif "missile" in w or "cruise" in d:
+                typ = "cruise"
+            elif "jet" in d or "реактив" in d:
+                typ = "jet"
+            elif "drone" in w or "uav" in w:
+                typ = "shahed"
+            else:
+                continue
+            uk = re.search(r"\(([^()]*[А-ЯІЇЄҐа-яіїєґ][^()]*)\)", where)
+            if not uk:
+                continue
+            name = uk.group(1).strip()
+            if name.endswith("область"):
+                continue  # уся область — надто неточно для позиції цілі
+            n = re.search(r"\((\d+) tracked\)", what)
+            hd = next((az for k, az in self.DIRW if f"heading {k}" in d or f"towards the {k}" in d or f"to the {k}" in d), None)
+            t = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+            if t > now + _dt.timedelta(minutes=5):
+                t -= _dt.timedelta(days=1)
+            out.append({"t": t.timestamp(), "type": typ, "count": int(n.group(1)) if n else None, "place": name, "heading": hd, "text": desc.strip()})
+        if len(self._seen_threats) > 4000:
+            self._seen_threats = set(list(self._seen_threats)[-2000:])
+        return out
+
     LINE = re.compile(r"^\*\*[^*]*\(([^)]*?) область\)\*\*(.*)$", re.M)
 
     @staticmethod
@@ -156,6 +206,12 @@ class OfficialAlerts:
                     r = await cli.get(ACTIVE_MD)
                     r.raise_for_status()
                     self.apply_md(r.text)
+                    if self.on_threat:
+                        for ev in self.threats(r.text):
+                            try:
+                                self.on_threat(ev)
+                            except Exception:  # noqa: BLE001
+                                log.exception("threat event")
                     fails = 0
                 except Exception as e:  # noqa: BLE001
                     fails += 1

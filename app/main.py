@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import os
 import logging
 import time
@@ -33,6 +34,7 @@ brain = Brain()
 pushsvc = Push()
 tracker = Tracker(config.SOURCES, brain)
 alerts = OfficialAlerts()
+alerts.on_threat = lambda ev: on_threat(ev)
 webmon = WebMonitor()
 clients: set[WebSocket] = set()
 started = time.time()
@@ -81,6 +83,44 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     trk.exclude = set()
     if not useful:
         trk.ingest(parser.parse(text, key), key, ts, link)
+
+
+def on_threat(ev: dict) -> None:
+    """Офіційна фіксація з alerts.in.ua: місце (село/місто/район) + тип + курс."""
+    from .parser import Observation, PlaceRef
+    name = re.sub(r"^(с\.|смт|м\.|сел\.)\s*", "", ev["place"]).strip()
+    place = None
+    if name.endswith("район"):
+        place = raion_centroid(name.replace(" район", "").strip())
+    else:
+        ids = parser.gaz.lookup(name)
+        if ids:
+            ctx = CTX.get("AIU")
+            P = [parser.gaz.places[i] for i in ids]
+            place = max(P, key=lambda p: p.pop) if len(P) == 1 or not ctx else min(P, key=lambda p: (p.lat - ctx[1]) ** 2 + (p.lon - ctx[2]) ** 2)
+    if not place:
+        return
+    obs = Observation(type=ev["type"], count=ev["count"], places=[PlaceRef("p", place)], course=ev["heading"])
+    tracker.ingest(obs, "AIU", ev["t"], "https://alerts.in.ua")
+    brain.log_msg(ev["t"], "AIU", None, obs.kind, obs.type, obs.count, [{"r": "p", "n": place.name}], None, ev["text"])
+
+
+_RC: dict = {}
+
+
+def raion_centroid(n: str):
+    from .geo import Place
+    if not _RC:
+        d = json.loads((Path(__file__).resolve().parent.parent / "data" / "raions.geojson").read_text(encoding="utf-8"))
+        for f in d["features"]:
+            g = f["geometry"]
+            pts = [p for poly in (g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]) for p in poly[0]]
+            _RC[f["properties"]["n"]] = Place(f["properties"]["n"] + " р-н", sum(p[1] for p in pts) / len(pts), sum(p[0] for p in pts) / len(pts), "R", 1000)
+    ap = lambda x: x.replace("’", "'").replace("ʼ", "'")
+    for k, v in _RC.items():
+        if ap(k) == ap(n):
+            return v
+    return None
 
 
 def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
@@ -133,7 +173,7 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.9",
+        "version": "2026-11-01.10",
         "push_subs": pushsvc.count(),
         "brain": brain.stats(),
     }
