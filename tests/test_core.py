@@ -153,3 +153,9 @@ def test_regional_channel_stays_in_region():
     assert o.places and all(46 < r.place.lat < 48.3 for r in o.places)
     o = p.parse("⚠️ Пуски шахедів з Південного напрямку", "monikppy")
     assert not any(r.place.name == "Південне" for r in o.places)
+
+
+def test_new_adjective_is_not_village_nove():
+    from app.parser import Parser
+    o = Parser().parse("🛵Новий реактивний БпЛА з т.о.Криму в бік Одещини", None)
+    assert not any(r.place.name == "Нове" for r in o.places)
