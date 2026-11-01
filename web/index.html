@@ -83,6 +83,10 @@
     <div class="row"><span>До укриття йти</span><div class="seg small" data-pref="shelter"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button><button data-v="10">10</button></div><span>хв</span></div>
     <label class="sw"><input type="checkbox" id="st-sound"><span>Звуковий сигнал, коли ціль іде на мій район</span></label>
     <label class="sw"><input type="checkbox" id="st-sys"><span>Сповіщення Windows / телефона, коли «Тривога» згорнута</span></label></section>
+  <section><h3>Стеж за мною</h3>
+    <label class="sw"><input type="checkbox" id="st-follow"><span>Попереджати про загрози біля того місця, де я зараз (за геолокацією пристрою)</span></label>
+    <div class="row"><span>Радіус</span><div class="seg small" id="st-radius"><button data-v="5">5</button><button data-v="10">10</button><button data-v="20">20</button><button data-v="30">30</button></div><span>км</span></div>
+    <p class="note">Працює, поки «Тривога» відкрита (на телефоні — поки сторінка не закрита). Місце не надсилається на сервер: перевірка йде на самому пристрої.</p></section>
   <section><h3>Що показувати</h3>
     <label class="sw"><input type="checkbox" id="st-ru"><span>Наші удари: куди летіли дрони й що уражено <small>(заяви МО РФ і Генштабу ЗСУ, постфактум)</small></span></label>
     <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>

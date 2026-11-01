@@ -84,7 +84,7 @@ function addOverlays(){
   map.addSource('ra',{type:'geojson',data:'/data/raions.geojson',generateId:true});
   map.addSource('occ',{type:'geojson',data:'/data/occupied.geojson'});
   if(!map.hasImage('hatch')){const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');x.strokeStyle='rgba(20,0,6,.55)';x.lineWidth=3;x.beginPath();x.moveTo(-4,20);x.lineTo(20,-4);x.moveTo(-4,4);x.lineTo(4,-4);x.moveTo(12,20);x.lineTo(20,12);x.stroke();map.addImage('hatch',x.getImageData(0,0,16,16),{pixelRatio:2});}
-  map.addSource('sel',{type:'geojson',data:EMPTY});
+  map.addSource('sel',{type:'geojson',data:EMPTY});map.addSource('mepos',{type:'geojson',data:EMPTY});
   map.addSource('ticks',{type:'geojson',data:EMPTY});
   map.addSource('holo',{type:'geojson',data:EMPTY});map.addSource('hrom',{type:'geojson',data:EMPTY});map.addSource('comets',{type:'geojson',data:EMPTY,lineMetrics:true});
   ['zones','trails','preds','targets','home','chains','lsites'].forEach(id=>map.addSource(id,{type:'geojson',data:EMPTY}));
@@ -137,7 +137,11 @@ function addOverlays(){
   if(map.getLayer('tg-course'))map.moveLayer('tg-course');
   map.on('click','tg-hit',e=>{const f=e.features[0];openSheet(f.properties.id);});
   map.on('mouseenter','tg-hit',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg-hit',()=>map.getCanvas().style.cursor='');
-  lastLv='';lastRa='';syncHome();
+  map.addLayer({id:'me-ring',type:'fill',source:'mepos',filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':'#3B9BFF','fill-opacity':0.07}});
+  map.addLayer({id:'me-ring-l',type:'line',source:'mepos',filter:['==',['geometry-type'],'Polygon'],paint:{'line-color':'#5AB0FF','line-width':1.4,'line-dasharray':[2,2],'line-opacity':0.85}});
+  map.addLayer({id:'me-dot-h',type:'circle',source:'mepos',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':16,'circle-color':'#3B9BFF','circle-opacity':0.22,'circle-blur':0.6}});
+  map.addLayer({id:'me-dot',type:'circle',source:'mepos',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':6.5,'circle-color':'#2F8BFF','circle-stroke-color':'#fff','circle-stroke-width':2.2}});
+  lastLv='';lastRa='';syncHome();syncMe();
   if(tilt)set3d(true,'keep');
   if(!map._scaleAdded){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
 }
@@ -586,4 +590,42 @@ function notesCheck(s){
 }
 
 window.__note=note;
+
+/* ---------- «Стеж за мною»: загрози в радіусі R від поточного місця пристрою ---------- */
+const FOL={watch:null,pos:null,acc:null,fired:new Map()};
+function ringGeo(c,km){const P=xy(c),pts=[];for(let i=0;i<=64;i++){const a=i/64*2*Math.PI;pts.push(ll([P[0]+Math.sin(a)*km,P[1]+Math.cos(a)*km]));}return {type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[pts]}};}
+function syncMe(){if(!map.getSource('mepos'))return;map.getSource('mepos').setData(PREF.follow&&FOL.pos?{type:'FeatureCollection',features:[ringGeo(FOL.pos,PREF.radius||10),{type:'Feature',properties:{},geometry:{type:'Point',coordinates:FOL.pos}}]}:EMPTY);}
+function followOn(){
+  if(!navigator.geolocation){toast('Геолокація недоступна');return false;}
+  if(FOL.watch!=null)return true;
+  FOL.watch=navigator.geolocation.watchPosition(p=>{const first=!FOL.pos;FOL.pos=[p.coords.longitude,p.coords.latitude];FOL.acc=p.coords.accuracy;syncMe();
+      if(first){toast('Стежу за вами · радіус '+(PREF.radius||10)+' км');map.flyTo({center:FOL.pos,zoom:Math.max(map.getZoom(),9.5)});}},
+    e=>{toast(e.code===1?'Доступ до геолокації заборонено в браузері':'Не вдалося визначити місце');},{enableHighAccuracy:true,maximumAge:20000,timeout:20000});
+  if('Notification' in window&&Notification.permission==='default')Notification.requestPermission().then(r=>{if(r==='granted'){PREF.sys=true;savePref();}});
+  return true;}
+function followOff(){if(FOL.watch!=null)navigator.geolocation.clearWatch(FOL.watch);FOL.watch=null;FOL.pos=null;FOL.fired.clear();syncMe();}
+setInterval(()=>{
+  if(!PREF.follow||!FOL.pos||!SNAP||REPLAY)return;
+  const R=PREF.radius||10,P=xy(FOL.pos),serverT=Date.now()/1000+offset,now=Date.now();
+  for(const tr of SNAP.tracks){
+    if(tr.status!=='active'||tr.conf<0.5)continue;
+    const d0=DISP.get(tr.id);const p0=d0?d0.p:[tr.lon,tr.lat];const d=dist(P,xy(p0));
+    let eta=null;if(d>R){for(let m=1;m<=15;m++){const q=posAt(tr,serverT+m*60).p;if(dist(P,xy(q))<=R){eta=m;break;}}}
+    const inside=d<=R;
+    if(!inside&&eta==null){const f=FOL.fired.get(tr.id);if(f&&now-f.t>5*60000)FOL.fired.delete(tr.id);continue;}
+    const f=FOL.fired.get(tr.id);const level=inside?2:1;
+    if(f&&f.level>=level&&now-f.t<10*60000)continue;   // уже попередили; повтор не частіше ніж раз на 10 хв або коли ціль ще ближче
+    FOL.fired.set(tr.id,{t:now,level});
+    const side=FROM[Math.round(brg(P,xy(p0))/45)%8];
+    note({k:'F:'+tr.id+':'+level+':'+Math.floor(now/600000),lvl:'red',ic:inside?'🚨':'⚠️',
+      title:(TYPE_NAME[tr.type]||'Ціль')+(tr.count>1?' ×'+tr.count:'')+(inside?' — '+Math.max(1,Math.round(d))+' км від вас':' — за ~'+eta+' хв буде в радіусі '+R+' км'),
+      sub:Math.round(d)+' км '+side+(tr.next?' · курс → '+tr.next:'')+' · пройдіть в укриття',go:()=>openSheet(tr.id)});
+    if(navigator.vibrate)try{navigator.vibrate(inside?[300,120,300,120,300]:[200,100,200]);}catch(e){}
+  }
+},3000);
+{const cb=$('#st-follow'),seg=$('#st-radius');
+  if(cb){cb.checked=!!PREF.follow;cb.onchange=()=>{PREF.follow=cb.checked;savePref();if(PREF.follow){if(!followOn()){PREF.follow=false;cb.checked=false;savePref();}}else followOff();};}
+  if(seg){const upd=()=>seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===(PREF.radius||10)));upd();
+    seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;PREF.radius=+b.dataset.v;savePref();upd();syncMe();FOL.fired.clear();toast('Радіус '+PREF.radius+' км');};}
+  if(PREF.follow)followOn();}
 })();
