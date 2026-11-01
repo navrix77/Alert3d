@@ -179,6 +179,9 @@ async def learn_history() -> None:
     log.info("історія: вивчено %d постів; модель маршрутів: %s", n, brain.stats())
 
 
+from .daily import Daily, current_day, last_finished  # noqa: E402
+
+daily = Daily(brain, feed, parser, lambda: Tracker(config.SOURCES), [CTX, LASTC], pushsvc)
 _FC = (0.0, {})
 HIST: list[dict] = brain.hist_load(time.time() - 12 * 3600)
 
@@ -212,13 +215,14 @@ def state() -> dict:
         while HIST and snap["now"] - HIST[0]["t"] > 12 * 3600:
             HIST.pop(0)
     snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
+    snap["daily"] = daily.ready
     snap["health"] = {
         "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1" or webmon.state()["live"] > 0,
         "channels": webmon.state(),
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.14",
+        "version": "2026-11-02.1",
         "push_subs": pushsvc.count(),
         "brain": brain.stats(),
     }
@@ -248,6 +252,8 @@ async def lifespan(app: FastAPI):
     tasks.append(asyncio.create_task(ru.run()))
     tasks.append(asyncio.create_task(occupied.run()))
     tasks.append(asyncio.create_task(hits.run()))
+    if os.getenv("REPLAY") != "1":
+        tasks.append(asyncio.create_task(daily.run()))
     if os.getenv("LAN_TLS", "1") == "1":
         tasks.append(asyncio.create_task(lan_tls.run()))
     if os.getenv("REPLAY") != "1":
@@ -282,6 +288,16 @@ async def push_register(body: dict):
 async def push_unregister(body: dict):
     pushsvc.unregister(str(body.get("token", "")))
     return {"ok": True}
+
+
+@app.get("/api/daily")
+async def api_daily(d: str | None = None):
+    """Мапа доби 09:00→09:00. d — дата ранку, коли доба закінчилась; без d — остання завершена."""
+    import re as _re
+    day = d if d and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) else last_finished()
+    if day > current_day():
+        return JSONResponse({"error": "доба ще не почалась"}, status_code=404)
+    return JSONResponse(await daily.get(day))
 
 
 @app.get("/api/history")

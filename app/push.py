@@ -81,6 +81,16 @@ class Push:
                 except Exception as e:  # noqa: BLE001
                     log.warning("push tick: %s", e)
 
+    async def broadcast(self, title: str, body: str, data: dict | None = None) -> None:
+        subs = [r[0] for r in self.db.execute("SELECT token FROM subs").fetchall()]
+        if not subs:
+            return
+        msgs = [{"to": t, "title": title, "body": body, "sound": "default", "data": data or {}} for t in subs]
+        async with httpx.AsyncClient(timeout=15) as cli:
+            for i in range(0, len(msgs), 100):
+                await cli.post("https://exp.host/--/api/v2/push/send", json=msgs[i:i + 100],
+                               headers={"Accept": "application/json", "Content-Type": "application/json"})
+
     async def tick(self, cli: httpx.AsyncClient, snap: dict) -> None:
         subs = self.db.execute("SELECT token, lon, lat FROM subs").fetchall()
         if not subs:

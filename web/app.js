@@ -554,6 +554,10 @@ function notesCheck(s){
     if(NHOMELV!==null&&!first){if(!NHOMELV&&lv)note({k:'A:'+mine+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Повітряна тривога: '+mine+' обл.',sub:'Пройдіть в укриття',go:()=>flyP(home,8)});
       else if(NHOMELV&&!lv)note({k:'O:'+mine+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій тривоги: '+mine+' обл.',sub:'У межах окремих громад тривога може ще тривати',go:()=>flyP(home,8)});}
     NHOMELV=lv;}}
+  // 0) мапа доби о 09:00
+  if(s.daily){let seen=null;try{seen=localStorage.getItem('dailySeen');}catch(e){}
+    if(seen!==s.daily){try{localStorage.setItem('dailySeen',s.daily);}catch(e){}
+      note({k:'D:'+s.daily,lvl:'violet',ic:'🗺️',title:'Мапа доби готова',sub:'Маршрути, пуски й вибухи за добу до 09:00 — натисніть, щоб відкрити',go:()=>{location.href='/daily.html?d='+s.daily;}});}}
   // 4) що вразили наші (офіційно)
   for(const h of (s.hits||[])){const k='H:'+(h.link||'')+':'+h.place+':'+h.what;if(first){NSEEN.add(k);continue;}
     note({k,t:h.t,lvl:'blue',ic:'🎯',title:'Уражено: '+h.what+' · '+h.place,sub:'Генштаб ЗСУ',go:()=>flyP([h.lon,h.lat],7)});}
