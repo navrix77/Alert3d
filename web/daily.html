@@ -15,7 +15,7 @@ html,body{margin:0;height:100%;background:#05070B;color:var(--fg);font-family:In
 .head .sub{margin-top:4px;color:var(--mute);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .head .nav{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .head{padding-right:58px!important}.head .x{position:absolute;right:10px;top:10px;width:38px;height:38px;border-radius:50%;padding:0;font-size:16px;background:rgba(255,255,255,.14)}
-.sm{display:none}
+.sm{display:none}.credit{display:none;font-size:9.5px;color:var(--mute);margin-top:3px}
 button{border:0;border-radius:11px;padding:7px 11px;font:600 13px inherit;font-family:inherit;color:var(--fg);background:rgba(255,255,255,.1);cursor:pointer}
 button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor:default}
 .legend{left:16px;bottom:16px;padding:12px 14px;min-width:230px}
@@ -40,13 +40,14 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
   .legend{left:10px;right:10px;bottom:calc(118px + env(safe-area-inset-bottom));min-width:0;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;column-gap:14px;border-radius:14px}
   .legend .r{margin:3px 0;font-size:12px;gap:7px}.legend .r i{width:18px}.legend small{display:none}
   .play{left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:auto;padding:8px 10px;border-radius:14px}
+  .maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left{display:none}.credit{display:block}
   .wm{display:none}.lg{display:none}.sm{display:inline}.head .x{width:34px;height:34px;right:8px;top:8px}
 }
 </style>
 </head>
 <body>
 <div id="map"></div>
-<div class="panel head"><button id="back" class="x" aria-label="Закрити й повернутися до карти" title="До карти">✕</button><h1>Мапа маршрутів БпЛА та ракет</h1><div class="sub" id="sub">…</div>
+<div class="panel head"><button id="back" class="x" aria-label="Закрити й повернутися до карти" title="До карти">✕</button><h1>Мапа маршрутів БпЛА та ракет</h1><div class="sub" id="sub">…</div><div class="credit">© Esri, Maxar · © OpenStreetMap · OpenFreeMap</div>
   <div class="nav"><button id="prev">◀ <span class="lg">Попередня доба</span><span class="sm">Попередня</span></button><button id="next"><span class="lg">Наступна</span><span class="sm">Наступна</span> ▶</button><button id="png">⤓ <span class="lg">Зберегти зображення</span><span class="sm">Зберегти</span></button></div></div>
 <div class="panel stats" id="stats"></div>
 <div class="panel legend" id="legend"></div>
@@ -150,9 +151,9 @@ function stats(){const o=D.official;
   $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+
     (D.booms.length?'<h3 class="bh" style="margin-top:12px">Найбільше вибухів</h3><ul>'+D.booms.slice(0,12).map(b=>'<li><span>'+b.n+'</span><b>'+b.c+'</b></li>').join('')+'</ul>':'');}
 $('#tt').oninput=e=>{playing=false;$('#pl').textContent='▶';draw(e.target.value/1000);};
-const SPD=[1,2.5,5,10,20,40];let spd=2;try{const v=+localStorage.getItem('dspd');if(v>=0&&v<SPD.length)spd=v;}catch(e){}
+const SPD=[1,2.5,5,10,20,40];let spd=1;try{const r=localStorage.getItem('dspd2');if(r!==null&&+r>=0&&+r<SPD.length)spd=+r;}catch(e){}
 const spdLbl=()=>{$('#spd').textContent=SPD[spd]+' с/год';};spdLbl();
-$('#spd').onclick=()=>{spd=(spd+1)%SPD.length;spdLbl();try{localStorage.setItem('dspd',spd);}catch(e){}};
+$('#spd').onclick=()=>{spd=(spd+1)%SPD.length;spdLbl();try{localStorage.setItem('dspd2',spd);}catch(e){}};
 $('#pl').onclick=()=>{playing=!playing;$('#pl').textContent=playing?'❚❚':'▶';if(playing&&CUR>=1)CUR=0;let last=performance.now();
   const step=now=>{if(!playing)return;CUR=Math.min(1,CUR+(now-last)/(SPD[spd]*24*1000));last=now;$('#tt').value=CUR*1000;draw(CUR);if(CUR>=1){playing=false;$('#pl').textContent='▶';return;}requestAnimationFrame(step);};requestAnimationFrame(step);};
 $('#prev').onclick=e=>load(e.currentTarget.dataset.d);$('#next').onclick=e=>load(e.currentTarget.dataset.d);
