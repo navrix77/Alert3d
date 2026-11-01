@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 log = logging.getLogger("daily")
-VER = 2
+VER = 3
 OUT = Path(__file__).resolve().parent.parent / "data" / "daily"
 BOOM = re.compile(r"вибух|взрыв|прил[іеё]т|влучан|попадан|детонац|пожеж|ураж")
 NOT_BOOM = re.compile(r"збит|сбит|мінус|минус|ппо працю|пво работ|роботу ппо|роботою ппо|роботою пво|не фіксу|відбій|наслідки .* \d+ жовтня|історі")
@@ -137,6 +137,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
         pts = ob if len(ob) >= 2 else v["pts"]
         if len(pts) >= 2:
             tracks.append({"id": k, "type": v["type"], "count": v["count"], "launch": v["launch"], "next": v["next"], "pts": pts})
+    tracks = stitch(tracks)
     by_type: dict[str, int] = {}
     for tr in tracks:
         by_type[tr["type"]] = by_type.get(tr["type"], 0) + (tr["count"] or 1)
@@ -151,6 +152,64 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
     bl = [{"n": b["n"], "lat": b["lat"], "lon": b["lon"], "c": b["c"], "t": b["t"]} for b in booms.values()]
     return {"v": VER, "day": day, "t0": t0, "t1": t1, "final": time.time() > t1 + 4 * 3600 or (t1 <= time.time() and official is not None), "built": int(time.time()), "msgs": len(rows),
             "tracks": tracks, "by_type": by_type, "official": official, "sites": list(sites.values()), "booms": sorted(bl, key=lambda b: -b["c"])}
+
+
+SPEED = {"shahed": 170, "jet": 450, "molniya": 120, "cruise": 800, "ballistic": 2000, "kab": 400}
+
+
+def stitch(tracks: list[dict]) -> list[dict]:
+    """Монітори ведуть ціль шматками (кожен канал — свою ділянку). Склеюємо шматки одного типу в маршрут, якщо
+    наступний починається там, куди міг долетіти попередній, і напрямок не ламається різко."""
+    import math
+    from .geo import bearing, dist_km, to_xy
+    xy = lambda p: to_xy(p[1], p[0])
+    ts = sorted(tracks, key=lambda t: t["pts"][0][2])
+    nxt: dict[int, int] = {}
+    taken: set[int] = set()
+    ends = sorted(range(len(ts)), key=lambda i: ts[i]["pts"][-1][2])
+    for j, b in enumerate(ts):
+        sb, pb = b["pts"][0][2], xy(b["pts"][0])
+        hb = bearing(pb, xy(b["pts"][1])) if len(b["pts"]) > 1 else None
+        best, bi = 1e9, None
+        for i in ends:
+            if i == j or i in nxt:
+                continue
+            a = ts[i]
+            ea = a["pts"][-1][2]
+            if a["type"] != b["type"] or not (sb - 1800 <= ea <= sb + 120):
+                continue
+            pa = xy(a["pts"][-1])
+            d = dist_km(pa, pb)
+            if d > min(130, SPEED.get(a["type"], 200) * max(0, sb - ea) / 3600 * 1.4 + 35):
+                continue
+            ha = bearing(xy(a["pts"][-2]), pa) if len(a["pts"]) > 1 else None
+            turn = 0.0
+            if ha is not None and d > 3:
+                turn = abs((bearing(pa, pb) - ha + 540) % 360 - 180)
+                if turn > 75:
+                    continue
+            if ha is not None and hb is not None and abs((hb - ha + 540) % 360 - 180) > 100:
+                continue
+            cost = d + turn * 0.3
+            if cost < best:
+                best, bi = cost, i
+        if bi is not None and j not in taken:
+            nxt[bi] = j
+            taken.add(j)
+    out = []
+    for i, t in enumerate(ts):
+        if i in taken:
+            continue
+        chain, k = dict(t), i
+        chain["pts"] = list(t["pts"])
+        while k in nxt:
+            k = nxt[k]
+            chain["pts"] += ts[k]["pts"]
+            chain["count"] = max(chain["count"] or 1, ts[k]["count"] or 1)
+            chain["launch"] = chain["launch"] or ts[k]["launch"]
+            chain["next"] = ts[k]["next"] or chain["next"]
+        out.append(chain)
+    return out
 
 
 class Daily:
