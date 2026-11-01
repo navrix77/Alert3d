@@ -87,6 +87,7 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
             if all(p.role == "f" for p in obs.places):  # «пуски з X» без місця в Україні — це не трек
                 continue
         if obs.kind in ("track", "zone", "close", "filtered"):
+            obs.raw = seg
             rec = trk.ingest(obs, key, ts, link)
             if rec.get("track") and obs.kind == "track":
                 LASTC[key] = (ts, obs.type, rec["track"])
@@ -116,6 +117,7 @@ def on_threat(ev: dict) -> None:
     if not place:
         return
     obs = Observation(type=ev["type"], count=ev["count"], places=[PlaceRef("p", place)], course=ev["heading"])
+    obs.raw = ev["text"]
     tracker.ingest(obs, "AIU", ev["t"], "https://alerts.in.ua")
     brain.log_msg(ev["t"], "AIU", None, obs.kind, obs.type, obs.count, [{"r": "p", "n": place.name}], None, ev["text"])
 

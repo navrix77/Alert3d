@@ -83,6 +83,11 @@ function addOverlays(){
   map.addLayer({id:'ru-dot',type:'circle',source:'ru',filter:['!',['has','sum']],paint:{'circle-radius':3.5,'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':2,'circle-opacity':0.85}});
   map.addLayer({id:'ru-t',type:'symbol',source:'ru',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['has','sum'],12,10.5],'text-max-width':16,'text-offset':['case',['has','sum'],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['has','sum'],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':1,'icon-allow-overlap':true,'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':'#FFE36B','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
+  map.addSource('xr',{type:'geojson',data:EMPTY});
+  map.addLayer({id:'xr-dim',type:'background',layout:{visibility:'none'},paint:{'background-color':'#02040A','background-opacity':0.62}});
+  map.addLayer({id:'xr-edge',type:'line',source:'xr',filter:['==',['geometry-type'],'LineString'],layout:{visibility:'none','line-cap':'round'},paint:{'line-color':['match',['get','k'],'confirm','#34C759','copy','#8892A6','assume','#B48CFF','contra','#F5B83D','#fff'],'line-width':['match',['get','k'],'confirm',2.5,1.6],'line-dasharray':['match',['get','k'],'confirm',['literal',[1,0]],'copy',['literal',[1,2]],['literal',[2.5,2]]],'line-opacity':0.9}});
+  map.addLayer({id:'xr-node',type:'circle',source:'xr',filter:['==',['geometry-type'],'Point'],layout:{visibility:'none'},paint:{'circle-radius':['match',['get','k'],'prim',7,'copy',4.5,'now',6,5],'circle-color':['match',['get','k'],'prim','#34C759','copy','#8892A6','dest','rgba(0,0,0,0)','now','rgba(180,140,255,.25)','#B48CFF'],'circle-stroke-color':['match',['get','k'],'prim','#C8FFD6','copy','#C9D2E3','dest','#F5B83D','now','#B48CFF','#E3D4FF'],'circle-stroke-width':['match',['get','k'],'dest',2,'now',2,1.5]}});
+  map.addLayer({id:'xr-t',type:'symbol',source:'xr',filter:['all',['==',['geometry-type'],'Point'],['has','l']],minzoom:6.5,layout:{visibility:'none','text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-offset':[0,1.2],'text-anchor':'top','text-allow-overlap':false,'text-max-width':12},paint:{'text-color':['match',['get','k'],'prim','#B8FFCB','copy','#AEB6C6','dest','#FFD27A','#D9C8FF'],'text-halo-color':'#000','text-halo-width':1.5}});
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['case',['get','est'],5,7],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
@@ -171,7 +176,7 @@ function frame(now){
         const dots=[];if(tail.length>1){const X=tail.map(xy);let seg=0,acc=0;const tot=X.slice(1).reduce((s,q,i)=>s+dist(X[i],q),0),step=tot/14;
           for(let k=1;k<=14;k++){let want=k*step;while(seg<X.length-1&&acc+dist(X[seg],X[seg+1])<want){acc+=dist(X[seg],X[seg+1]);seg++;}if(seg>=X.length-1)break;const a=X[seg],b=X[seg+1],f=(want-acc)/(dist(a,b)||1);dots.push(ll([a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]));}}
         const n=parseInt(TYPE_COLOR[tr.type].slice(1),16);
-        fx.push({id:tr.id,p:d.p,sa,hd:d.hd,type:tr.type,col:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],weak,thr:!!(rel&&rel.rel),sel:sel===tr.id,tail:dots});}
+        fx.push({id:tr.id,age:((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),spd:tr.speed,p:d.p,sa,hd:d.hd,type:tr.type,col:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],weak,thr:!!(rel&&rel.rel),sel:sel===tr.id,tail:dots});}
       const c=TYPE_COLOR[tr.type];
       if(false)trails.push({type:'Feature',properties:{c,o:0.95},geometry:{type:'LineString',coordinates:[...tr.trail.slice(-3).map(t=>[t[0],t[1]]),d.p]}});
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.route.length)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
@@ -326,7 +331,15 @@ function fillSheet(first){
     if(home&&r&&r.eta!=null)items.push('<li class="home"><b>~'+Math.max(1,Math.round(r.eta))+' хв</b> ваш дім</li>');
     const why=tr.pred==='learned'?' <small>· вивчено з історії'+(tr.pred_p?' ('+Math.round(tr.pred_p*100)+'%)':'')+'</small>':tr.pred==='channels'?' <small>· за каналами</small>':'';
     $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо — позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'');}else $('#sh-route').innerHTML='';
-  const n=tr.srcs.length;$('#sh-proof').innerHTML='<h4>Підтвердження: '+n+' '+(n===1?'канал':n<5?'канали':'каналів')+(n>=2?' · незалежно':' · лише одне джерело')+'</h4><div class="bar">'+[0,1,2,3].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</div><ul>'+tr.srcs.map(s=>{const L=tr.links.filter(l=>SNAP.sources[s]&&l.includes('/'+(SNAP.sources[s].url||'').split('/').pop()+'/')).pop();return '<li><span>'+esc(SNAP.sources[s]?.name||s)+'</span>'+(L?'<a href="'+esc(L)+'" target="_blank" rel="noopener">пост ↗</a>':'')+'</li>';}).join('')+'</ul>';
+  // «Чому я це показую»: першоджерело, копії, суперечності, давність, що змінило відображення
+  {const E=tr.ev||{items:[],prim:[],pubs:0,contra:[],age:0};const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
+   const head=E.pubs+' '+(E.pubs===1?'публікація':E.pubs<5?'публікації':'публікацій')+' · '+ind+' '+(ind===1?'першоджерело':ind<5?'першоджерела':'першоджерел')+' · '+(ind>=2?'<b class=ok>незалежне підтвердження є</b>':'<b class=warn>незалежного підтвердження немає</b>');
+   const age=E.age;const ageTxt=age<120?'щойно':age<3600?Math.round(age/60)+' хв тому':'понад годину тому';
+   let h='<h4>Чому я це показую</h4><p class=ev-head>'+head+'</p><p class=ev-age>Остання фіксація місця: '+ageTxt+(age>300?' — позиція далі лише оцінка, зона невизначеності росте':'')+'</p>';
+   if(E.contra.length)h+='<div class=ev-contra><b>Версії розходяться:</b>'+E.contra.map(v=>'<div>→ '+esc(v.dest||'?')+' <small>('+v.srcs.map(nm).join(', ')+')</small></div>').join('')+'</div>';
+   h+='<ol class=ev-list>'+E.items.slice().reverse().map(it=>{const tag=it.copy?'<i class=cp>копія '+nm(it.copy)+'</i>':(it.why==='нова ціль'?'<i class=nw>першоджерело</i>':it.why==='змінило позицію'?'<i class=mv>змінило позицію</i>':it.why==='змінило курс'?'<i class=cr>змінило курс</i>':'<i class=cf>підтвердження</i>');
+     return '<li class="'+(it.copy?'copy':'')+'"><div class=ev-m><span>'+fmt(it.t)+'</span><b>'+nm(it.src)+'</b>'+tag+(it.link?'<a href="'+esc(it.link)+'" target=_blank rel=noopener>пост ↗</a>':'')+'</div>'+(it.text?'<q>'+esc(it.text)+'</q>':'')+'</li>';}).join('')+'</ol>';
+   $('#sh-proof').innerHTML=h;}
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }
 $('#sh-close').onclick=()=>{sel=null;follow=false;$('#sheet').hidden=true;};
@@ -391,6 +404,28 @@ async function openWidget(){
   const upd=()=>{pip.document.body.innerHTML=$('#me').outerHTML;const m=pip.document.querySelector('#me');if(m)m.onclick=()=>window.focus();};
   upd();const h=setInterval(upd,1000);pip.addEventListener('pagehide',()=>clearInterval(h));}
 window.__openWidget=openWidget;
+/* ---------- «Рентген неба» ---------- */
+let XRAY=false;
+function setXray(on){XRAY=on;document.body.classList.toggle('xray',on);$('#b-xray').classList.toggle('on',on);$('#xr-legend').hidden=!on;
+  for(const id of ['xr-dim','xr-edge','xr-node','xr-t'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none');
+  for(const id of ['holo','holo-top','ra-glow'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');
+  syncXray();toast(on?'Рентген неба: повідомлення → підтвердження → припущення':'Звичайна карта');}
+$('#b-xray').onclick=()=>setXray(!XRAY);
+map.on('styledata',()=>{if(XRAY&&map.getLayer('xr-dim')&&map.getLayoutProperty('xr-dim','visibility')!=='visible')setXray(true);});
+function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;const F=[],nm=k=>SNAP.sources[k]?.name||k;
+  for(const tr of SNAP.tracks){if(tr.status!=='active'||!tr.ev)continue;if(sel&&tr.id!==sel&&SNAP.tracks.length>12)continue;
+    const d=DISP.get(tr.id);const items=tr.ev.items.filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
+    items.forEach((it,ix)=>{let p=it.p;if(it.copy&&primAt[it.copy]){const a=ix*1.3;p=[primAt[it.copy][0]+Math.cos(a)*0.035,primAt[it.copy][1]+Math.sin(a)*0.024];
+        F.push({type:'Feature',properties:{k:'copy'},geometry:{type:'LineString',coordinates:[primAt[it.copy],p]}});}
+      const k=it.copy?'copy':(it.pt==='dest'?'dest':(it.pt==='est'?'est':'prim'));
+      F.push({type:'Feature',properties:{k:it.copy?'copy':k==='dest'?'dest':k==='est'?'est':'prim',l:nm(it.src)+' · '+fmt(it.t)+(it.copy?' (копія)':k==='dest'?' → '+(it.dest||''):'')},geometry:{type:'Point',coordinates:p}});
+      if(!it.copy){if(prevPrim&&(prevPrim[0]!==p[0]||prevPrim[1]!==p[1]))F.push({type:'Feature',properties:{k:'confirm'},geometry:{type:'LineString',coordinates:[prevPrim,p]}});prevPrim=p;primAt[it.src]=primAt[it.src]||p;if(k==='prim')lastReal=p;}});
+    if(d){F.push({type:'Feature',properties:{k:'now',l:'зараз (оцінка)'},geometry:{type:'Point',coordinates:d.p}});
+      const from=lastReal||prevPrim;if(from)F.push({type:'Feature',properties:{k:'assume'},geometry:{type:'LineString',coordinates:[from,d.p]}});
+      if(tr.route&&tr.route.length)F.push({type:'Feature',properties:{k:'assume'},geometry:{type:'LineString',coordinates:[d.p,...tr.route.slice(0,3)]}});
+      for(const v of (tr.ev.contra||[])){const r=v.b*D2R,P=xy(d.p);F.push({type:'Feature',properties:{k:'contra'},geometry:{type:'LineString',coordinates:[d.p,ll([P[0]+Math.sin(r)*25,P[1]+Math.cos(r)*25])]}});}}}
+  map.getSource('xr').setData({type:'FeatureCollection',features:F});}
+setInterval(syncXray,1000);
 /* ---------- небо в камері ---------- */
 $('#b-ar').onclick=()=>{location.href='ar.html';};
 let ws,backoff=1000;

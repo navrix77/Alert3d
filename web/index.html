@@ -66,6 +66,7 @@
   <button id="b-layers" title="Підкладка"><svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button>
   <button id="b-3d" title="3D">3D</button>
   <button id="b-feed" title="Стрічка"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  <button id="b-xray" title="Рентген неба"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="17" r="2.2"/><path d="M7.8 8.2 10.6 15M16.4 7.6 13.4 15.2M8.2 7h7.6" stroke-dasharray="2 2"/></svg></button>
   <button id="b-time" title="Машина часу"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></button>
   <button id="b-ar" title="Небо в камері"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg></button>
   <button id="b-set" title="Налаштування"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M4.2 7.5l2.2 1.3M17.6 15.2l2.2 1.3M4.2 16.5l2.2-1.3M17.6 8.8l2.2-1.3"/></svg></button>
@@ -96,6 +97,9 @@
   <b id="tb-time">—</b>
   <button class="pill" id="tb-live">Наживо</button>
 </div>
+<div class="xr-legend" id="xr-legend" hidden><b>Рентген неба</b>
+  <div><i class="n prim"></i>першоджерело (місце назвав канал)</div><div><i class="n copy"></i>копія / перепост</div><div><i class="n dest"></i>заявлений пункт призначення</div><div><i class="n est"></i>моя оцінка позиції</div>
+  <div><i class="l confirm"></i>підтверджує</div><div><i class="l copy"></i>копіює</div><div><i class="l assume"></i>припущення</div><div><i class="l contra"></i>інша версія курсу</div></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>

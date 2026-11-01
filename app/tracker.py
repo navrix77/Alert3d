@@ -6,6 +6,16 @@ import time
 from dataclasses import dataclass, field
 
 from .geo import Place, ang_diff, bearing, dist_km, from_xy, move, oblasts
+import re as _re
+
+
+def _norm_key(s: str) -> str:
+    """Текст без емодзі, підписів і посилань — щоб упізнати перепост."""
+    s = s.lower()
+    s = _re.sub(r"https?://\S+|@\w+|підпи\w*.*|подпи\w*.*", " ", s)
+    s = _re.sub(r"[^а-яіїєґa-z0-9]+", " ", s).strip()
+    return s[:90]
+
 from .launch import LaunchBook
 from .parser import Observation
 
@@ -53,6 +63,7 @@ class Track:
     from_place: Place | None = None
     course_to: str | None = None
     credited: set[str] = field(default_factory=set)
+    evidence: list = field(default_factory=list)  # [{t, src, link, text, why, dest, pos, key}]
     pred_src: str | None = None
     closed: float | None = None
 
@@ -248,6 +259,16 @@ class Tracker:
         if obs.count:
             tr.count = max(tr.count or 0, obs.count) if t - tr.obs[0].t < 900 else obs.count
         rec["track"] = tr.id
+        # «Чому я це показую»: що саме змінило відображення цієї цілі
+        moved = bool(tr.obs and tr.obs[-1].t == t and tr.obs[-1].src == src)
+        if moved and len(tr.obs) > 1 and dist_km((tr.obs[-1].x, tr.obs[-1].y), (tr.obs[-2].x, tr.obs[-2].y)) < 1.5 and tr.evidence:
+            moved = False  # та сама точка — це підтвердження, а не переміщення
+        why = "нова ціль" if len(tr.evidence) == 0 else ("змінило позицію" if moved else ("змінило курс" if route else "підтвердження"))
+        txt = (getattr(obs, "raw", "") or "").strip()
+        tr.evidence.append({"t": t, "src": src, "link": link, "text": txt[:220], "why": why, "key": _norm_key(txt),
+                            "dest": route[0].name if route else None, "dxy": route[0].xy if route else None,
+                            "pos": (tr.obs[-1].x, tr.obs[-1].y) if moved else None, "est": bool(moved and tr.obs[-1].est)})
+        tr.evidence = tr.evidence[-40:]
         return rec
 
     def _best_by_target(self, typ: str, route, t: float) -> Track | None:
@@ -310,10 +331,53 @@ class Tracker:
             return min(base, km / tr.speed * 3600 + 600)
         return min(base, 600 if tr.last.est or tr.heading is None else 900)
 
+    def _ev_out(self, tr: Track, now: float, here) -> dict:
+        info = self.evidence(tr)
+        real = [o for o in tr.obs if not o.est]
+        last_real = real[-1].t if real else tr.obs[0].t
+        # суперечності: різні напрямки за останні 10 хв
+        vers: list[dict] = []
+        for e in tr.evidence:
+            if now - e["t"] > 600 or not e["dxy"]:
+                continue
+            b = bearing(here, e["dxy"]) if dist_km(here, e["dxy"]) > 3 else None
+            if b is None:
+                continue
+            v = next((v for v in vers if ang_diff(v["b"], b) < 60), None)
+            if v:
+                v["srcs"] = sorted(set(v["srcs"]) | {e["src"]})
+            else:
+                vers.append({"b": round(b), "dest": e["dest"], "srcs": [e["src"]]})
+        items = []
+        for e in tr.evidence[-14:]:
+            p = from_xy(*e["pos"]) if e["pos"] else (from_xy(*e["dxy"]) if e["dxy"] else None)
+            items.append({"t": int(e["t"]), "src": e["src"], "link": e["link"], "text": e["text"], "why": e["why"], "copy": e.get("copy_of"),
+                          "dest": e["dest"], "p": [round(p[1], 4), round(p[0], 4)] if p else None, "pt": "pos" if e["pos"] and not e["est"] else ("est" if e["pos"] else "dest")})
+        return {"pubs": info["pubs"], "prim": info["prim"], "indep": len(info["prim"]), "items": items,
+                "contra": vers if len(vers) > 1 else [], "age": int(now - last_real)}
+
     # ---------------- знімок стану для клієнтів
+    def evidence(self, tr: Track) -> dict:
+        """Групуємо публікації: однаковий текст протягом 5 хв — копія першої (перепост/ретрансляція)."""
+        groups: list[dict] = []
+        for e in tr.evidence:
+            g = next((g for g in groups if e["key"] and g["key"] == e["key"] and e["t"] - g["t"] < 300), None)
+            if g:
+                g["copies"].append(e["src"])
+                e["copy_of"] = g["src"]
+            else:
+                groups.append({"key": e["key"], "t": e["t"], "src": e["src"], "copies": []})
+                e["copy_of"] = None
+        prim = []
+        for g in groups:
+            if g["src"] not in prim:
+                prim.append(g["src"])
+        return {"pubs": len(tr.evidence), "prim": prim, "groups": groups}
+
     def conf(self, tr: Track) -> float:
         q = 1.0
-        for s in tr.srcs:
+        srcs = self.evidence(tr)["prim"] if tr.evidence else tr.srcs
+        for s in srcs:
             prior = self.sources.get(s, Source(s, s, 0.5)).rel
             q *= 1 - (self.brain.rel(s, prior) if self.brain else prior)
         return 1 - q
@@ -386,6 +450,7 @@ class Tracker:
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),
                 "links": [o.link for o in tr.obs[-5:] if o.link],
+                "ev": self._ev_out(tr, now, (ex, ey)),
                 "from": tr.from_place.name if tr.from_place else None, "ts": now,
                 "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4), tr.obs[0].label, int(tr.obs[0].t)],
                 "launch": self.launches.link(tr, now, hd) if status != "closed" or age < 1800 else None,
