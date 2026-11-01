@@ -27,6 +27,7 @@ SITES = [
     ("Таганрог", 47.21, 38.94, "пуск", {"ballistic", "jet"}, None, ["таганрог"]),
     ("Ростов", 47.23, 39.72, "пуск", {"ballistic", "jet"}, None, ["ростов"]),
     ("Єйськ", 46.68, 38.27, "аеродром", {"shahed", "kab"}, None, ["єйськ", "ейск"]),
+    ("Українка", 51.17, 128.45, "аеродром", {"cruise"}, "Ту-95МС", ["українк", "украинк"]),
     ("Енгельс", 51.48, 46.21, "аеродром", {"cruise"}, "Ту-95МС/Ту-160", ["енгельс", "энгельс"]),
     ("Оленья", 68.15, 33.46, "аеродром", {"cruise"}, "Ту-95МС/Ту-22М3", ["оленя", "оленья", "оленегорськ", "оленегорск"]),
     ("Шайківка", 54.23, 34.37, "аеродром", {"cruise"}, "Ту-22М3", ["шайковк", "шайківк"]),
@@ -45,6 +46,7 @@ CARRIER = [(re.compile(r"ту-95|ту95|ту-160|ту160"), "Ту-95МС/Ту-16
            (re.compile(r"су-34|су-35|су34"), "Су-34", "kab"), (re.compile(r"міг-31|миг-31"), "МіГ-31К", "ballistic"),
            (re.compile(r"калібр|калибр|корабл|крейсер|підводн|подводн|носі[їй] калібр"), "кораблі (Калібр)", "cruise")]
 SUMMARY_RX = re.compile(r"в ніч на|у ніч на|в ночь на|протягом ночі|за ніч|за минулу добу|атакував[аи]?\s+\d|загалом")
+FORECAST_RX = re.compile(r"передислокац|перебазув|перелетіл|перелетели|очікуєм|очікуєть|ожидаем|ожидает|прогноз|через \d+[-–]?\d* (?:дн|дня|днів|год)|найближчим часом")
 STRIKE_RX = re.compile(r"вибух|взрыв|прил[её]т|влучан|попадан|пожеж|пожар|бавовн|хлопок")
 SPEED = {"shahed": 170, "molniya": 120, "jet": 450, "cruise": 800, "ballistic": 2000, "kab": 600}
 MAXAGE = {"shahed": 9 * 3600, "molniya": 2 * 3600, "jet": 2 * 3600, "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60}
@@ -106,8 +108,10 @@ def detect(text: str, typ: str | None) -> tuple[list[Site], str | None, str | No
             taken.append((s, e))
             if site not in found:
                 found.append(site)
-    if not found or (STRIKE_RX.search(t) and not LAUNCH_RX.search(t)):
+    if not found or (STRIKE_RX.search(t) and not LAUNCH_RX.search(t)) or FORECAST_RX.search(t):
         return [], None, None, False
+    if ctype == "cruise" and typ in (None, "kab", "shahed"):
+        typ = "cruise"
     return found, typ or ctype, carrier, bool(SUMMARY_RX.search(t))
 
 

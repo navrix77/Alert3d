@@ -98,3 +98,5 @@
 .proof a{color:#7FB2FF;text-decoration:none}
 
 #sh-route small{font-weight:500;opacity:.6}#sh-route .est{margin:6px 0 0;font-size:12px;opacity:.7}
+
+#sh-from small{font-weight:500;opacity:.65}#sh-from a{color:#FF8A8A}#feed li.launches{border-left:3px solid #FF3B3B;padding-left:10px}#feed li.launches div{margin:2px 0}
