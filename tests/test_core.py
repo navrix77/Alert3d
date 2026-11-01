@@ -88,3 +88,16 @@ def test_push_threat():
     assert r and r[2] == "півночі" and 9 < r[1] < 13
     tr2 = dict(tr, hd=0.0, route=[])
     assert Push.threat(tr2, H) is None
+
+
+def test_parser_real_world_cases():
+    from app.parser import Parser
+    P = Parser()
+    pl = lambda t, c=None: [(r.role, r.place.name) for r in P.parse(t, c).places]
+    assert P.parse("🟡 Сумський район — повітряна тривога, жовтий рівень: Дронова загроза", "SU").kind == "info"
+    assert pl("Великий Вистороп > Михайлівка шах", "SU") == [("p", "Великий Вистороп"), ("t", "Михайлівка")]
+    assert pl("Чугуїв: шахед курсом на Харків", "M") == [("p", "Чугуїв"), ("t", "Харків")]
+    assert pl("Ракетний удар по Харкову", "M")[0][1] == "Харків"
+    assert pl("БпЛА на Лозову")[0][1] == "Лозова" and P.parse("БпЛА на Лозову").places[0].place.lat < 49.2
+    assert P.parse("Ударний на Безлюдівку", "M").type == "shahed"
+    assert pl("Шахед над Трухановим островом", "kievreal1") == []

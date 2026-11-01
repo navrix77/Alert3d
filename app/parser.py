@@ -12,8 +12,10 @@ TYPES = [
     ("molniya", re.compile(r"молни|молні")),
     ("kab", re.compile(r"(^|[^а-яіїє])каб|бомб|авиабомб|авіабомб|керован[аі] авіа")),
     ("cruise", re.compile(r"ракет|крилат|крылат|калибр|калібр|х-101|х-59|х-69|х-22|бандерол")),
-    ("shahed", re.compile(r"шахед|мопед|бпла|беспилот|безпілот|герань|гербер|дрон|(^|[^а-яіїє])ударн(ий|ик|і|их|ого)\b|(^|[^а-яіїє])ударн(ый|ые|ых)\b")),
+    ("shahed", re.compile(r"шахед|мопед|бпла|беспилот|безпілот|герань|гербер|дрон|(^|[^а-яіїє])шах(и|ів)?\b|(^|[^а-яіїє])ударн(ий|ик|і|их|ого)\b|(^|[^а-яіїє])ударн(ый|ые|ых)\b")),
 ]
+# статус офіційної тривоги («Сумський район — повітряна тривога / відбій») — не ціль: тривоги беремо з офіційного API
+ALERT_STATUS = re.compile(r"повітряна тривога|воздушная тревога|тривога скасована|відбій (повітряної )?тривоги|рівень:|жовтий рівень|червоний рівень|тривога продовжує")
 CLOSE = re.compile(r"не фиксир|не фіксу|отбой|відбій|чисто")
 # Безпека: роботу ППО та влучання не публікуємо далі
 SAFETY = re.compile(r"пво|ппо|сбит|збит|мінус|минус|взрыв|вибух|прил[её]т|влучан|попадан")
@@ -104,6 +106,8 @@ class Parser:
         t = norm(text)
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         m = COUNT.search(t)
+        if ALERT_STATUS.search(t):
+            typ = None
         obs = Observation(
             type=typ,
             count=int(m.group(1)) if m and 0 < int(m.group(1)) <= 15 else None,
@@ -129,6 +133,8 @@ class Parser:
                         obs.oblast_hint, bbox = name, (bb[1] - 0.15, bb[3] + 0.15, bb[0] - 0.2, bb[2] + 0.2)
                         self._chan_bbox = True
                         break
+        arrow = re.search(r"\s(?:>|→|->|=>|➡️?)\s", text)
+        cut = len([w for w in (re.sub(r"[^\w'’\-]", "", x) for x in WORD_SPLIT.split(text[:arrow.start()])) if w]) if arrow else None
         words = [re.sub(r"[^\w'’\-]", "", w) for w in WORD_SPLIT.split(text)]
         words = [w for w in words if w]
         found: list[tuple[str, list[int]]] = []
@@ -142,7 +148,7 @@ class Parser:
                 i += 1
                 continue
             nxt = norm(words[i + 1]) if i + 1 < len(words) else ""
-            if norm(w) in SKIP or nxt.startswith(("област", "обл")):
+            if norm(w) in SKIP or nxt.startswith(("област", "обл", "громад")):
                 i += 1
                 continue
             ids, used = None, 1
@@ -154,7 +160,11 @@ class Parser:
                 ids = self.gaz.lookup(w)
             if ids:
                 role = "t"
-                if prev in POS_PREV:
+                if cut is not None:
+                    role = "p" if i < cut else "t"
+                elif i == 0 and not obs.close:
+                    role = "p"  # «Великий Вистороп — шахед»: пункт на початку без прийменника — де ціль зараз
+                elif prev in POS_PREV:
                     role = "p"
                 elif prev in FROM_PREV or (prev == "района" and prev2 in FROM_PREV):
                     role = "f"
