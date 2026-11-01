@@ -196,9 +196,9 @@ class Gazetteer:
             k = phon(c)
             if k in self.kidx:
                 return self.kidx[k]
-        for c in self.candidates(w)[:3]:
+        for c in self.candidates(w)[:3] if len(w) >= 6 else []:
             k = phon(c)
-            lim = 1 if len(k) <= 5 else 2 if len(k) <= 9 else 3
+            lim = 1 if len(k) <= 8 else 2
             best, bd = None, lim + 1
             for kk in self.buckets.get(k[:2], ()):
                 if abs(len(kk) - len(k)) > lim:

@@ -233,6 +233,10 @@ class Tracker:
                         rest.append(b)
             names = [p.name for p in tr.route if dist_km(p.xy, (ex, ey)) > 2 and p.xy in rest] or []
             hd = bearing((ex, ey), rest[0]) if rest else tr.heading
+            if hd is None and len(tr.obs) >= 2:  # курс за останніми двома точками
+                a_, b_ = tr.obs[-2], tr.obs[-1]
+                if dist_km((a_.x, a_.y), (b_.x, b_.y)) > 2:
+                    hd = bearing((a_.x, a_.y), (b_.x, b_.y))
             conf = self.conf(tr)
             if status == "active":
                 up(obl.of(lon, lat), 2 if conf >= 0.5 else 1)

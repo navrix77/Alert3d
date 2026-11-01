@@ -51,10 +51,8 @@ def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
 def state() -> dict:
     snap = tracker.snapshot()
     off = alerts.state()
-    levels = dict(snap["levels_tracker"])
-    for k, v in off["levels"].items():
-        levels[k] = max(levels.get(k, 0), v)
-    snap["levels"] = levels
+    # Заливка регіонів — ЛИШЕ офіційні тривоги. Оцінка трекера йде окремо (levels_tracker) і регіони не фарбує.
+    snap["levels"] = dict(off["levels"])
     snap["official"] = off
     snap["sources"] = {k: {"name": s.name, "rel": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
     snap["health"] = {

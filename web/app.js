@@ -69,9 +69,10 @@ function addOverlays(){
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':1,'icon-allow-overlap':true,'text-field':'Дім','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['has','next'],['==',['get','active'],true]],layout:{'text-field':['concat','→ ',['get','next']],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[3,7,3,7],'text-anchor':'left','text-offset':[1.9,0.9],'icon-allow-overlap':true,'text-allow-overlap':true,'text-optional':false},paint:{'text-color':'#fff'}});
   const TGS=['interpolate',['linear'],['zoom'],4,0.55,7,0.85,9,1.15,12,1.55];
-  map.addLayer({id:'tg-sh',type:'symbol',source:'targets',filter:['==',['get','active'],true],layout:{'icon-image':['concat','t-',['get','type'],'-sh'],'icon-rotate':['get','hd'],'icon-rotation-alignment':'map','icon-pitch-alignment':'map','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS,'icon-offset':['literal',[14,22]]},paint:{'icon-opacity':0.9}});
-  map.addLayer({id:'tg',type:'symbol',source:'targets',layout:{'icon-image':['concat','t-',['get','type'],['case',['get','active'],'','-d']],'icon-rotate':['get','hd'],'icon-rotation-alignment':'map','icon-pitch-alignment':'map','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS,'symbol-sort-key':['get','sk']},paint:{'icon-opacity':['case',['get','weak'],0.6,1]}});
+  map.addLayer({id:'tg-sh',type:'symbol',source:'targets',filter:['==',['get','active'],true],layout:{'icon-image':['concat','t-',['get','type'],'-sh'],'icon-rotate':['get','sa'],'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS},paint:{'icon-opacity':0.9,'icon-translate':[14,22],'icon-translate-anchor':'viewport'}});
+  map.addLayer({id:'tg',type:'symbol',source:'targets',layout:{'icon-image':['concat','t-',['get','type'],['case',['get','active'],'','-d']],'icon-rotate':['get','sa'],'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS,'symbol-sort-key':['get','sk']},paint:{'icon-opacity':['case',['get','weak'],0.6,1]}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['>',['get','count'],1],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-offset':[1.3,-1.2],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
+  map.addLayer({id:'tg-unk',type:'symbol',source:'targets',filter:['all',['get','unk'],['get','active']],layout:{'text-field':'курс ?','text-font':['Noto Sans Bold'],'text-size':11,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-offset':[0,2.2],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#F5B83D'}});
   map.on('click','tg',e=>{const f=e.features[0];openSheet(f.properties.id);});
   map.on('mouseenter','tg',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg',()=>map.getCanvas().style.cursor='');
   lastLv='';lastRa='';syncHome();
@@ -116,7 +117,10 @@ function frame(now){
       const active=tr.status==='active',weak=tr.conf<0.5;
       const rel=active&&!weak?homeRel(tr,d.p):null;
       if(rel&&rel.rel)threats.push({tr,rel});
-      feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,active,weak,count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
+      // кут на ЕКРАНІ: проєктуємо точку і точку на 3 км уздовж курсу — враховує нахил і поворот карти
+      const unk=tr.hd==null;let sa=0;
+      if(!unk){const P=xy(d.p),r=d.hd*D2R;const A=map.project(d.p),B=map.project(ll([P[0]+Math.sin(r)*3,P[1]+Math.cos(r)*3]));sa=Math.atan2(B.x-A.x,-(B.y-A.y))/D2R;}
+      feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
       const c=TYPE_COLOR[tr.type];
       trails.push({type:'Feature',properties:{c,o:active?0.95:0.35},geometry:{type:'LineString',coordinates:[...tr.trail.slice(-3).map(t=>[t[0],t[1]]),d.p]}});
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.route.length)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
@@ -150,10 +154,7 @@ fetch('/data/raions.geojson').then(r=>r.json()).then(j=>{RA=j.features.map((f,i)
 function syncRaions(){
   if(!SNAP||!RA||!map.getSource('ra'))return;const lv={};const up=(i,v)=>{if(i>=0&&(lv[i]||0)<v)lv[i]=v;};
   const O=SNAP.official||{};const rl=O.raion_levels||{};RA.forEach(r=>{if(rl[r.n])up(r.i,rl[r.n]);});(O.points||[]).forEach(([lo,la,_n,l])=>up(raionOf(lo,la),l));
-  const serverT=Date.now()/1000+offset;
-  for(const tr of SNAP.tracks){if(tr.status!=='active'||tr.conf<0.5)continue;const {p}=posAt(tr,serverT);up(raionOf(p[0],p[1]),2);
-    for(let m=2;m<=15;m+=2){const q=posAt(tr,serverT+m*60).p;up(raionOf(q[0],q[1]),1);}}
-  SNAP.zones.forEach(z=>z.places.forEach(([lo,la])=>up(raionOf(lo,la),2)));
+  // райони фарбуються лише за офіційними тривогами (alerts.in.ua)
   const key=JSON.stringify(lv);if(key===lastRa)return;lastRa=key;
   RA.forEach(r=>{try{map.setFeatureState({source:'ra',id:r.i},{lvl:lv[r.i]||0});}catch(e){lastRa='';}});
 }
@@ -244,7 +245,7 @@ $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Mat
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
 $('#b-layers').onclick=()=>{setBase(base==='sat'?'map':'sat');toast(base==='sat'?'Супутник':'Карта');};
-function set3d(on,anim){tilt=on;if(map.getLayer('tg-sh'))map.setLayoutProperty('tg-sh','icon-offset',on?['literal',[30,48]]:['literal',[14,22]]);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
+function set3d(on,anim){tilt=on;if(map.getLayer('tg-sh'))map.setPaintProperty('tg-sh','icon-translate',on?[26,44]:[14,22]);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
