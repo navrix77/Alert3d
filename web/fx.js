@@ -123,7 +123,7 @@
         // давність: старе повідомлення тьмяніє, а зона «де ціль може бути» росте — без вигаданого польоту
         const a = (f.weak ? 0.45 : 1) * (age > 300 ? Math.max(0.35, 1 - (age - 300) / 1800) : 1);
         if (age > 300 && f.spd) { const km = Math.min(45, f.spd * age / 3600 * 0.5), mpp = 40075016.686 * Math.cos(f.p[1] * Math.PI / 180) / (512 * Math.pow(2, z));
-          const r = Math.max(spr * 1.6, km * 1000 / mpp); glow.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.10], 0]); top.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.45], 2, 0, 0]); }
+          const r = Math.max(spr * 1.6, km * 1000 / mpp); glow.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.10], 0]); top.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.22], 2, 0, 0]); }
         // хвіст: краплі світла вздовж пройденого шляху, тануть до кінця
         const T = f.tail || [], N = T.length;
         for (let i = 0; i < N; i++) { const k = 1 - i / N, tm = mc(T[i]);
