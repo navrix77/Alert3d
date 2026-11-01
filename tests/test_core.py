@@ -144,3 +144,12 @@ def test_continuation_word_is_not_a_place():
     names = [r.place.name for r in o.places]
     assert "Дальнє" not in names and not any(r.role == "p" for r in o.places)
     assert names[:2] == ["Печеніги", "Чугуїв"]
+
+
+def test_regional_channel_stays_in_region():
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("БпЛА з півдня на Піски", "operatyvnohlep")  # Запоріжжя: Піски — район міста, не село на Харківщині
+    assert o.places and all(46 < r.place.lat < 48.3 for r in o.places)
+    o = p.parse("⚠️ Пуски шахедів з Південного напрямку", "monikppy")
+    assert not any(r.place.name == "Південне" for r in o.places)

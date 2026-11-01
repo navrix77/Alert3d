@@ -218,7 +218,7 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-01.13",
+        "version": "2026-11-01.14",
         "push_subs": pushsvc.count(),
         "brain": brain.stats(),
     }
