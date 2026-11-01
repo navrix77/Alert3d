@@ -83,10 +83,12 @@ map.on('load',async()=>{
   map.addLayer({id:'occ',type:'fill',source:'occ',paint:{'fill-color':'#7A2A36','fill-opacity':0.45}});
   map.addLayer({id:'obl',type:'line',source:'obl',paint:{'line-color':'rgba(255,255,255,.28)','line-width':0.8}});
   map.addSource('tr',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-  map.addLayer({id:'tr-glow',type:'line',source:'tr',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':5,'line-blur':4,'line-opacity':0.18}});
+  map.addLayer({id:'tr-glow',type:'line',source:'tr',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':9,'line-blur':8,'line-opacity':0.12}});
+  map.addLayer({id:'tr-glow2',type:'line',source:'tr',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':3.5,'line-blur':2,'line-opacity':0.3}});
   map.addLayer({id:'tr',type:'line',source:'tr',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['interpolate',['linear'],['zoom'],5,1.3,8,2.2],'line-opacity':0.78}});
   map.addSource('heads',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-  map.addLayer({id:'heads',type:'circle',source:'heads',paint:{'circle-radius':2.6,'circle-color':['get','c'],'circle-stroke-color':'#fff','circle-stroke-width':0.6}});
+  map.addLayer({id:'heads',type:'circle',source:'heads',paint:{'circle-radius':3.2,'circle-color':'#fff','circle-stroke-color':['get','c'],'circle-stroke-width':2.2,'circle-blur':0.15}});
+  map.addLayer({id:'heads-glow',type:'circle',source:'heads',paint:{'circle-radius':11,'circle-color':['get','c'],'circle-blur':1,'circle-opacity':0.55}},'heads');
   map.addSource('sites',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'sites',type:'circle',source:'sites',paint:{'circle-radius':['+',6,['*',2,['sqrt',['get','c']]]],'circle-color':'rgba(255,60,70,.25)','circle-stroke-color':'#FF4D57','circle-stroke-width':1.6}});
   map.addLayer({id:'sites-t',type:'symbol',source:'sites',layout:{'text-field':['concat','🚀 ',['get','n'],' ×',['to-string',['get','c']]],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,1.4],'text-anchor':'top'},paint:{'text-color':'#FFB3B8','text-halo-color':'#000','text-halo-width':1.6}});
@@ -105,11 +107,24 @@ async function load(day){
   DAY=D.day;history.replaceState(null,'','?d='+DAY);
   $('#sub').textContent=fd(D.t0)+' – '+fd(D.t1)+' '+new Date(D.t1*1000).getFullYear()+' · з 09:00 до 09:00'+(D.final?'':' · доба ще триває');
   for(const t of D.tracks)t.sp=smoothPts(t.pts);
-  draw(1);legend();stats();if(!load.fitted||load.fitted!==DAY){fit();load.fitted=DAY;}
+  legend();stats();
+  if(!load.fitted||load.fitted!==DAY){fit();load.fitted=DAY;intro();}else draw(CUR);
   clearTimeout(load.poll);if(D.crawling)load.poll=setTimeout(()=>load(DAY),20000);
   const nx=new Date(new Date(DAY).getTime()+864e5).toISOString().slice(0,10);
   $('#next').disabled=!D.final;$('#next').dataset.d=nx;
   $('#prev').dataset.d=new Date(new Date(DAY).getTime()-864e5).toISOString().slice(0,10);
+}
+// «вау»-вхід: камера опускається з нахилу на всю країну, а маршрути доби «пролітають» за кілька секунд
+function intro(){
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){draw(1);return;}
+  const end={center:map.getCenter(),zoom:map.getZoom()};
+  map.jumpTo({center:[end.center.lng+1.2,end.center.lat-1.6],zoom:end.zoom-0.7,pitch:58,bearing:-24});
+  map.easeTo({center:end.center,zoom:end.zoom,pitch:0,bearing:0,duration:6500,easing:t=>1-Math.pow(1-t,3)});
+  playing=true;$('#pl').textContent='❚❚';CUR=0;const t0=performance.now(),DUR=6500;
+  const step=now=>{if(!playing)return;const u=Math.min(1,(now-t0)/DUR);CUR=1-Math.pow(1-u,2);$('#tt').value=CUR*1000;draw(CUR);
+    if(u<1)requestAnimationFrame(step);else{playing=false;$('#pl').textContent='▶';draw(1);}};
+  requestAnimationFrame(step);
 }
 function fit(){// уся Україна в кадрі, з урахуванням панелей
   const m=mobile(),hh=document.querySelector('.head').offsetHeight;
