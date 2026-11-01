@@ -16,7 +16,7 @@
     }`;
   const FS = `
     precision mediump float;
-    uniform float u_t; uniform sampler2D u_tex; uniform float u_pass;
+    uniform float u_t; uniform sampler2D u_tex; uniform float u_pass; uniform float u_tint;
     varying vec2 v_c; varying vec4 v_col; varying float v_kind;
     float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
     float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -93,8 +93,12 @@
           o = max(o, texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.03).a); }
         float rim = clamp(o - t.a, 0.0, 1.0) * 0.85;
         vec3 body = t.rgb * (0.38 + 0.82 * dif) + vec3(spec * 0.75);
+        // огляд країни: суцільний колір типу (читається з першого погляду); зблизька — реалістичний метал
+        vec3 tc = v_col.rgb * (0.55 + 0.6 * dif) + vec3(spec * 0.35);
+        body = mix(body, tc, u_tint);
+        vec3 rimc = mix(v_col.rgb, vec3(0.03, 0.04, 0.06), u_tint * 0.85);
         float a = max(t.a, rim);
-        gl_FragColor = vec4(body * t.a + v_col.rgb * rim, a) * v_col.a;
+        gl_FragColor = vec4(body * t.a + rimc * rim, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -111,7 +115,7 @@
       this.p = p; this.buf = gl.createBuffer();
       const A = n => gl.getAttribLocation(p, n), U = n => gl.getUniformLocation(p, n);
       this.a = { merc: A('a_merc'), corner: A('a_corner'), off: A('a_off'), size: A('a_size'), rot: A('a_rot'), col: A('a_col'), kind: A('a_kind') };
-      this.u = { m: U('u_m'), vp: U('u_vp'), t: U('u_t'), tex: U('u_tex'), px: U('u_px') };
+      this.u = { m: U('u_m'), vp: U('u_vp'), t: U('u_t'), tex: U('u_tex'), px: U('u_px'), tint: U('u_tint') };
       for (const t of Object.keys(window.TYPE_COLOR)) {
         const img = new Image(); img.onload = () => {
           const tx = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tx);
@@ -186,6 +190,7 @@
       gl.uniform2f(this.u.vp, gl.drawingBufferWidth / devicePixelRatio, gl.drawingBufferHeight / devicePixelRatio);
       gl.uniform1f(this.u.px, 1 / (512 * Math.pow(2, z)));
       gl.uniform1f(this.u.t, (performance.now() - this.t0) / 1000);
+      gl.uniform1f(this.u.tint, Math.max(0, Math.min(1, (8.5 - z) / 2)));
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.enable(gl.BLEND);
       if (day) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendFunc(gl.ONE, gl.ONE); // уночі — адитивне світло
       this.draw(gl, this.quads(glow), glow.length);
