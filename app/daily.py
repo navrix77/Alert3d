@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 log = logging.getLogger("daily")
+VER = 2
 OUT = Path(__file__).resolve().parent.parent / "data" / "daily"
 BOOM = re.compile(r"вибух|взрыв|прил[іеё]т|влучан|попадан|детонац|пожеж|ураж")
 NOT_BOOM = re.compile(r"збит|сбит|мінус|минус|ппо працю|пво работ|роботу ппо|роботою ппо|роботою пво|не фіксу|відбій|наслідки .* \d+ жовтня|історі")
@@ -79,7 +80,9 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
             if tr["status"] != "active":
                 continue
             k = f"{tr['id']}@{int(tr['first'])}"
-            e = traj.setdefault(k, {"type": tr["type"], "count": tr["count"] or 1, "pts": [], "launch": None, "next": None})
+            e = traj.setdefault(k, {"type": tr["type"], "count": tr["count"] or 1, "pts": [], "obs": {}, "launch": None, "next": None})
+            for q in tr.get("trail") or []:  # справжні фіксації каналів — основа маршруту (без «зигзагів» оцінки)
+                e["obs"][int(q[2])] = [round(q[0], 4), round(q[1], 4), int(q[2])]
             e["count"] = max(e["count"], tr["count"] or 1)
             if tr.get("launch") and not tr["launch"].get("est"):
                 e["launch"] = tr["launch"]["site"]
@@ -124,7 +127,16 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
             live.clear()
             live.update(old)
     launches = shadow.launches.snapshot(t1 if t1 < time.time() else time.time())
-    tracks = [dict(id=k, **v) for k, v in traj.items() if len(v["pts"]) >= 2 or v["launch"]]
+    tracks = []
+    for k, v in traj.items():
+        ob = [v["obs"][t] for t in sorted(v["obs"])]
+        if ob and v["pts"]:
+            last = v["pts"][-1]  # куди ціль летіла після останньої фіксації (оцінка до зникнення)
+            if last[2] > ob[-1][2] and abs(last[0] - ob[-1][0]) + abs(last[1] - ob[-1][1]) > 0.02:
+                ob.append(last)
+        pts = ob if len(ob) >= 2 else v["pts"]
+        if len(pts) >= 2:
+            tracks.append({"id": k, "type": v["type"], "count": v["count"], "launch": v["launch"], "next": v["next"], "pts": pts})
     by_type: dict[str, int] = {}
     for tr in tracks:
         by_type[tr["type"]] = by_type.get(tr["type"], 0) + (tr["count"] or 1)
@@ -137,7 +149,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
         s["c"] += L["count"] or 1
     # точки вибухів: лише ті, що підтверджені ≥1 джерелом і не збіглися з «пусками»
     bl = [{"n": b["n"], "lat": b["lat"], "lon": b["lon"], "c": b["c"], "t": b["t"]} for b in booms.values()]
-    return {"day": day, "t0": t0, "t1": t1, "final": time.time() > t1 + 4 * 3600 or (t1 <= time.time() and official is not None), "built": int(time.time()), "msgs": len(rows),
+    return {"v": VER, "day": day, "t0": t0, "t1": t1, "final": time.time() > t1 + 4 * 3600 or (t1 <= time.time() and official is not None), "built": int(time.time()), "msgs": len(rows),
             "tracks": tracks, "by_type": by_type, "official": official, "sites": list(sites.values()), "booms": sorted(bl, key=lambda b: -b["c"])}
 
 
@@ -152,12 +164,13 @@ class Daily:
 
     async def get(self, day: str) -> dict:
         f = OUT / f"{day}.json"
-        if day in self.cache and (self.cache[day]["final"] or time.time() - self.cache[day]["built"] < 300):
+        if day in self.cache and self.cache[day].get("v") == VER and (self.cache[day]["final"] or time.time() - self.cache[day]["built"] < 300):
             return self.cache[day]
         if f.exists():
             d = json.loads(f.read_text(encoding="utf-8"))
-            self.cache[day] = d
-            return d
+            if d.get("v") == VER:
+                self.cache[day] = d
+                return d
         async with self.lock:
             d = await build(day, *self.args)
         self.cache[day] = d
@@ -171,7 +184,8 @@ class Daily:
         while True:
             day = last_finished()
             try:
-                if not (OUT / f"{day}.json").exists():
+                f = OUT / f"{day}.json"
+                if not f.exists() or json.loads(f.read_text(encoding="utf-8")).get("v") != VER:
                     d = await self.get(day)
                     log.info("мапа доби %s: %d цілей, %d вибухів", day, len(d["tracks"]), len(d["booms"]))
                     if self.push and d["tracks"]:

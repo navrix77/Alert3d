@@ -87,7 +87,8 @@ map.on('load',async()=>{
 });
 async function load(day){
   $('#ld').hidden=false;
-  const r=await fetch('/api/daily'+(day?'?d='+day:''));D=await r.json();$('#ld').hidden=true;
+  for(let i=0;i<6;i++){try{const r=await fetch('/api/daily'+(day?'?d='+day:''));D=await r.json();break;}catch(e){$('#ld').textContent='Сервер перезапускається… повторюю';await new Promise(r=>setTimeout(r,4000));}}
+  $('#ld').hidden=true;if(!D){$('#sub').textContent='Не вдалося завантажити';return;}
   if(D.error){$('#sub').textContent=D.error;return;}
   DAY=D.day;history.replaceState(null,'','?d='+DAY);
   $('#sub').textContent=fd(D.t0)+' – '+fd(D.t1)+' '+new Date(D.t1*1000).getFullYear()+' · з 09:00 до 09:00'+(D.final?'':' · доба ще триває');
