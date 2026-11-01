@@ -55,3 +55,44 @@
 
 .maplibregl-ctrl-scale{background:transparent;border-color:#fff;color:#fff;font:700 13px var(--f);text-shadow:0 1px 3px #000;border-width:0 2px 2px}
 .maplibregl-ctrl-bottom-left{bottom:calc(84px + env(safe-area-inset-bottom))}
+
+/* особистий таймер «Мій дім» */
+.me{position:fixed;right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));z-index:5;width:min(340px,calc(100% - 24px));background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:12px 14px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.me.danger{border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset,0 10px 30px rgba(229,72,77,.35)}
+.me.watch{border-color:var(--yellow)}
+.me-head{display:flex;align-items:center;gap:8px}
+.me-head b{font-size:18px;font-weight:800;flex:1}
+.me-dot{width:10px;height:10px;border-radius:50%;background:#3DDC84;box-shadow:0 0 10px #3DDC84}
+.me.watch .me-dot{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
+.me.danger .me-dot{background:var(--red);box-shadow:0 0 12px var(--red);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.me-set{border:1px solid var(--line);background:#1A1F2A;color:var(--fg);border-radius:10px;padding:4px 8px;font:600 13px var(--f);cursor:pointer}
+.me-sub{margin:6px 0 0;color:var(--mute);font-size:13px}
+.me-sub b{color:var(--fg)}
+.me-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.me-list li{cursor:pointer}
+.me-row{display:flex;align-items:center;gap:8px;font-size:14px}
+.me-row canvas{width:22px;height:22px;flex:none}
+.me-row .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.me-row .t{font-weight:800;font-variant-numeric:tabular-nums}
+.me-bar{position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:4px;overflow:hidden}
+.me-bar i{position:absolute;top:0;bottom:0;border-radius:3px}
+.me-bar .sh{left:0;background:#3D8BFF}
+.me-bar .tg{background:var(--red)}
+.me-act{font-size:12px;font-weight:700;margin-top:2px}
+.me-act.go{color:var(--red)}.me-act.ok{color:var(--yellow)}
+@media (max-width:640px){.me{top:auto;bottom:calc(84px + env(safe-area-inset-bottom));right:12px;left:12px;width:auto}.banner{display:none!important}}
+/* картка цілі: маршрут і підтвердження */
+.route{margin-top:12px}
+.route h4,.proof h4{margin:0 0 6px;font-size:13px;color:var(--mute);font-weight:700}
+.route ol{list-style:none;margin:0;padding:0;display:flex;gap:6px;flex-wrap:wrap}
+.route li{background:#1A1F2A;border:1px solid var(--line);border-radius:10px;padding:4px 8px;font-size:13px}
+.route li b{font-variant-numeric:tabular-nums}
+.route li.home{border-color:var(--red);color:#fff}
+.proof{margin-top:12px}
+.proof .bar{display:flex;gap:3px;margin-bottom:6px}
+.proof .bar i{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.1)}
+.proof .bar i.on{background:#3DDC84}
+.proof ul{list-style:none;margin:0;padding:0;font-size:13px}
+.proof li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
+.proof a{color:#7FB2FF;text-decoration:none}

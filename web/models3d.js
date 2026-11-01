@@ -82,8 +82,7 @@ window.T3D={heads:[],on:false,
     if(!map.getLayer('hill'))map.addLayer({id:'hill',type:'hillshade',source:'dem-h',paint:{'hillshade-exaggeration':0.35,'hillshade-shadow-color':'#000','hillshade-highlight-color':'#fff'}},map.getLayer('obl-fill')?'obl-fill':undefined);
     try{map.setTerrain({source:'dem',exaggeration:1.6});}catch(e){}
     try{map.setSky({'sky-color':'#8EC1F0','horizon-color':'#DCE9F7','fog-color':'#B9CCE0','sky-horizon-blend':0.5,'horizon-fog-blend':0.6,'fog-ground-blend':0.8,'atmosphere-blend':0.6});}catch(e){}
-    if(!map.getLayer('t3d'))map.addLayer(layer);
-    ['tg'].forEach(id=>map.getLayer(id)&&map.setLayoutProperty(id,'visibility','none'));
+    // цілі показуються реалістичними спрайтами (шар tg) — процедурні 3D-моделі вимкнено
   },
   disable(map){this.on=false;try{map.setTerrain(null);}catch(e){}
     if(map.getLayer('t3d'))map.removeLayer('t3d');if(map.getLayer('hill'))map.removeLayer('hill');

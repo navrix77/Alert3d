@@ -40,7 +40,9 @@ async function styleFor(kind){
 async function setBase(kind){base=kind;localStorage.setItem('base',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
 function addImages(){
-  for(const t of Object.keys(TYPE_COLOR)){for(const d of [0,1]){const id='t-'+t+(d?'-d':'');if(map.hasImage(id))continue;const c=drawTarget(t,44,{dim:!!d});map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});}}
+  // реалістичні спрайти цілей (вид згори, ніс на північ) + тіні
+  for(const t of Object.keys(TYPE_COLOR))for(const v of ['','-d','-sh']){const id='t-'+t+v;if(map.hasImage(id))continue;
+    map.loadImage('sprites/t-'+t+v+'.png').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:2});}).catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
   if(!map.hasImage('home')){const c=drawHome(40);map.addImage('home',c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});}
   if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.88)';x.beginPath();x.roundRect(2,2,s-4,s-4,14);x.fill();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
 }
@@ -52,6 +54,7 @@ function addOverlays(){
   map.addSource('obl',{type:'geojson',data:'/data/oblasts.geojson',promoteId:'n'});
   map.addSource('ra',{type:'geojson',data:'/data/raions.geojson',generateId:true});
   map.addSource('sel',{type:'geojson',data:EMPTY});
+  map.addSource('ticks',{type:'geojson',data:EMPTY});
   ['zones','trails','preds','targets','home'].forEach(id=>map.addSource(id,{type:'geojson',data:EMPTY}));
   map.addLayer({id:'obl-fill',type:'fill',source:'obl',paint:{'fill-color':['match',LV,2,'#C8102E',1,'#E8B300','#000'],'fill-opacity':['match',LV,2,0.2,1,0.22,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.38,1,0.2,0],'fill-opacity-transition':{duration:500}}});
@@ -60,10 +63,14 @@ function addOverlays(){
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
   map.addLayer({id:'trails',type:'line',source:'trails',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':3,'line-dasharray':[0.1,2.2],'line-opacity':['get','o']}});
   map.addLayer({id:'sel-ring',type:'circle',source:'sel',paint:{'circle-pitch-alignment':'map','circle-radius':28,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':['get','c'],'circle-stroke-width':2.5}});
+  map.addLayer({id:'ticks-c',type:'circle',source:'ticks',paint:{'circle-radius':4,'circle-color':['get','c'],'circle-stroke-color':'#0B0F17','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'ticks-t',type:'symbol',source:'ticks',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,-1.1],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addLayer({id:'preds',type:'line',source:'preds',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':2,'line-dasharray':[1.5,2],'line-opacity':0.9}});
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':1,'icon-allow-overlap':true,'text-field':'Дім','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['has','next'],['==',['get','active'],true]],layout:{'text-field':['concat','→ ',['get','next']],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[3,7,3,7],'text-anchor':'left','text-offset':[1.9,0.9],'icon-allow-overlap':true,'text-allow-overlap':true,'text-optional':false},paint:{'text-color':'#fff'}});
-  map.addLayer({id:'tg',type:'symbol',source:'targets',layout:{'icon-image':['concat','t-',['get','type'],['case',['get','active'],'','-d']],'icon-rotate':['get','hd'],'icon-rotation-alignment':'map','icon-pitch-alignment':'map','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':['interpolate',['linear'],['zoom'],4,0.62,8,0.95,12,1.25],'symbol-sort-key':['get','sk']},paint:{'icon-opacity':['case',['get','weak'],0.6,1]}});
+  const TGS=['interpolate',['linear'],['zoom'],4,0.42,7,0.62,9,0.85,12,1.15];
+  map.addLayer({id:'tg-sh',type:'symbol',source:'targets',filter:['==',['get','active'],true],layout:{'icon-image':['concat','t-',['get','type'],'-sh'],'icon-rotate':['get','hd'],'icon-rotation-alignment':'map','icon-pitch-alignment':'map','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS,'icon-offset':['literal',[14,22]]},paint:{'icon-opacity':0.9}});
+  map.addLayer({id:'tg',type:'symbol',source:'targets',layout:{'icon-image':['concat','t-',['get','type'],['case',['get','active'],'','-d']],'icon-rotate':['get','hd'],'icon-rotation-alignment':'map','icon-pitch-alignment':'map','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS,'symbol-sort-key':['get','sk']},paint:{'icon-opacity':['case',['get','weak'],0.6,1]}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['>',['get','count'],1],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-offset':[1.3,-1.2],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
   map.on('click','tg',e=>{const f=e.features[0];openSheet(f.properties.id);});
   map.on('mouseenter','tg',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg',()=>map.getCanvas().style.cursor='');
@@ -121,6 +128,11 @@ function frame(now){
     if(map.getSource('sel')){const d=sel&&DISP.get(sel);const tr=sel&&SNAP.tracks.find(t=>t.id===sel);map.getSource('sel').setData(d&&tr?{type:'FeatureCollection',features:[{type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:{type:'Point',coordinates:d.p}}]}:EMPTY);}
     if(follow&&sel){const d=DISP.get(sel);if(d)map.easeTo({center:d.p,duration:0});}
     renderBanner(threats);
+    if(map.getSource('ticks')&&now-(frame.tk||0)>800){frame.tk=now;const tk=[];const serverT=Date.now()/1000+offset;
+      for(const tr of SNAP.tracks){if(tr.status!=='active'||!(sel===tr.id||threats.some(x=>x.tr.id===tr.id)))continue;const c=TYPE_COLOR[tr.type];
+        for(const m of [5,10,15]){const q=posAt(tr,serverT+m*60).p;tk.push({type:'Feature',properties:{c,l:'+'+m+' хв'},geometry:{type:'Point',coordinates:q}});}}
+      map.getSource('ticks').setData({type:'FeatureCollection',features:tk});}
+    if(now-(frame.me||0)>700){frame.me=now;renderMe(threats);}
     if(sel&&now-(frame.sh||0)>500){frame.sh=now;fillSheet();}
   }
   requestAnimationFrame(frame);
@@ -166,6 +178,27 @@ function renderAsOf(){
   el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.version?'':' · <b style="color:#F5B83D">стара версія сервера — перезапустіть start.bat</b>')+(h.replay?' · ДЕМО: записана ніч 29→30.10':(h.channels?' · наживо: '+h.channels.live+'/'+h.channels.channels+' каналів':''))+(h.alerts?' · тривоги: '+esc((SNAP.official&&SNAP.official.source)||'✓'):' · офіційні тривоги недоступні');
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
+let SHELTER=+(localStorage.getItem('shelter')||3);$('#me-sh').textContent=SHELTER;
+$('#me-set').onclick=()=>{const v=[1,2,3,5,7,10];SHELTER=v[(v.indexOf(SHELTER)+1)%v.length];localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;toast('До укриття: '+SHELTER+' хв');};
+const MEI={};
+function renderMe(threats){
+  const box=$('#me');if(!home){box.className='me';$('#me-word').textContent='Мій дім';$('#me-sub').innerHTML='Позначте дім кнопкою ⌂ унизу — тут буде особистий таймер: що летить до вас і коли йти в укриття.';$('#me-list').innerHTML='';return;}
+  const isStale=!SNAP||(Date.now()-recvAt)/1000>20;
+  const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
+  const thr=near.filter(x=>x.r.rel);const first=thr[0];
+  let cls='me',word='Спокійно',sub='Підтверджених цілей у бік дому немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
+  if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
+  else if(first){const m=Math.max(0,(first.r.eta||0)-SHELTER);cls=m<=3?'me danger':'me watch';word=m<=0?'В укриття зараз':m<=3?'Виходь в укриття':'Увага';
+    sub=(m<=0?'Ціль прибуде раніше, ніж ви дійдете до укриття. Правило двох стін.':'Маєте <b>~'+Math.floor(m)+' хв</b>, щоб зібратися, потім '+SHELTER+' хв до укриття.');}
+  box.className=cls;$('#me-word').textContent=word;$('#me-sub').innerHTML=sub;
+  $('#me-list').innerHTML='';
+  (thr.length?thr:near).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
+    const c=MEI[t.type]||(MEI[t.type]=drawTarget(t.type,22));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
+    const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;const span=Math.max(eta||0,SHELTER)+3;
+    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':'—')+'</span></div>'+
+      (eta?'<div class="me-bar"><i class="sh" style="width:'+(SHELTER/span*100)+'%"></i><i class="tg" style="left:'+(eta*0.8/span*100)+'%;width:'+Math.max(3,eta*0.5/span*100)+'%"></i></div><div class="me-act '+(eta-SHELTER<=3?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить біля дому':'курс у ваш бік')+'</div>':'');
+    li.querySelector('.me-row').prepend(cv);li.onclick=()=>openSheet(t.id);$('#me-list').appendChild(li);});
+}
 function renderBanner(threats){
   const b=$('#banner');if(!threats.length){b.hidden=true;return;}
   threats.sort((a,b)=>(a.rel.eta??999)-(b.rel.eta??999));const t=threats[0];
@@ -188,6 +221,11 @@ function fillSheet(first){
   $('#sh-src').textContent=tr.srcs.map(s=>SNAP.sources[s]?.name||s).join(', ')+(tr.srcs.length>1?'':'');
   $('#sh-from').textContent=tr.from||'канали не вказали';
   $('#sh-conf').textContent=Math.round(tr.conf*100)+'%'+(tr.conf<0.5?' · непідтверджено':'');
+  const serverT=Date.now()/1000+offset;const pos=DISP.get(tr.id);
+  if(tr.route_names&&tr.route_names.length&&tr.route&&tr.route.length&&pos){let acc=0,prev=xy(pos.p);const items=tr.route.slice(0,tr.route_names.length).map((p,i)=>{const q=xy(p);acc+=dist(prev,q);prev=q;return '<li><b>~'+Math.max(1,Math.round(acc/tr.speed*60))+' хв</b> '+esc(tr.route_names[i])+'</li>';});
+    if(home&&r&&r.eta!=null)items.push('<li class="home"><b>~'+Math.max(1,Math.round(r.eta))+' хв</b> ваш дім</li>');
+    $('#sh-route').innerHTML='<h4>Прогноз маршруту</h4><ol>'+items.join('')+'</ol>';}else $('#sh-route').innerHTML='';
+  const n=tr.srcs.length;$('#sh-proof').innerHTML='<h4>Підтвердження: '+n+' '+(n===1?'канал':n<5?'канали':'каналів')+(n>=2?' · незалежно':' · лише одне джерело')+'</h4><div class="bar">'+[0,1,2,3].map(i=>'<i class="'+(i<n?'on':'')+'"></i>').join('')+'</div><ul>'+tr.srcs.map(s=>{const L=tr.links.filter(l=>SNAP.sources[s]&&l.includes('/'+(SNAP.sources[s].url||'').split('/').pop()+'/')).pop();return '<li><span>'+esc(SNAP.sources[s]?.name||s)+'</span>'+(L?'<a href="'+esc(L)+'" target="_blank" rel="noopener">пост ↗</a>':'')+'</li>';}).join('')+'</ul>';
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }
 $('#sh-close').onclick=()=>{sel=null;follow=false;$('#sheet').hidden=true;};
@@ -206,7 +244,7 @@ $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Mat
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
 $('#b-layers').onclick=()=>{setBase(base==='sat'?'map':'sat');toast(base==='sat'?'Супутник':'Карта');};
-function set3d(on,anim){tilt=on;localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
+function set3d(on,anim){tilt=on;if(map.getLayer('tg-sh'))map.setLayoutProperty('tg-sh','icon-offset',on?['literal',[30,48]]:['literal',[14,22]]);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
