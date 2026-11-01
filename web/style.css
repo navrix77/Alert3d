@@ -146,3 +146,28 @@
 .sh-icon{background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.14),rgba(255,255,255,.03))!important;border:1px solid rgba(255,255,255,.1)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .sheet .grid{border:0!important;overflow:visible!important}.sheet .grid>div{border-right:1px solid rgba(255,255,255,.07)!important;border-bottom:1px solid rgba(255,255,255,.07)!important}
+
+/* ===================== «Holy shit» шар ===================== */
+#intro{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:radial-gradient(ellipse at 50% 60%,rgba(3,5,10,0) 0%,rgba(3,5,10,.55) 55%,rgba(3,5,10,.92) 100%);transition:opacity 1.2s ease,backdrop-filter 1.2s;cursor:pointer}
+#intro.out{opacity:0;pointer-events:none}
+#intro .wm{font:800 clamp(44px,9vw,120px)/1 var(--f);letter-spacing:.42em;padding-left:.42em;color:transparent;
+  background:linear-gradient(180deg,#fff 10%,#9fb3d9 60%,#3a4a6b);-webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 0 30px rgba(120,160,255,.35));animation:wmIn 1.6s cubic-bezier(.2,.7,0,1) both}
+#intro .ln{width:min(420px,60vw);height:1px;background:linear-gradient(90deg,transparent,#FF2D3D,transparent);box-shadow:0 0 18px #FF2D3D;animation:lnIn 1.4s .3s cubic-bezier(.2,.7,0,1) both}
+#intro p{margin:0;color:#B8C4DA;font:500 15px var(--f);letter-spacing:.18em;text-transform:uppercase;animation:wmIn 1.4s .5s both}
+@keyframes wmIn{from{opacity:0;letter-spacing:.9em;filter:blur(14px)}to{opacity:1}}
+@keyframes lnIn{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+/* герой: відповідь на головне питання — у лівому верхньому куті, великим */
+.me{left:max(16px,env(safe-area-inset-left));right:auto!important;top:max(16px,env(safe-area-inset-top));width:min(380px,calc(100% - 32px));padding:18px 20px!important;border-radius:26px!important}
+.me-head b{font-size:30px!important;letter-spacing:-.03em;line-height:1.05}
+.me-sub{font-size:14px!important;line-height:1.45;color:#C9D2E3!important}
+.me-dot{width:12px!important;height:12px!important}
+.cta{display:block;width:100%;margin-top:14px;border:0;border-radius:16px;padding:14px 16px;font:700 16px var(--f);color:#0B0F17;cursor:pointer;
+  background:linear-gradient(180deg,#fff,#cfd8ea);box-shadow:0 10px 30px rgba(160,190,255,.25),inset 0 -2px 0 rgba(0,0,0,.08);transition:transform .45s var(--spring)}
+.cta:active{transform:scale(.96)}
+.top{left:auto!important;right:max(16px,env(safe-area-inset-right));align-items:flex-end!important}
+.counters{justify-content:flex-end}
+.cnt{padding:6px 12px 6px 8px!important}.cnt b{font-size:22px!important}.cnt canvas{width:22px!important;height:22px!important}
+@media (max-width:640px){.me{left:12px;right:12px!important;width:auto;top:auto;bottom:calc(84px + env(safe-area-inset-bottom))}.top{right:12px}}
+.maplibregl-ctrl-attrib{opacity:.55}

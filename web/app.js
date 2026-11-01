@@ -13,31 +13,38 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const FROM=['з півночі','з північного сходу','зі сходу','з південного сходу','з півдня','з південного заходу','з заходу','з північного заходу'];
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
-let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base')||'sat';
+let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base2')||'night';
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
+const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,kab:600})[t]||200;
 
 /* ---------- карта ---------- */
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
-const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#0B0F17'}}]},center:[33.5,48.6],zoom:5.2,attributionControl:{compact:true},maxPitch:65});window.tryvogaMap=map;
+const INTRO=!sessionStorage.getItem('intro');
+const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[27,46]:[32.2,48.4],zoom:INTRO?3.1:5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65});window.tryvogaMap=map;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
   const UK=['coalesce',['get','name:uk'],['get','name']];
   vec.layers.forEach(l=>{if(l.type==='symbol'&&l.layout&&l.layout['text-field']&&JSON.stringify(l.layout['text-field']).includes('name'))l.layout['text-field']=UK;});
   if(kind==='map')return vec;
+  const NIGHT=kind==='night';
   // супутник + підписи й дороги з векторної карти
   const keep=vec.layers.filter(l=>l.type==='symbol'||/boundary|road_(trunk|motorway|primary)|highway/.test(l.id)).map(l=>{
     const L=JSON.parse(JSON.stringify(l));
-    if(L.type==='symbol'&&L.paint){L.paint['text-color']='#FFFFFF';L.paint['text-halo-color']='rgba(0,0,0,.85)';L.paint['text-halo-width']=1.6;}
-    if(L.type==='line'&&L.paint){L.paint['line-opacity']=0.55;}
+    if(L.type==='symbol'&&L.paint){L.paint['text-color']=NIGHT?'#E9EEF7':'#FFFFFF';L.paint['text-halo-color']='rgba(0,0,0,.9)';L.paint['text-halo-width']=1.6;}
+    if(L.type==='line'&&L.paint){L.paint['line-opacity']=NIGHT?0.22:0.55;if(NIGHT&&/road|highway/.test(L.id))L.paint['line-color']='#D99A45';}
     return L;});
   const out={version:8,glyphs:vec.glyphs,sources:{...vec.sources,esri:{type:'raster',tiles:[ESRI],tileSize:256,maxzoom:19,attribution:'© Esri, Maxar, Earthstar Geographics'}},
-    layers:[{id:'esri',type:'raster',source:'esri',paint:{'raster-saturation':-0.25,'raster-brightness-max':0.82}},...keep]};
+    layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}},
+      {id:'esri',type:'raster',source:'esri',paint:NIGHT?{'raster-saturation':-0.55,'raster-brightness-max':['interpolate',['linear'],['zoom'],6,0.18,9,0.42,12,0.6],'raster-contrast':0.15,'raster-opacity':['interpolate',['linear'],['zoom'],5,0.6,8,1]}:{'raster-saturation':-0.25,'raster-brightness-max':0.82}},
+      ...(NIGHT?[{id:'lights',type:'raster',source:'lights',maxzoom:10,paint:{'raster-opacity':['interpolate',['linear'],['zoom'],6.5,0.95,9,0],'raster-saturation':-0.1,'raster-contrast':0.25,'raster-resampling':'linear'}}]:[]),...keep]};
+  if(NIGHT){out.sources.lights={type:'raster',tiles:['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png'],tileSize:256,maxzoom:8,attribution:'NASA Black Marble'};}
+  out.sky={'sky-color':'#04060C','horizon-color':'#1B2A4A','fog-color':'#04060C','sky-horizon-blend':0.7,'horizon-fog-blend':0.85,'fog-ground-blend':0.35,'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,0.75,8,0.2]};
   if(vec.sprite)out.sprite=vec.sprite;return out;
 }
-async function setBase(kind){base=kind;localStorage.setItem('base',kind);map.setStyle(await styleFor(kind),{diff:false});}
+async function setBase(kind){base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
 function addImages(){
   // реалістичні спрайти цілей (вид згори, ніс на північ) + тіні
@@ -55,9 +62,10 @@ function addOverlays(){
   map.addSource('ra',{type:'geojson',data:'/data/raions.geojson',generateId:true});
   map.addSource('sel',{type:'geojson',data:EMPTY});
   map.addSource('ticks',{type:'geojson',data:EMPTY});
+  map.addSource('holo',{type:'geojson',data:EMPTY});map.addSource('comets',{type:'geojson',data:EMPTY,lineMetrics:true});
   ['zones','trails','preds','targets','home','chains','lsites'].forEach(id=>map.addSource(id,{type:'geojson',data:EMPTY}));
-  map.addLayer({id:'obl-fill',type:'fill',source:'obl',paint:{'fill-color':['match',LV,2,'#C8102E',1,'#E8B300','#000'],'fill-opacity':['match',LV,2,0.2,1,0.22,0],'fill-opacity-transition':{duration:500}}});
-  map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.38,1,0.2,0],'fill-opacity-transition':{duration:500}}});
+  map.addLayer({id:'obl-fill',type:'fill',source:'obl',paint:{'fill-color':['match',LV,2,'#C8102E',1,'#E8B300','#000'],'fill-opacity':['match',LV,2,0.1,1,0.1,0],'fill-opacity-transition':{duration:500}}});
+  map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.16,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':'#fff','line-opacity':['interpolate',['linear'],['zoom'],5.5,0.25,9,0.55],'line-width':['interpolate',['linear'],['zoom'],6,0.5,10,1.2]}});
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
@@ -65,27 +73,39 @@ function addOverlays(){
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['case',['get','est'],5,7],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
   map.addLayer({id:'lsites-t',type:'symbol',source:'lsites',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,1.25],'text-anchor':'top','text-allow-overlap':true},paint:{'text-color':'#FFB3B3','text-halo-color':'#0B0F17','text-halo-width':2}});
   map.addLayer({id:'trails',type:'line',source:'trails',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':3,'line-dasharray':[0.1,2.2],'line-opacity':['get','o']}});
-  map.addLayer({id:'sel-ring',type:'circle',source:'sel',paint:{'circle-pitch-alignment':'map','circle-radius':28,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':['get','c'],'circle-stroke-width':2.5}});
   map.addLayer({id:'ticks-c',type:'circle',source:'ticks',paint:{'circle-radius':4,'circle-color':['get','c'],'circle-stroke-color':'#0B0F17','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ticks-t',type:'symbol',source:'ticks',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,-1.1],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addLayer({id:'preds',type:'line',source:'preds',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':2,'line-dasharray':[1.5,2],'line-opacity':0.9}});
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':1,'icon-allow-overlap':true,'text-field':'Дім','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['has','next'],['==',['get','active'],true]],layout:{'text-field':['concat','→ ',['get','next']],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[3,7,3,7],'text-anchor':'left','text-offset':[1.9,0.9],'icon-allow-overlap':false,'text-allow-overlap':false,'text-optional':false,'symbol-sort-key':['get','sk']},paint:{'text-color':'#fff'}});
   const TGS=['interpolate',['linear'],['zoom'],4,0.55,7,0.85,9,1.15,12,1.55];
-  try{if(window.GlowLayer&&!map.getLayer('glow'))map.addLayer(window.GlowLayer);}catch(e){console.warn('glow',e);}
+  // голограма тривоги: об'єми над районами (червоні вищі), «дихають»
+  const firstLbl=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
+  map.addLayer({id:'holo',type:'fill-extrusion',source:'holo',paint:{'fill-extrusion-color':['match',['get','l'],2,'#FF2D3D','#FFB020'],'fill-extrusion-height':['match',['get','l'],2,12000,4500],'fill-extrusion-base':0,'fill-extrusion-opacity':0.36,'fill-extrusion-vertical-gradient':true}},firstLbl);
+  map.addLayer({id:'holo-top',type:'line',source:'holo',paint:{'line-color':['match',['get','l'],2,'#FF6B76','#FFD27A'],'line-width':1.2,'line-opacity':0.8}},firstLbl);
   map.addLayer({id:'ra-glow',type:'line',source:'ra',paint:{'line-color':'#FF3B4E','line-width':['interpolate',['linear'],['zoom'],5,2,9,5],'line-blur':['interpolate',['linear'],['zoom'],5,2,9,5],'line-opacity':['case',['==',LV,2],0.5,0]}});
-  map.addLayer({id:'tg-sh',type:'symbol',source:'targets',filter:['==',['get','active'],true],layout:{'icon-image':['concat','t-',['get','type'],'-sh'],'icon-rotate':['get','sa'],'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS},paint:{'icon-opacity':0.9,'icon-translate':[14,22],'icon-translate-anchor':'viewport'}});
-  map.addLayer({id:'tg',type:'symbol',source:'targets',layout:{'icon-image':['concat','t-',['get','type'],['case',['get','active'],'','-d']],'icon-rotate':['get','sa'],'icon-rotation-alignment':'viewport','icon-pitch-alignment':'viewport','icon-allow-overlap':true,'icon-ignore-placement':true,'icon-size':TGS,'symbol-sort-key':['get','sk']},paint:{'icon-opacity':['case',['get','weak'],0.6,1]}});
+  map.addLayer({id:'tg-hit',type:'circle',source:'targets',filter:['==',['get','active'],true],paint:{'circle-radius':22,'circle-opacity':0,'circle-stroke-opacity':0}});
+  try{if(window.FxLayer&&!map.getLayer('fx'))map.addLayer(window.FxLayer);}catch(e){console.warn('fx',e);}
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['>',['get','count'],1],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-offset':[1.3,-1.2],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
   map.addLayer({id:'tg-unk',type:'symbol',source:'targets',filter:['all',['get','unk'],['get','active']],layout:{'text-field':'курс ?','text-font':['Noto Sans Bold'],'text-size':11,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-offset':[0,2.2],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#F5B83D'}});
-  map.on('click','tg',e=>{const f=e.features[0];openSheet(f.properties.id);});
-  map.on('mouseenter','tg',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg',()=>map.getCanvas().style.cursor='');
+  if(map.getLayer('tg-course'))map.moveLayer('tg-course');
+  map.on('click','tg-hit',e=>{const f=e.features[0];openSheet(f.properties.id);});
+  map.on('mouseenter','tg-hit',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg-hit',()=>map.getCanvas().style.cursor='');
   lastLv='';lastRa='';syncHome();
-  if(tilt)set3d(true,false);
+  if(tilt)set3d(true,'keep');
   if(!map._scaleAdded){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
 }
-map.on('style.load',addOverlays);map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
-map.on('click',e=>{if(!setHomeMode)return;const f=map.queryRenderedFeatures(e.point,{layers:['tg']});if(f.length)return;home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));setHomeMode=false;$('#b-home').classList.remove('on');syncHome();toast('Дім збережено');});
+map.on('style.load',addOverlays);
+// кінематографічне інтро: з космосу — на Україну вночі, поки збираються дані
+let introDone=false;function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
+  const cam={center:home||[32.2,48.4],zoom:home?7.6:5.6,pitch:52,bearing:-14};
+  if(skip||!INTRO){if(el)el.remove();if(INTRO)map.jumpTo(cam);return;}
+  setTimeout(()=>el&&el.classList.add('out'),1900);setTimeout(()=>el&&el.remove(),3200);
+  map.flyTo({...cam,duration:5600,curve:1.65,essential:true});window.__introAt=Date.now();tilt=true;}
+map.once('idle',()=>setTimeout(()=>introFly(false),INTRO?700:0));
+setTimeout(()=>introFly(false),6000);
+{const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
+map.on('click',e=>{if(!setHomeMode)return;const f=map.queryRenderedFeatures(e.point,{layers:['tg-hit']});if(f.length)return;home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));setHomeMode=false;$('#b-home').classList.remove('on');syncHome();toast('Дім збережено');});
 fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};}).catch(()=>{}).finally(()=>setBase(base));
 
 /* ---------- позиція цілі в момент часу ---------- */
@@ -110,8 +130,8 @@ function homeRel(tr,p){
 /* ---------- кадр ---------- */
 let lastLv='',lastFrame=performance.now();
 function frame(now){
-  const dt=Math.min(0.2,(now-lastFrame)/1000);lastFrame=now;
-  if(SNAP&&map.getSource('targets')){
+  const dt=Math.min(0.2,(now-lastFrame)/1000);
+  if(SNAP&&map.getSource('targets')){lastFrame=now;const slow=now-(frame.sd||0)>500;if(slow)frame.sd=now;const fx=[];
     const serverT=Date.now()/1000+offset;
     const feats=[],trails=[],preds=[],threats=[];
     for(const tr of SNAP.tracks){
@@ -125,7 +145,15 @@ function frame(now){
       // кут на ЕКРАНІ: проєктуємо точку і точку на 3 км уздовж курсу — враховує нахил і поворот карти
       const unk=tr.hd==null;let sa=0;
       if(!unk){const P=xy(d.p),r=d.hd*D2R;const A=map.project(d.p),B=map.project(ll([P[0]+Math.sin(r)*3,P[1]+Math.cos(r)*3]));sa=Math.atan2(B.x-A.x,-(B.y-A.y))/D2R;}
-      feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
+      feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,thr:!!(rel&&rel.rel),c:TYPE_COLOR[tr.type],count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
+      if(active){const tail=[d.p];let P=xy(d.p),left=Math.max(14,TYPES_KMH(tr.type)*0.09);
+        for(const q of tr.trail.slice().reverse()){const Q=xy([q[0],q[1]]),dd=dist(P,Q);if(dd<0.5)continue;if(dd>=left){const f=left/dd;tail.push(ll([P[0]+(Q[0]-P[0])*f,P[1]+(Q[1]-P[1])*f]));left=0;break;}tail.push([q[0],q[1]]);left-=dd;P=Q;}
+        if(left>0&&tr.hd!=null){const r=(d.hd+180)*D2R;tail.push(ll([P[0]+Math.sin(r)*left,P[1]+Math.cos(r)*left]));}
+        // краплі хвоста рівномірно вздовж шляху (від цілі назад)
+        const dots=[];if(tail.length>1){const X=tail.map(xy);let seg=0,acc=0;const tot=X.slice(1).reduce((s,q,i)=>s+dist(X[i],q),0),step=tot/14;
+          for(let k=1;k<=14;k++){let want=k*step;while(seg<X.length-1&&acc+dist(X[seg],X[seg+1])<want){acc+=dist(X[seg],X[seg+1]);seg++;}if(seg>=X.length-1)break;const a=X[seg],b=X[seg+1],f=(want-acc)/(dist(a,b)||1);dots.push(ll([a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]));}}
+        const n=parseInt(TYPE_COLOR[tr.type].slice(1),16);
+        fx.push({id:tr.id,p:d.p,sa,type:tr.type,col:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],weak,thr:!!(rel&&rel.rel),sel:sel===tr.id,tail:dots});}
       const c=TYPE_COLOR[tr.type];
       if(active)trails.push({type:'Feature',properties:{c,o:0.95},geometry:{type:'LineString',coordinates:[...tr.trail.slice(-3).map(t=>[t[0],t[1]]),d.p]}});
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.route.length)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
@@ -136,12 +164,12 @@ function frame(now){
       if(near&&f.properties.id!==sel){near.properties.count+=f.properties.count;near.properties.merged=(near.properties.merged||1)+1;continue;}
       f._p=P;shown.push(f);}
     feats.length=0;feats.push(...shown);
-    map.getSource('targets').setData({type:'FeatureCollection',features:feats});
-    {const thr=new Set(threats.map(x=>x.tr.id)),z=map.getZoom(),sz=Math.max(18,Math.min(70,10+z*5));
+    const vis=new Set(shown.map(f=>f.properties.id));window.FX=fx.filter(f=>vis.has(f.id));
+    if(slow)map.getSource('targets').setData({type:'FeatureCollection',features:feats});
+    if(false){const thr=new Set(threats.map(x=>x.tr.id)),z=map.getZoom(),sz=Math.max(18,Math.min(70,10+z*5));
      window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
        return {p:f.geometry.coordinates,c:t?[1,0.23,0.27]:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],a:f.properties.weak?0.3:0.7,s:t?sz*1.9:sz,ring:t};});}
-    if(map.getLayer('ra-glow')&&now-(frame.rg||0)>90){frame.rg=now;const k=0.25+0.45*(0.5+0.5*Math.sin(now/520));map.setPaintProperty('ra-glow','line-opacity',['case',['==',['coalesce',['feature-state','lvl'],0],2],k,0]);}
-    if(map.getSource('chains')&&now-(frame.ch||0)>500){frame.ch=now;const ch=[],ls=new Map();
+    if(slow&&map.getSource('chains')){frame.ch=now;const ch=[],ls=new Map();
       for(const L of (SNAP.launches||[]))ls.set(L.site,{type:'Feature',properties:{est:false,l:'ПУСК · '+L.site.replace(/ \(.*\)/,'')+' '+fmt(L.t)+(L.count?' ×'+L.count:'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
         if(L.est&&!isSel)continue;
@@ -149,11 +177,11 @@ function frame(now){
         if(!ls.has(L.site))ls.set(L.site,{type:'Feature',properties:{est:true,l:'ймовірно · '+L.site.replace(/ \(.*\)/,'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       map.getSource('chains').setData({type:'FeatureCollection',features:ch});map.getSource('lsites').setData({type:'FeatureCollection',features:[...ls.values()]});}
     T3D.heads=feats.map(f=>({id:f.properties.id,type:f.properties.type,hd:f.properties.hd,active:f.properties.active,weak:f.properties.weak,p:f.geometry.coordinates}));
-    map.getSource('trails').setData({type:'FeatureCollection',features:trails});
-    map.getSource('preds').setData({type:'FeatureCollection',features:preds});
-    if(map.getSource('sel')){const d=sel&&DISP.get(sel);const tr=sel&&SNAP.tracks.find(t=>t.id===sel);map.getSource('sel').setData(d&&tr?{type:'FeatureCollection',features:[{type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:{type:'Point',coordinates:d.p}}]}:EMPTY);}
+    if(slow){map.getSource('trails').setData({type:'FeatureCollection',features:trails});
+    map.getSource('preds').setData({type:'FeatureCollection',features:preds});}
+    if(slow&&map.getSource('sel')){const d=sel&&DISP.get(sel);const tr=sel&&SNAP.tracks.find(t=>t.id===sel);map.getSource('sel').setData(d&&tr?{type:'FeatureCollection',features:[{type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:{type:'Point',coordinates:d.p}}]}:EMPTY);}
     if(follow&&sel){const d=DISP.get(sel);if(d)map.easeTo({center:d.p,duration:0});}
-    renderBanner(threats);
+    if(slow)renderBanner(threats);
     if(map.getSource('ticks')&&now-(frame.tk||0)>800){frame.tk=now;const tk=[];const serverT=Date.now()/1000+offset;
       for(const tr of SNAP.tracks){if(tr.status!=='active'||!(sel===tr.id||threats.some(x=>x.tr.id===tr.id)))continue;const c=TYPE_COLOR[tr.type];
         let last=map.project(posAt(tr,serverT).p);
@@ -167,7 +195,7 @@ function frame(now){
 requestAnimationFrame(frame);
 
 function syncLevels(){
-  if(!SNAP||!map.getSource('obl'))return;const key=JSON.stringify(SNAP.levels);if(key===lastLv)return;lastLv=key;
+  if(!SNAP||!map.getSource('obl'))return;const key=JSON.stringify(SNAP.levels);if(key===lastLv)return;lastLv=key;lastRa='';
   fetchOblNames().then(names=>{if(!map.getSource('obl'))return;names.forEach(n=>{try{map.setFeatureState({source:'obl',id:n},{lvl:SNAP.levels[n]||0});}catch(e){lastLv='';}});});
 }
 let RA=null,lastRa='';
@@ -180,8 +208,14 @@ function syncRaions(){
   // райони фарбуються лише за офіційними тривогами (alerts.in.ua)
   const key=JSON.stringify(lv);if(key===lastRa)return;lastRa=key;
   RA.forEach(r=>{try{map.setFeatureState({source:'ra',id:r.i},{lvl:lv[r.i]||0});}catch(e){lastRa='';}});
+  syncHolo(lv);
 }
 setInterval(syncRaions,3000);
+let OBLF=null;fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{OBLF=j.features;lastRa='';});
+function syncHolo(lv){if(!map.getSource('holo')||!RA)return;const F=[];
+  RA.forEach(r=>{const l=lv[r.i];if(l)F.push({type:'Feature',properties:{l},geometry:r.polys.length===1?{type:'Polygon',coordinates:r.polys[0]}:{type:'MultiPolygon',coordinates:r.polys}});});
+  const L=(SNAP&&SNAP.levels)||{};if(OBLF)OBLF.forEach(f=>{const l=L[f.properties.n];if(l)F.push({type:'Feature',properties:{l},geometry:f.geometry});});
+  map.getSource('holo').setData({type:'FeatureCollection',features:F});}
 let OBLN=null;function fetchOblNames(){if(OBLN)return Promise.resolve(OBLN);return fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>OBLN=j.features.map(f=>f.properties.n));}
 function syncHome(){if(map.getSource('home'))map.getSource('home').setData(home?{type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:home}}]}:EMPTY);}
 function syncZones(){if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap(z=>z.places.map(([lo,la])=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:[lo,la]}})))});}
@@ -210,11 +244,11 @@ let SHELTER=+(localStorage.getItem('shelter')||3);$('#me-sh').textContent=SHELTE
 $('#me-set').onclick=()=>{const v=[1,2,3,5,7,10];SHELTER=v[(v.indexOf(SHELTER)+1)%v.length];localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;toast('До укриття: '+SHELTER+' хв');};
 const MEI={};
 function renderMe(threats){
-  const box=$('#me');if(!home){box.className='me';$('#me-word').textContent='Мій дім';$('#me-sub').innerHTML='Позначте дім кнопкою ⌂ унизу — тут буде особистий таймер: що летить до вас і коли йти в укриття.';$('#me-list').innerHTML='';return;}
+  const box=$('#me');if(!home){box.className='me';$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас і скільки хвилин є до укриття.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>20;
   const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
   const thr=near.filter(x=>x.r.rel);const first=thr[0];
-  let cls='me',word='Спокійно',sub='Підтверджених цілей у бік дому немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
+  let cls='me',word='Над вами чисто',sub='Підтверджених цілей у бік дому немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
   if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
   else if(first){const m=Math.max(0,(first.r.eta||0)-SHELTER);cls=m<=3?'me danger':'me watch';word=m<=0?'В укриття зараз':m<=3?'Виходь в укриття':'Увага';
     sub=(m<=0?'Ціль прибуде раніше, ніж ви дійдете до укриття. Правило двох стін.':'Маєте <b>~'+Math.floor(m)+' хв</b>, щоб зібратися, потім '+SHELTER+' хв до укриття.');}
@@ -235,7 +269,7 @@ function renderBanner(threats){
   // кінематографічний переліт: нова загроза дому — камера плавно показує і дім, і ціль (якщо користувач не крутить карту)
   renderBanner.seen=renderBanner.seen||new Set();
   if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);const d=DISP.get(t.tr.id);
-    if(d&&home&&Date.now()-(window.__touch||0)>20000){const b2=new maplibregl.LngLatBounds(home,home).extend(d.p);
+    if(d&&home&&introDone&&Date.now()-(window.__introAt||0)>9000&&Date.now()-(window.__touch||0)>20000){const b2=new maplibregl.LngLatBounds(home,home).extend(d.p);
       const cam=map.cameraForBounds(b2,{padding:{top:140,bottom:160,left:80,right:380}});if(cam)map.flyTo({...cam,zoom:Math.min(cam.zoom,10),pitch:tilt?55:20,bearing:tilt?-18:0,curve:1.5,speed:0.7,essential:true});}}
 }
 ['mousedown','touchstart','wheel'].forEach(ev=>document.getElementById('map').addEventListener(ev,()=>window.__touch=Date.now(),{passive:true}));
@@ -285,10 +319,10 @@ function renderFeed(){
 $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Довге натискання — змінити дім');return;}setHomeMode=!setHomeMode;$('#b-home').classList.toggle('on',setHomeMode);toast(setHomeMode?'Торкніться карти, щоб позначити дім':'Скасовано');};
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
-$('#b-layers').onclick=()=>{setBase(base==='sat'?'map':'sat');toast(base==='sat'?'Супутник':'Карта');};
+$('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D) — без перспективних спотворень; у 3D лише коротша тінь
   if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
-function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
+function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
