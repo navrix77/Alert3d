@@ -13,7 +13,7 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 const FROM=['з півночі','з північного сходу','зі сходу','з південного сходу','з півдня','з південного заходу','з заходу','з північного заходу'];
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
-let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=false,base=localStorage.getItem('base')||'sat';
+let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base')||'sat';
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
 
@@ -57,9 +57,9 @@ function addOverlays(){
   map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.38,1,0.2,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':'#fff','line-opacity':['interpolate',['linear'],['zoom'],5.5,0.25,9,0.55],'line-width':['interpolate',['linear'],['zoom'],6,0.5,10,1.2]}});
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
-  map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
+  map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-pitch-alignment':'map','circle-radius':['interpolate',['exponential',2],['zoom'],5,4,9,60,12,480],'circle-color':'#FF7A2E','circle-opacity':0.18,'circle-stroke-color':'#FF7A2E','circle-stroke-width':1.2,'circle-stroke-opacity':0.7}});
   map.addLayer({id:'trails',type:'line',source:'trails',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':3,'line-dasharray':[0.1,2.2],'line-opacity':['get','o']}});
-  map.addLayer({id:'sel-ring',type:'circle',source:'sel',paint:{'circle-radius':28,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':['get','c'],'circle-stroke-width':2.5}});
+  map.addLayer({id:'sel-ring',type:'circle',source:'sel',paint:{'circle-pitch-alignment':'map','circle-radius':28,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':['get','c'],'circle-stroke-width':2.5}});
   map.addLayer({id:'preds',type:'line',source:'preds',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':2,'line-dasharray':[1.5,2],'line-opacity':0.9}});
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':1,'icon-allow-overlap':true,'text-field':'Дім','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['has','next'],['==',['get','active'],true]],layout:{'text-field':['concat','→ ',['get','next']],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[3,7,3,7],'text-anchor':'left','text-offset':[1.9,0.9],'icon-allow-overlap':false,'text-optional':false},paint:{'text-color':'#fff'}});
@@ -68,6 +68,7 @@ function addOverlays(){
   map.on('click','tg',e=>{const f=e.features[0];openSheet(f.properties.id);});
   map.on('mouseenter','tg',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg',()=>map.getCanvas().style.cursor='');
   lastLv='';lastRa='';syncHome();
+  if(tilt)set3d(true,false);
   if(!map._scaleAdded){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
 }
 map.on('style.load',addOverlays);map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
@@ -114,6 +115,7 @@ function frame(now){
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.route.length)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
     }
     map.getSource('targets').setData({type:'FeatureCollection',features:feats});
+    T3D.heads=feats.map(f=>({id:f.properties.id,type:f.properties.type,hd:f.properties.hd,active:f.properties.active,weak:f.properties.weak,p:f.geometry.coordinates}));
     map.getSource('trails').setData({type:'FeatureCollection',features:trails});
     map.getSource('preds').setData({type:'FeatureCollection',features:preds});
     if(map.getSource('sel')){const d=sel&&DISP.get(sel);const tr=sel&&SNAP.tracks.find(t=>t.id===sel);map.getSource('sel').setData(d&&tr?{type:'FeatureCollection',features:[{type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:{type:'Point',coordinates:d.p}}]}:EMPTY);}
@@ -135,7 +137,7 @@ function raionOf(lon,lat){if(!RA)return -1;for(const r of RA){if(lon<r.bb[0]||lo
 fetch('/data/raions.geojson').then(r=>r.json()).then(j=>{RA=j.features.map((f,i)=>{const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;let bb=[180,90,-180,-90];polys.forEach(pl=>pl[0].forEach(([x,y])=>{bb[0]=Math.min(bb[0],x);bb[1]=Math.min(bb[1],y);bb[2]=Math.max(bb[2],x);bb[3]=Math.max(bb[3],y);}));return {i,n:f.properties.n,polys,bb};});});
 function syncRaions(){
   if(!SNAP||!RA||!map.getSource('ra'))return;const lv={};const up=(i,v)=>{if(i>=0&&(lv[i]||0)<v)lv[i]=v;};
-  const off=new Set((SNAP.official&&SNAP.official.raions)||[]);RA.forEach(r=>{if(off.has(r.n))up(r.i,2);});
+  const O=SNAP.official||{};const rl=O.raion_levels||{};RA.forEach(r=>{if(rl[r.n])up(r.i,rl[r.n]);});(O.points||[]).forEach(([lo,la,_n,l])=>up(raionOf(lo,la),l));
   const serverT=Date.now()/1000+offset;
   for(const tr of SNAP.tracks){if(tr.status!=='active'||tr.conf<0.5)continue;const {p}=posAt(tr,serverT);up(raionOf(p[0],p[1]),2);
     for(let m=2;m<=15;m+=2){const q=posAt(tr,serverT+m*60).p;up(raionOf(q[0],q[1]),1);}}
@@ -161,7 +163,7 @@ function renderAsOf(){
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
   if(!SNAP||age>20){el.className='asof stale';el.innerHTML=SNAP?'Немає звʼязку <b>'+Math.round(age)+' с</b> · це не відбій':'зʼєднання…';return;}
   const h=SNAP.health;el.className='asof'+((!h.telegram&&!h.replay)?' stale':'');
-  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.replay?' · ДЕМО: записана ніч 29→30.10':(h.channels?' · наживо: '+h.channels.live+'/'+h.channels.channels+' каналів':''))+(h.alerts?' · офіційні тривоги ✓':' · офіційні тривоги недоступні');
+  el.innerHTML='станом на <b>'+fmtS(SNAP.now)+'</b>'+(h.replay?' · ДЕМО: записана ніч 29→30.10':(h.channels?' · наживо: '+h.channels.live+'/'+h.channels.channels+' каналів':''))+(h.alerts?' · тривоги: '+esc((SNAP.official&&SNAP.official.source)||'✓'):' · офіційні тривоги недоступні');
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
 function renderBanner(threats){
@@ -204,7 +206,8 @@ $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Mat
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
 $('#b-layers').onclick=()=>{setBase(base==='sat'?'map':'sat');toast(base==='sat'?'Супутник':'Карта');};
-$('#b-3d').onclick=()=>{tilt=!tilt;$('#b-3d').classList.toggle('on',tilt);map.easeTo({pitch:tilt?55:0,bearing:tilt?-15:0,duration:600});};
+function set3d(on,anim){tilt=on;localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(map.getSource('obl')){on?T3D.enable(map):T3D.disable(map);}map.easeTo({pitch:on?60:0,bearing:on?-18:0,duration:anim?700:0});}
+$('#b-3d').onclick=()=>set3d(!tilt,true);
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 

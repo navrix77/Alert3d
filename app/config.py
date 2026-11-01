@@ -16,21 +16,61 @@ MAP_STYLE_VECTOR = os.getenv("MAP_STYLE_VECTOR", "https://tiles.openfreemap.org/
 MAPTILER_KEY = os.getenv("MAPTILER_KEY", "")
 
 # Вайтлист каналів: ключ -> (username, назва, апріорна довіра, офіційний)
-CHANNELS = [
-    # ключ, username, назва, апріорна довіра, офіційний
-    ("K", "kpszsu", "Повітряні Сили ЗСУ", 0.95, True),
-    ("D", "Nablydatel_Dozor", "Наблюдатель · Ночной Дозор", 0.80, False),
-    ("M", "monitor1654", "monitor 1654", 0.80, False),
-    ("R", "radar_kharkov", "Радар Харків", 0.70, False),
-    ("CX", "cxidua", "Схід (Харків)", 0.65, False),
-    ("MU", "mon1tor_ua", "Монітор UA", 0.75, False),
-    ("KL", "kudy_letyt", "Куди летить", 0.70, False),
-    ("WM", "war_monitor", "War Monitor", 0.70, False),
-    ("SU", "sumy_monitor", "Суми монітор", 0.70, False),
-    ("PL", "PoltavaRadar", "Полтава радар", 0.65, False),
-    ("DN", "dnipro_alerts", "Дніпро тривоги", 0.65, False),
-    ("KR", "kramatorsk_radar", "Краматорськ радар", 0.65, False),
+# (ключ, username, назва, довіра, офіційний, область-контекст, швидкий)
+# швидкий=True — опитується кожен цикл (~12 с), решта — по черзі (~1–2 хв)
+_C = [
+    ("K", "kpszsu", "Повітряні Сили ЗСУ", 0.95, True, None, True),
+    ("D", "Nablydatel_Dozor", "Наблюдатель · Ночной Дозор", 0.80, False, "Харківська", True),
+    ("M", "monitor1654", "monitor 1654", 0.80, False, "Харківська", True),
+    ("R", "radar_kharkov", "Радар Харків", 0.70, False, "Харківська", True),
+    ("ND", "NochnojDozorKh", "Ночной Дозор Харків", 0.75, False, "Харківська", True),
+    ("CX", "cxidua", "СХІD", 0.65, False, "Харківська", True),
+    ("SG", "synegubov", "Синєгубов (Харківська ОВА)", 0.90, True, "Харківська", True),
+    ("MU", "mon1tor_ua", "ППО радар", 0.75, False, None, True),
+    ("KL", "kudy_letyt", "Куди летить", 0.70, False, None, True),
+    ("MK", "monitor_ukr", "Моніторинг Україна", 0.65, False, None, True),
+    ("SU", "sumy_monitor", "Суми монітор", 0.70, False, "Сумська", True),
+    ("PL", "PoltavaRadar", "Полтава радар", 0.65, False, "Полтавська", True),
+    ("DN", "dnipro_alerts", "Дніпро тривоги", 0.65, False, "Дніпропетровська", True),
+    ("KR", "kramatorsk_radar", "Краматорськ радар", 0.65, False, "Донецька", True),
 ]
+_SLOW = {
+    None: "UkraineAlarmSignal alarmua tryvoga_chomu eRadarrua monikppy povitryanatrivogaaa radar_raketaa radar_top_ua raketa_trevoga UkraineRadar_24_7 rozvidkaneba Ukrainian_Intelligence war_monitor veselyy_pivden pivden_varta Shturval_media sectorv666 totallzrada vibuxaviasia deraketaua admiralbukhta newspn zahidnimonitoring monitoring_zaxid",
+    "Вінницька": "vinnradar vinytsa_radar ppo_vinnytsa vin_info_ppo",
+    "Волинська": "lutsk_radar lutsk_info volynblog",
+    "Житомирська": "zhytomyr_operativ zhitomirtrivoga Angry_Pol korostentoday",
+    "Івано-Франківська": "ifalarm",
+    "Київська": "KyivCityOfficial ppo_kiev kyivradar kyiv_alarm kyev_radar kyiv_nebo kiev_nebo kyiv_airdef monitoring_kyiv shahedradar kievinform_ua1 nebo_raketa k_dvizh",
+    "Кіровоградська": "krop_vanek",
+    "Львівська": "lviv_raketna rocket_danger_lviv",
+    "Полтавська": "ppo_poltava poltava_alarm PoltavaRanger ppopoltavanightfighters kremen_sv region_poltava_syrena",
+    "Рівненська": "mapa_novinyr",
+    "Сумська": "rdsprostir sumygo sumyregion krolevetsnews svessainfo",
+    "Тернопільська": "ternopil_ternopol",
+    "Хмельницька": "khmlv",
+    "Черкаська": "cherkasy_monitor cherkasy_nebbo",
+    "Чернігівська": "Northern_Sich_ukr PhantomChe RadarChernihiv ShahedChernihiv horizon_of_war_Official my_safety_Chernigiv taktychna_rukavuchkaa",
+    "Чернівецька": "goodchernivtsi",
+    "Дніпропетровська": "Radar_Dnipra dnipromonitor pavlograd_radar nikalert dnepr_nagladach shovnebi",
+    "Донецька": "operatyvnyi_donbas",
+    "Запорізька": "radar_zp eyes_everywhere_ua operatyvnohlep gnilayachereha info_zp zaborzp",
+    "Миколаївська": "vanek_nikolaev korabely_media pivden_FPV",
+    "Одеська": "radar_odesa odessa_inform odessa_knight odessaveter ReniHub temporis_odesa odessa_infonews xydessa_live",
+    "Харківська": "Karkivw kharkivlife kharkov_media kuptg place_kharkiv tlknewsua",
+    "Херсонська": "kherson_monitoring kherson_non_drone",
+}
+_NEWS = {"newspn", "kharkivlife", "kharkov_media", "place_kharkiv", "tlknewsua", "kievinform_ua1", "odessa_infonews", "xydessa_live",
+         "lutsk_info", "volynblog", "korostentoday", "sumyregion", "krolevetsnews", "svessainfo", "info_zp", "zaborzp", "odessa_inform", "kuptg", "Karkivw"}
+_seen = {u.lower() for _, u, *_ in _C}
+for region, names in _SLOW.items():
+    for u in names.split():
+        if u.lower() in _seen:
+            continue
+        _seen.add(u.lower())
+        _C.append((u, u, "@" + u, 0.40 if u in _NEWS else 0.60, u == "KyivCityOfficial", region, False))
+CHANNELS = [(k, u, n, r, off) for k, u, n, r, off, _reg, _f in _C]
+CHANNEL_REGION = {k: reg for k, _u, _n, _r, _o, reg, _f in _C if reg}
+FAST = {k for k, *_rest, f in _C if f}
 extra = os.getenv("TG_CHANNELS_EXTRA", "")  # "key:username:Назва:0.7,..."
 for item in filter(None, extra.split(",")):
     k, u, n, r = item.split(":")

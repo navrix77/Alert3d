@@ -61,7 +61,7 @@ class WebMonitor:
         lid = self.last_id.get(user, 0)
         cutoff = time.time() - backfill_sec
         for mid, ts, text in sorted(msgs):
-            if mid <= lid or (first and ts < cutoff):
+            if mid <= lid or (first and ts < max(cutoff, time.time() - 1800)):
                 continue
             on_message(text, key, ts, f"https://t.me/{user}/{mid}")
         self.last_id[user] = max(m[0] for m in msgs)
@@ -71,7 +71,7 @@ class WebMonitor:
         # Перший прохід — дочитати останні 30 хв у хронологічному порядку по всіх каналах
         async with httpx.AsyncClient(timeout=15, headers=UA, follow_redirects=True) as cli:
             buf = []
-            for key, user in chans:
+            for key, user in [(k, u) for k, u in chans if k in config.FAST]:
                 try:
                     r = await cli.get(f"https://t.me/s/{user}")
                     msgs = parse_page(r.text)
@@ -80,16 +80,26 @@ class WebMonitor:
                     buf += [(ts, text, key, f"https://t.me/{user}/{mid}") for mid, ts, text in msgs if ts > time.time() - 1800]
                 except Exception as e:  # noqa: BLE001
                     self.errors[user] = str(e)[:120]
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.25)
             for ts, text, key, link in sorted(buf):
                 on_message(text, key, ts, link)
-            log.info("t.me/s: стартово прочитано %d постів із %d каналів", len(buf), len(chans))
+            log.info("t.me/s: стартово прочитано %d постів; усього каналів у моніторингу: %d", len(buf), len(chans))
             # Далі — по колу; цикл ~ len(chans) * gap секунд
-            gap = max(0.4, config.TG_WEB_CYCLE_SEC / max(1, len(chans)))
+            fast = [(k, u) for k, u in chans if k in config.FAST]
+            slow = [(k, u) for k, u in chans if k not in config.FAST]
+            per_cycle_slow = 6
+            gap = max(0.35, config.TG_WEB_CYCLE_SEC / max(1, len(fast) + per_cycle_slow))
+            si = 0
             while True:
-                for key, user in chans:
+                batch = fast + [slow[(si + n) % len(slow)] for n in range(min(per_cycle_slow, len(slow)))]
+                si = (si + per_cycle_slow) % max(1, len(slow))
+                for key, user in batch:
                     try:
-                        await self.poll(cli, key, user, on_message, 0)
+                        await self.poll(cli, key, user, on_message, 1800)
+                    except httpx.HTTPStatusError as e:
+                        self.errors[user] = f"HTTP {e.response.status_code}"
+                        if e.response.status_code == 429:
+                            await asyncio.sleep(20)
                     except Exception as e:  # noqa: BLE001
                         self.errors[user] = str(e)[:120]
                     await asyncio.sleep(gap)

@@ -115,6 +115,15 @@ class Parser:
             if rx.search(t):
                 obs.oblast_hint, bbox = name, bb
                 break
+        if bbox is None and channel:
+            from .config import CHANNEL_REGION
+            from .geo import oblasts
+            reg = CHANNEL_REGION.get(channel)
+            if reg:
+                for name, _polys, bb in oblasts().items:
+                    if name == reg:
+                        obs.oblast_hint, bbox = name, (bb[1] - 0.15, bb[3] + 0.15, bb[0] - 0.2, bb[2] + 0.2)
+                        break
         words = [re.sub(r"[^\w'’\-]", "", w) for w in WORD_SPLIT.split(text)]
         words = [w for w in words if w]
         found: list[tuple[str, list[int]]] = []
