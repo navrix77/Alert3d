@@ -349,7 +349,7 @@ async def ws_endpoint(ws: WebSocket):
 
 @app.get("/data/{name}")
 def data_file(name: str):
-    allowed = {"oblasts.geojson", "raions.geojson", "occupied.geojson", "hromadas.geojson"}
+    allowed = {"oblasts.geojson", "raions.geojson", "occupied.geojson", "hromadas.geojson", "outside.geojson"}
     if name not in allowed or not (ROOT / "data" / name).exists():
         return JSONResponse({"type": "FeatureCollection", "features": []} if name == "occupied.geojson" else {"error": "not found"},
                             status_code=200 if name == "occupied.geojson" else 404)

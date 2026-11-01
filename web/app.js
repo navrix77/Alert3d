@@ -94,7 +94,7 @@ function addOverlays(){
   map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.62,0.35]}});
   map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.8}});
   map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#E0405A','line-width':['interpolate',['linear'],['zoom'],5,1,9,2.2],'line-opacity':0.85}});
-  map.addSource('outside',{type:'geojson',data:EMPTY});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});syncOutside();
+  map.addSource('outside',{type:'geojson',data:'/data/outside.geojson'});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});syncOutside();
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
   map.addSource('ru',{type:'geojson',data:EMPTY});map.addSource('hits',{type:'geojson',data:EMPTY});
   if(!map.hasImage('hit')){const c=document.createElement('canvas');c.width=c.height=40;const x=c.getContext('2d');x.translate(20,20);
@@ -296,12 +296,8 @@ function syncRaions(){
 }
 setInterval(syncRaions,3000);
 let OBLF=null;fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{OBLF=j.features;lastRa='';syncOutside();});
-// поза Україною — притемнено, щоб країна «світилася» на карті (як у провідних сервісів)
-function syncOutside(){if(!OBLF||!map.getSource('outside'))return;
-  const area=r=>{let a=0;for(let i=0,j=r.length-1;i<r.length;j=i++)a+=(r[j][0]-r[i][0])*(r[j][1]+r[i][1]);return a;};
-  const world=[[-180,-85],[180,-85],[180,85],[-180,85],[-180,-85]];const sw=Math.sign(area(world));const holes=[];
-  for(const f of OBLF){const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;for(const p of polys){let r=p[0].slice();if(Math.sign(area(r))===sw)r=r.reverse();holes.push(r);}}
-  map.getSource('outside').setData({type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[world,...holes]}});}
+// поза Україною — притемнено, щоб країна «світилася» на карті (маска готується на сервері)
+function syncOutside(){}
 function syncHolo(lv){if(!map.getSource('holo')||!RA)return;const F=[];
   RA.forEach(r=>{const l=lv[r.i];if(l)F.push({type:'Feature',properties:{l},geometry:r.polys.length===1?{type:'Polygon',coordinates:r.polys[0]}:{type:'MultiPolygon',coordinates:r.polys}});});
   const L=(SNAP&&SNAP.levels)||{};if(OBLF)OBLF.forEach(f=>{const l=L[f.properties.n];if(l)F.push({type:'Feature',properties:{l},geometry:f.geometry});});
