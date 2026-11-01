@@ -124,12 +124,20 @@ class Tracker:
             return rec
         if obs.kind == "close":
             n = 0
+            from .config import CHANNEL_REGION
+            reg = CHANNEL_REGION.get(src)
+            obl = oblasts()
             for tr in self.tracks:
                 if tr.closed or (obs.type and tr.type != obs.type):
                     continue
                 e = tr.est(t)
                 if places and not any(dist_km(p.place.xy, e) < 45 for p in places):
                     continue
+                if not places:
+                    # «не фіксується» без місця: лише цілі регіону цього каналу (або ті, про які він сам писав)
+                    la, lo = from_xy(*e)
+                    if not (src in tr.srcs or (reg and obl.of(lo, la) == reg)):
+                        continue
                 tr.closed = t
                 n += 1
             rec["closed"] = n
@@ -274,6 +282,15 @@ class Tracker:
                 best, bs = tr, s
         return best
 
+    def life(self, tr: Track) -> float:
+        """Скільки ціль лишається «активною» без нових повідомлень. Долетіла до названого пункту і мовчить —
+        прибираємо через 10 хв (як провідні сервіси), а не тримаємо 40 хв на місці."""
+        base = TYPES[tr.type]["life"]
+        if tr.route:
+            km = sum(dist_km(a, b) for a, b in itertools.pairwise(tr.path()))
+            return min(base, km / tr.speed * 3600 + 600)
+        return min(base, 600 if tr.last.est or tr.heading is None else 900)
+
     # ---------------- знімок стану для клієнтів
     def conf(self, tr: Track) -> float:
         q = 1.0
@@ -299,7 +316,7 @@ class Tracker:
                 self.brain.rel_update(next(iter(tr.srcs)), False, 0.5)  # ніхто не підтвердив
         self.tracks = keep
         for tr in self.tracks:
-            life = TYPES[tr.type]["life"]
+            life = self.life(tr)
             age = now - tr.last.t
             status = "closed" if tr.closed else ("lost" if age > life else "active")
             if status != "active" and age > life + 900:
