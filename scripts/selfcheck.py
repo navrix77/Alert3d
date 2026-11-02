@@ -41,9 +41,13 @@ def main() -> None:
     a = ap.parse_args()
     # копія бази: живий сервер тримає її відкритою
     tmp = Path(tempfile.mkdtemp()) / "brain.sqlite"
-    for suf in ("", "-wal", "-shm"):
+    for suf in ("", "-wal"):  # -shm не потрібен (і буває заблокований живим сервером)
         if Path(a.db + suf).exists():
-            shutil.copyfile(a.db + suf, str(tmp) + suf)
+            try:
+                shutil.copyfile(a.db + suf, str(tmp) + suf)
+            except OSError:
+                if not suf:
+                    raise
     db = sqlite3.connect(tmp)
     t_end = db.execute("SELECT max(t) FROM msg").fetchone()[0]
     rows = db.execute("SELECT t, src, link, kind, type, places, track, text FROM msg WHERE t > ? ORDER BY t",
