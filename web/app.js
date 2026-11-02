@@ -667,12 +667,12 @@ function renderFollow(){const el=$('#follow-pill');if(!follow||!sel){el.hidden=t
 if($('#sh-why'))$('#sh-why').onclick=()=>{if(!sel)return;
   // картка закриває мапу — ховаємо її (ціль лишається вибраною), вмикаємо рентген лише цієї цілі й летимо до неї
   $('#sheet').hidden=true;xrPanel().dataset.k='';if(!XRAY)setXray(true);else syncXray();const d=DISP.get(sel);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),9.5),duration:900,essential:true,padding:{bottom:Math.round(innerHeight*0.4)}});};
-if($('#sh-then'))$('#sh-then').onclick=async()=>{const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr)return;const t0=tr.first||tr.last;
+if($('#sh-then'))$('#sh-then').onclick=async()=>{const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr)return;const t0=Math.max(tr.first||tr.last,liveNow()-2*3600);
   try{if(!HISTF.length){const j=await fetch('/api/history').then(r=>r.json());HISTF=j.frames||[];}}catch(e){}
   if(!HISTF.length)return toast('Історія ще збирається');let i=HISTF.findIndex(f=>f.t>=t0);if(i<0)i=HISTF.length-1;
-  const id=tr.id;$('#sheet').hidden=true;$('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;play(false);showFrame(i);
+  const id=tr.id;$('#sheet').hidden=true;$('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;showFrame(i);play(true);
   const ft=(HISTF[i].tracks||[]).find(x=>x.id===id);if(ft){map.flyTo({center:[ft.lon,ft.lat],zoom:Math.max(map.getZoom(),9),duration:900});}
-  toast('Так було о '+fmt(HISTF[i].t)+(ft?' — ціль у центрі':'')+'. «Наживо» — повернутись');};
+  toast('Програю з '+fmt(HISTF[i].t)+' до зараз'+(ft?', ціль у центрі':'')+'. «Наживо» — вийти');};
 $('#sh-follow').onclick=()=>{if(follow)stopFollow('Стеження зупинено');else startFollow();$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити стеження':'Стежити за ціллю';};
 map.on('dragstart',e=>{if(follow&&e.originalEvent)stopFollow('Ви зсунули карту — стеження зупинено');});
 setInterval(()=>{if(follow)renderFollow();},1000);
@@ -706,6 +706,8 @@ $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 /* ---------- живий потік ---------- */
 function onSnap(s){window.__snapOK=true;LIVE=s;if(REPLAY)return;SNAP=s;try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
 let LIVE=null,REPLAY=null;
+// «зараз» за сервером — не залежить від того, на який кадр машини часу перемкнуто offset
+const liveNow=()=>LIVE&&LIVE.now?LIVE.now+(REPLAY?0:Math.max(0,(Date.now()-recvAt)/1000)):Date.now()/1000;
 /* ---------- прогноз ---------- */
 function renderForecast(){const el=$('#fc');if(!el)return;el.innerHTML='';el.hidden=true;return;if(!SNAP||!SNAP.forecast||!SNAP.forecast.oblasts){el.innerHTML='';return;}const O=SNAP.forecast.oblasts;
   let mine=null;if(home&&window.OBLPOLY){mine=window.OBLPOLY(home[0],home[1]);}
@@ -718,7 +720,7 @@ fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{const P=j.features.map
 /* ---------- машина часу ---------- */
 let HISTF=[],tbTimer=null;
 $('#b-time').onclick=()=>{fetch('/api/history').then(r=>r.json()).then(j=>{HISTF=j.frames||[];if(!HISTF.length)return toast('Історія ще збирається — кадр щохвилини');
-  $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;const t30=Date.now()/1000+offset-1800;let i0=HISTF.findIndex(f=>f.t>=t30);if(i0<0)i0=HISTF.length-1;play(false);showFrame(i0);toast('Машина часу: 30 хв тому. ▶ — програти до зараз, −5/+5 — крок');});};
+  $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;const t30=liveNow()-1800;let i0=HISTF.findIndex(f=>f.t>=t30);if(i0<0)i0=HISTF.length-1;showFrame(i0);play(true);toast('Програю останні 30 хв до зараз. ❚❚ — пауза, −5/+5 — крок, «Наживо» — вийти');});};
 function showFrame(i){const f=HISTF[i];if(!f)return;document.body.classList.add('replay');$('#tb-range').value=i;$('#tb-time').textContent=new Date(f.t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
   REPLAY=f;SNAP=Object.assign({},LIVE||{},{now:f.t,levels:f.levels,official:Object.assign({},(LIVE&&LIVE.official)||{},{raion_levels:f.raions,points:[]}),
     tracks:f.tracks.map(t=>Object.assign({status:'active',speed:0,route:[],trail:[],route_names:[],srcs:(t.ev&&t.ev.prim)||[],links:[],first:f.t,last:f.t,ts:f.t,entry:[t.lon,t.lat,'',f.t],ev:{pubs:0,prim:[],items:[],contra:[],age:0}},t)),launches:[],zones:[],ru:[]});
