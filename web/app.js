@@ -155,7 +155,7 @@ function addOverlays(){
     map.addImage('hit',fire,{pixelRatio:2});}
   map.addLayer({id:'ru-glow',type:'circle',source:'ru',minzoom:3,filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':1,'circle-opacity':0.22,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ru-dot',type:'circle',source:'ru',filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,1.8,7,3.5],'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':['interpolate',['linear'],['zoom'],4,1,7,2],'circle-opacity':0.85}});
-  map.addLayer({id:'ru-t',type:'symbol',source:'ru',minzoom:6,filter:['!',['has','sum']],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['has','sum'],12,10.5],'text-max-width':16,'text-offset':['case',['has','sum'],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['has','sum'],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
+  map.addLayer({id:'ru-t',type:'symbol',source:'ru',minzoom:5.5,filter:['!',['has','sum']],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['has','sum'],12,10.5],'text-max-width':16,'text-offset':['case',['has','sum'],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['has','sum'],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':['interpolate',['linear'],['zoom'],4,0.9,7,1.5,10,2],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',6.5,['get','l']],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':'#FFE36B','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addSource('xr',{type:'geojson',data:EMPTY});
   map.addLayer({id:'xr-dim',type:'background',layout:{visibility:'none'},paint:{'background-color':'#02040A','background-opacity':0.62}});
@@ -649,7 +649,7 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;
   // останнє зведення МО РФ: на карті — лише точки регіонів (з кількістю, якщо названа) і ОДИН підсумковий підпис
   const ev=(SNAP.ru||[]).slice().sort((a,b)=>b.t-a.t)[0];if(!ev){map.getSource('ru').setData(EMPTY);return;}
   const PER=p=>!p?'':/ноч/.test(p)?'за ніч':/дня/.test(p)?'за день':/суток/.test(p)?'за добу':'';
-  const F=ev.regions.map(r=>({type:'Feature',properties:{c:r.cnt?Math.min(12,r.cnt/3):3,l:r.cnt?'×'+r.cnt:'',n:r.n,cnt:r.cnt||0},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}));
+  const F=ev.regions.map(r=>({type:'Feature',properties:{c:r.cnt?Math.min(12,r.cnt/3):3,l:'наші дрони'+(r.cnt?' ×'+r.cnt:'')+'\n'+r.n,n:r.n,cnt:r.cnt||0},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}));
   const lo=ev.regions.reduce((s,r)=>s+r.lon,0)/ev.regions.length,la=ev.regions.reduce((s,r)=>s+r.lat,0)/ev.regions.length;
   F.push({type:'Feature',properties:{c:0,sum:true,l:'Наші дрони над РФ '+PER(ev.period)+': '+ev.total+' «збитих» за МО РФ · '+ev.regions.length+' рег. · '+fmt(ev.t)},geometry:{type:'Point',coordinates:[lo+1.5,la+0.6]}});
   map.getSource('ru').setData({type:'FeatureCollection',features:F});}
