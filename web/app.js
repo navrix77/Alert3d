@@ -198,7 +198,7 @@ function addOverlays(){
   const TGS=['interpolate',['linear'],['zoom'],4,0.55,7,0.85,9,1.15,12,1.55];
   // голограма тривоги: об'єми над районами (червоні вищі), «дихають»
   const firstLbl=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
-  map.addLayer({id:'holo',type:'fill-extrusion',source:'holo',paint:{'fill-extrusion-color':['match',['get','l'],2,'#FF2D3D','#FFB020'],'fill-extrusion-height':['match',['get','l'],2,12000,4500],'fill-extrusion-base':0,'fill-extrusion-opacity':0.26,'fill-extrusion-vertical-gradient':true}},firstLbl);
+  map.addLayer({id:'holo',type:'fill-extrusion',source:'holo',maxzoom:8.5,paint:{'fill-extrusion-color':['match',['get','l'],2,'#FF2D3D','#FFB020'],'fill-extrusion-height':['interpolate',['linear'],['zoom'],5,['match',['get','l'],2,12000,4500],7.5,['match',['get','l'],2,1500,600],8.5,0],'fill-extrusion-base':0,'fill-extrusion-opacity':0.26,'fill-extrusion-vertical-gradient':true}},firstLbl);
   // громади з тривогою — справжні межі громади (КАТОТТГ + OSM), а не коло
   if(!map.getSource('hp'))map.addSource('hp',{type:'geojson',data:HPDATA||EMPTY,attribution:'Межі громад: КАТОТТГ, © OpenStreetMap (ODbL)'});HPPREV={};lastRa='';
   map.addLayer({id:'hp-f',type:'fill',source:'hp',paint:{'fill-color':['match',['coalesce',['feature-state','l'],0],2,'#FF2D3D','#FFB020'],'fill-opacity':['match',['coalesce',['feature-state','l'],0],0,0,0.34]}},firstLbl);
