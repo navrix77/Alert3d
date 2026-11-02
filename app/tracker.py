@@ -266,7 +266,9 @@ class Tracker:
                 if a and t - a["t"] < AVIA_LIFE:
                     a.update(t=t, n=a["n"] + 1, act=t)
                 else:
-                    self.avia[o] = {"t": t, "first": t, "n": 1, "platform": None, "act": t}
+                    self.avia[o] = {"t": t, "first": t, "n": 1, "platform": None, "act": t, "ev": []}
+                self.avia[o].setdefault("ev", []).append({"t": int(t), "src": src, "text": (getattr(obs, "raw", "") or "")[:220], "link": link, "k": "avia"})
+                self.avia[o]["ev"] = self.avia[o]["ev"][-6:]
                 if obs.aviation:
                     self.avia[o]["platform"] = "Су-34/Су-35"
             rec["avia"] = regs
@@ -292,7 +294,9 @@ class Tracker:
                     if a and t - a["t"] < AVIA_LIFE:
                         a.update(t=t, n=a["n"] + 1)
                     else:
-                        self.avia[z.obl] = {"t": t, "first": t, "n": 1, "platform": None}
+                        self.avia[z.obl] = {"t": t, "first": t, "n": 1, "platform": None, "ev": []}
+                    self.avia[z.obl].setdefault("ev", []).append({"t": int(t), "src": src, "text": (getattr(obs, "raw", "") or "")[:220], "link": link, "k": "kab"})
+                    self.avia[z.obl]["ev"] = self.avia[z.obl]["ev"][-6:]
             return rec
         if obs.kind != "track" or obs.type not in TYPES:
             return rec
@@ -693,6 +697,8 @@ class Tracker:
             avia.append({"obl": o, "lat": la, "lon": lo, "area": area, "t": int(a["t"]), "first": int(a["first"]), "n": a["n"],
                          "platform": a.get("platform") or "тактична авіація", "kab": len(kz),
                          "to": [[z.places[0].lon, z.places[0].lat] for z in kz][:4],
-                         "fade": round(min(1.0, (now - a["t"]) / AVIA_LIFE), 2)})
+                         "fade": round(min(1.0, (now - a["t"]) / AVIA_LIFE), 2), "ev": a.get("ev", []),
+                         "act": int(a["act"]) if a.get("act") else None, "until": int(a["t"] + AVIA_LIFE),
+                         "targets": [z.places[0].name for z in kz][:6]})
         return {"now": now, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
                 "log": self.log[-60:]}
