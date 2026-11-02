@@ -388,8 +388,8 @@ function frame(now){
       let d=DISP.get(tr.id);
       if(!d||Math.abs(d.p[0]-p[0])+Math.abs(d.p[1]-p[1])>1.2){d={p:[...p],hd:hd??0};DISP.set(tr.id,d);}
       else{const k=Math.min(1,dt*3);d.p[0]+=(p[0]-d.p[0])*k;d.p[1]+=(p[1]-d.p[1])*k;if(hd!=null){let a=hd-d.hd;while(a>180)a-=360;while(a<-180)a+=360;d.hd+=a*Math.min(1,dt*2.5);}}
-      const active=tr.status==='active',weak=tr.conf<0.5;
-      const rel=active&&!weak?homeRel(tr,d.p):null;
+      const active=tr.status==='active',still=!!(tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next)),weak0=tr.conf<0.5,weak=weak0||still;// still: місце не назвали або лише оцінка без нового пункту — на мапі стоїть і напівпрозора, щоб не вдавати рух
+      const rel=active&&!weak0?homeRel(tr,d.p):null;
       if(rel&&rel.rel)threats.push({tr,rel});
       // кут на ЕКРАНІ: проєктуємо точку і точку на 3 км уздовж курсу, враховує нахил і поворот карти
       const unk=tr.hd==null;let sa=0;
