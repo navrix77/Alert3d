@@ -392,4 +392,13 @@ def data_file(name: str):
     return FileResponse(ROOT / "data" / name, media_type="application/geo+json")
 
 
-app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
+class FreshStatic(StaticFiles):
+    """Оболонка застосунку завжди перевіряється на свіжість (ETag): телефон не тримає стару версію годинами."""
+    async def get_response(self, path, scope):
+        r = await super().get_response(path, scope)
+        if path == "" or path.endswith((".html", ".js", ".css", ".webmanifest")) or "." not in path.rsplit("/", 1)[-1]:
+            r.headers["Cache-Control"] = "no-cache"
+        return r
+
+
+app.mount("/", FreshStatic(directory=WEB, html=True), name="web")
