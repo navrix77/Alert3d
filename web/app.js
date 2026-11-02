@@ -272,7 +272,25 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
 map.once('idle',()=>introFly(false));
 setTimeout(()=>introFly(false),7000);
 {const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
-map.on('click',e=>{if(!setHomeMode)return;const f=map.queryRenderedFeatures(e.point,{layers:['tg-hit']});if(f.length)return;home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));setHomeMode=false;$('#b-home').classList.remove('on');syncHome();toast('Дім збережено');});
+/* ---------- дім: змінюється лише свідомо (Налаштування → «Змінити дім»), лише на суші України ---------- */
+let homeArmT=null;
+function armHome(){setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім (30 с)');clearTimeout(homeArmT);
+  homeArmT=setTimeout(()=>{if(setHomeMode){setHomeMode=false;$('#b-home').classList.remove('on');toast('Дім не змінено');}},30000);}
+function disarmHome(){setHomeMode=false;clearTimeout(homeArmT);$('#b-home').classList.remove('on');}
+map.on('click',e=>{if(!setHomeMode)return;
+  // дотик по цілі, пуску, пам'ятному знаку тощо — це перегляд, а не вибір дому (02.11: дім «з'їхав» у море на крейсер «Москва»)
+  const OBJ=new Set(['targets','zones','lsites','hits','memo','ru','rf-mark','by-mark','chains','preds','trails','myplaces','comets','sel','home','lpred','mepos']);
+  if(map.queryRenderedFeatures([[e.point.x-12,e.point.y-12],[e.point.x+12,e.point.y+12]]).some(f=>OBJ.has(f.source)))return;
+  if(!map.queryRenderedFeatures(e.point,{layers:['obl-fill']}).length){toast('Дім можна позначити лише на території України');return;}
+  try{if(home)localStorage.setItem('home_prev',JSON.stringify(home));}catch(x){}
+  home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));disarmHome();syncHome();toast('Дім збережено');});
+// перевірка збереженого дому: поза Україною (у морі) — повертаємо попередній або просимо позначити знову
+fetch('/data/oblasts.geojson').then(r=>r.json()).then(g=>{if(!home)return;
+  const inRing=(pt,r)=>{let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const [xi,yi]=r[i],[xj,yj]=r[j];if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))c=!c;}return c;};
+  const inUA=pt=>g.features.some(f=>{const G=f.geometry;const P=G.type==='Polygon'?[G.coordinates]:G.coordinates;return P.some(poly=>inRing(pt,poly[0]));});
+  if(inUA(home))return;let prev=null;try{prev=JSON.parse(localStorage.getItem('home_prev')||'null');}catch(x){}
+  if(prev&&inUA(prev)){home=prev;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім був поза Україною — повернув попередній');}
+  else{home=null;localStorage.removeItem('home');syncHome();toast('Дім був позначений поза Україною (у морі). Позначте його знову: Налаштування → «Змінити дім»');}}).catch(()=>{});
 fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};window.NXCFG=CFG;syncReal3d();}).catch(()=>{}).finally(()=>setBase(base==='__init'?'night':base));
 
 let HPDATA=null,HPPREV={},HPLOADING=false;
@@ -601,8 +619,8 @@ function renderFeed(){
 }
 
 /* ---------- кнопки ---------- */
-$('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Довге натискання — змінити дім');return;}setHomeMode=!setHomeMode;$('#b-home').classList.toggle('on',setHomeMode);toast(setHomeMode?'Торкніться карти, щоб позначити дім':'Скасовано');};
-let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
+$('#b-home').onclick=()=>{if(setHomeMode){disarmHome();toast('Скасовано');return;}if(home){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Змінити дім — у Налаштуваннях');return;}armHome();};
+// довге натискання на «Дім» прибрано: на телефоні воно спрацьовувало випадково й наступний дотик переносив дім
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
 $('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D) — без перспективних спотворень; у 3D лише коротша тінь
@@ -758,7 +776,7 @@ $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
 $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};
 $('#st-geo').onclick=()=>{$('#b-locate').click();};
-$('#st-pick').onclick=()=>{$('#settings').hidden=true;setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');};
+$('#st-pick').onclick=()=>{$('#settings').hidden=true;armHome();};
 $('#st-clear').onclick=()=>{home=null;localStorage.removeItem('home');syncHome();toast('Дім прибрано');};
 let lanDone=false;function loadLan(){if(!$('#st-qr'))return;fetch('/api/lan').then(r=>r.json()).then(j=>{lanDone=true;const urls=j.urls||[];const host=location.hostname;
   const sec=(j.secure||[]).sort((a,b)=>(/\/\/192\.168\./.test(b)-/\/\/192\.168\./.test(a)));const best=sec[0]||((host!=='localhost'&&host!=='127.0.0.1')?location.origin:(urls[0]||location.origin));
