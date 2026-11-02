@@ -28,7 +28,27 @@ const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,ka
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
 const INTRO=!sessionStorage.getItem('intro');
-const map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,2),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});window.tryvogaMap=map;
+/* ---------- без WebGL карта не стартує: текстовий режим замість вічної заставки (аудит 02.11) ---------- */
+const hasGL=(()=>{try{const c=document.createElement('canvas');return !!(c.getContext('webgl2')||c.getContext('webgl'));}catch(e){return false;}})();
+if(!hasGL||!window.maplibregl){liteMode();return;}
+function liteMode(){
+  const ix=document.getElementById('intro');if(ix)ix.remove();document.body.classList.remove('intro');
+  const el=document.createElement('div');el.id='lite';document.body.appendChild(el);
+  const st=document.createElement('style');st.textContent='#lite{position:fixed;inset:0;overflow:auto;background:#07090E;color:#E8ECF4;font:15px/1.45 system-ui,sans-serif;padding:16px;z-index:9999}#lite h1{font-size:20px;margin:0 0 4px}#lite .n{color:#9AA4B8;font-size:13px}#lite h2{font-size:15px;margin:18px 0 6px;color:#fff}#lite li{margin:3px 0}#lite .on{color:#ff6b6b}#lite button{margin-top:8px;padding:8px 14px;border-radius:10px;border:1px solid #2B6BFF;background:#13224A;color:#fff;font:inherit}';document.head.appendChild(st);
+  const N=window.TYPE_NAME||{};const e=x=>String(x??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const hm=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+  let last=0;
+  const draw=s=>{last=Date.now();const now=s.now;const O=s.official||{};const obl=Object.keys(s.levels||{}).sort();const part=(O.alert_obl||[]).filter(o=>!obl.includes(o));
+    const act=(s.tracks||[]).filter(t=>t.status==='active').sort((a,b)=>b.last-a.last);
+    el.innerHTML='<h1>NAVRYX SKY · текстовий режим</h1><div class=n>Карта не запускається на цьому пристрої (немає WebGL / графічного прискорення). Дані ті самі, наживо. Станом на '+hm(now)+'.</div>'+
+      '<h2>Офіційні тривоги</h2>'+(obl.length?'<ul>'+obl.map(o=>'<li class=on>'+e(o)+' обл. — уся область</li>').join('')+'</ul>':'<div class=n>Тривог на всю область немає.</div>')+
+      (part.length?'<div class=n>Тривога в частині області: '+part.map(e).join(', ')+'</div>':'')+
+      '<h2>Цілі за повідомленнями моніторів ('+act.length+')</h2>'+(act.length?'<ul>'+act.slice(0,60).map(t=>'<li><b>'+e(N[t.type]||t.type)+(t.count>1?' ×'+t.count:'')+'</b>'+(t.next?' → '+e(t.next):'')+' <span class=n>· '+Math.max(0,Math.round((now-t.last)/60))+' хв тому · '+(t.conf>=0.5?'підтверджено':'непідтверджено')+'</span></li>').join('')+'</ul>':'<div class=n>Активних цілей немає. Це не відбій — орієнтуйтеся на офіційні сигнали.</div>')+
+      '<button onclick="location.reload()">Спробувати карту ще раз</button>';};
+  const poll=()=>fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(draw).catch(()=>{el.innerHTML='<h1>NAVRYX SKY</h1><div class=n>Немає звʼязку з сервером. Це не відбій.</div>';});
+  try{const ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws');ws.onmessage=m=>{try{draw(JSON.parse(m.data));}catch(x){}};}catch(x){}
+  poll();setInterval(()=>{if(Date.now()-last>25000)poll();},15000);}
+let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,2),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
@@ -285,7 +305,8 @@ map.on('click',e=>{if(!setHomeMode)return;
   try{if(home)localStorage.setItem('home_prev',JSON.stringify(home));}catch(x){}
   home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));disarmHome();syncHome();toast('Дім збережено');});
 // перевірка збереженого дому: поза Україною (у морі) — повертаємо попередній або просимо позначити знову
-fetch('/data/oblasts.geojson').then(r=>r.json()).then(g=>{if(!home)return;
+fetch('/data/raions.geojson').then(r=>r.json()).then(g=>{window.__RAGJ=g;homeObl.k=null;}).catch(()=>{});
+fetch('/data/oblasts.geojson').then(r=>r.json()).then(g=>{window.__OBLGJ=g;homeObl.k=null;if(!home)return;
   const inRing=(pt,r)=>{let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const [xi,yi]=r[i],[xj,yj]=r[j];if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))c=!c;}return c;};
   const inUA=pt=>g.features.some(f=>{const G=f.geometry;const P=G.type==='Polygon'?[G.coordinates]:G.coordinates;return P.some(poly=>inRing(pt,poly[0]));});
   if(inUA(home))return;let prev=null;try{prev=JSON.parse(localStorage.getItem('home_prev')||'null');}catch(x){}
@@ -514,35 +535,55 @@ setInterval(()=>SNAP&&renderAsOf(),1000);
 let SHELTER=+(localStorage.getItem('shelter')||3);if($('#me-sh'))$('#me-sh').textContent=SHELTER;
 if($('#me-set'))$('#me-set').onclick=()=>{const v=[1,2,3,5,7,10];SHELTER=v[(v.indexOf(SHELTER)+1)%v.length];localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;toast('До укриття: '+SHELTER+' хв');};
 const MEI={};
+function homeObl(){if(!home||!window.__OBLGJ)return null;if(homeObl.k===home.join())return homeObl.v;
+  const inRing=(pt,r)=>{let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const [xi,yi]=r[i],[xj,yj]=r[j];if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))c=!c;}return c;};
+  const find=g=>{const f=g&&g.features.find(f=>{const G=f.geometry;const P=G.type==='Polygon'?[G.coordinates]:G.coordinates;return P.some(poly=>inRing(home,poly[0]));});return f?f.properties.n:null;};
+  homeObl.k=home.join();homeObl.v=find(window.__OBLGJ);homeObl.r=find(window.__RAGJ);return homeObl.v;}
+// офіційний статус для дому: уся область → район дому → «у частині області» (громади) → немає
+function homeOfficial(ob){const O=SNAP.official||{};const ra=homeObl.r;
+  if((SNAP.levels||{})[ob])return {on:1,t:'повітряна тривога'};
+  if(ra&&(O.raion_levels||{})[ra])return {on:1,t:'повітряна тривога · '+ra+' р-н'};
+  if((O.alert_obl||[]).includes(ob))return {on:1,t:'тривога в частині області — перевірте свою громаду'};
+  return {on:0,t:'офіційної тривоги немає'};}
 function renderMe(threats){
   const box=$('#me');if(!home){box.className='me'+(box.classList.contains('open')?' open':'');$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>(document.hidden?75:30);
   const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
   const thr=near.filter(x=>x.r.rel);const first=thr[0];
-  let cls='me',word='Над вами чисто',sub='Підтверджених цілей у ваш бік немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
+  // перший рядок — завжди офіційний статус області дому; відсутність позначки на мапі ≠ персональний відбій (аудит 02.11)
+  const ob=homeObl();const OF=ob?homeOfficial(ob):{on:0,t:''};const lvl=OF.on;
+  const offL=ob?'<div class="me-off '+(lvl?'on':'')+'"><b>'+esc(ob)+' обл.</b> · '+esc(OF.t)+'</div>':'';
+  // що відомо моніторам: давність останнього повідомлення поруч (≤60 км), непідтверджені цілі теж рахуємо
+  const H=xy(home);let lastNear=0,weak=0;for(const t of SNAP.tracks){if(t.status==='closed')continue;const d=dist(H,xy([t.lon,t.lat]));if(d<=60){lastNear=Math.max(lastNear,t.last||0);if(t.status==='active'&&t.conf<0.5)weak++;}}
+  const srvT=Date.now()/1000+offset;const ago=lastNear?Math.round((srvT-lastNear)/60):null;
+  const ageL=ago==null?'Поруч (60 км) повідомлень моніторів сьогодні не було.':'Останнє повідомлення моніторів у межах 60 км — '+(ago<1?'щойно':ago+' хв тому')+'.';
+  const tg=!SNAP.health||SNAP.health.telegram||SNAP.health.replay;
+  let cls=lvl?'me watch':'me',word=lvl?'Повітряна тривога':'Тривоги немає',sub=offL+'У повідомленнях моніторів немає цілі з курсом на вас. '+ageL+(weak?' Ще '+weak+' непідтвердж. поруч.':'');
+  if(!tg){cls='me watch';sub=offL+'Канали моніторів зараз не надходять — оцінка неповна. Це <b>не відбій</b>.';}
   const mb=near.filter(x=>!x.r.rel&&x.r.maybe).sort((a,b)=>b.r.p-a.r.p)[0];
-  if(!first&&mb){cls='me watch';word='Можлива загроза';sub=esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · ймовірність пройти поруч ~'+Math.round(mb.r.p*100)+'%. Будьте поруч з укриттям — це ще не тривога.';}
-  if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
-  else if(first){const e=first.r.eta||0;cls=e<=5?'me danger':'me watch';word=e<=5?'Летить на вас':'У ваш бік';
-    sub=esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':'');}
+  if(!first&&mb){cls='me watch';word='Можлива загроза';sub=offL+esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · напрямок за оцінкою, шанс пройти поруч ~'+Math.round(mb.r.p*100)+'%. Будьте поруч з укриттям — це ще не тривога.';}
+  if(isStale){cls='me watch';word='Невідомо';sub=offL+'Немає звʼязку з сервером. Це <b>не відбій</b>.';}
+  else if(first){const e=first.r.eta||0,byRoute=first.r.rel==='route';
+    cls=e<=5&&byRoute?'me danger':'me watch';word=byRoute?(e<=5?'Летить на вас':'Маршрут поруч'):'Можливо у ваш бік';
+    sub=offL+esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(byRoute?(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':''):' · напрямок за оцінкою, може наблизитися');}
   box.className=cls+(box.classList.contains('open')?' open':'');$('#me-word').textContent=word;
-  // ГОЛОВНЕ: скільки хвилин саме у вас — великим числом з кільцем
-  if(first&&!isStale&&first.r.eta!=null){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
-    sub='<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
-      '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> · ~'+eta+' хв до вас<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+'</span></div>';}
+  // великі хвилини — лише коли маршрут названо каналами (обґрунтована оцінка), а не з напрямку
+  if(first&&!isStale&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
+    sub=offL+'<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
+      '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> · ~'+eta+' хв до вас<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+' · за повідомленнями каналів</span></div>';}
   $('#me-sub').innerHTML=sub;
   $('#me-list').innerHTML='';
   (thr.length?thr:near).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
     const c=MEI[t.type]||(MEI[t.type]=drawTarget(t.type,22));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
     const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;
     li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':(r.away?'віддаляється':t.hd==null?'курс невідомий':r.maybe?'можливо у ваш бік · '+Math.round(r.p*100)+'%':'летить повз'))+'</span></div>'+
-      (eta?'<div class="me-act '+(eta<=5?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить поруч':'курс у ваш бік')+'</div>':'');
+      (eta?'<div class="me-act '+(eta<=5&&r.rel==='route'?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить поруч':'напрямок за оцінкою — може наблизитися')+'</div>':'');
     li.querySelector('.me-row').prepend(cv);li.onclick=()=>openSheet(t.id);$('#me-list').appendChild(li);});
 }
 function renderBanner(threats){
   const b=$('#banner');if(!threats.length){b.hidden=true;return;}
   threats.sort((a,b)=>(a.rel.eta??999)-(b.rel.eta??999));const t=threats[0];
-  b.hidden=false;b.innerHTML=esc(TYPE_NAME[t.tr.type])+(t.tr.count>1?' ×'+t.tr.count:'')+' · '+(t.rel.rel==='route'?'маршрут проходить біля дому':'курс на твій район')+(t.rel.eta!=null?' · ~'+Math.max(1,Math.round(t.rel.eta))+' хв':'')+'<small>'+Math.round(t.rel.d)+' км '+t.rel.from+(threats.length>1?' · ще '+(threats.length-1):'')+'</small>';
+  b.hidden=false;b.innerHTML=esc(TYPE_NAME[t.tr.type])+(t.tr.count>1?' ×'+t.tr.count:'')+' · '+(t.rel.rel==='route'?'маршрут проходить біля дому':'може наблизитися до вашого району')+(t.rel.eta!=null?' · ~'+Math.max(1,Math.round(t.rel.eta))+' хв':'')+'<small>'+Math.round(t.rel.d)+' км '+t.rel.from+(threats.length>1?' · ще '+(threats.length-1):'')+'</small>';
   b.onclick=()=>openSheet(t.tr.id);
   // кінематографічний переліт: нова загроза дому — камера плавно показує і дім, і ціль (якщо користувач не крутить карту)
   renderBanner.seen=renderBanner.seen||new Set();
@@ -586,7 +627,7 @@ function fillSheet(first){
     const why=tr.pred==='learned'?' <small>· вивчено з історії'+(tr.pred_p?' ('+Math.round(tr.pred_p*100)+'%)':'')+'</small>':tr.pred==='channels'?' <small>· за каналами</small>':'';
     $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо — позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'')+lpHtml(tr);}else $('#sh-route').innerHTML=lpHtml(tr);
   // «Чому я це показую»: першоджерело, копії, суперечності, давність, що змінило відображення
-  {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=evItems(tr.id,()=>{if(sel===tr.id)fillSheet();});E.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
+  {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=(tr.ev&&tr.ev.items)?tr.ev.items:evItems(tr.id,()=>{if(sel===tr.id)fillSheet();});// машина часу: лише те, що було відомо на той моментE.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
    const head=E.pubs+' '+(E.pubs===1?'публікація':E.pubs<5?'публікації':'публікацій')+' · '+ind+' '+(ind===1?'першоджерело':ind<5?'першоджерела':'першоджерел')+' · '+(ind>=2?'<b class=ok>незалежне підтвердження є</b>':'<b class=warn>незалежного підтвердження немає</b>');
    const age=E.age;const ageTxt=age<120?'щойно':age<3600?Math.round(age/60)+' хв тому':'понад годину тому';
    let h='<h4>Чому я це показую</h4><p class=ev-head>'+head+'</p><p class=ev-age>Остання фіксація місця: '+ageTxt+(age>300?' — позиція далі лише оцінка, зона невизначеності росте':'')+'</p>';
@@ -694,7 +735,7 @@ function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;const F=[],nm=k
   // лише обрана ціль, або до 6 найсвіжіших цілей у кадрі — інакше «павутиння» на пів країни
   const bb=map.getBounds();const pool=SNAP.tracks.filter(t=>t.status==='active'&&t.ev&&(sel?t.id===sel:bb.contains([t.lon,t.lat]))).sort((a,b)=>b.last-a.last).slice(0,sel?1:6);
   for(const tr of pool){
-    const d=DISP.get(tr.id);const items=(evItems(tr.id,syncXray)||[]).filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
+    const d=DISP.get(tr.id);const items=((tr.ev&&tr.ev.items)||evItems(tr.id,syncXray)||[]).filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
     items.forEach((it,ix)=>{let p=it.p;if(it.copy&&primAt[it.copy]){const a=ix*1.3;p=[primAt[it.copy][0]+Math.cos(a)*0.035,primAt[it.copy][1]+Math.sin(a)*0.024];
         F.push({type:'Feature',properties:{k:'copy'},geometry:{type:'LineString',coordinates:[primAt[it.copy],p]}});}
       const k=it.copy?'copy':(it.pt==='dest'?'dest':(it.pt==='est'?'est':'prim'));
@@ -778,7 +819,7 @@ async function webPushSync(loud){
       if(loud&&PREF.sys&&!home)toast('Позначте своє місце — тоді сервер стежитиме за загрозами для нього');return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
     const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
-    if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:home[0],lat:home[1],pre:PREF.pre!==false})});
+    if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
   }catch(e){if(loud)toast('Не вдалося увімкнути сповіщення: '+(e&&e.message||e));}}
 if($('#st-pre')){$('#st-pre').checked=PREF.pre!==false;$('#st-pre').onchange=e=>{PREF.pre=e.target.checked;savePref();webPushSync(false);};}
