@@ -102,9 +102,16 @@ PH_VOW = set("aɛeɪiouɐʊəɔæ")
 _stress = None
 
 
+_stress_try = 0.0
+
+
 def _stressifier():
-    global _stress
+    global _stress, _stress_try
+    import time as _t
+    if _stress is False and _t.time() - _stress_try > 120:
+        _stress = None  # словник могли щойно доставити — пробуємо знову
     if _stress is None:
+        _stress_try = _t.time()
         try:
             from ukrainian_word_stress import OnAmbiguity, Stressifier, StressSymbol
             _stress = Stressifier(stress_symbol=StressSymbol.CombiningAcuteAccent, on_ambiguity=OnAmbiguity.First,
@@ -223,7 +230,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes 
     if not piper_ok():
         _install_bg()
         return None, "installing" if _install["state"] == "running" else f"no-piper:{_install['state']}"
-    cache = BASE / "cache" / f"{hashlib.sha1(f'v2|{key}|{rate}|{text}'.encode()).hexdigest()}.wav"
+    cache = BASE / "cache" / f"{hashlib.sha1(f'v2|{bool(_stressifier())}|{key}|{rate}|{text}'.encode()).hexdigest()}.wav"
     if cache.exists():
         return cache.read_bytes(), "cache"
     try:
