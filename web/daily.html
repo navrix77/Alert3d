@@ -68,7 +68,7 @@ function mobile(){return innerWidth<700;}
 const MON=['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
 const fd=t=>{const d=new Date(t*1000);return d.getDate()+' '+MON[d.getMonth()];};
 const hm=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
-// плавна крива через точки (Catmull-Rom) — маршрут виглядає як політ, а не ламана
+// плавна крива через точки (Catmull-Rom), маршрут виглядає як політ, а не ламана
 function smoothPts(p){if(p.length<3)return p.map(x=>[x[0],x[1]]);const o=[];
   for(let i=0;i<p.length-1;i++){const a=p[Math.max(0,i-1)],b=p[i],c=p[i+1],d=p[Math.min(p.length-1,i+2)];
     const n=Math.max(2,Math.min(8,Math.round(Math.hypot(c[0]-b[0],c[1]-b[1])*20)));
@@ -122,7 +122,7 @@ function intro(){
   const end={center:map.getCenter(),zoom:map.getZoom()};
   map.jumpTo({center:[end.center.lng+1.2,end.center.lat-1.6],zoom:end.zoom-0.7,pitch:58,bearing:-24});
   map.easeTo({center:end.center,zoom:end.zoom,pitch:0,bearing:0,duration:6500,easing:t=>1-Math.pow(1-t,3)});
-  // програвання доби — з обраною швидкістю (за замовчуванням 2.5 с на годину), а не за 6 секунд
+  // програвання доби, з обраною швидкістю (за замовчуванням 2.5 с на годину), а не за 6 секунд
   CUR=0;draw(0);$('#tt').value=0;playing=false;setTimeout(()=>{if(!playing&&CUR===0)$('#pl').click();},700);
 }
 function fit(){// уся Україна в кадрі, з урахуванням панелей
@@ -144,7 +144,7 @@ function draw(f){CUR=f;const T1=D.t0+(Math.min(D.t1,D.built)-D.t0)*f;const F=[],
 function legend(){const cnt={};for(const t of D.tracks)cnt[t.type]=(cnt[t.type]||0)+1;
   $('#legend').innerHTML=Object.keys(T).filter(k=>cnt[k]).map(k=>'<div class="r"><i style="background:'+T[k][1]+';color:'+T[k][1]+'"></i>'+T[k][0]+'<b>'+cnt[k]+'</b></div>').join('')+
     '<div class="r"><span style="width:26px;text-align:center">🔥</span>Вибухи'+(D.crawling?' <small style="display:inline;margin:0">· збираю з історії каналів…</small>':'')+'<b>'+D.booms.length+'</b></div><div class="r"><span style="width:26px;text-align:center">🚀</span>Місця пусків<b>'+D.sites.length+'</b></div>'+
-    '<small>Число — кількість відновлених маршрутів, а не точна кількість цілей. Маршрути відтворено з повідомлень моніторів і приблизні; вибухи — з точністю до населеного пункту, публікуються лише після завершення доби.</small>';}
+    '<small>Число, кількість відновлених маршрутів, а не точна кількість цілей. Маршрути відтворено з повідомлень моніторів і приблизні; вибухи, з точністю до населеного пункту, публікуються лише після завершення доби.</small>';}
 function stats(){const o=D.official;
   $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+
     (D.booms.length?'<h3 class="bh" style="margin-top:12px">Найбільше вибухів</h3><ul>'+D.booms.slice(0,12).map(b=>'<li><span>'+b.n+'</span><b>'+b.c+'</b></li>').join('')+'</ul>':'');}
@@ -160,8 +160,8 @@ $('#png').onclick=()=>{const mc=map.getCanvas(),c=document.createElement('canvas
   g.fillStyle='#fff';g.font='800 '+Math.round(26*k)+'px Inter,system-ui,sans-serif';g.fillText('МАПА МАРШРУТІВ БПЛА ТА РАКЕТ',24*k,44*k);
   g.fillStyle='#B8C0CE';g.font='700 '+Math.round(15*k)+'px Inter,system-ui,sans-serif';g.fillText($('#sub').textContent.toUpperCase(),24*k,68*k);
   let y=c.height-24*k-(Object.keys(T).length+1)*22*k;const cnt={};for(const t of D.tracks)cnt[t.type]=(cnt[t.type]||0)+1;
-  for(const kk of Object.keys(T).filter(x=>cnt[x])){g.fillStyle=T[kk][1];g.fillRect(24*k,y-6*k,26*k,4*k);g.fillStyle='#fff';g.font='700 '+Math.round(14*k)+'px Inter,system-ui,sans-serif';g.fillText(T[kk][0]+' — '+cnt[kk],58*k,y);y+=22*k;}
-  g.fillText('🔥 Вибухи за повідомленнями — '+D.booms.length,24*k,y);
+  for(const kk of Object.keys(T).filter(x=>cnt[x])){g.fillStyle=T[kk][1];g.fillRect(24*k,y-6*k,26*k,4*k);g.fillStyle='#fff';g.font='700 '+Math.round(14*k)+'px Inter,system-ui,sans-serif';g.fillText(T[kk][0]+', '+cnt[kk],58*k,y);y+=22*k;}
+  g.fillText('🔥 Вибухи за повідомленнями, '+D.booms.length,24*k,y);
   if(D.official){g.font='800 '+Math.round(15*k)+'px Inter,system-ui,sans-serif';g.textAlign='right';g.fillText('ПС ЗСУ: збито/подавлено '+D.official.shot,c.width-24*k,44*k);}
   g.textAlign='right';g.fillStyle='rgba(255,255,255,.6)';g.font='800 '+Math.round(15*k)+'px Inter,system-ui,sans-serif';g.fillText('NAVRYX SKY',c.width-24*k,c.height-24*k);
   const a=document.createElement('a');a.download='tryvoga-doba-'+DAY+'.png';a.href=c.toDataURL('image/png');a.click();};

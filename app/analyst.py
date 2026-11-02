@@ -1,9 +1,9 @@
 """Аналітик NAVRYX: не лише «що де летить», а що це означає.
 
-Кожен висновок — з числами й посиланнями на цілі/повідомлення, з яких він зроблений (філософія NAVRYX:
+Кожен висновок, з числами й посиланнями на цілі/повідомлення, з яких він зроблений (філософія NAVRYX:
 жодного твердження без доказів). Розділи:
 - хвиля: скільки цілей зараз, наростає чи спадає (нові цілі за 30 хв проти попередніх 30 хв);
-- напрямки: групи цілей одного типу з близьким курсом в одній області — «коридори» атаки;
+- напрямки: групи цілей одного типу з близьким курсом в одній області, «коридори» атаки;
 - цілі: куди летять за словами каналів (з часом підльоту) і ймовірність для областей на годину (прогноз-віяло);
 - порівняння з попередніми ночами на ту саму годину;
 - джерела: хто повідомляє першим і з якою затримкою інші (за журналом доби), частка перепостів;
@@ -143,7 +143,7 @@ def source_stats(groups: list[dict], min_groups: int = 20) -> list[dict]:
 
 
 def night_compare(groups: list[dict], now: float, nights: int = 7) -> dict:
-    """Скільки цілей з початку цієї ночі (дня) до цього моменту — і скільки було на ту саму годину в попередні."""
+    """Скільки цілей з початку цієї ночі (дня) до цього моменту, і скільки було на ту саму годину в попередні."""
     st, label, length = period_start(now)
     off = now - st
     tonight = collections.Counter()
@@ -216,7 +216,7 @@ def corridors(active: list[dict]) -> list[dict]:
 
 
 def _spread(hds: list[float]) -> int | None:
-    """Розкид курсів у групі (кругове відхилення, град.): мале — цілі справді йдуть одним коридором."""
+    """Розкид курсів у групі (кругове відхилення, град.): мале, цілі справді йдуть одним коридором."""
     if len(hds) < 2:
         return None
     sx = sum(math.sin(math.radians(h)) for h in hds) / len(hds)
@@ -230,7 +230,7 @@ HD_SRC_UA = {"channels": "названий каналами пункт", "course
 
 
 def direction_quality(active: list[dict]) -> dict:
-    """Звідки відомий напрямок кожної активної цілі — щоб довіряти напрямкам свідомо."""
+    """Звідки відомий напрямок кожної активної цілі, щоб довіряти напрямкам свідомо."""
     c = collections.Counter()
     for tr in active:
         c[(tr.get("hd_src") or "movement") if tr.get("hd") is not None else "none"] += tr.get("count") or 1
@@ -238,7 +238,7 @@ def direction_quality(active: list[dict]) -> dict:
 
 
 def likely_next(active: list[dict]) -> list[dict]:
-    """Куди ймовірно далі за досвідом попередніх перельотів — для цілей, про пункт призначення яких канали мовчать."""
+    """Куди ймовірно далі за досвідом попередніх перельотів, для цілей, про пункт призначення яких канали мовчать."""
     tg: dict[str, dict] = {}
     for tr in active:
         if tr.get("next") or not tr.get("pred_next"):
@@ -336,7 +336,7 @@ def analyze(snap: dict, hist: list[dict], brain=None, now: float | None = None) 
 
 
 def summary(r: dict) -> list[str]:
-    """Аналітична довідка людською мовою — кожен рядок спирається на числа з розділів вище."""
+    """Аналітична довідка людською мовою, кожен рядок спирається на числа з розділів вище."""
     out = []
     w = r["wave"]
     if r["active_n"]:
@@ -358,7 +358,7 @@ def summary(r: dict) -> list[str]:
     dq = r.get("direction") or {}
     known = sum(v for k, v in dq.items() if k != "none")
     if r["active_n"] and dq:
-        parts = [f"{HD_SRC_UA.get(k, k)} — {v}" for k, v in sorted(dq.items(), key=lambda kv: -kv[1]) if k != "none"]
+        parts = [f"{HD_SRC_UA.get(k, k)}, {v}" for k, v in sorted(dq.items(), key=lambda kv: -kv[1]) if k != "none"]
         out.append(f"Напрямок відомий для {known} з {r['active_n']}" + (": " + ", ".join(parts) if parts else "") + "."
                    + (f" Без курсу: {dq['none']}." if dq.get("none") else ""))
     ln = r.get("likely_next") or []
@@ -368,7 +368,7 @@ def summary(r: dict) -> list[str]:
     tg = r["targets"][:3]
     if tg:
         out.append("Куди летять за словами каналів: " + "; ".join(
-            f"{x['name']} — {x['n']} {plural(x['n'], ('ціль', 'цілі', 'цілей'))}" + (f", найближча ≈{x['eta_min']} хв" if x["eta_min"] is not None else "")
+            f"{x['name']}, {x['n']} {plural(x['n'], ('ціль', 'цілі', 'цілей'))}" + (f", найближча ≈{x['eta_min']} хв" if x["eta_min"] is not None else "")
             for x in tg) + ".")
     if r["oblast_p60"]:
         def fo(o):
@@ -386,13 +386,13 @@ def summary(r: dict) -> list[str]:
         cmp_ = "більше" if k and k > 1.2 else ("менше" if k is not None and k < 0.8 else "приблизно стільки ж")
         since = "Від 18:00" if n.get("period") == "ніч" else "Від 09:00"
         prev = "у попередні ночі" if n.get("period") == "ніч" else "у попередні дні"
-        out.append(f"{since} — {n['tonight_n']} {plural(n['tonight_n'], ('трек', 'треки', 'треків'))} цілей; {prev} зі схожим охопленням каналів "
-                   f"({n['comparable']}) на цю годину в середньому {a} — {cmp_}" + (f" (×{k:.1f})" if k and cmp_ != "приблизно стільки ж" else "") + ".")
+        out.append(f"{since}, {n['tonight_n']} {plural(n['tonight_n'], ('трек', 'треки', 'треків'))} цілей; {prev} зі схожим охопленням каналів "
+                   f"({n['comparable']}) на цю годину в середньому {a}, {cmp_}" + (f" (×{k:.1f})" if k and cmp_ != "приблизно стільки ж" else "") + ".")
     fast = [x for x in r["sources"] if x["shared"] >= 20]
     if fast:
         s = fast[0]
-        out.append(f"Найшвидше джерело за добу: {s['src']} — першим у {round(s['first_share'] * 100)}% із {s['shared']} спільних цілей"
-                   + (f"; коли не перший — відстає в середньому на {round(s['lag_med_s'] / 60, 1)} хв" if s["lag_med_s"] else "") + ".")
+        out.append(f"Найшвидше джерело за добу: {s['src']}, першим у {round(s['first_share'] * 100)}% із {s['shared']} спільних цілей"
+                   + (f"; коли не перший, відстає в середньому на {round(s['lag_med_s'] / 60, 1)} хв" if s["lag_med_s"] else "") + ".")
     if r["sources"]:
         cp = [x for x in r["sources"] if x["copy_share"] >= 0.5]
         if cp:

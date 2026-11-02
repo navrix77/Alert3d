@@ -1,5 +1,5 @@
-/* «Тривога» FX — усі рухомі цілі одним WebGL-шаром: хвіст-комета, ореол, сонар загрози, тінь і спрайт.
-   Карта при цьому не перераховує жодних даних щокадру — лише GPU-малювання ~60 кадр/с.
+/* «Тривога» FX, усі рухомі цілі одним WebGL-шаром: хвіст-комета, ореол, сонар загрози, тінь і спрайт.
+   Карта при цьому не перераховує жодних даних щокадру, лише GPU-малювання ~60 кадр/с.
    app.js щокадру кладе в window.FX масив: {p:[lon,lat], sa:кут на екрані°, type, col:[r,g,b], weak, thr, sel, tail:[[lon,lat],...]} */
 (function () {
   const VS = `
@@ -8,7 +8,7 @@
     uniform mat4 u_m; uniform vec2 u_vp; uniform float u_px;
     varying vec2 v_c; varying vec4 v_col; varying float v_kind;
     void main(){
-      // усе лежить у площині карти: кут — географічний курс (0 = північ), розмір — у пікселях на поточному масштабі
+      // усе лежить у площині карти: кут, географічний курс (0 = північ), розмір, у пікселях на поточному масштабі
       float c = cos(a_rot), s = sin(a_rot);
       vec2 k = vec2(a_corner.x * c + a_corner.y * s, a_corner.x * s - a_corner.y * c);
       vec2 m = a_merc + (k * a_size + a_off) * u_px;
@@ -35,7 +35,7 @@
           a += smoothstep(0.045, 0.0, abs(r - ph)) * (1.0 - ph); }
         a *= v_col.a; gl_FragColor = vec4(v_col.rgb * a, a);
       } else if (v_kind > 5.5) {                // реактивний струмінь: ядро з «діамантами» Маха, турбулентний факел, мерехтіння
-        float d = (0.95 - v_c.y) / 1.95;            // 0 — зріз сопла, 1 — кінець квадрата
+        float d = (0.95 - v_c.y) / 1.95;            // 0, зріз сопла, 1, кінець квадрата
         if (d < 0.0 || d > 1.0) discard;
         float sd = v_col.a * 37.0;
         float tt = u_t + sd;
@@ -71,7 +71,7 @@
         if (r > 1.0) discard;
         float a = smoothstep(0.08, 0.0, abs(r - 0.86)) * v_col.a;
         gl_FragColor = vec4(v_col.rgb * a, a);
-      } else {                                  // спрайт (3.0–3.4, дробова частина — крен) або його тінь (4)
+      } else {                                  // спрайт (3.0–3.4, дробова частина, крен) або його тінь (4)
         vec2 uv = vec2(v_c.x, -v_c.y) * 0.5 + 0.5;
         vec4 t = texture2D(u_tex, uv);
         if (v_kind > 3.5 && v_kind < 4.5) {     // м'яка тінь на землі
@@ -92,7 +92,7 @@
         for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236;
           o = max(o, texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.03).a); }
         float rim = clamp(o - t.a, 0.0, 1.0) * 0.55;
-        vec3 body = t.rgb * (0.82 + 0.3 * dif) + vec3(spec * 0.25);   // текстура вже з реалістичним світлом — лише легке підсилення
+        vec3 body = t.rgb * (0.82 + 0.3 * dif) + vec3(spec * 0.25);   // текстура вже з реалістичним світлом, лише легке підсилення
         float a = max(t.a, rim);
         gl_FragColor = vec4(body * t.a + v_col.rgb * rim, a) * v_col.a;
       }
@@ -150,14 +150,14 @@
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
-      const spr = Math.max(13, Math.min(24, 6 + z * 2.0));  // крупніше на масштабі країни — цілі читаються одразу       // напіврозмір спрайта, px (менші — як на радарі)
+      const spr = Math.max(13, Math.min(24, 6 + z * 2.0));  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
       const glow = [], top = [];
       const day = !!window.FXDAY;
       if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
         const hm = mc(H.p), mpp = 40075016.686 * Math.cos(H.p[1] * Math.PI / 180) / (512 * Math.pow(2, z));
         const c = H.state === 'danger' ? [1, 0.23, 0.3] : H.state === 'watch' ? [1, 0.72, 0.2] : [0.2, 0.95, 0.55];
         const kz = Math.max(0, Math.min(1, (12.5 - z) / 1.5)); // зблизька радар не фарбує весь екран
-        if (kz > 0) glow.push([hm[0], hm[1], Math.max(30, 15000 / mpp), 0, [c[0], c[1], c[2], (H.state === 'calm' ? 0.28 : 0.7) * kz], 5]);  // спокійно — ледь помітно
+        if (kz > 0) glow.push([hm[0], hm[1], Math.max(30, 15000 / mpp), 0, [c[0], c[1], c[2], (H.state === 'calm' ? 0.28 : 0.7) * kz], 5]);  // спокійно, ледь помітно
         // світловий потік від кожної загрози до дому
         const tnow = performance.now() / 1000;
         for (const f of L) if (f.thr && Math.hypot(f.p[0] - H.p[0], (f.p[1] - H.p[1]) * 1.5) < 1.2) { const tm = mc(f.p);
@@ -168,7 +168,7 @@
         glow.push([bm[0], bm[1], spr * 0.9, 0, [1, 0.2, 0.25, 0.7], 0]); }
       for (const f of L) {
         const m = mc(f.p), c = f.col, age = f.age || 0;
-        // давність: старе повідомлення тьмяніє, а зона «де ціль може бути» росте — без вигаданого польоту
+        // давність: старе повідомлення тьмяніє, а зона «де ціль може бути» росте, без вигаданого польоту
         const a = (f.weak ? 0.45 : 1) * (age > 300 ? Math.max(0.35, 1 - (age - 300) / 1800) : 1);
         if (age > 300 && f.spd && z >= 6.5) { const km = Math.min(45, f.spd * age / 3600 * 0.5), mpp = 40075016.686 * Math.cos(f.p[1] * Math.PI / 180) / (512 * Math.pow(2, z));
           const r = Math.max(spr * 1.6, km * 1000 / mpp); glow.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.10], 0]); top.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.22], 2, 0, 0]); }
@@ -187,7 +187,7 @@
       gl.uniform1f(this.u.px, 1 / (512 * Math.pow(2, z)));
       gl.uniform1f(this.u.t, (performance.now() - this.t0) / 1000);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.enable(gl.BLEND);
-      if (day) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendFunc(gl.ONE, gl.ONE); // уночі — адитивне світло
+      if (day) gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); else gl.blendFunc(gl.ONE, gl.ONE); // уночі, адитивне світло
       this.draw(gl, this.quads(glow), glow.length);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);        // тіні, спрайти, кільця
       gl.activeTexture(gl.TEXTURE0); gl.uniform1i(this.u.tex, 0);

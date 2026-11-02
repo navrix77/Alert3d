@@ -1,5 +1,5 @@
 // Крейсер «Москва»: кінематографічна сцена при натисканні на значок у Чорному морі.
-// Озвучка — файл web/media/ship.mp3 (якщо покладено); хвилі й вибухи синтезуються в браузері.
+// Озвучка, файл web/media/ship.mp3 (якщо покладено); хвилі й вибухи синтезуються в браузері.
 (function(){
 let busy=false,AC=null;
 function sfx(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();AC.resume&&AC.resume();}catch(e){return null;}
@@ -20,7 +20,7 @@ function sfx(){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)()
 function play(){if(busy)return;busy=true;
   const el=document.createElement('div');el.className='cine';
   el.innerHTML='<div class="cine-img"><img src="media/moskva.jpg" alt=""></div><div class="cine-flash"></div><div class="cine-bar t"></div><div class="cine-bar b"></div>'+
-    '<div class="cine-cap"><small>острів Зміїний · 24 лютого 2022</small><q></q><em>Крейсер «Москва» — на дні Чорного моря з 14 квітня 2022</em></div><div class="cine-hint">торкніться, щоб закрити</div>';
+    '<div class="cine-cap"><small>острів Зміїний · 24 лютого 2022</small><q></q><em>Крейсер «Москва», на дні Чорного моря з 14 квітня 2022</em></div><div class="cine-hint">торкніться, щоб закрити</div>';
   document.body.appendChild(el);const s=sfx();
   const voice=new Audio('media/ship.mp3');voice.preload='auto';let vOk=false;voice.oncanplaythrough=()=>{vOk=true;};
   requestAnimationFrame(()=>el.classList.add('on'));

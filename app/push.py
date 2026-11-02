@@ -1,6 +1,6 @@
 """Push-сповіщення на телефон навіть із заблокованим екраном (Expo Push Service).
 
-Телефон реєструє свій Expo-токен і дім (координати округлені до ~1 км — точна адреса серверу не потрібна).
+Телефон реєструє свій Expo-токен і дім (координати округлені до ~1 км, точна адреса серверу не потрібна).
 Сервер сам стежить за цілями і шле сповіщення, коли підтверджена ціль маршрутом або курсом іде на дім.
 """
 from __future__ import annotations
@@ -207,8 +207,8 @@ class Push:
 
     async def tick(self, cli: httpx.AsyncClient, snap: dict) -> None:
         """Ізраїльська схема етапів: «можлива загроза» (широко) → «курс на ваш район» (вузько) → явний «відбій для вас».
-        Уроки: під час масованої атаки — одне зведене повідомлення на телефон за раз (800 полігонів поклали cell broadcast);
-        після загрози — явне «можна виходити», а не тиша (Home Front Command, червень 2025)."""
+        Уроки: під час масованої атаки, одне зведене повідомлення на телефон за раз (800 полігонів поклали cell broadcast);
+        після загрози, явне «можна виходити», а не тиша (Home Front Command, червень 2025)."""
         subs = self.db.execute("SELECT token, lon, lat FROM subs").fetchall()
         webs = {r[0]: r[1] for r in self.db.execute("SELECT endpoint, sub FROM websubs").fetchall()}
         no_pre = {r[0] for r in self.db.execute("SELECT endpoint FROM websubs WHERE pre=0").fetchall()}
@@ -263,7 +263,7 @@ class Push:
                     self.armed.pop(token, None)
                     out.append({"to": token, "title": "Цілі, що йшли до вас, віддалились",
                                 "body": "За повідомленнями каналів цілі, що летіли у ваш бік, віддаляються або більше не фіксуються. "
-                                        "Офіційний відбій — лише за сиреною та «Повітряною тривогою».",
+                                        "Офіційний відбій, лише за сиреною та «Повітряною тривогою».",
                                 "sound": "default", "channelId": "threats", "data": {}})
         self.fired = {k: v for k, v in self.fired.items() if now - v < 3 * REARM}
         web_out = [dict(m, sub=webs[m["to"]]) for m in out if m["to"] in webs]
@@ -289,8 +289,8 @@ class Push:
             tr, a = thr[0]
             n = sum(t.get("count") or 1 for t, _ in thr)
             title = (f"{NAME.get(tr['type'], 'Ціль')}" + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
-                     + " — курс на ваш район") if len(thr) == 1 else f"{n} цілей — курс на ваш район"
-            body = (f"{round(a['d'])} км з {a['side']}" if a.get("d") is not None else "місце невідоме — канали назвали курс") + (f" · ~{max(1, round(a['eta']))} хв" if a["eta"] is not None else "") + \
+                     + ", курс на ваш район") if len(thr) == 1 else f"{n} цілей, курс на ваш район"
+            body = (f"{round(a['d'])} км з {a['side']}" if a.get("d") is not None else "місце невідоме, канали назвали курс") + (f" · ~{max(1, round(a['eta']))} хв" if a["eta"] is not None else "") + \
                 (f" · → {tr['next']}" if tr.get("next") else "") + (f" · ймовірність {round(a['p'] * 100)}%" if a["p"] < 1 else "")
             return title, body, tr["id"]
         if pre:
@@ -298,6 +298,6 @@ class Push:
             tr, a = pre[0]
             title = "Можлива загроза: будьте поруч з укриттям"
             body = (f"{NAME.get(tr['type'], 'Ціль')} за {round(a['d'])} км з {a['side']}, ймовірність пройти поруч ~{round(a['p'] * 100)}%"
-                    + (f"; ще {len(pre) - 1}" if len(pre) > 1 else "") + ". Це ще не тривога — може й не дійти.")
+                    + (f"; ще {len(pre) - 1}" if len(pre) > 1 else "") + ". Це ще не тривога, може й не дійти.")
             return title, body, tr["id"]
         return None

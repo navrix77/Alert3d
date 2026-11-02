@@ -1,16 +1,16 @@
-"""«Що змінилося, поки мене не було?» — короткий огляд змін для обраного місця за проміжок.
+"""«Що змінилося, поки мене не було?», короткий огляд змін для обраного місця за проміжок.
 
 Будується з того, що SKY уже має: щохвилинні кадри (що було відомо тоді), поточний стан і докази цілей
-(першоджерела, перепости, хто змінив курс). Кожен рядок — подія з часом, джерелом і точками «було → стало»,
+(першоджерела, перепости, хто змінив курс). Кожен рядок, подія з часом, джерелом і точками «було → стало»,
 щоб мапа могла програти саме ці зміни.
 
 Категорії подій:
-  official — тривогу в області/районі місця оголошено або знято;
-  new      — нова ціль поруч або з курсом на місце; скільки незалежних джерел і скільки перепостів;
-  course   — курс уточнено (було → A, тепер → B), хто і коли це написав;
-  closer / away — ціль помітно наблизилась / віддаляється;
-  lost     — про ціль, що була поруч, канали замовкли (це НЕ відбій);
-  closed   — канали написали «збито / не фіксується».
+  official, тривогу в області/районі місця оголошено або знято;
+  new     , нова ціль поруч або з курсом на місце; скільки незалежних джерел і скільки перепостів;
+  course  , курс уточнено (було → A, тепер → B), хто і коли це написав;
+  closer / away, ціль помітно наблизилась / віддаляється;
+  lost    , про ціль, що була поруч, канали замовкли (це НЕ відбій);
+  closed  , канали написали «збито / не фіксується».
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def frame_at(frames: list[dict], since: float) -> dict | None:
 
 def changes(frames: list[dict], now_snap: dict, lon: float, lat: float, since: float, r_km: float = 60,
             names: dict | None = None, ev_of=None, obl: str | None = None, raion: str | None = None) -> dict:
-    """frames — кадри машини часу; now_snap — поточний стан; ev_of(id) — повні докази цілі (items)."""
+    """frames, кадри машини часу; now_snap, поточний стан; ev_of(id), повні докази цілі (items)."""
     names = names or {}
     H = to_xy(lat, lon)
     now = now_snap.get("now") or 0
@@ -99,11 +99,11 @@ def changes(frames: list[dict], now_snap: dict, lon: float, lat: float, since: f
             continue
         if st == "closed":
             ev.append({"k": "closed", "t": t.get("last") or now, "id": tid, "type": t["type"], "from": [old["lon"], old["lat"]],
-                       "text": f"{typ} ({round(d_old)} км з {_side(H, to_xy(old['lat'], old['lon']))}) — канали написали «збито / не фіксується»"})
+                       "text": f"{typ} ({round(d_old)} км з {_side(H, to_xy(old['lat'], old['lon']))}), канали написали «збито / не фіксується»"})
             continue
         if st == "lost":
             ev.append({"k": "lost", "t": t.get("last") or now, "id": tid, "type": t["type"], "from": [old["lon"], old["lat"]],
-                       "text": f"{typ}: нових повідомлень немає з {_hm(t.get('last'))}. Позначку втрачено — це не відбій"})
+                       "text": f"{typ}: нових повідомлень немає з {_hm(t.get('last'))}. Позначку втрачено, це не відбій"})
             continue
         if old.get("next") != t.get("next") and t.get("next"):
             who = None
@@ -115,13 +115,13 @@ def changes(frames: list[dict], now_snap: dict, lon: float, lat: float, since: f
             ev.append({"k": "course", "t": (who or {}).get("t") or t.get("last") or now, "id": tid, "type": t["type"],
                        "from": [old["lon"], old["lat"]], "to": [t["lon"], t["lat"]],
                        "text": f"{typ}: курс уточнено" + (f" (було → {old['next']})" if old.get("next") else "") + f", тепер → {t['next']}"
-                               + (f" — {who['src']} о {_hm(who['t'])}" if who else ""),
+                               + (f", {who['src']} о {_hm(who['t'])}" if who else ""),
                        "src": (who or {}).get("src")})
             continue
         if st == "active" and abs(d - d_old) >= 15:
             ev.append({"k": "closer" if d < d_old else "away", "t": t.get("last") or now, "id": tid, "type": t["type"],
                        "from": [old["lon"], old["lat"]], "to": [t["lon"], t["lat"]],
-                       "text": f"{typ}: {'наблизилась' if d < d_old else 'віддаляється'} — {round(d_old)} → {round(d)} км"})
+                       "text": f"{typ}: {'наблизилась' if d < d_old else 'віддаляється'}, {round(d_old)} → {round(d)} км"})
     # цілі, що були поруч, а тепер їх немає зовсім у знімку (давно зникли)
     for tid, old in then_tr.items():
         if tid in now_tr:
@@ -129,7 +129,7 @@ def changes(frames: list[dict], now_snap: dict, lon: float, lat: float, since: f
         rel_old, d_old = _relevant(old, H, r_km)
         if rel_old:
             ev.append({"k": "lost", "t": then["t"], "id": tid, "type": old["type"], "from": [old["lon"], old["lat"]],
-                       "text": f"{names.get(old['type'], old['type'])}: давно немає нових повідомлень. Позначку прибрано з мапи — це не відбій"})
+                       "text": f"{names.get(old['type'], old['type'])}: давно немає нових повідомлень. Позначку прибрано з мапи, це не відбій"})
     order = {"official": 0, "new": 1, "course": 2, "closer": 3, "closed": 4, "lost": 5, "away": 6}
     ev.sort(key=lambda e: (order.get(e["k"], 9), -e["t"]))
     cnt = {}

@@ -52,7 +52,7 @@ LASTC: dict[str, tuple[float, str, str]] = {}
 
 
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool, typ_hint: str | None = None) -> None:
-    """Одне повідомлення каналу може містити кілька цілей — ділимо на сегменти й кожен веде в трекер."""
+    """Одне повідомлення каналу може містити кілька цілей, ділимо на сегменти й кожен веде в трекер."""
     segs = parser.segments(text)
     # контекст для одноіменних сіл: усі пункти повідомлення разом + що канал називав останні 30 хв
     prev = CTX.get(key)
@@ -257,9 +257,9 @@ HIDDEN: set = set()  # клієнти, чия вкладка/застосуно�
 
 
 async def pusher() -> None:
-    """Повний стан — лише коли щось змінилось (нове повідомлення каналу чи офіційна тривога) або раз на 10 с як «пульс»;
-    фоновим вкладкам — раз на 30 с. Мапа між оновленнями сама рухає цілі. Довідник джерел і журнал (≈28 КБ) — раз на 30 с.
-    Раніше: ~290 КБ кожні 2 с кожному — до ~80 МБ/год на телефон з відкритою мапою."""
+    """Повний стан, лише коли щось змінилось (нове повідомлення каналу чи офіційна тривога) або раз на 10 с як «пульс»;
+    фоновим вкладкам, раз на 30 с. Мапа між оновленнями сама рухає цілі. Довідник джерел і журнал (≈28 КБ), раз на 30 с.
+    Раніше: ~290 КБ кожні 2 с кожному, до ~80 МБ/год на телефон з відкритою мапою."""
     last_sig, last_full, last_sent = None, 0.0, {}
     while True:
         await asyncio.sleep(config.PUSH_SEC)
@@ -364,7 +364,7 @@ def _client_ip(scope_client, headers) -> str | None:
 
 @app.middleware("http")
 async def count_visits(request, call_next):
-    """Відвідування сторінок (без cookies і без збереження IP — див. app/visits.py)."""
+    """Відвідування сторінок (без cookies і без збереження IP, див. app/visits.py)."""
     resp = await call_next(request)
     if request.method == "GET" and request.url.path in PAGES and resp.status_code < 400:
         try:
@@ -383,7 +383,7 @@ def api_visits(days: int = 30):
 
 @app.get("/api/tts")
 async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
-    """Українська озвучка (Piper). 503 — поки ставиться рушій або голос; клієнт тоді говорить голосом пристрою."""
+    """Українська озвучка (Piper). 503, поки ставиться рушій або голос; клієнт тоді говорить голосом пристрою."""
     from fastapi import Response
     from . import tts
     data, why = await tts.speak(text, voice, rate)
@@ -395,7 +395,7 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
 
 @app.get("/api/msgs")
 def api_msgs(kind: str | None = None, type: str | None = None, hours: float = 3, q: str | None = None, limit: int = 200):
-    """Журнал розібраних повідомлень — докази для самоаналізу (що написав канал і як ми це зрозуміли)."""
+    """Журнал розібраних повідомлень, докази для самоаналізу (що написав канал і як ми це зрозуміли)."""
     sql, args = "SELECT t, src, link, kind, type, places, text FROM msg WHERE t >= ?", [time.time() - hours * 3600]
     if kind:
         sql += " AND kind = ?"; args.append(kind)
@@ -482,7 +482,7 @@ async def push_unregister(body: dict):
 
 @app.get("/api/daily")
 async def api_daily(d: str | None = None):
-    """Мапа доби 09:00→09:00. d — дата ранку, коли доба закінчилась; без d — остання завершена."""
+    """Мапа доби 09:00→09:00. d, дата ранку, коли доба закінчилась; без d, остання завершена."""
     import re as _re
     day = d if d and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) else last_finished()
     if day > current_day():
@@ -496,7 +496,7 @@ _AN: list = [0.0, None]
 @app.get("/api/analysis")
 def api_analysis():
     """Аналітична довідка: хвиля, напрямки, цілі, порівняння з попередніми ночами, швидкість і незалежність джерел,
-    самоперевірка прогнозу. Кожен розділ — з числами й id цілей, з яких зроблено висновок."""
+    самоперевірка прогнозу. Кожен розділ, з числами й id цілей, з яких зроблено висновок."""
     from .analyst import analyze
     if time.time() - _AN[0] > 30 or _AN[1] is None:
         snap = state()
@@ -520,7 +520,7 @@ def _lite_frame(f: dict) -> dict:
 
 @app.get("/api/history")
 def api_history(full: int = 0, hours: float = 12):
-    """Машина часу. За замовчуванням — легкі кадри (≈1.8 МБ замість 7.5 МБ JSON); докази кадру — /api/history/frame."""
+    """Машина часу. За замовчуванням, легкі кадри (≈1.8 МБ замість 7.5 МБ JSON); докази кадру, /api/history/frame."""
     since = time.time() - max(0.5, min(hours, 12)) * 3600
     fr = [f for f in HIST if f["t"] >= since]
     return JSONResponse({"frames": fr if full else [_lite_frame(f) for f in fr]})
@@ -539,7 +539,7 @@ def api_changes(lon: float, lat: float, since: float, r: float = 60, obl: str | 
 
 @app.get("/api/near")
 def api_near(lon: float, lat: float, r: float = 60):
-    """Коли востаннє позначка цілі була в межах r км від точки — за кадрами машини часу (до 12 год) і поточним станом."""
+    """Коли востаннє позначка цілі була в межах r км від точки, за кадрами машини часу (до 12 год) і поточним станом."""
     from .geo import dist_km, to_xy
     H = to_xy(lat, lon)
     last, hours = None, 0.0
@@ -557,7 +557,7 @@ def api_near(lon: float, lat: float, r: float = 60):
 
 @app.get("/api/history/frame")
 def api_history_frame(t: float):
-    """Повний кадр (з доказами «що було відомо тоді») — найближчий до t не пізніше нього."""
+    """Повний кадр (з доказами «що було відомо тоді»), найближчий до t не пізніше нього."""
     best = None
     for f in HIST:
         if f["t"] <= t + 30:
@@ -569,7 +569,7 @@ def api_history_frame(t: float):
 
 @app.get("/api/lan")
 def api_lan():
-    """Адреси цього комп'ютера в локальній мережі — щоб відкрити «Тривогу» на телефоні (QR у налаштуваннях)."""
+    """Адреси цього комп'ютера в локальній мережі, щоб відкрити «Тривогу» на телефоні (QR у налаштуваннях)."""
     import socket
     ips = set()
     try:

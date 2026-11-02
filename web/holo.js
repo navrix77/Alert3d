@@ -1,7 +1,7 @@
-/* «Голостіл» — експериментальний режим: екран як вікно в об'ємний макет карти.
-   Голова (вебкамера, MediaPipe Face Landmarker) рухає точку спостереження — камера карти облітає центр макета.
+/* «Голостіл», експериментальний режим: екран як вікно в об'ємний макет карти.
+   Голова (вебкамера, MediaPipe Face Landmarker) рухає точку спостереження, камера карти облітає центр макета.
    Руки (MediaPipe Hand Landmarker): зведені великий і вказівний = «захопити»; одна рука тягне макет,
-   дві руки із захопленням — масштаб і поворот. На телефоні без камери — нахил телефона (гіроскоп).
+   дві руки із захопленням, масштаб і поворот. На телефоні без камери, нахил телефона (гіроскоп).
    Відео обробляється лише в браузері: кадри нікуди не надсилаються й не записуються. */
 (function () {
   'use strict';
@@ -34,7 +34,7 @@
       '<div class="hh-btn"><button id="holo-c">Центрувати</button><button id="holo-x" title="Вимкнути камеру й режим">✕</button></div>';
     document.body.appendChild(d);
     for (let i = 0; i < 2; i++) { const c = document.createElement('div'); c.className = 'holo-cur'; c.id = 'holo-cur' + i; c.hidden = true; c.innerHTML = '<i></i><span>Захоплено</span>'; document.body.appendChild(c); }
-    $('#holo-c').onclick = () => { H.base = null; say('Сядьте рівно — центрую'); };
+    $('#holo-c').onclick = () => { H.base = null; say('Сядьте рівно, центрую'); };
     $('#holo-x').onclick = () => { stop(); const cb = $('#st-holo'); if (cb) cb.checked = false; save(false); };
   }
   function status(t) { const s = $('#holo-st'); if (s) s.textContent = t; }
@@ -52,7 +52,7 @@
       H.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
     } catch (e) {
       status('камера недоступна');
-      say(location.protocol === 'https:' || location.hostname === 'localhost' ? 'Без доступу до камери — вмикаю керування нахилом' : 'Камера працює лише через https (на телефоні — адреса з :8443)');
+      say(location.protocol === 'https:' || location.hostname === 'localhost' ? 'Без доступу до камери, вмикаю керування нахилом' : 'Камера працює лише через https (на телефоні, адреса з :8443)');
       if (mobile) return startTilt();
       return;
     }
@@ -102,7 +102,7 @@
     const dt = (now - (H.lastT || now)) / 1000 || 0.03; H.lastT = now;
     let fr = null, hr = null;
     try { fr = H.face.detectForVideo(v, now); if (!mobile || (H.tick = !H.tick)) hr = H.hands.detectForVideo(v, now + 0.1); } catch (e) { return; }
-    // голова: середина між очима; відстань — за міжочною відстанню (оцінка приблизна)
+    // голова: середина між очима; відстань, за міжочною відстанню (оцінка приблизна)
     const lm = fr && fr.faceLandmarks && fr.faceLandmarks[0];
     if (lm) {
       const L = lm[33], R = lm[263];
@@ -110,12 +110,12 @@
       if (!H.base) { H.base = { x: cx, y: cy, s: iod }; status('голова ✓ · руки: зведіть пальці, щоб захопити'); }
       const k = 1 / Math.max(0.05, H.base.s * 4);           // нормуємо рух на розмір обличчя
       const tx = (cx - H.base.x) * k * 2.2, ty = (cy - H.base.y) * k * 2.2, tz = Math.log2(iod / H.base.s);
-      const dz = (a, w) => Math.sign(a) * Math.max(0, Math.abs(a) - w); // мертва зона: нерухома голова — нерухома сцена
+      const dz = (a, w) => Math.sign(a) * Math.max(0, Math.abs(a) - w); // мертва зона: нерухома голова, нерухома сцена
       H.head.x = smooth(H.head.x, Math.max(-1, Math.min(1, dz(tx, 0.03))), dt, 1.0, 1.5);
       H.head.y = smooth(H.head.y, Math.max(-1, Math.min(1, dz(ty, 0.03))), dt, 1.0, 1.5);
       H.head.z = smooth(H.head.z, Math.max(-0.8, Math.min(0.8, dz(tz, 0.06))), dt, 0.6, 0.8);
       H.head.seen = now;
-    } else if (now - H.head.seen > 600) { // обличчя зникло — плавно до нейтрального вигляду
+    } else if (now - H.head.seen > 600) { // обличчя зникло, плавно до нейтрального вигляду
       H.head.x *= 0.92; H.head.y *= 0.92; H.head.z *= 0.92;
     }
     apply(H.head.x, H.head.y, H.head.z);
@@ -160,7 +160,7 @@
     try { if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) { const r = await DeviceOrientationEvent.requestPermission(); if (r !== 'granted') throw 0; } }
     catch (e) { status('немає доступу до гіроскопа'); return; }
     window.addEventListener('deviceorientation', onTilt);
-    status('нахиляйте телефон · «Центрувати» — нове положення');
+    status('нахиляйте телефон · «Центрувати», нове положення');
   }
   function onTilt(e) {
     if (!H.on || e.beta == null) return;
@@ -179,7 +179,7 @@
     H.mode = p.holoMode || (mobile ? 'tilt' : 'cam');
     if (seg) { seg.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === H.mode);
       b.onclick = () => { H.mode = b.dataset.v; seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); save(cb.checked); if (cb.checked) start(H.mode); }; }); }
-    cb.checked = false; // камеру ніколи не вмикаємо самі після перезавантаження — лише за дією людини
+    cb.checked = false; // камеру ніколи не вмикаємо самі після перезавантаження, лише за дією людини
     cb.onchange = () => { save(cb.checked); if (cb.checked) start(H.mode); else stop(); };
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();

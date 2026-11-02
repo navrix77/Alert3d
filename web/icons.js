@@ -25,7 +25,7 @@ window.drawHome=function(px){const s=px*2,c=document.createElement('canvas');c.w
   x.beginPath();x.arc(50,50,40,0,Math.PI*2);x.fillStyle='#fff';x.shadowColor='rgba(0,0,0,.45)';x.shadowBlur=10;x.fill();x.shadowColor='transparent';
   x.lineWidth=6;x.strokeStyle='#1E6BFF';x.stroke();
   x.beginPath();x.moveTo(28,52);x.lineTo(50,33);x.lineTo(72,52);x.lineTo(72,70);x.lineTo(58,70);x.lineTo(58,58);x.lineTo(42,58);x.lineTo(42,70);x.lineTo(28,70);x.closePath();x.fillStyle='#0B0F17';x.fill();return c;};
-// Якщо реалістичні спрайти завантажились — інтерфейсні іконки (лічильники, картка, таймер) малюються з них.
+// Якщо реалістичні спрайти завантажились, інтерфейсні іконки (лічильники, картка, таймер) малюються з них.
 (()=>{const SP={};const base=window.drawTarget;
   Object.keys(TYPE_COLOR).forEach(t=>{const im=new Image();im.src='sprites/t-'+t+'.png';SP[t]=im;});
   window.drawTarget=function(type,px,opts){const im=SP[type];if(!im||!im.complete||!im.naturalWidth||(opts&&opts.dim))return base(type,px,opts);

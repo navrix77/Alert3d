@@ -1,7 +1,7 @@
 // 3D-режим: рельєф, небо і 3D-моделі цілей (Three.js у шарі MapLibre).
 (()=>{
 'use strict';
-if(!window.THREE){console.warn('THREE не завантажився — 3D-моделі вимкнено');window.T3D={enable(){},disable(){}};return;}
+if(!window.THREE){console.warn('THREE не завантажився, 3D-моделі вимкнено');window.T3D={enable(){},disable(){}};return;}
 const RGB=h=>{h=h.replace('#','');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
 const D2R=Math.PI/180;
 function soft(hex,k){const c=RGB(hex);return new THREE.Color(...c.map(v=>(v+(255-v)*k)/255));}
@@ -26,7 +26,7 @@ function buildModel(type){
   else if(type==='ballistic'){add(body(1,0.065,0.32,0.02),mB);for(let k=0;k<4;k++){const f=add(finG([[-0.34,0.05],[-0.5,0.05],[-0.5,0.16],[-0.44,0.16]],0.012),mW);f.rotation.x=k*Math.PI/2+Math.PI/4;}
     const ex=add(new THREE.CircleGeometry(0.05,24),new THREE.MeshBasicMaterial({color:0xffe2b0}),-0.505,0,0);ex.rotation.y=-Math.PI/2;}
   else if(type==='kab'){add(body(0.85,0.09,0.22,0.22),mB);add(wingG([[0.06,0.46],[-0.04,0.46],[-0.04,-0.46],[0.06,-0.46]],0.012),mW,0,0.09,0);for(let k=0;k<4;k++){const f=add(finG([[-0.3,0.07],[-0.43,0.07],[-0.43,0.17],[-0.38,0.17]],0.01),mW);f.rotation.x=k*Math.PI/2+Math.PI/4;}}
-  // темний контур по силуету (back-face outline) — модель читається на будь-якій підкладці
+  // темний контур по силуету (back-face outline), модель читається на будь-якій підкладці
   const outl=new THREE.MeshBasicMaterial({color:0x0b0b10,side:THREE.BackSide});
   [...g.children].forEach(m=>{if(!m.isMesh||m.material.transparent||m.material.type==='MeshBasicMaterial')return;const o=new THREE.Mesh(m.geometry,outl);o.position.copy(m.position);o.rotation.copy(m.rotation);o.scale.copy(m.scale).multiplyScalar(1.07);g.add(o);});
   const up=new THREE.Group();up.rotation.x=Math.PI/2;up.add(g);up.userData=g.userData;return up;
@@ -82,7 +82,7 @@ window.T3D={heads:[],on:false,
     if(!map.getLayer('hill'))map.addLayer({id:'hill',type:'hillshade',source:'dem-h',paint:{'hillshade-exaggeration':0.35,'hillshade-shadow-color':'#000','hillshade-highlight-color':'#fff'}},map.getLayer('obl-fill')?'obl-fill':undefined);
     try{map.setTerrain({source:'dem',exaggeration:1.6});}catch(e){}
     try{map.setSky({'sky-color':'#8EC1F0','horizon-color':'#DCE9F7','fog-color':'#B9CCE0','sky-horizon-blend':0.5,'horizon-fog-blend':0.6,'fog-ground-blend':0.8,'atmosphere-blend':0.6});}catch(e){}
-    // цілі показуються реалістичними спрайтами (шар tg) — процедурні 3D-моделі вимкнено
+    // цілі показуються реалістичними спрайтами (шар tg), процедурні 3D-моделі вимкнено
   },
   disable(map){this.on=false;try{map.setTerrain(null);}catch(e){}
     if(map.getLayer('t3d'))map.removeLayer('t3d');if(map.getLayer('hill'))map.removeLayer('hill');

@@ -4,7 +4,7 @@
   let S=Object.assign({},DEF);try{const o=JSON.parse(localStorage.getItem('snd')||'null');if(o)S=Object.assign(S,o);else if(JSON.parse(localStorage.getItem('pref')||'{}').sound)S.mode='tone';}catch(e){}
   const save=()=>{try{localStorage.setItem('snd',JSON.stringify(S));}catch(e){}};
   let ac=null;const ctx=()=>{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state!=='running')ac.resume();return ac;};
-  // iOS: Web Audio мовчить при беззвучному режимі, доки сторінка не відтворить звичайний <audio> — «розблоковуємо» тишею
+  // iOS: Web Audio мовчить при беззвучному режимі, доки сторінка не відтворить звичайний <audio>, «розблоковуємо» тишею
   const SILENT='data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAACAgICA';
   let unlocked=false;function unlock(){if(unlocked)return;unlocked=true;try{const a=new Audio(SILENT);a.setAttribute('playsinline','');a.loop=true;a.volume=0.01;a.play().catch(()=>{unlocked=false;});}catch(e){unlocked=false;}
     try{ctx();}catch(e){}try{if('speechSynthesis' in window){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}}catch(e){}}
@@ -18,7 +18,7 @@
     soft:(v)=>{const t=ctx().currentTime;osc('sine',660,t,0.6,v*0.45);osc('sine',440,t+0.55,0.8,v*0.45);return 1.4;},
   };
   let voices=[];const loadV=()=>{try{voices=speechSynthesis.getVoices();}catch(e){}};if('speechSynthesis' in window){loadV();speechSynthesis.onvoiceschanged=loadV;}
-  // голос: серверна українська озвучка (Piper: Лада/Микита/Тетяна/Олекса), а якщо сервер ще не готовий — голос пристрою
+  // голос: серверна українська озвучка (Piper: Лада/Микита/Тетяна/Олекса), а якщо сервер ще не готовий, голос пристрою
   let curA=null;
   function speak(text){if(!text)return false;
     if(S.voice&&S.voice!=='device'){try{if(curA)curA.pause();const a=new Audio('/api/tts?voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text));
@@ -29,13 +29,13 @@
   function play(text,force){const m=S.mode;if(m==='off'&&!force)return;let wait=0;
     if(m==='tone'||m==='both'||(force&&m==='off'))try{wait=TONES[S.tone](S.vol);}catch(e){}
     if((m==='voice'||m==='both')&&text)setTimeout(()=>speak(text),m==='both'?wait*1000:0);}
-  // анти-спам: не частіше ніж раз на 8 с, той самий текст — не частіше ніж раз на 2 хв
+  // анти-спам: не частіше ніж раз на 8 с, той самий текст, не частіше ніж раз на 2 хв
   let lastT=0;const said=new Map();
   window.NXSound={get:()=>Object.assign({},S),set(k,v){S[k]=v;save();},hasUkVoice:()=>voices.some(x=>/^uk/i.test(x.lang)),
     alert(text){const now=Date.now();if(now-lastT<8000)return;if(text&&said.has(text)&&now-said.get(text)<120000)return;lastT=now;if(text)said.set(text,now);play(text);},
     test(){unlock();const txt='Тест. Шахед, двадцять кілометрів з півдня, приблизно вісім хвилин до вас.';const m=S.mode;
-      if(m==='voice'||m==='both')speak(txt);            // голос — одразу в межах натискання (вимога iOS)
-      if(m!=='voice')try{TONES[S.tone](S.vol);}catch(e){}  // сигнал (у режимі «Вимк» — теж, щоб почути звук)
+      if(m==='voice'||m==='both')speak(txt);            // голос, одразу в межах натискання (вимога iOS)
+      if(m!=='voice')try{TONES[S.tone](S.vol);}catch(e){}  // сигнал (у режимі «Вимк», теж, щоб почути звук)
     },
     speakOnly:speak};
 })();

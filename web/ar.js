@@ -1,4 +1,4 @@
-// «Небо в камері»: де відносно вас зараз цілі — азимут, кут над горизонтом, курс на 5 хв уперед і хвилини до вас.
+// «Небо в камері»: де відносно вас зараз цілі, азимут, кут над горизонтом, курс на 5 хв уперед і хвилини до вас.
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -16,7 +16,7 @@
   const HFOV = 62; // горизонтальний кут камери телефона в портреті, °
   const cv = $('#ov'), cx = cv.getContext('2d');
   let SNAP = null, offset = 0, home = null, hasOri = false, drag = null, calib = false, lastBuzz = 0, wake = null;
-  // згладжений напрям камери: азимут — через вектор (щоб 359°→0° не «стрибав»), кут, крен
+  // згладжений напрям камери: азимут, через вектор (щоб 359°→0° не «стрибав»), кут, крен
   const cam = { sx: 0, sy: 1, el: 15, roll: 0, raw: null };
   let azOffset = +(localStorage.getItem('ar-offset') || 0);
   const IMG = {};
@@ -56,7 +56,7 @@
   window.addEventListener('deviceorientationabsolute', e => { gotAbsolute = true; onOri(e); }, true);
   window.addEventListener('deviceorientation', onOri, true);
 
-  function smooth() { // низькочастотний фільтр — без тремтіння
+  function smooth() { // низькочастотний фільтр, без тремтіння
     if (!cam.raw) return;
     const k = 0.18, r = cam.raw;
     cam.sx += (Math.sin(r.az * D2R) - cam.sx) * k; cam.sy += (Math.cos(r.az * D2R) - cam.sy) * k;
@@ -68,14 +68,14 @@
     $('#start').style.display = 'none';
     try { if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); } catch (e) {}
     try { const st = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }); $('#cam').srcObject = st; }
-    catch (e) { $('#sub').textContent = location.protocol === 'https:' || location.hostname === 'localhost' ? 'Камера недоступна — показую небо без фону' : 'Камері потрібне https — відкрийте адресу з phone.bat'; }
+    catch (e) { $('#sub').textContent = location.protocol === 'https:' || location.hostname === 'localhost' ? 'Камера недоступна, показую небо без фону' : 'Камері потрібне https, відкрийте адресу з phone.bat'; }
     try { wake = await navigator.wakeLock.request('screen'); } catch (e) {}
-    if (!home && navigator.geolocation) navigator.geolocation.getCurrentPosition(p => { home = [p.coords.longitude, p.coords.latitude]; localStorage.setItem('home', JSON.stringify(home)); }, () => { $('#sub').textContent = 'Потрібне ваше місце — позначте дім у «Тривозі»'; });
-    setTimeout(() => { if (!hasOri) $('#sub').textContent = 'Немає компаса — відкрийте на телефоні. Тут небо можна тягнути мишею.'; }, 2500);
+    if (!home && navigator.geolocation) navigator.geolocation.getCurrentPosition(p => { home = [p.coords.longitude, p.coords.latitude]; localStorage.setItem('home', JSON.stringify(home)); }, () => { $('#sub').textContent = 'Потрібне ваше місце, позначте дім у «Тривозі»'; });
+    setTimeout(() => { if (!hasOri) $('#sub').textContent = 'Немає компаса, відкрийте на телефоні. Тут небо можна тягнути мишею.'; }, 2500);
   }
   $('#go').onclick = start;
   document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && wake) try { wake = await navigator.wakeLock.request('screen'); } catch (e) {} });
-  // калібрування: компаси телефонів часто брешуть на 10–30° — підлаштовуємо пальцем по видимому орієнтиру
+  // калібрування: компаси телефонів часто брешуть на 10–30°, підлаштовуємо пальцем по видимому орієнтиру
   $('#cal').onclick = () => { calib = !calib; $('#cal').classList.toggle('on', calib); $('#cal').textContent = calib ? 'Готово' : 'Підлаштувати компас'; if (!calib) localStorage.setItem('ar-offset', String(azOffset)); };
   cv.addEventListener('pointerdown', e => drag = { x: e.clientX, y: e.clientY, az: azNow(), el: cam.el, off: azOffset });
   addEventListener('pointerup', () => drag = null);
@@ -94,10 +94,10 @@
     const hf = HFOV, vf = HFOV * H / W, az = azNow(), el = cam.el;
     cx.clearRect(0, 0, W, H);
     const proj = (tAz, tEl) => [W / 2 + wrap(tAz - az) / hf * W, H / 2 - (tEl - el) / vf * H];
-    // світ (горизонт, цілі) крутимо проти крену телефона, компас — ні
+    // світ (горизонт, цілі) крутимо проти крену телефона, компас, ні
     cx.save(); cx.translate(W / 2, H / 2); cx.rotate(cam.roll * D2R); cx.translate(-W / 2, -H / 2);
     const hy = H / 2 + el / vf * H;
-    // земля трохи темніша, горизонт — тонка світла лінія з легким сяйвом
+    // земля трохи темніша, горизонт, тонка світла лінія з легким сяйвом
     cx.fillStyle = 'rgba(0,0,0,.28)'; cx.fillRect(-W, hy, W * 3, H * 2);
     cx.shadowColor = 'rgba(140,180,255,.9)'; cx.shadowBlur = 10 * k;
     cx.strokeStyle = 'rgba(200,220,255,.7)'; cx.lineWidth = 1.2 * k; cx.beginPath(); cx.moveTo(-W, hy); cx.lineTo(2 * W, hy); cx.stroke(); cx.shadowBlur = 0;
@@ -122,8 +122,8 @@
         list.push({ tr, p, d, tAz, tEl, eta, alt });
         marks.push({ tAz, c: COL[tr.type], thr: eta != null });
       }
-      list.sort((a, b) => b.d - a.d); // ближчі — поверх
-      const boxes = []; // підписи не налазять: пріоритет — загрози й ближчі
+      list.sort((a, b) => b.d - a.d); // ближчі, поверх
+      const boxes = []; // підписи не налазять: пріоритет, загрози й ближчі
       const prio = list.slice().sort((a, b) => (a.eta == null) - (b.eta == null) || a.d - b.d);
       const showLabel = new Set();
       for (const o of prio) { const [x, y] = proj(o.tAz, o.tEl); const s = Math.max(30, Math.min(96, 1100 / o.d)) * k;
@@ -135,7 +135,7 @@
         const on = x > -40 && x < W + 40 && y > -40 && y < H + 40;
         if (!on) continue;
         const fade = Math.max(0.35, 1 - d / 170), s = Math.max(30, Math.min(96, 1100 / d)) * k, c = COL[tr.type];
-        // курс на 5 хв уперед — лінія в небі
+        // курс на 5 хв уперед, лінія в небі
         if (tr.hd != null || (tr.route || []).length) {
           cx.strokeStyle = c; cx.lineWidth = 2 * k; cx.setLineDash([6 * k, 6 * k]); cx.globalAlpha = 0.8 * fade; cx.beginPath();
           let first = true;
@@ -146,7 +146,7 @@
           }
           cx.stroke(); cx.setLineDash([]); cx.globalAlpha = 1;
         }
-        // ореол і силует (ніс угору — від вас, донизу — на вас)
+        // ореол і силует (ніс угору, від вас, донизу, на вас)
         cx.save(); cx.translate(x, y); cx.globalAlpha = fade;
         const g = cx.createRadialGradient(0, 0, 0, 0, 0, s * 1.2); g.addColorStop(0, (eta != null ? '#FF3B4E' : c) + 'cc'); g.addColorStop(1, c + '00');
         cx.fillStyle = g; cx.beginPath(); cx.arc(0, 0, s * 1.2, 0, 7); cx.fill();
@@ -166,7 +166,7 @@
     }
     cx.restore();
 
-    // загроза поза кадром — велика червона стрілка
+    // загроза поза кадром, велика червона стрілка
     if (best) {
       const dx = wrap(best.tAz - az);
       if (Math.abs(dx) > hf / 2 - 4) {
@@ -194,7 +194,7 @@
     cx.textBaseline = 'alphabetic';
 
     // шапка
-    if (best) { $('#head').textContent = NAME[best.tr.type] + ' · ' + Math.round(best.d) + ' км · ~' + Math.max(1, Math.round(best.eta)) + ' хв'; $('#sub').textContent = 'Іде на вас з ' + SIDE[Math.round(best.tAz / 45) % 8] + ' — в укриття'; $('.card').classList.add('danger'); }
+    if (best) { $('#head').textContent = NAME[best.tr.type] + ' · ' + Math.round(best.d) + ' км · ~' + Math.max(1, Math.round(best.eta)) + ' хв'; $('#sub').textContent = 'Іде на вас з ' + SIDE[Math.round(best.tAz / 45) % 8] + ', в укриття'; $('.card').classList.add('danger'); }
     else if (SNAP && home) { $('#head').textContent = 'Небо над вами чисте'; if (hasOri || calib) $('#sub').textContent = calib ? 'Тягніть, щоб сторони світу збіглися з реальними' : 'Цілей, що йдуть на вас, немає'; $('.card').classList.remove('danger'); }
     requestAnimationFrame(frame);
   }

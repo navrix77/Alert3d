@@ -1,5 +1,5 @@
 """Демо без Telegram: прокручує записану ніч 29→30.10.2026 так, ніби вона йде зараз.
-Вмикається змінною REPLAY=1 (REPLAY_SPEED — у скільки разів швидше)."""
+Вмикається змінною REPLAY=1 (REPLAY_SPEED, у скільки разів швидше)."""
 from __future__ import annotations
 
 import asyncio
