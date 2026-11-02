@@ -476,3 +476,10 @@ def test_geran34_is_jet():
     p = Parser()
     assert p.parse("🛸 Ще потенційні 2× рБпЛА «Герань-4» у напрямку Вінниці", "vinnradar").type == "jet"
     assert p.parse("Герань на Київ").type == "shahed"
+
+
+def test_security_news_not_target():
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("Військова контррозвідка Служби безпеки затримала в Одесі ще одного російського агента. Ним виявився колишній моряк торговельного судна, який коригував обстріли портового міста.", "temporis_odesa")
+    assert o.kind != "track" and o.no_target
