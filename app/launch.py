@@ -67,7 +67,7 @@ SPECUL_RX = re.compile(r"можлив\w*\s+(?:\w+\s+)?пуск|возможн\w*
 AVIA_CTX = re.compile(r"ту-?95|ту-?160|ту-?22|борт|аеродром|аэродром|(?<![а-яіїє])ае\.|аер\.|стратег")
 STRIKE_RX = re.compile(r"вибух|взрыв|прил[её]т|влучан|попадан|пожеж|пожар|бавовн|хлопок")
 SPEED = {"shahed": 170, "molniya": 120, "jet": 450, "cruise": 800, "ballistic": 2000, "kab": 600, "geran5": 550, "banderol": 650, "rszv": 1500, "fpv": 100, "fpvf": 80, "recon": 110}
-MAXAGE = {"shahed": 9 * 3600, "molniya": 2 * 3600, "jet": 2 * 3600, "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60, "geran5": 3 * 3600, "banderol": 2 * 3600, "rszv": 10 * 60, "fpv": 30 * 60, "fpvf": 30 * 60, "recon": 4 * 3600}
+MAXAGE = {"shahed": 9 * 3600, "molniya": 2 * 3600, "jet": int(3.5 * 3600), "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60, "geran5": 3 * 3600, "banderol": 2 * 3600, "rszv": 10 * 60, "fpv": 30 * 60, "fpvf": 30 * 60, "recon": 4 * 3600}
 RANGE = {"shahed": 1800, "molniya": 200, "jet": 900, "cruise": 3000, "ballistic": 600, "kab": 120, "geran5": 950, "banderol": 500, "rszv": 120, "fpv": 30, "fpvf": 40, "recon": 300}
 
 
