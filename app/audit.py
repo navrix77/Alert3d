@@ -65,7 +65,8 @@ class Audit:
         if region and tr.obs and tr.last.src == src:
             la, lo = from_xy(tr.last.x, tr.last.y)
             o = obl_of_xy(lo, la)
-            if o and not region.startswith(o[:5]):
+            hint = getattr(obs, "oblast_hint", None)
+            if o and not region.startswith(o[:5]) and hint != o:  # текст сам назвав іншу область — не аномалія
                 self.add("off_region", src, text, t, track=tr.id, place=tr.last.label, obl=o, region=region)
 
     def state(self) -> dict:

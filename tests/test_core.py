@@ -228,3 +228,13 @@ def test_review_regressions():
     tr2.ingest(p.parse("Шахед у районі Чугуєва"), "k", t + 5)
     tr2.exclude = set()
     assert len([x for x in tr2.snapshot()["tracks"] if x["status"] == "active"]) == 2
+
+
+def test_night_audit_fixes():
+    from app.parser import Parser
+    p = Parser()
+    # «Сумського району» — район, а не село Сумське за 500 км
+    assert not any(r.place.name == "Сумське" for r in p.parse("Обстріл Сумського району реактивними системами залпового вогню", "rozvidkaneba").places)
+    # «Петропавлівська Борщагівка» — село, а не київський мікрорайон
+    o = p.parse("Реактивний БпЛА курсом на Петропавлівську Борщагівку (Київщина)", "rozvidkaneba")
+    assert [r.place.name for r in o.places] == ["Петропавлівська Борщагівка"]
