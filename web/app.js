@@ -473,7 +473,7 @@ let SHELTER=+(localStorage.getItem('shelter')||3);if($('#me-sh'))$('#me-sh').tex
 if($('#me-set'))$('#me-set').onclick=()=>{const v=[1,2,3,5,7,10];SHELTER=v[(v.indexOf(SHELTER)+1)%v.length];localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;toast('До укриття: '+SHELTER+' хв');};
 const MEI={};
 function renderMe(threats){
-  const box=$('#me');if(!home){box.className='me';$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
+  const box=$('#me');if(!home){box.className='me'+(box.classList.contains('open')?' open':'');$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>20;
   const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
   const thr=near.filter(x=>x.r.rel);const first=thr[0];
@@ -481,7 +481,7 @@ function renderMe(threats){
   if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
   else if(first){const e=first.r.eta||0;cls=e<=5?'me danger':'me watch';word=e<=5?'Летить на вас':'У ваш бік';
     sub=esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':'');}
-  box.className=cls;$('#me-word').textContent=word;
+  box.className=cls+(box.classList.contains('open')?' open':'');$('#me-word').textContent=word;
   // ГОЛОВНЕ: скільки хвилин саме у вас — великим числом з кільцем
   if(first&&!isStale&&first.r.eta!=null){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
     sub='<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
@@ -491,7 +491,7 @@ function renderMe(threats){
   (thr.length?thr:near).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
     const c=MEI[t.type]||(MEI[t.type]=drawTarget(t.type,22));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
     const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;
-    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':'—')+'</span></div>'+
+    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':(r.away?'віддаляється':t.hd==null?'курс невідомий':'летить повз'))+'</span></div>'+
       (eta?'<div class="me-act '+(eta<=5?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить поруч':'курс у ваш бік')+'</div>':'');
     li.querySelector('.me-row').prepend(cv);li.onclick=()=>openSheet(t.id);$('#me-list').appendChild(li);});
 }
