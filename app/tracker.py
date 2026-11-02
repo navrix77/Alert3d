@@ -113,8 +113,21 @@ class Track:
                 pts.append(p.xy)
         return pts
 
-    def est(self, now: float, cap_min: float = 4, k: float = 1.0) -> tuple[float, float]:
+    def est(self, now: float, cap_min: float = 4, k: float = 1.0, mapm: bool = False) -> tuple[float, float]:
         km = self.speed * k * max(0.0, now - self.last.t) / 3600
+        if mapm:  # модель показу на мапі: зміщення за часом (map_disp), ліміт — зміщення за cap_min
+            km = map_disp(self.type, self.speed, now - self.last.t)
+            cap_km = map_disp(self.type, self.speed, cap_min * 60)
+            if self.route:
+                pts = self.path()
+                tot = sum(dist_km(pts[i - 1], pts[i]) for i in range(1, len(pts)))
+                if km <= tot or self.heading is None:
+                    return along(pts, km)
+                hd = bearing(pts[-2], pts[-1]) if len(pts) > 1 else self.heading
+                return move(pts[-1], hd, min(km - tot, cap_km))
+            if self.heading is None:
+                return (self.last.x, self.last.y)
+            return move((self.last.x, self.last.y), self.heading, min(km, cap_km))
         if self.route:
             pts = self.path()
             tot = sum(dist_km(pts[i - 1], pts[i]) for i in range(1, len(pts)))
@@ -134,6 +147,21 @@ class Track:
 # навчання до 01.11 09:00 / перевірка після): шахеди k≈0.3–0.4 (медіана 23.0 → 17.8 км), реактивні k≈0.6 (26.0 → 21.2 км).
 # Для зіставлення повідомлень і часу підльоту лишається паспортна швидкість (обережніше).
 MAP_K = {"shahed": 0.35, "jet": 0.6}
+# Зміщення шахеда між названими позиціями росте повільніше за час (маневри, запізнення постів, грубі «села»):
+# бектест 28.10–02.11 (n≈45 на горизонт): ≈1.0× паспортної за перші 10 хв, 0.71× за 20, 0.49× за 40.
+# Модель d(h) = v·10/60·k10·(h/10)^b (h ≥ 10 хв), до 10 хв — лінійно з k10. Шахед (0.7, 0.5): медіана похибки
+# через ≤10 хв 16.1 → 12.0 км (≤15 км: 47% → 60%), ≤20 хв 20.7 → 21.7, ≤40 хв 30.4 → 29.3 — проти сталого k=0.35.
+# Реактивні: стале 0.6 точніше за степеневу модель — лишаємо.
+MAP_POW = {"shahed": (0.7, 0.5)}
+
+
+def map_disp(typ: str, speed: float, sec: float) -> float:
+    """Скільки км ціль «просунулась» на мапі за sec секунд після останньої названої позиції."""
+    h = max(0.0, sec) / 60
+    k10, b = MAP_POW.get(typ, (MAP_K.get(typ, 1.0), 1.0))
+    if h <= 10 or b == 1.0:
+        return speed * h / 60 * k10
+    return speed * 10 / 60 * k10 * (h / 10) ** b
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
 SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5, "recon": 15}
@@ -347,7 +375,11 @@ class Tracker:
                 if self.brain and self.learn:
                     self._score_heading(tr, pt, t)
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
-                if self.brain and self.learn and prev.place:
+                # кінематично неможливий «перехід» (той самий пост/хвилина, сусідні села різних дронів групи,
+                # >1.8× номінальної швидкості) — це не рух однієї цілі: не вчимо маршрут і не беремо з нього курс.
+                # Діагностика журналу 26.10–02.11: 21% сусідніх позицій шахедів давали >300 км/год, 43% трійок — «зигзаг» >120°.
+                plaus = d <= 3 or (dt >= 60 and d / dt * 3600 <= nom * 1.8)
+                if self.brain and self.learn and prev.place and plaus:
                     self.brain.learn_step(tr.type, prev.place, pos.place, 0.6 if prev.est else 1.0)
                 if not route and obs.course is None:
                     # Курс без названого каналами пункту. Бектест 26.10–02.11 (похибка напрямку до наступної названої
@@ -356,7 +388,7 @@ class Tracker:
                     lh = self._learned_heading(tr, pos.place, pt)
                     if lh is not None:
                         tr.heading, tr.hd_src = lh, "learned"
-                    elif d > 3:
+                    elif d > 3 and plaus and dt >= 90:
                         tr.heading, tr.hd_src = bearing((prev.x, prev.y), pt), "movement"
             elif route:
                 # «на X» від каналу, що веде ціль щохвилини: ціль уже біля X (так показують провідні сервіси).
@@ -728,9 +760,9 @@ class Tracker:
             if status != "active" and age > life + 900:
                 continue
             mk = MAP_K.get(tr.type, 1.0)
-            ex, ey = tr.est(now, SHOW_BY_TYPE.get(tr.type, SHOW_MIN), mk) if status == "active" else (tr.last.x, tr.last.y)
+            ex, ey = tr.est(now, SHOW_BY_TYPE.get(tr.type, SHOW_MIN), mk, mapm=True) if status == "active" else (tr.last.x, tr.last.y)
             lat, lon = from_xy(ex, ey)
-            km = tr.speed * mk * min(age, life) / 3600
+            km = map_disp(tr.type, tr.speed, min(age, life))
             rest = []
             if tr.route and status == "active":
                 acc = 0.0
@@ -781,7 +813,7 @@ class Tracker:
             out.append({
                 "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
-                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est,
+                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est,
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),

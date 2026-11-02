@@ -690,7 +690,10 @@ def test_heading_learned_and_map_speed():
     assert t.hd_src == "learned" and abs(((t.heading - bearing(t.last.place.xy, to_xy(49.82, 36.05))) + 540) % 360 - 180) < 1
     s = [x for x in tr.snapshot(now)["tracks"] if x["status"] == "active"][0]
     moved = dist_km(t.last.place.xy, to_xy(s["lat"], s["lon"]))
-    assert abs(moved - 170 * MAP_K["shahed"] * 10 / 60) < 2 and s["vmap"] == round(170 * MAP_K["shahed"]) and s["hd_src"] == "learned"
+    from app.tracker import map_disp
+    # модель показу: 10 хв шахеда ≈ 170·10/60·0.7 ≈ 19.8 км (бектест: k≈1.0 на 10 хв, 0.49 на 40 хв)
+    assert abs(moved - map_disp("shahed", 170, 600)) < 2 and abs(moved - 19.8) < 2 and s["dm"] == [0.7, 0.5] and s["hd_src"] == "learned"
+    assert abs(map_disp("shahed", 170, 2400) - 170 * 10 / 60 * 0.7 * 2) < 0.1  # 40 хв — лише вдвічі далі за 10 хв
     # навчений «наступний пункт» за 100+ км — не курс
     tr2 = Tracker(config.SOURCES, B(far=True), learn=False)
     tr2.ingest(p.parse("Шахед у районі Лозової"), "M", now)
