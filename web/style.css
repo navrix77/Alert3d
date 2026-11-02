@@ -529,3 +529,18 @@ a.pill{display:inline-block;text-decoration:none}
 .me-off.on i{background:#ff4d4d;box-shadow:0 0 8px #ff4d4d}.me-off.part i{background:#ffb020}
 body.replay #me,body.replay #banner{display:none!important}
 .grid>div[hidden]{display:none!important}
+
+/* рентген: панель «звідки SKY знає» замість легенди-павутиння */
+#xr-panel{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 86px);width:min(560px,calc(100vw - 20px));max-height:46vh;overflow:auto;z-index:55;
+  background:rgba(9,13,21,.96);color:#E8ECF4;border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:12px 14px 10px;box-shadow:0 14px 44px rgba(0,0,0,.55);backdrop-filter:blur(14px);font-size:14px;line-height:1.4}
+#xr-panel .xp-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}#xr-panel .xp-h b{font-size:15px}
+#xr-panel .xp-x{margin-left:auto;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:5px 12px;font:600 13px inherit;cursor:pointer}
+#xr-panel .xp-n{margin:2px 0 8px;color:#AEB6C6;font-size:13px}#xr-panel .xp-n b{color:#FFB020}
+#xr-panel .xp-w{background:rgba(245,184,61,.12);border:1px solid rgba(245,184,61,.35);color:#FFD27A;border-radius:10px;padding:6px 9px;font-size:13px;margin-bottom:8px}
+#xr-panel ol{list-style:none;margin:0;padding:0}#xr-panel li{display:flex;gap:10px;padding:7px 0;border-top:1px solid rgba(255,255,255,.07)}
+#xr-panel .xp-num{flex:none;width:24px;height:24px;border-radius:50%;background:#2B6BFF;border:2px solid #fff;color:#fff;font:700 12px/20px system-ui;text-align:center;font-style:normal}
+#xr-panel .xp-num.o{background:transparent;border-color:rgba(255,255,255,.35)}#xr-panel .xp-num.p{background:rgba(180,140,255,.3);border-color:#B48CFF;color:#E3D4FF;line-height:19px}
+#xr-panel q{display:block;color:#C9D2E3;font-size:13px;margin-top:2px;quotes:"«" "»"}#xr-panel .xp-c{color:#8F99AD;font-size:12.5px;margin-top:2px}
+#xr-panel a{color:#7DB0FF}#xr-panel li.now .xp-m b{color:#E3D4FF}
+body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
+:root[data-theme="light"] #xr-panel{background:rgba(255,255,255,.97);color:#111}:root[data-theme="light"] #xr-panel q{color:#333}
