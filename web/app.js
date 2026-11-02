@@ -832,7 +832,7 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;
   // останнє зведення МО РФ: на карті — лише точки регіонів (з кількістю, якщо названа) і ОДИН підсумковий підпис
   const ev=(SNAP.ru||[]).slice().sort((a,b)=>b.t-a.t)[0];if(!ev){map.getSource('ru').setData(EMPTY);return;}
   const PER=p=>!p?'':/ноч/.test(p)?'за ніч':/дня/.test(p)?'за день':/суток/.test(p)?'за добу':'';
-  const F=ev.regions.map(r=>({type:'Feature',properties:{c:r.cnt?Math.min(12,r.cnt/3):3,l:'наші дрони'+(r.cnt?' ×'+r.cnt:'')+'\n'+r.n,n:r.n,cnt:r.cnt||0},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}));
+  const F=ev.regions.map(r=>({type:'Feature',properties:{c:r.cnt?Math.min(12,r.cnt/3):3,l:'Наші БпЛА над '+r.n+(r.cnt?' · ×'+r.cnt:'')+'\n'+PER(ev.period)+(PER(ev.period)?' до ':'')+fmt(ev.t)+' · заява МО РФ',n:r.n,cnt:r.cnt||0},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}));
   const lo=ev.regions.reduce((s,r)=>s+r.lon,0)/ev.regions.length,la=ev.regions.reduce((s,r)=>s+r.lat,0)/ev.regions.length;
   F.push({type:'Feature',properties:{c:0,sum:true,l:'Наші дрони над РФ '+PER(ev.period)+': '+ev.total+' «збитих» за МО РФ · '+ev.regions.length+' рег. · '+fmt(ev.t)},geometry:{type:'Point',coordinates:[lo+1.5,la+0.6]}});
   map.getSource('ru').setData({type:'FeatureCollection',features:F});}
