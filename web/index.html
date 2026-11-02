@@ -124,7 +124,8 @@
   <section><h3>Що показувати</h3>
     <label class="sw"><input type="checkbox" id="st-ru"><span>Наші удари: куди летіли дрони й що уражено <small>(заяви МО РФ і Генштабу ЗСУ, постфактум)</small></span></label>
     <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>
-    <label class="sw"><input type="checkbox" id="st-zones"><span>КАБ і ворожа авіація</span></label></section>
+    <label class="sw"><input type="checkbox" id="st-zones"><span>КАБ і ворожа авіація</span></label>
+    <div id="st-real3d-row" hidden><label class="sw"><input type="checkbox" id="st-real3d"><span>Фотореалістичні 3D-моделі міст (Google)</span></label></div></section>
   <section><h3>Голостіл <small class="beta">експеримент</small></h3>
     <label class="sw"><input type="checkbox" id="st-holo"><span>Екран як вікно в об'ємну карту</span></label>
     <div class="row"><span>Керування</span><div class="seg small" id="st-holo-mode"><button data-v="cam">Камера: голова й руки</button><button data-v="tilt">Нахил телефона</button></div></div>
@@ -157,6 +158,7 @@
 <script src="app.js"></script>
 <script src="arsenal.js"></script>
 <script src="cine.js"></script>
+<script src="real3d.js"></script>
 <script src="holo.js"></script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
 </body>

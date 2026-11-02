@@ -14,6 +14,8 @@ PUSH_SEC = float(os.getenv("PUSH_SEC", "2"))
 TG_WEB_CYCLE_SEC = float(os.getenv("TG_WEB_CYCLE_SEC", "8"))  # цикл: головні канали щоразу, решта — порціями по 30
 MAP_STYLE_VECTOR = os.getenv("MAP_STYLE_VECTOR", "https://tiles.openfreemap.org/styles/liberty")
 MAPTILER_KEY = os.getenv("MAPTILER_KEY", "")
+# Google Map Tiles API (Photorealistic 3D Tiles) — ключ обмежте за HTTP-referrer у Google Cloud Console
+GOOGLE_TILES_KEY = os.getenv("GOOGLE_TILES_KEY", "")
 
 # Вайтлист каналів: ключ -> (username, назва, апріорна довіра, офіційний)
 # (ключ, username, назва, довіра, офіційний, область-контекст, швидкий)

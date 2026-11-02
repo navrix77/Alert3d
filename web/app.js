@@ -15,6 +15,7 @@ const FROM=['з півночі','з північного сходу','зі сх�
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
 let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base2')||'night';
+function syncReal3d(){const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
 window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m)};
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
@@ -209,7 +210,7 @@ map.once('idle',()=>introFly(false));
 setTimeout(()=>introFly(false),7000);
 {const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
 map.on('click',e=>{if(!setHomeMode)return;const f=map.queryRenderedFeatures(e.point,{layers:['tg-hit']});if(f.length)return;home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));setHomeMode=false;$('#b-home').classList.remove('on');syncHome();toast('Дім збережено');});
-fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};}).catch(()=>{}).finally(()=>setBase(base==='__init'?'night':base));
+fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};window.NXCFG=CFG;syncReal3d();}).catch(()=>{}).finally(()=>setBase(base==='__init'?'night':base));
 
 let HPDATA=null,HPPREV={},HPLOADING=false;
 function syncHromadas(H){

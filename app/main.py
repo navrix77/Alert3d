@@ -298,7 +298,7 @@ def api_state():
 
 @app.get("/api/config")
 def api_config():
-    return {"vectorStyle": config.MAP_STYLE_VECTOR, "maptilerKey": config.MAPTILER_KEY or None}
+    return {"vectorStyle": config.MAP_STYLE_VECTOR, "maptilerKey": config.MAPTILER_KEY or None, "gtilesKey": config.GOOGLE_TILES_KEY or None}
 
 
 @app.post("/api/push/register")

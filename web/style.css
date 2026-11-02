@@ -474,3 +474,4 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 :root[data-theme="day"] .me.watch{border-color:#E0A21E!important;box-shadow:0 0 0 2px rgba(245,184,61,.35),0 8px 28px rgba(15,25,45,.16)!important}
 :root[data-theme="day"] .cnt small{color:color-mix(in srgb,var(--tc) 75%,#000)!important}
 :root[data-theme="day"] .xr-legend{color:#0A0F1A!important}
+#g3d-credit{position:fixed;left:10px;bottom:calc(6px + env(safe-area-inset-bottom));z-index:4;font:500 10px var(--f);color:rgba(255,255,255,.8);text-shadow:0 1px 3px #000;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
