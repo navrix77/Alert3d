@@ -508,3 +508,4 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 .snd-vol{width:100%;accent-color:#3B82F6}
 .snd-test{margin-top:14px;width:100%}
 .snd-hint{display:block;font-size:12px;color:var(--mute);margin:8px 0 0;line-height:1.4}
+a.pill{display:inline-block;text-decoration:none}

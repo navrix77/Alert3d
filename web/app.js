@@ -713,7 +713,8 @@ setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
-$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
+if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
+if(new URLSearchParams(location.search).get('app')==='widget'&&$('#st-widget-sec'))$('#st-widget-sec').hidden=true;
 document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.pref,v=b.dataset.v;
   if(k==='theme'){PREF.theme=v;PREF.base=null;savePref();applyTheme(true);}
   else if(k==='base'){PREF.base=v;savePref();setBase(v);setTimeout(syncSettingsUI,50);}
