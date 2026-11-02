@@ -14,7 +14,7 @@ const SIDE=['на північ','на північний схід','на схі�
 const FROM=['з півночі','з північного сходу','зі сходу','з південного сходу','з півдня','з південного заходу','з заходу','з північного заходу'];
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
-let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base2')||'night';
+let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=(()=>{try{if(!localStorage.getItem('mapv2')){localStorage.setItem('mapv2','1');localStorage.setItem('t3d','0');}}catch(e){}return localStorage.getItem('t3d')==='1';})(),base=localStorage.getItem('base2')||'night';
 function applySaver(){const on=window.NXPERF&&NXPERF.saver;['hillshade','bld3d'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');});const c=$('#st-saver');if(c){c.checked=!!(window.NXPERF&&localStorage.getItem('saver')==='1');c.onchange=e=>NXPERF.setSaver(e.target.checked);}}
 document.addEventListener('nxsaver',()=>{try{applySaver();}catch(e){}});
 function syncReal3d(){applySaver();const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
@@ -107,10 +107,10 @@ function addOverlays(){
   ['zones','trails','preds','targets','home','chains','lsites'].forEach(id=>map.addSource(id,{type:'geojson',data:EMPTY}));
   map.addLayer({id:'obl-fill',type:'fill',source:'obl',paint:{'fill-color':['match',LV,2,'#C8102E',1,'#E8B300','#000'],'fill-opacity':['match',LV,2,0.1,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.16,1,0.1,0],'fill-opacity-transition':{duration:500}}});
-  map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':'#fff','line-opacity':['interpolate',['linear'],['zoom'],5.5,0.25,9,0.55],'line-width':['interpolate',['linear'],['zoom'],6,0.5,10,1.2]}});
-  map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.62,0.35]}});
-  map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.8}});
-  map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#E0405A','line-width':['interpolate',['linear'],['zoom'],5,1,9,2.2],'line-opacity':0.85}});
+  map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':['match',LV,2,'#FF6B7D',1,'#FFC940','#fff'],'line-opacity':['match',LV,0,['interpolate',['linear'],['zoom'],5.5,0.2,9,0.5],0.9],'line-width':['match',LV,0,['interpolate',['linear'],['zoom'],6,0.5,10,1.2],['interpolate',['linear'],['zoom'],6,1.2,10,2.2]]}});
+  map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.5,0.3]}});
+  map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.45}});
+  map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#B24A5C','line-width':['interpolate',['linear'],['zoom'],5,1,9,2],'line-opacity':0.7}});
   map.addSource('outside',{type:'geojson',data:'/data/outside.geojson',tolerance:0.2,buffer:256});
   // напис навскіс, напівпрозоро — над територією РФ (у площині карти)
   map.addSource('rf-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[39.2,53.6],[44.5,50.4],[36.2,56.9],[46.5,55.4]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.55,8,0.6]}});
