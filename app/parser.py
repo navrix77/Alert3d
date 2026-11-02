@@ -74,6 +74,7 @@ MORE_HINTS = [(re.compile(r"житомирщ|житомирськ\w* обл|жи
               (re.compile(r"закарпатт"), "Закарпатська"),
               (re.compile(r"буковин|чернівецьк\w* обл"), "Чернівецька")]
 SUMLINE = re.compile(r"^[^\w\d]*\d+\s+на\s+([А-ЯІЇЄҐа-яіїєґ']+?)(щині|ччині)\s*[–—-]\s*(.+)$")
+LISTITEM = re.compile(r"^[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+(?:\s+[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+)?(?:\s*\(\d+\))?$")
 POS_MARK = "⟐"  # маркер: сегмент — поточне місце цілі (з кількістю), а не пункт призначення
 SKIP = {
     "реактивний", "реактивный", "реактивні", "реактивних", "реактивные", "реактивных", "шахед", "шахеды", "шахеда",
@@ -170,6 +171,12 @@ class Parser:
         # зведення «3 на Дніпропетровщині – Тернівка (1), Шахтарське (1)» — це ПОТОЧНІ місця з кількістю, а не маршрут
         lines = []
         for ln in text.split("\n"):
+            bare = ln.strip().rstrip(".")
+            items = [x.strip() for x in bare.split(",")]
+            if len(items) >= 3 and all(LISTITEM.match(x) for x in items):
+                # «Чорнобай, Білики, Юріївка, Очаків, Вилкове» — перелік, де цілі зараз, а не маршрут через пів країни
+                lines += [f"{POS_MARK}1 {x}" for x in items]
+                continue
             m = SUMLINE.match(ln.strip())
             if m:
                 for name, cnt in re.findall(r"([А-ЯІЇЄҐ][\w'’ʼ\- ]{1,40}?)\s*\((\d+)\)", m.group(3)):
@@ -288,7 +295,10 @@ class Parser:
                 continue
             nxt = norm(words[i + 1]) if i + 1 < len(words) else ""
             # «Шахеди», «Гербери», «Герані», «Бандероль» — назви цілей, а не села Шахи / Гербине
-            if norm(w) in SKIP or nxt.startswith(("област", "обл", "громад", "район", "р-н")) or any(rx.search(norm(w)) for _k, rx in TYPES):
+            ahead = " ".join(norm(x) for x in words[i + 1:i + 4])
+            adj_gen = norm(w).endswith(("ської", "цької", "зької", "ської,", "ской", "цкой")) or (
+                norm(w).endswith(("ського", "цького", "зького", "ского", "цкого")) and re.search(r"район|област|обл\b|громад", ahead))
+            if adj_gen or norm(w) in SKIP or nxt.startswith(("област", "обл", "громад", "район", "р-н")) or any(rx.search(norm(w)) for _k, rx in TYPES):
                 i += 1
                 continue
             ids, used = None, 1

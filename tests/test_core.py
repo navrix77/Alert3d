@@ -273,3 +273,14 @@ def test_summary_lines_are_positions():
     obs = [p.parse(s, "kiev_nebo") for s in segs]
     pos = [(r.role, r.place.name) for o in obs for r in o.places]
     assert ("p", "Тернівка") in pos and all(r == "p" for r, _ in pos)  # місця зараз, а не «курс → Петропавлівка»
+
+
+def test_night_0630_fixes():
+    from app.parser import Parser
+    p = Parser()
+    # monikppy: перелік пунктів — це поточні місця, не «курс → Ізмаїл» на 540 км
+    segs = p.segments("Чорнобай, Білики, Юріївка, Очаків, Вилкове, Кілія, Ізмаїл.")
+    assert len(segs) == 7 and all(r.role == "p" for s in segs for r in p.parse(s, "monikppy").places)
+    # Angry_Pol: «Житомирської та Київської областей» — не село Житомирське в Криму
+    o = p.parse("БпЛА по межі Житомирської та Київської областей в напрямку Погребище ( Вінниччина)", "Angry_Pol")
+    assert [r.place.name for r in o.places] == ["Погребище"]
