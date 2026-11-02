@@ -814,3 +814,17 @@ def test_webpush_subscribe_and_stage_send(tmp_path, monkeypatch):
     asyncio.run(pu.tick(Cli(), {"tracks": [tr]}))
     assert len(got) == 1 and "курс на ваш район" in got[0][1]["title"]
     assert pu.count() == 0  # 410 Gone — браузер скасував підписку
+
+
+def test_launch_forecast_and_ship_carrier_2026_11_02():
+    """02.11 21:00: «ПУСК: балістика з Курськ (кораблі (Калібр))» — з посту-попередження «ворог може застосовувати…»."""
+    from app.launch import LaunchBook, detect
+    warn = ("❗Друзі, маю попередження, що ворог може застосовувати: Значну кількість шахедів ❗️Балістичні ракети з Курська, "
+            "Брянська, Воронежа ❗️Ракети зі стратегічної авіації Х-10, Калібри з кораблів")
+    assert detect(warn, "ballistic")[0] == []
+    assert detect("40 балістичних ракет із Курська, Брянська (не думаю, що всі будуть застосовані)", "ballistic")[0] == []
+    # справжній пуск: носій «кораблі» з іншої частини посту не приписуємо аеродрому
+    sites, typ, car, summ = detect("Пуск балістики з Курська! Також Калібри з кораблів", "ballistic")
+    assert [s.name for s in sites] == ["Курськ (Халіно)"]
+    L = LaunchBook().add(sites, "ballistic", None, car, "x", None, 1_793_646_000.0, summ)[0]
+    assert not L.carrier or "Калібр" not in L.carrier
