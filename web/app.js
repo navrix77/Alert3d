@@ -539,7 +539,7 @@ function renderAsOf(){
   // для людей: лише «наживо» і час; технічні деталі, у стрічці
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
   if(!SNAP){el.className='asof';el.innerHTML='<i class="live-dot wait"></i>Підключення…';return;}
-  if(REPLAY){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Машина часу · '+fmt(REPLAY.t);return;}
+  if(REPLAY){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Машина часу · '+fmt(REPLAY.t)+' · ✕';el.style.cursor='pointer';return;}
   if(age>30){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Немає звʼязку '+Math.round(age)+' с, це не відбій';return;}
   const h=SNAP.health,ok=h.telegram||h.replay;
   el.className='asof'+(ok?'':' stale');
@@ -748,6 +748,7 @@ function play(on){clearInterval(tbTimer);tbTimer=null;$('#tb-play').textContent=
 const tbStep=k=>{play(false);const r=$('#tb-range');const i=Math.max(0,Math.min(HISTF.length-1,+r.value+k));showFrame(i);};
 if($('#tb-back'))$('#tb-back').onclick=()=>tbStep(-5);if($('#tb-fwd'))$('#tb-fwd').onclick=()=>tbStep(5);
 $('#tb-play').onclick=()=>play(!tbTimer||$('#tb-play').textContent==='▶');
+if($('#asof'))$('#asof').addEventListener('click',()=>{if(REPLAY)$('#tb-live').click();});
 $('#tb-range').oninput=e=>{play(false);showFrame(+e.target.value);};
 $('#tb-live').onclick=()=>{play(false);REPLAY=null;document.body.classList.remove('replay');setTimeout(renderAsOf,50);$('#timebar').hidden=true;DISP.clear();lastLv='';lastRa='';if(LIVE)onSnap(LIVE);};
 /* ---------- «Що змінилося, поки мене не було?» ---------- */

@@ -547,3 +547,12 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 
 .grid>.wide{grid-column:1/-1}.conf3{font-size:14px!important;font-weight:500!important;line-height:1.5}.conf3 .ok{color:#3ddc84}.conf3 .warn{color:#ffb020}
 #sh-eta{font-style:normal;font-weight:700;opacity:.8}.sheet .sh-g+.route,.sheet .route+.sh-g{margin-top:10px}#sh-now small,#sh-conf small{opacity:.7}
+/* машина часу на телефоні: «Наживо» завжди видно (раніше підпис виштовхував кнопку за край екрана) */
+.timebar{flex-wrap:wrap}
+.timebar #tb-live{flex:none}
+@media (max-width:600px){
+  .timebar{gap:8px;padding:8px 10px}
+  .timebar .tb-hint{display:none}
+  .timebar .round{width:40px;height:40px;min-width:40px;font-size:15px}
+  .timebar input{min-width:60px}
+}
