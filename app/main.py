@@ -86,7 +86,7 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
                 brain.log_msg(ts, key, link, "launch", ltyp, obs.count, [{"r": "L", "n": s.name} for s in sites], None, seg)
             if all(p.role == "f" for p in obs.places):  # «пуски з X» без місця в Україні — це не трек
                 continue
-        if obs.kind in ("track", "zone", "close", "filtered"):
+        if obs.kind in ("track", "zone", "close", "filtered", "avia"):
             obs.raw = seg
             rec = trk.ingest(obs, key, ts, link)
             if rec.get("track") and obs.kind == "track":
@@ -192,6 +192,11 @@ def state() -> dict:
     # Заливка регіонів — ЛИШЕ офіційні тривоги. Оцінка трекера йде окремо (levels_tracker) і регіони не фарбує.
     snap["levels"] = dict(off["levels"])
     snap["official"] = off
+    # КАБ без тривоги в області не буває: якщо офіційна тривога там знята — зону й авіацію прибираємо
+    if off.get("ok") and off.get("alert_obl") is not None:
+        ao = set(off["alert_obl"])
+        snap["zones"] = [z for z in snap.get("zones", []) if not z.get("obl") or z["obl"] in ao]
+        snap["avia"] = [a for a in snap.get("avia", []) if a["obl"] in ao]
     snap["ru"] = ru.state()
     snap["hits"] = hits.state()
     global _FC

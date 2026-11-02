@@ -25,7 +25,24 @@ TYPES = {
     "molniya": {"label": "М", "name": "«Молнія»", "speed": 120, "life": 20 * 60},
     "cruise": {"label": "КР", "name": "Крилата ракета", "speed": 800, "life": 8 * 60},
     "ballistic": {"label": "Б", "name": "Балістика", "speed": 2000, "life": 3 * 60},
+    "geran5": {"label": "Г5", "name": "«Герань-5»", "speed": 550, "life": 12 * 60},
+    "banderol": {"label": "БД", "name": "«Бандероль»", "speed": 700, "life": 8 * 60},
+    "rszv": {"label": "РС", "name": "РСЗВ", "speed": 1500, "life": 3 * 60},
+    "fpv": {"label": "FPV", "name": "FPV-дрон", "speed": 80, "life": 8 * 60},
+    "fpvf": {"label": "FPV", "name": "FPV на оптоволокні", "speed": 60, "life": 8 * 60},
 }
+FAST_TYPES = ("cruise", "ballistic", "banderol", "rszv", "geran5")
+# КАБ: зона живе, поки про неї пишуть або поки біля кордону активна тактична авіація
+KAB_QUIET = 10 * 60      # без нових згадок і без авіації — прибираємо
+KAB_AVIA = 20 * 60       # авіація активна — тримаємо до 20 хв від останньої згадки
+KAB_MAX = 30 * 60        # жорстка межа від останньої згадки
+AVIA_LIFE = 25 * 60      # «активність тактичної авіації» без підтверджень
+# типові райони пусків КАБ (носії Су-34/Су-35 тримаються за 40–70 км від цілі, над РФ або окупованою територією)
+LAUNCH_AREA = {"Харківська": (50.62, 36.85, "Бєлгородщина"), "Сумська": (51.40, 35.35, "Курщина"),
+               "Чернігівська": (52.40, 32.95, "Брянщина"), "Донецька": (48.05, 38.10, "окупована Донеччина"),
+               "Луганська": (48.65, 39.35, "окупована Луганщина"), "Запорізька": (47.20, 35.95, "окупована Запорізька"),
+               "Дніпропетровська": (47.45, 36.55, "окупована Запорізька"), "Херсонська": (46.50, 33.25, "лівобережжя Херсонщини"),
+               "Миколаївська": (46.50, 33.25, "лівобережжя Херсонщини")}
 ZONE_LIFE = 12 * 60
 
 
@@ -68,6 +85,7 @@ class Track:
     pred_src: str | None = None
     last_pred: tuple | None = None  # (назва, xy, t) — перший крок навченого прогнозу, для самоперевірки
     closed: float | None = None
+    merged: str | None = None  # дублікат іншого треку (той самий об'єкт, різні канали/назви)
 
     @property
     def last(self) -> Point:
@@ -98,7 +116,7 @@ class Track:
 
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
-SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1}
+SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5}
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:
@@ -114,12 +132,33 @@ def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:
     return pts[-1]
 
 
+def obl_of(p) -> str | None:
+    try:
+        return oblasts().of(p.lon, p.lat)
+    except Exception:
+        return None
+
+
+def _obl_name(reg) -> str | None:
+    """CHANNEL_REGION → назва області як у oblasts() ("Харківська")."""
+    if not reg:
+        return None
+    r = str(reg)
+    for o in LAUNCH_AREA:
+        if r.lower().startswith(o[:5].lower()):
+            return o
+    return None
+
+
 @dataclass
 class Zone:
     places: list[Place]
     t: float
     src: str
     platform: str | None
+    last: float = 0.0
+    n: int = 1
+    obl: str | None = None
 
 
 class Tracker:
@@ -129,6 +168,7 @@ class Tracker:
         self.learn = learn
         self.tracks: list[Track] = []
         self.zones: list[Zone] = []
+        self.avia: dict[str, dict] = {}  # область -> {"t", "first", "n", "platform"}
         self.counters: dict[str, int] = {}
         self.log: list[dict] = []
         self.last_update = 0.0
@@ -147,7 +187,7 @@ class Tracker:
         places = obs.places
         if obs.kind == "filtered":
             # «збито / вибухи / приліт» не публікуємо (безпека), але ціль після цього прибираємо з карти
-            fast = ("cruise", "ballistic") if obs.type is None else ((obs.type,) if obs.type in TYPES else ())
+            fast = FAST_TYPES if obs.type is None else ((obs.type,) if obs.type in TYPES else ())
             if fast:
                 done = 0
                 for tr in sorted(self.tracks, key=lambda x: -x.last.t):
@@ -165,6 +205,22 @@ class Tracker:
                     if not places or tr.type == "shahed":
                         break  # дрон у групі — лише один, найсвіжіший
                 rec["closed"] = done
+            return rec
+        if obs.kind == "close" and obs.type == "kab":
+            n = 0
+            from .config import CHANNEL_REGION
+            reg = _obl_name(CHANNEL_REGION.get(src))
+            regs = set(obs.avia or []) | {o for o in (obl_of(p.place) for p in places) if o}
+            for z in list(self.zones):
+                near = places and any(dist_km(p.place.xy, q.xy) < 40 for p in places for q in z.places)
+                if near or (not places and (z.obl in regs or (not regs and (z.obl == reg or z.src == src)))):
+                    self.zones.remove(z)
+                    n += 1
+            if obs.avia_off:
+                for o in list(self.avia):
+                    if o in regs or (not regs and (o == reg or reg is None)):
+                        self.avia.pop(o, None)
+            rec["closed"] = n
             return rec
         if obs.kind == "close":
             n = 0
@@ -186,9 +242,44 @@ class Tracker:
                 n += 1
             rec["closed"] = n
             return rec
+        if obs.kind == "avia":
+            regs = list(obs.avia or [])
+            regs += [o for o in (obl_of(p.place) for p in places) if o]
+            if not regs:
+                from .config import CHANNEL_REGION
+                r = CHANNEL_REGION.get(src)
+                regs = [o for o in [_obl_name(r)] if o]
+            for o in dict.fromkeys(regs):
+                if o not in LAUNCH_AREA:
+                    continue
+                a = self.avia.get(o)
+                if a and t - a["t"] < AVIA_LIFE:
+                    a.update(t=t, n=a["n"] + 1, act=t)
+                else:
+                    self.avia[o] = {"t": t, "first": t, "n": 1, "platform": None, "act": t}
+                if obs.aviation:
+                    self.avia[o]["platform"] = "Су-34/Су-35"
+            rec["avia"] = regs
+            return rec
         if obs.kind == "zone":
             if places:
-                self.zones.append(Zone([p.place for p in places], t, src, "Су-34" if obs.aviation else None))
+                pl = [p.place for p in places]
+                # та сама зона (повторна згадка) — оновлюємо час, а не плодимо дублікати
+                z = next((z for z in self.zones if any(dist_km(a.xy, b.xy) < 25 for a in z.places for b in pl)), None)
+                if z:
+                    z.last, z.n = t, z.n + 1
+                    z.places += [p for p in pl if all(dist_km(p.xy, q.xy) > 3 for q in z.places)]
+                    z.places = z.places[-6:]
+                else:
+                    z = Zone(pl, t, src, "Су-34" if obs.aviation else None, t, 1, obl_of(pl[0]))
+                    self.zones.append(z)
+                # КАБ летять — отже авіація в цьому напрямку активна
+                if z.obl in LAUNCH_AREA:
+                    a = self.avia.get(z.obl)
+                    if a and t - a["t"] < AVIA_LIFE:
+                        a.update(t=t, n=a["n"] + 1)
+                    else:
+                        self.avia[z.obl] = {"t": t, "first": t, "n": 1, "platform": None}
             return rec
         if obs.kind != "track" or obs.type not in TYPES:
             return rec
@@ -322,7 +413,7 @@ class Tracker:
         names = {p.name for p in route}
         best, bs = None, 1e9
         for tr in self.tracks:
-            if tr.type != typ or tr.closed or t - tr.last.t > TYPES[typ]["life"] or tr.id in self.exclude:
+            if tr.type != typ or tr.closed or tr.merged or t - tr.last.t > TYPES[typ]["life"] or tr.id in self.exclude:
                 continue
             shared = names & ({p.name for p in tr.route} | ({tr.course_to} if tr.course_to else set()))
             e = tr.est(t)
@@ -343,7 +434,7 @@ class Tracker:
     def _best(self, typ: str, pt, t: float, names: set | None = None) -> Track | None:
         best, bs = None, 1e9
         for tr in self.tracks:
-            if tr.type != typ or tr.closed or tr.id in self.exclude:
+            if tr.type != typ or tr.closed or tr.merged or tr.id in self.exclude:
                 continue
             dt = t - tr.last.t
             if dt > TYPES[typ]["life"] * 1.2:
@@ -365,11 +456,54 @@ class Tracker:
                 best, bs = tr, s
         return best
 
+    MERGE_KM = {"jet": 30, "cruise": 35, "ballistic": 40, "geran5": 30, "banderol": 30, "shahed": 7, "molniya": 6}
+
+    def _dedup(self, now: float) -> None:
+        """Один і той самий об'єкт різні канали називають різними селами (а то й типами) — треки-близнюки зливаємо.
+        Лишаємо трек із більшою кількістю незалежних джерел; дублікат ховаємо, його джерела переходять до основного."""
+        act = [tr for tr in self.tracks if not tr.closed and not tr.merged and now - tr.last.t < self.life(tr)]
+        pos = {tr.id: tr.est(now, SHOW_BY_TYPE.get(tr.type, SHOW_MIN)) for tr in act}
+
+        def rank(tr):
+            return (len(tr.srcs), tr.last.t)
+
+        def same_way(a, b):
+            return a.heading is None or b.heading is None or ang_diff(a.heading, b.heading) < 60
+
+        for i, a in enumerate(act):
+            if a.merged:
+                continue
+            for b in act[i + 1:]:
+                if b.merged:
+                    continue
+                d = dist_km(pos[a.id], pos[b.id])
+                if a.type == b.type:
+                    lim = self.MERGE_KM.get(a.type, 10)
+                    # шахеди летять групами — зливаємо лише «той самий пункт від різних каналів»
+                    if a.type in ("shahed", "molniya") and not (a.last.label == b.last.label or d < 3):
+                        continue
+                elif {a.type, b.type} == {"jet", "shahed"}:
+                    # «реактивний» і «шахед» в одній точці одним курсом — найчастіше той самий об'єкт, різні канали
+                    lim = 8
+                else:
+                    continue
+                if d > lim or not same_way(a, b):
+                    continue
+                keep, drop = (a, b) if rank(a) >= rank(b) else (b, a)
+                if a.type != b.type and keep.type == "jet" and len(drop.srcs) >= len(keep.srcs):
+                    keep, drop = drop, keep
+                drop.merged = keep.id
+                keep.srcs |= drop.srcs
+                if (drop.count or 1) > (keep.count or 1) and drop.type == keep.type:
+                    keep.count = drop.count
+                if drop is a:
+                    break
+
     def life(self, tr: Track) -> float:
         """Скільки ціль лишається «активною» без нових повідомлень. Долетіла до названого пункту і мовчить —
         прибираємо через 10 хв (як провідні сервіси), а не тримаємо 40 хв на місці."""
         base = TYPES[tr.type]["life"]
-        fast = tr.type in ("cruise", "ballistic")
+        fast = tr.type in FAST_TYPES
         if tr.route:
             km = sum(dist_km(a, b) for a, b in itertools.pairwise(tr.path()))
             # ракета долетіла до названого пункту і про неї мовчать — вона впала або збита: прибираємо за 3 хв
@@ -445,7 +579,10 @@ class Tracker:
             elif self.brain and self.learn and len(tr.srcs) == 1 and not tr.credited:
                 self.brain.rel_update(next(iter(tr.srcs)), False, 0.5)  # ніхто не підтвердив
         self.tracks = keep
+        self._dedup(now)
         for tr in self.tracks:
+            if tr.merged:
+                continue
             life = self.life(tr)
             age = now - tr.last.t
             status = "closed" if tr.closed else ("lost" if age > life else "active")
@@ -510,10 +647,30 @@ class Tracker:
                 "launch": self.launches.link(tr, now, hd) if status != "closed" or age < 1800 else None,
             })
         zones = []
-        self.zones = [z for z in self.zones if now - z.t < ZONE_LIFE]
+        self.avia = {o: a for o, a in self.avia.items() if now - a["t"] < AVIA_LIFE}
+
+        def alive(z):
+            age = now - (z.last or z.t)
+            if age > KAB_MAX:
+                return False
+            a = self.avia.get(z.obl)
+            if a and now - a.get("act", 0) < 12 * 60:   # про авіацію в цьому напрямку прямо писали щойно
+                return age < KAB_AVIA
+            return age < KAB_QUIET
+        self.zones = [z for z in self.zones if alive(z)]
         for z in self.zones:
-            zones.append({"places": [[p.lon, p.lat, p.name] for p in z.places], "t": int(z.t), "platform": z.platform})
+            age = now - (z.last or z.t)
+            zones.append({"places": [[p.lon, p.lat, p.name] for p in z.places], "t": int(z.t), "last": int(z.last or z.t),
+                          "n": z.n, "obl": z.obl, "platform": z.platform, "fade": round(min(1.0, age / KAB_QUIET), 2)})
             for p in z.places:
                 up(obl.of(p.lon, p.lat), 2)
-        return {"now": now, "tracks": out, "zones": zones, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
+        avia = []
+        for o, a in self.avia.items():
+            la, lo, area = LAUNCH_AREA[o]
+            kz = [z for z in self.zones if z.obl == o]
+            avia.append({"obl": o, "lat": la, "lon": lo, "area": area, "t": int(a["t"]), "first": int(a["first"]), "n": a["n"],
+                         "platform": a.get("platform") or "тактична авіація", "kab": len(kz),
+                         "to": [[z.places[0].lon, z.places[0].lat] for z in kz][:4],
+                         "fade": round(min(1.0, (now - a["t"]) / AVIA_LIFE), 2)})
+        return {"now": now, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
                 "log": self.log[-60:]}

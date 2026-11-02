@@ -251,7 +251,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
             "tracks": tracks, "by_type": by_type, "official": official, "sites": list(sites.values()), "booms": sorted(bl, key=lambda b: -b["c"])}
 
 
-SPEED = {"shahed": 170, "jet": 450, "molniya": 120, "cruise": 800, "ballistic": 2000, "kab": 400}
+SPEED = {"shahed": 170, "jet": 450, "molniya": 120, "cruise": 800, "ballistic": 2000, "kab": 400, "geran5": 550, "banderol": 700, "rszv": 1500, "fpv": 80, "fpvf": 60}
 
 
 def stitch(tracks: list[dict]) -> list[dict]:

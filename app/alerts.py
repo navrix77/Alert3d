@@ -186,6 +186,7 @@ class OfficialAlerts:
                         p = max((g.places[i] for i in gids), key=lambda q: q.pop)
                         points.append([p.lon, p.lat, uk, lv, 1 if ids else 0])
         self.oblast_levels, self.raion_levels, self.points = obl, raions, points
+        self.any_obl = set(obl) | set(area_obl.values())
         self.hromada_levels = hrom_poly
         self.raions = sorted(raions)
         self.updated, self.ok, self.error = time.time(), True, None
@@ -322,5 +323,6 @@ class OfficialAlerts:
                 rl[r] = max(rl.get(r, 0), lvl)
             else:
                 rl.pop(r, None)
-        return {"levels": self.oblast_levels, "raions": sorted(rl), "raion_levels": rl, "points": self.points, "hromadas": self.hromada_levels,
+        anyo = set(self.oblast_levels) | (getattr(self, "any_obl", set()) if time.time() - (self.updated or 0) < 600 else set())
+        return {"levels": self.oblast_levels, "alert_obl": sorted(anyo), "raions": sorted(rl), "raion_levels": rl, "points": self.points, "hromadas": self.hromada_levels,
                 "updated": self.updated, "ok": self.ok, "error": self.error, "source": self.source}

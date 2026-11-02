@@ -170,3 +170,33 @@ def test_alert_lines_and_fpv_are_not_targets():
         assert o.kind != "track" and o.no_target, t
     assert p.parse("🔴 Шахед на Полтаву", None).kind == "track"
     assert p.parse("💥 Харків", None).kind == "filtered"
+
+
+def test_explicit_new_types():
+    from app.parser import Parser
+    p = Parser()
+    assert p.parse("Бандероль курсом на Харків").type == "banderol"
+    assert p.parse("Герань-5 на Полтаву").type == "geran5"
+    assert p.parse("FPV у районі Білозерки").type == "fpv"
+    assert p.parse("FPV на оптоволокні біля Херсона").type == "fpvf"
+    assert p.parse("Шахед на Полтаву").type == "shahed"
+    assert p.parse("Град пройшов у Києві").type != "rszv"
+
+
+def test_kab_zone_lifecycle():
+    import time
+    from app import config
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p, tr = Parser(), Tracker(config.SOURCES, learn=False)
+    t = time.time() - 3600
+    tr.ingest(p.parse("Активність тактичної авіації на північно-східному напрямку"), "x", t)
+    tr.ingest(p.parse("КАБ на Золочів"), "x", t + 60)
+    tr.ingest(p.parse("КАБ на Золочів"), "x", t + 120)
+    tr.zones[0].last = time.time() - 60
+    s = tr.snapshot()
+    assert len(s["zones"]) == 1 and s["zones"][0]["n"] == 2  # повторна згадка не дублює зону
+    tr.ingest(p.parse("Відбій загрози КАБ на Харківщині"), "x", time.time())
+    assert not tr.snapshot()["zones"]
+    tr.ingest(p.parse("КАБ на Золочів"), "x", time.time() - 11 * 60)  # 11 хв тиші, авіації вже нема
+    assert not tr.snapshot()["zones"]
