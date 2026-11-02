@@ -218,6 +218,10 @@ class Brain:
             self._x("INSERT INTO pacc VALUES(?,?,?) ON CONFLICT(type) DO UPDATE SET hit=excluded.hit, tot=excluded.tot", (typ, st[0], st[1]))
             self._tick()
 
+    def hd_acc(self) -> dict:
+        """Частка випадків, коли показаний на мапі курс збігся (≤45°) з тим, куди ціль назвали далі."""
+        return {k[:-3]: {"acc": round(h / n, 2), "n": int(n)} for k, (h, n) in self.pacc.items() if k.endswith("@hd") and n >= 5}
+
     def pred_acc(self) -> dict:
         """Точність навченого прогнозу за метрикою v2 (див. Tracker._score_pred) і наївного базового для порівняння.
         Старі лічильники (метрика v1, без «@2») більше не показуються — вони міряли не те."""

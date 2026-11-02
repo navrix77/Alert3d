@@ -285,9 +285,10 @@ function posAt(tr,serverT){
   if(tr.status!=='active')return {p:[tr.lon,tr.lat],hd:tr.hd};
   // місце лише оцінене («курсом на X» — і вже в X), а нового пункту немає: далі не «ведемо» ціль навмання
   if(tr.pos_est&&!tr.route.length&&!tr.next)return {p:[tr.lon,tr.lat],hd:tr.hd};
-  let km=tr.speed*Math.max(0,serverT-tr.ts)/3600;
+  const V=tr.vmap||tr.speed;// швидкість просування на мапі (сервер: бектест), не паспортна
+  let km=V*Math.max(0,serverT-tr.ts)/3600;
   const SHOW={shahed:25,molniya:20,jet:6,cruise:2,ballistic:1}[tr.type]??25;// хв: ціль рухається курсом, доки не прийде нове повідомлення (зона «де може бути» росте)
-  const cap=Math.max(0,tr.speed*SHOW/60-tr.speed*Math.max(0,tr.ts-tr.last)/3600);
+  const cap=Math.max(0,V*SHOW/60-V*Math.max(0,tr.ts-tr.last)/3600);
   if(!tr.route.length)km=Math.min(km,cap);
   const pts=[xy([tr.lon,tr.lat]),...tr.route.map(xy)];
   if(pts.length===1){if(tr.hd==null)return {p:[tr.lon,tr.lat],hd:tr.hd};const r=tr.hd*D2R;return {p:ll([pts[0][0]+Math.sin(r)*km,pts[0][1]+Math.cos(r)*km]),hd:tr.hd};}

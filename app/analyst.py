@@ -137,7 +137,8 @@ def source_stats(groups: list[dict], min_groups: int = 20) -> list[dict]:
         out.append({"src": s, "targets": v["groups"], "shared": v["multi"], "first_share": round(v["first"] / v["multi"], 2) if v["multi"] else 0.0,
                     "lag_med_s": int(statistics.median(v["lags"])) if v["lags"] else 0,
                     "copy_share": round(v["copies"] / v["msgs"], 2) if v["msgs"] else 0.0})
-    out.sort(key=lambda x: (-x["first_share"], x["lag_med_s"]))
+    # рейтинг «хто перший» — лише за достатньої кількості спільних цілей; ретранслятори з малою вибіркою — в кінці
+    out.sort(key=lambda x: (x["shared"] < min_groups, -x["first_share"], x["lag_med_s"]))
     return out
 
 
@@ -190,8 +191,10 @@ def corridors(active: list[dict]) -> list[dict]:
         g = next((g for g in groups if g["type"] == tr["type"] and g["obl"] == o and
                   (hd is None and g["hd"] is None or hd is not None and g["hd"] is not None and abs((hd - g["hd"] + 540) % 360 - 180) <= 35)), None)
         if g is None:
-            g = {"type": tr["type"], "obl": o, "hd": hd, "ids": [], "n": 0, "next": collections.Counter(), "hds": []}
+            g = {"type": tr["type"], "obl": o, "hd": hd, "ids": [], "n": 0, "next": collections.Counter(), "hds": [], "src": collections.Counter()}
             groups.append(g)
+        if hd is not None:
+            g["src"][tr.get("hd_src") or "movement"] += 1
         g["ids"].append(tr["id"])
         g["n"] += tr.get("count") or 1
         if hd is not None:
@@ -207,8 +210,48 @@ def corridors(active: list[dict]) -> list[dict]:
             hd = (math.degrees(math.atan2(sx, cx)) + 360) % 360
         out.append({"type": g["type"], "obl": g["obl"], "n": g["n"], "hd": None if hd is None else round(hd),
                     "dir": None if hd is None else DIR8[int((hd + 22.5) // 45) % 8], "next": [n for n, _ in g["next"].most_common(3)],
-                    "ids": g["ids"]})
+                    "hd_src": dict(g["src"]), "spread": _spread(g["hds"]), "ids": g["ids"]})
     out.sort(key=lambda g: -g["n"])
+    return out
+
+
+def _spread(hds: list[float]) -> int | None:
+    """Розкид курсів у групі (кругове відхилення, град.): мале — цілі справді йдуть одним коридором."""
+    if len(hds) < 2:
+        return None
+    sx = sum(math.sin(math.radians(h)) for h in hds) / len(hds)
+    cx = sum(math.cos(math.radians(h)) for h in hds) / len(hds)
+    r = min(1.0, math.hypot(sx, cx))
+    return round(math.degrees(math.sqrt(max(0.0, -2 * math.log(max(r, 1e-9))))))
+
+
+HD_SRC_UA = {"channels": "названий каналами пункт", "course": "курс, названий каналом", "learned": "навчені маршрути",
+             "movement": "рух між позиціями", "from": "звідки летить"}
+
+
+def direction_quality(active: list[dict]) -> dict:
+    """Звідки відомий напрямок кожної активної цілі — щоб довіряти напрямкам свідомо."""
+    c = collections.Counter()
+    for tr in active:
+        c[(tr.get("hd_src") or "movement") if tr.get("hd") is not None else "none"] += tr.get("count") or 1
+    return dict(c)
+
+
+def likely_next(active: list[dict]) -> list[dict]:
+    """Куди ймовірно далі за досвідом попередніх перельотів — для цілей, про пункт призначення яких канали мовчать."""
+    tg: dict[str, dict] = {}
+    for tr in active:
+        if tr.get("next") or not tr.get("pred_next"):
+            continue
+        n = tr["pred_next"]
+        x = tg.setdefault(n, {"name": n, "n": 0, "p": 0.0, "types": collections.Counter(), "ids": []})
+        x["n"] += tr.get("count") or 1
+        x["p"] = max(x["p"], tr.get("pred_p") or 0)
+        x["types"][tr["type"]] += 1
+        x["ids"].append(tr["id"])
+    out = sorted(tg.values(), key=lambda x: (-x["n"], -x["p"]))
+    for x in out:
+        x["types"] = dict(x["types"])
     return out
 
 
@@ -263,7 +306,8 @@ def analyze(snap: dict, hist: list[dict], brain=None, now: float | None = None) 
     for t in active:
         by_type[t["type"]] += t.get("count") or 1
     res: dict = {"t": int(now), "active": dict(by_type), "active_n": sum(by_type.values()),
-                 "wave": wave(hist, now), "corridors": corridors(active), "targets": targets(active)}
+                 "wave": wave(hist, now), "corridors": corridors(active), "targets": targets(active),
+                 "likely_next": likely_next(active), "direction": direction_quality(active)}
     fc = (snap.get("forecast") or {}).get("oblasts") or {}
     res["oblast_p60"] = sorted(({"obl": o, "p60": v.get("p60"), "n60": v.get("n60")} for o, v in fc.items() if (v.get("p60") or 0) >= 0.2),
                                key=lambda x: (-round(x["p60"] or 0, 1), -(x["n60"] or 0)))[:6]
@@ -283,9 +327,10 @@ def analyze(snap: dict, hist: list[dict], brain=None, now: float | None = None) 
         except Exception:  # noqa: BLE001
             jr = jr or (now, {"sources": [], "nights": None})
     jd = jr[1] if jr else {"sources": [], "nights": None}
-    res["sources"] = jd["sources"][:12]
+    res["sources"] = jd["sources"][:24]
     res["nights"] = jd["nights"]
-    res["self"] = {"pred_acc": brain.pred_acc() if brain is not None and hasattr(brain, "pred_acc") else {}}
+    res["self"] = {"pred_acc": brain.pred_acc() if brain is not None and hasattr(brain, "pred_acc") else {},
+                   "hd_acc": brain.hd_acc() if brain is not None and hasattr(brain, "hd_acc") else {}}
     res["summary"] = summary(res)
     return res
 
@@ -310,6 +355,16 @@ def summary(r: dict) -> list[str]:
                 s += f" (→ {', '.join(c['next'][:2])})"
             parts.append(s)
         out.append("Головні напрямки: " + "; ".join(parts) + ".")
+    dq = r.get("direction") or {}
+    known = sum(v for k, v in dq.items() if k != "none")
+    if r["active_n"] and dq:
+        parts = [f"{HD_SRC_UA.get(k, k)} — {v}" for k, v in sorted(dq.items(), key=lambda kv: -kv[1]) if k != "none"]
+        out.append(f"Напрямок відомий для {known} з {r['active_n']}" + (": " + ", ".join(parts) if parts else "") + "."
+                   + (f" Без курсу: {dq['none']}." if dq.get("none") else ""))
+    ln = r.get("likely_next") or []
+    if ln:
+        out.append("Канали не назвали куди, але за попередніми перельотами ймовірно далі: " + "; ".join(
+            f"{x['name']} ({x['n']} {plural(x['n'], ('ціль', 'цілі', 'цілей'))}, {round(x['p'] * 100)}%)" for x in ln[:3]) + ".")
     tg = r["targets"][:3]
     if tg:
         out.append("Куди летять за словами каналів: " + "; ".join(
@@ -333,13 +388,19 @@ def summary(r: dict) -> list[str]:
         prev = "у попередні ночі" if n.get("period") == "ніч" else "у попередні дні"
         out.append(f"{since} — {n['tonight_n']} {plural(n['tonight_n'], ('трек', 'треки', 'треків'))} цілей; {prev} зі схожим охопленням каналів "
                    f"({n['comparable']}) на цю годину в середньому {a} — {cmp_}" + (f" (×{k:.1f})" if k and cmp_ != "приблизно стільки ж" else "") + ".")
-    if r["sources"]:
-        s = r["sources"][0]
+    fast = [x for x in r["sources"] if x["shared"] >= 20]
+    if fast:
+        s = fast[0]
         out.append(f"Найшвидше джерело за добу: {s['src']} — першим у {round(s['first_share'] * 100)}% із {s['shared']} спільних цілей"
                    + (f"; коли не перший — відстає в середньому на {round(s['lag_med_s'] / 60, 1)} хв" if s["lag_med_s"] else "") + ".")
+    if r["sources"]:
         cp = [x for x in r["sources"] if x["copy_share"] >= 0.5]
         if cp:
             out.append("Переважно дублюють інших (не незалежні підтвердження): " + ", ".join(f"{x['src']} ({round(x['copy_share'] * 100)}% перепостів)" for x in cp[:4]) + ".")
+    ha = r["self"].get("hd_acc") or {}
+    if ha:
+        out.append("Самоперевірка напрямку (курс на мапі збігся з наступною названою позицією в межах 45°): " + ", ".join(
+            f"{TYPE_UA.get(t, (t,))[0]} {round(v['acc'] * 100)}% з {v['n']}" for t, v in ha.items()) + ".")
     pa = r["self"].get("pred_acc") or {}
     if pa:
         out.append("Самоперевірка прогнозу «ймовірно далі»: " + ", ".join(

@@ -191,9 +191,11 @@ def run(rows, test_from: float | None = None, methods=None, verbose=True) -> dic
         rep.setdefault(g, {}).setdefault(m, {})[h] = {
             "n": len(es), "med": round(statistics.median(es), 1), "p15": round(sum(e <= 15 for e in es) / len(es), 2)}
     rep["_live_pred_acc"] = brain.pred_acc()
+    rep["_live_hd_acc"] = brain.hd_acc() if hasattr(brain, "hd_acc") else {}
     if verbose:
         print("Живa метрика прогнозу «ймовірно далі» (v2) за весь повтор:", rep["_live_pred_acc"])
         print("Похибка курсу (град.):", rep["_heading_err"])
+        print("Жива самоперевірка напрямку (≤45°):", rep["_live_hd_acc"])
         for g in rep:
             if g.startswith("_"):
                 continue

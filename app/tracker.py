@@ -94,6 +94,7 @@ class Track:
     credited: set[str] = field(default_factory=set)
     evidence: list = field(default_factory=list)  # [{t, src, link, text, why, dest, pos, key}]
     pred_src: str | None = None
+    hd_src: str | None = None  # звідки курс: channels (названий пункт) / course (написано «курс на захід») / learned / movement
     last_pred: tuple | None = None  # (назва, xy, t, звідки xy, наївний xy) — перший крок навченого прогнозу, для самоперевірки
     pred_moved: int = 0
     pred_naive_hit: bool = False
@@ -112,8 +113,8 @@ class Track:
                 pts.append(p.xy)
         return pts
 
-    def est(self, now: float, cap_min: float = 4) -> tuple[float, float]:
-        km = self.speed * max(0.0, now - self.last.t) / 3600
+    def est(self, now: float, cap_min: float = 4, k: float = 1.0) -> tuple[float, float]:
+        km = self.speed * k * max(0.0, now - self.last.t) / 3600
         if self.route:
             pts = self.path()
             tot = sum(dist_km(pts[i - 1], pts[i]) for i in range(1, len(pts)))
@@ -121,13 +122,18 @@ class Track:
                 return along(pts, km)
             # пункт пройдено — летить далі тим самим курсом, доки не з'явиться нове повідомлення
             hd = bearing(pts[-2], pts[-1]) if len(pts) > 1 else self.heading
-            return move(pts[-1], hd, min(km - tot, self.speed * cap_min / 60))
+            return move(pts[-1], hd, min(km - tot, self.speed * k * cap_min / 60))
         if self.heading is None:
             return (self.last.x, self.last.y)
         # для зіставлення повідомлень — лише ~4 хв польоту; для показу на карті — довше (зона невизначеності росте)
-        return move((self.last.x, self.last.y), self.heading, min(km, self.speed * cap_min / 60))
+        return move((self.last.x, self.last.y), self.heading, min(km, self.speed * k * cap_min / 60))
 
 
+# Швидкість, з якою ціль «просувається» між названими каналами пунктами (для показу на мапі), — нижча за паспортну:
+# повідомлення запізнюються, дрони маневрують. Бектест 26.10–02.11 (поз. похибка до наступної названої позиції,
+# навчання до 01.11 09:00 / перевірка після): шахеди k≈0.3–0.4 (медіана 23.0 → 17.8 км), реактивні k≈0.6 (26.0 → 21.2 км).
+# Для зіставлення повідомлень і часу підльоту лишається паспортна швидкість (обережніше).
+MAP_K = {"shahed": 0.35, "jet": 0.6}
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
 SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5, "recon": 15}
@@ -338,11 +344,20 @@ class Tracker:
                 prev = tr.last
                 if tr.last_pred and self.brain and self.learn:
                     self._score_pred(tr, pt, t)
+                if self.brain and self.learn:
+                    self._score_heading(tr, pt, t)
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
                 if self.brain and self.learn and prev.place:
                     self.brain.learn_step(tr.type, prev.place, pos.place, 0.6 if prev.est else 1.0)
-                if d > 3 and not route and obs.course is None:
-                    tr.heading = bearing((prev.x, prev.y), pt)
+                if not route and obs.course is None:
+                    # Курс без названого каналами пункту. Бектест 26.10–02.11 (похибка напрямку до наступної названої
+                    # позиції): «від попередньої точки» — медіана 46°, бо різні канали з різною затримкою називають
+                    # сусідні села (A→B→A, 0 хв між точками); навчений «наступний пункт» — 25°. Тож: навчений, інакше рух.
+                    lh = self._learned_heading(tr, pos.place, pt)
+                    if lh is not None:
+                        tr.heading, tr.hd_src = lh, "learned"
+                    elif d > 3:
+                        tr.heading, tr.hd_src = bearing((prev.x, prev.y), pt), "movement"
             elif route:
                 # «на X» від каналу, що веде ціль щохвилини: ціль уже біля X (так показують провідні сервіси).
                 # Переносимо її в X, якщо X досяжний за час від останньої фіксації; курс — звідки прийшла.
@@ -378,9 +393,9 @@ class Tracker:
                 tr.route = [p for p in tr.route if dist_km(p.xy, pt) > 3]
             tr.route = [p for p in tr.route if dist_km(p.xy, (tr.last.x, tr.last.y)) > 1.5]
             if tr.route:
-                tr.heading = bearing((tr.last.x, tr.last.y), tr.route[0].xy)
+                tr.heading, tr.hd_src = bearing((tr.last.x, tr.last.y), tr.route[0].xy), "channels"
             elif obs.course is not None:
-                tr.heading = obs.course
+                tr.heading, tr.hd_src = obs.course, "course"
         else:
             c = self.counters[obs.type] = self.counters.get(obs.type, 0) + 1
             tr = Track(f"{TYPES[obs.type]['label']}-{c}", obs.type, self.speed_over.get(obs.type, TYPES[obs.type]["speed"]))
@@ -401,11 +416,15 @@ class Tracker:
                     tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
             tr.route = [p for p in route if dist_km(p.xy, (tr.last.x, tr.last.y)) > 2]
             if tr.route:
-                tr.heading = bearing((tr.last.x, tr.last.y), tr.route[0].xy)
+                tr.heading, tr.hd_src = bearing((tr.last.x, tr.last.y), tr.route[0].xy), "channels"
             elif obs.course is not None:
-                tr.heading = obs.course
+                tr.heading, tr.hd_src = obs.course, "course"
             elif frm and pos is not None and dist_km(frm.place.xy, pt) > 3:
-                tr.heading = bearing(frm.place.xy, pt)
+                tr.heading, tr.hd_src = bearing(frm.place.xy, pt), "from"
+            elif pos is not None:
+                lh = self._learned_heading(tr, pos.place, pt)  # нова ціль без курсу: навчений напрямок із цього пункту
+                if lh is not None:
+                    tr.heading, tr.hd_src = lh, "learned"
             tr.from_place = frm.place if frm else None
             self.tracks.append(tr)
         # канал прямо назвав «звідки → куди»: це теж знання про маршрут
@@ -447,6 +466,31 @@ class Tracker:
                             "pos": (tr.obs[-1].x, tr.obs[-1].y) if moved else None, "est": bool(moved and tr.obs[-1].est)})
         tr.evidence = tr.evidence[-40:]
         return rec
+
+    def _score_heading(self, tr: Track, pt, t: float) -> None:
+        """Жива самоперевірка напрямку: курс, який показувала мапа після останньої НАЗВАНОЇ позиції, проти того,
+        куди ціль насправді назвали далі (>5 км, через 3–40 хв). Влучання — ≤45°."""
+        real = next((o for o in reversed(tr.obs) if not o.est), None)
+        if real is None or not 180 <= t - real.t <= 2400:
+            return
+        a = (real.x, real.y)
+        if dist_km(a, pt) <= 5:
+            return
+        shown = bearing(a, tr.route[0].xy) if tr.route and dist_km(a, tr.route[0].xy) > 3 else tr.heading
+        if shown is None:
+            return
+        self.brain.pred_score(tr.type + "@hd", ang_diff(shown, bearing(a, pt)) <= 45)
+
+    def _learned_heading(self, tr: Track, place, pt) -> float | None:
+        if not self.brain or not place or not hasattr(self.brain, "next_places"):
+            return None
+        la, lo = from_xy(*pt)
+        nx = self.brain.next_places(tr.type, place.name, None, (la, lo))
+        if nx and nx[0][1] >= 0.3:
+            xy = _gxy(nx[0][2], nx[0][3])
+            if 3 < dist_km(pt, xy) <= 110:  # навчений «наступний пункт» за 100+ км — помилка навчання, не курс
+                return bearing(pt, xy)
+        return None
 
     def _score_pred(self, tr: Track, pt, t: float) -> None:
         """Чесна самоперевірка навченого прогнозу «ймовірно далі X» (бектест 26.10–02.11 показав, що стара
@@ -675,9 +719,10 @@ class Tracker:
             status = "closed" if tr.closed else ("lost" if age > life else "active")
             if status != "active" and age > life + 900:
                 continue
-            ex, ey = tr.est(now, SHOW_BY_TYPE.get(tr.type, SHOW_MIN)) if status == "active" else (tr.last.x, tr.last.y)
+            mk = MAP_K.get(tr.type, 1.0)
+            ex, ey = tr.est(now, SHOW_BY_TYPE.get(tr.type, SHOW_MIN), mk) if status == "active" else (tr.last.x, tr.last.y)
             lat, lon = from_xy(ex, ey)
-            km = tr.speed * min(age, life) / 3600
+            km = tr.speed * mk * min(age, life) / 3600
             rest = []
             if tr.route and status == "active":
                 acc = 0.0
@@ -728,7 +773,7 @@ class Tracker:
             out.append({
                 "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
-                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "pred": pred_src, "pred_p": pred_p, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est,
+                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est,
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),

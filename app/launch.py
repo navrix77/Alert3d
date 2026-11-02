@@ -226,6 +226,7 @@ class LaunchBook:
         p0 = (first.x, first.y)
         back = (hd + 180) % 360
         stats = self.brain.site_stats(tr.type, first.place.name if first.place else None) if self.brain else {}
+        stats = stats or {}
         best, bs = None, 1e9
         for s in SITE_LIST:
             if tr.type not in s.types or s.kind == "аеродром" and tr.type != "kab":

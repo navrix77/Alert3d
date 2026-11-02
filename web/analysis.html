@@ -49,6 +49,8 @@ footer{color:var(--mute);font-size:12px;margin-top:16px;line-height:1.5}
 <section class="grid">
   <div class="card"><h2>Напрямки атаки</h2><div id="corr"></div></div>
   <div class="card"><h2>Куди летять (за каналами)</h2><div id="tg"></div></div>
+  <div class="card"><h2>Ймовірно далі (навчені маршрути)</h2><div id="ln"></div></div>
+  <div class="card"><h2>Звідки відомий напрямок</h2><div id="dq"></div></div>
   <div class="card"><h2>Прогноз на годину</h2><div id="fc"></div></div>
   <div class="card"><h2>Ця ніч проти попередніх</h2><div id="nights"></div></div>
   <div class="card"><h2>Швидкість і незалежність джерел · доба</h2><div id="src"></div></div>
@@ -72,16 +74,23 @@ function render(a){
   const w=a.wave||{};const k=[[a.active_n,'у повітрі зараз',''],[w.new30,'нових за 30 хв',w.trend==='наростає'?'up':(w.trend==='спадає'?'down':'')],[w.prev30,'за попередні 30 хв',''],[w.peak12h,'пік за 12 год','']];
   if(a.nights)k.push([a.nights.tonight_n,(a.nights.period==='ніч'?'треків від 18:00':'треків від 09:00'),'']);
   $('kpis').innerHTML=k.map(([v,l,c])=>'<div class="kpi '+c+'"><b>'+(v??'—')+'</b><span>'+l+'</span></div>').join('');
-  $('corr').innerHTML=table(['Що й де','Курс · далі','К-сть'],(a.corridors||[]).slice(0,8).map(c=>[esc(TY[c.type]||c.type)+'<div class="mute">'+esc(c.obl)+'</div>',(c.dir?esc(c.dir):'<span class="mute">курс невідомий</span>')+(c.next&&c.next.length?'<div>→ '+esc(c.next.join(', '))+'</div>':'')+'<div class="ids">'+esc(c.ids.join(' '))+'</div>',c.n]));
+  $('corr').innerHTML=table(['Що й де','Курс · далі','К-сть'],(a.corridors||[]).slice(0,8).map(c=>[esc(TY[c.type]||c.type)+'<div class="mute">'+esc(c.obl)+'</div>',(c.dir?esc(c.dir)+(c.spread!=null?' <span class="mute">±'+c.spread+'°</span>':''):'<span class="mute">курс невідомий</span>')+(c.next&&c.next.length?'<div>→ '+esc(c.next.join(', '))+'</div>':'')+'<div class="ids">'+esc(c.ids.join(' '))+'</div>',c.n]));
   $('tg').innerHTML=table(['Пункт','Типи','Підліт','Цілей'],(a.targets||[]).slice(0,10).map(x=>[esc(x.name)+'<div class="ids">'+esc(x.ids.join(' '))+'</div>',esc(Object.keys(x.types).map(t=>TY[t]||t).join(', ')),x.eta_min!=null?'≈'+x.eta_min+' хв':'—',x.n]));
+  $('ln').innerHTML=table(['Пункт','Типи','Ймовірність','Цілей'],(a.likely_next||[]).slice(0,8).map(x=>[esc(x.name)+'<div class="ids">'+esc(x.ids.join(' '))+'</div>',esc(Object.keys(x.types).map(t=>TY[t]||t).join(', ')),Math.round((x.p||0)*100)+'%',x.n]))+
+    '<p class="mute" style="font-size:12px;margin:8px 0 0">Лише для цілей, про пункт призначення яких канали мовчать. Наступний пункт — з переходів, які ціль цього типу робила з цього місця в попередні ночі.</p>';
+  const DQ={channels:'Названий каналами пункт',course:'Курс, названий каналом',learned:'Навчені маршрути',movement:'Рух між позиціями',from:'Звідки летить',none:'Курс невідомий'};
+  const dq=a.direction||{},dqt=Object.values(dq).reduce((x,y)=>x+y,0)||1;
+  $('dq').innerHTML=table(['Джерело курсу','Цілей','Частка'],Object.entries(dq).sort((x,y)=>y[1]-x[1]).map(([k,v])=>[esc(DQ[k]||k)+'<div class="bar" style="width:'+Math.round(v/dqt*100)+'%"></div>',v,Math.round(v/dqt*100)+'%']))+
+    '<p class="mute" style="font-size:12px;margin:8px 0 0">Бектест тижня: курс за названим пунктом — медіанна похибка ~19°, за навченими маршрутами ~16–25°, «від попередньої точки» — ~46° (канали з різною затримкою називають сусідні села).</p>';
   $('fc').innerHTML=table(['Область','Ймовірність','Очік. цілей'],(a.oblast_p60||[]).map(o=>[esc(o.obl)+'<div class="bar" style="width:'+Math.round((o.p60||0)*100)+'%"></div>',Math.round((o.p60||0)*100)+'%',o.n60??'—']));
   const n=a.nights;
   $('nights').innerHTML=!n?'<div class="empty">Журнал ще збирається</div>':(
     '<p style="margin:0 0 8px;font-size:13px">Зараз: <b>'+n.tonight_n+'</b> треків, '+n.channels_now+' каналів. '+(n.avg_same_time!=null?'Схожі за охопленням періоди на цю годину: в середньому <b>'+n.avg_same_time+'</b>.':'<span class="mute">Попередні періоди мали значно менше каналів ('+(n.past_channels||[]).join(', ')+') — пряме порівняння було б нечесним.</span>')+'</p>'+
     table(['Період','На цю годину','За весь','Каналів'],(n.past_same_time||[]).map((v,i)=>[(i+1)+' '+(n.period==='ніч'?pl(i+1,['ніч','ночі','ночей']):pl(i+1,['день','дні','днів']))+' тому',v,(n.past_full||[])[i],(n.past_channels||[])[i]])));
   $('src').innerHTML=table(['Канал','Першим','Відстає','Перепости','Спільних'],(a.sources||[]).map(s=>[esc(s.src),Math.round(s.first_share*100)+'%',s.lag_med_s?(s.lag_med_s/60).toFixed(1)+' хв':'—',Math.round(s.copy_share*100)+'%',s.shared]));
-  const pa=(a.self||{}).pred_acc||{};
-  $('self').innerHTML=table(['Тип','Влучань','Наївний','Перевірок'],Object.entries(pa).map(([t,v])=>[esc(TY[t]||t),Math.round(v.acc*100)+'%',v.naive!=null?Math.round(v.naive*100)+'%':'—',v.n]))+
+  const pa=(a.self||{}).pred_acc||{},ha=(a.self||{}).hd_acc||{};
+  $('self').innerHTML=table(['Тип','Напрямок ≤45°','«Ймовірно далі»','Наївний'],[...new Set([...Object.keys(ha),...Object.keys(pa)])].map(t=>[esc(TY[t]||t),ha[t]?Math.round(ha[t].acc*100)+'% <span class="mute">з '+ha[t].n+'</span>':'—',pa[t]?Math.round(pa[t].acc*100)+'% <span class="mute">з '+pa[t].n+'</span>':'—',pa[t]&&pa[t].naive!=null?Math.round(pa[t].naive*100)+'%':'—']))+
+    '<p class="mute" style="font-size:12px;margin:8px 0 0">Напрямок: курс, що показувала мапа після останньої названої позиції, проти того, куди ціль назвали далі (через 3–40 хв). </p>'+
     '<p class="mute" style="font-size:12px;margin:8px 0 0">Влучання: ціль названо ≤15 км від передбаченого пункту протягом 40 хв. Наївний — «30 км тим самим курсом» на тих самих подіях.</p>';
 }
 async function load(){try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}

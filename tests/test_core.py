@@ -656,3 +656,57 @@ def test_no_context_prefers_significant_place():
     assert pl("🔴⚠️Герань-5 падає на Рівне.", "MU") == [("Рівне", 50.6)]
     assert pl("🛵 Реактивний на Трипілля", "eRadarrua") == [("Трипілля", 50.1)]
     assert pl("КАБ на Золочів", None) == [("Золочів", 50.3)]  # КАБ — біля фронту (Харківщина), не Львівщина
+
+
+def test_heading_learned_and_map_speed():
+    """Бектест 26.10–02.11: без названого пункту курс з навчених маршрутів (медіана похибки 46° → 19°);
+    на мапі ціль просувається з ефективною швидкістю (шахед ×0.35, реактивний ×0.6), а не паспортною."""
+    import time
+    from app import config
+    from app.geo import bearing, dist_km, to_xy
+    from app.parser import Parser
+    from app.tracker import MAP_K, Tracker
+
+    class B:
+        def __init__(self, far=False):
+            self.far = far
+
+        def next_places(self, typ, name, heading=None, here=None):
+            return [("Мерефа", 0.8, 49.82, 36.05)] if not self.far else [("Циркуни", 0.9, 50.08, 36.39)]
+
+        def next_path(self, *a, **k):
+            return []
+
+        def rel(self, s, prior):
+            return prior
+
+        def __getattr__(self, n):
+            return lambda *a, **k: None
+    p = Parser()
+    now = time.time()
+    tr = Tracker(config.SOURCES, B(), learn=False)
+    tr.ingest(p.parse("Шахед у районі Чугуєва"), "M", now - 600)
+    t = tr.tracks[0]
+    assert t.hd_src == "learned" and abs(((t.heading - bearing(t.last.place.xy, to_xy(49.82, 36.05))) + 540) % 360 - 180) < 1
+    s = [x for x in tr.snapshot(now)["tracks"] if x["status"] == "active"][0]
+    moved = dist_km(t.last.place.xy, to_xy(s["lat"], s["lon"]))
+    assert abs(moved - 170 * MAP_K["shahed"] * 10 / 60) < 2 and s["vmap"] == round(170 * MAP_K["shahed"]) and s["hd_src"] == "learned"
+    # навчений «наступний пункт» за 100+ км — не курс
+    tr2 = Tracker(config.SOURCES, B(far=True), learn=False)
+    tr2.ingest(p.parse("Шахед у районі Лозової"), "M", now)
+    assert tr2.tracks[0].heading is None
+
+
+def test_analyst_direction_and_likely_next():
+    from app.analyst import direction_quality, likely_next, summary
+    act = [{"id": "Ш-1", "type": "shahed", "lat": 49.6, "lon": 34.5, "hd": 270, "hd_src": "learned", "count": 2, "next": None, "pred_next": "Решетилівка", "pred_p": 0.6},
+           {"id": "Ш-2", "type": "shahed", "lat": 49.5, "lon": 34.6, "hd": None, "count": 1, "next": None}]
+    dq = direction_quality(act)
+    assert dq == {"learned": 2, "none": 1}
+    ln = likely_next(act)
+    assert ln[0]["name"] == "Решетилівка" and ln[0]["n"] == 2
+    r = {"active_n": 3, "active": {"shahed": 3}, "wave": {"new30": 0, "prev30": 0, "trend": "стабільна", "peak12h": 3},
+         "corridors": [], "targets": [], "likely_next": ln, "direction": dq, "oblast_p60": [], "launches": [], "nights": None,
+         "sources": [], "self": {"hd_acc": {"shahed": {"acc": 0.72, "n": 90}}}}
+    txt = " ".join(summary(r))
+    assert "Напрямок відомий для 2 з 3" in txt and "Решетилівка (2 цілі, 60%)" in txt and "шахед 72% з 90" in txt
