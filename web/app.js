@@ -149,6 +149,9 @@ function addOverlays(){
   map.addLayer({id:'avia-l',type:'line',source:'avia-l',paint:{'line-color':'#22E1FF','line-width':1.3,'line-dasharray':[1,2.2],'line-opacity':0.7}});
   map.addLayer({id:'avia',type:'symbol',source:'avia',layout:{'icon-image':'su34','icon-size':['interpolate',['linear'],['zoom'],4,0.7,8,1.1],'icon-rotate':['get','r'],'icon-rotation-alignment':'map','icon-allow-overlap':true,
     'text-field':['step',['zoom'],'',5.2,['get','l']],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-max-width':12,'text-offset':[0,1.7],'text-anchor':'top','text-optional':true},paint:{'icon-opacity':['-',1,['*',0.6,['get','f']]],'text-color':'#FF9A9A','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.5}});
+  if(!map._kabClick){map._kabClick=1;map.on('click','zones-t',e=>{const f=e.features&&e.features[0];if(!f||!SNAP)return;const z=SNAP.zones[f.properties.zi];if(!z)return;
+    if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'320px',className:'kab-pop',offset:18}).setLngLat(f.geometry.coordinates).setHTML(kabInfo(z)).addTo(map);});
+  map.on('mouseenter','zones-t',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','zones-t',()=>map.getCanvas().style.cursor='');}
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['case',['get','est'],3,4],7,['case',['get','est'],5,7]],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
   map.addLayer({id:'lsites-t',type:'symbol',source:'lsites',minzoom:6.2,layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-max-width':14,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':false,'text-optional':true},paint:{'text-color':'#FFB3B3','text-halo-color':'#0B0F17','text-halo-width':2}});
@@ -354,7 +357,17 @@ function syncAvia(){if(!SNAP||!map.getSource('avia'))return;const A=SNAP.avia||[
     Z.push({type:'Feature',properties:{f:a.fade||0},geometry:{type:'Polygon',coordinates:[ring]}});
     (a.to||[]).forEach(t=>L.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[c,t]}}));});
   map.getSource('avia').setData({type:'FeatureCollection',features:P});map.getSource('avia-z').setData({type:'FeatureCollection',features:Z});map.getSource('avia-l').setData({type:'FeatureCollection',features:L});}
-function syncZones(){syncAvia();if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap(z=>z.places.map(([lo,la])=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:[lo,la]}})))});}
+const hm=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+function kabInfo(z){const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k].name)||k;const L=z.launch;
+  const where=[...new Set(z.places.map(p=>p[2]))].join(', ')+(z.obl?' · '+z.obl+' обл.':'');
+  return '<div class="kp"><small>ЗАГРОЗА КАБ</small><h4>'+esc(where)+'</h4>'+
+   '<div class="kp-r"><span>Пуски</span><b>'+(L?esc(L.area)+(L.avia_t?' · авіація з '+hm(L.avia_t):''):'район уточнюється')+'</b></div>'+
+   '<div class="kp-r"><span>Перша згадка</span><b>'+hm(z.t)+'</b></div>'+
+   '<div class="kp-r"><span>Остання</span><b>'+hm(z.last)+(z.n>1?' · повідомлень: '+z.n:'')+'</b></div>'+
+   '<div class="kp-r"><span>Зникне</span><b>~'+hm(z.until)+', якщо не буде нових пусків</b></div>'+
+   ((z.ev||[]).length?'<div class="kp-ev">'+z.ev.slice(-3).reverse().map(e=>'<div><i>'+hm(e.t)+' · '+esc(nm(e.src))+'</i>'+esc(e.text||'')+'</div>').join('')+'</div>':'')+'</div>';}
+let kabPop=null;
+function syncZones(){syncAvia();if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap((z,zi)=>z.places.map(([lo,la])=>({type:'Feature',properties:{zi},geometry:{type:'Point',coordinates:[lo,la]}})))});}
 
 /* ---------- лічильники, статус ---------- */
 const CNTI={};

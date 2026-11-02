@@ -34,8 +34,8 @@ TYPES = {
 FAST_TYPES = ("cruise", "ballistic", "banderol", "rszv", "geran5")
 # КАБ: зона живе, поки про неї пишуть або поки біля кордону активна тактична авіація
 KAB_QUIET = 10 * 60      # без нових згадок і без авіації — прибираємо
-KAB_AVIA = 20 * 60       # авіація активна — тримаємо до 20 хв від останньої згадки
-KAB_MAX = 30 * 60        # жорстка межа від останньої згадки
+KAB_AVIA = 15 * 60       # авіація активна — максимум 15 хв: КАБ довше не летить, без повторних пусків загрози немає
+KAB_MAX = 15 * 60        # жорстка межа від останньої згадки
 AVIA_LIFE = 25 * 60      # «активність тактичної авіації» без підтверджень
 # типові райони пусків КАБ (носії Су-34/Су-35 тримаються за 40–70 км від цілі, над РФ або окупованою територією)
 LAUNCH_AREA = {"Харківська": (50.62, 36.85, "Бєлгородщина"), "Сумська": (51.40, 35.35, "Курщина"),
@@ -159,6 +159,7 @@ class Zone:
     last: float = 0.0
     n: int = 1
     obl: str | None = None
+    ev: list = field(default_factory=list)  # докази: [{t, src, text, link}]
 
 
 class Tracker:
@@ -268,10 +269,13 @@ class Tracker:
                 z = next((z for z in self.zones if any(dist_km(a.xy, b.xy) < 25 for a in z.places for b in pl)), None)
                 if z:
                     z.last, z.n = t, z.n + 1
+                    z.ev.append({"t": int(t), "src": src, "text": (getattr(obs, "raw", "") or "")[:220], "link": link})
+                    z.ev = z.ev[-8:]
                     z.places += [p for p in pl if all(dist_km(p.xy, q.xy) > 3 for q in z.places)]
                     z.places = z.places[-6:]
                 else:
-                    z = Zone(pl, t, src, "Су-34" if obs.aviation else None, t, 1, obl_of(pl[0]))
+                    z = Zone(pl, t, src, "Су-34" if obs.aviation else None, t, 1, obl_of(pl[0]),
+                             [{"t": int(t), "src": src, "text": (getattr(obs, "raw", "") or "")[:220], "link": link}])
                     self.zones.append(z)
                 # КАБ летять — отже авіація в цьому напрямку активна
                 if z.obl in LAUNCH_AREA:
@@ -667,7 +671,10 @@ class Tracker:
         for z in self.zones:
             age = now - (z.last or z.t)
             zones.append({"places": [[p.lon, p.lat, p.name] for p in z.places], "t": int(z.t), "last": int(z.last or z.t),
-                          "n": z.n, "obl": z.obl, "platform": z.platform, "fade": round(min(1.0, age / KAB_QUIET), 2)})
+                          "n": z.n, "obl": z.obl, "platform": z.platform, "fade": round(min(1.0, age / KAB_QUIET), 2),
+                          "ev": z.ev, "launch": (lambda a: {"area": LAUNCH_AREA[z.obl][2], "lat": LAUNCH_AREA[z.obl][0], "lon": LAUNCH_AREA[z.obl][1],
+                                                            "avia_t": int(a["act"]) if a and a.get("act") else None} if z.obl in LAUNCH_AREA else None)(self.avia.get(z.obl)),
+                          "until": int((z.last or z.t) + (KAB_AVIA if (self.avia.get(z.obl) or {}).get("act", 0) > now - 720 else KAB_QUIET))})
             for p in z.places:
                 up(obl.of(p.lon, p.lat), 2)
         avia = []
