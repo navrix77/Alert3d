@@ -427,7 +427,7 @@ function syncHolo(lv){if(!map.getSource('holo')||!RA)return;const F=[];
   const L=(SNAP&&SNAP.levels)||{};if(OBLF)OBLF.forEach(f=>{const l=L[f.properties.n];if(l)F.push({type:'Feature',properties:{l},geometry:f.geometry});});
   map.getSource('holo').setData({type:'FeatureCollection',features:F});}
 let OBLN=null;function fetchOblNames(){if(OBLN)return Promise.resolve(OBLN);return fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>OBLN=j.features.map(f=>f.properties.n));}
-function syncHome(){if(map.getSource('home'))map.getSource('home').setData(home?{type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:home}}]}:EMPTY);}
+function syncHome(){clearTimeout(window.__wpT);window.__wpT=setTimeout(()=>window.webPushSync&&webPushSync(false),1500);if(map.getSource('home'))map.getSource('home').setData(home?{type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:home}}]}:EMPTY);}
 function syncAvia(){if(!SNAP||!map.getSource('avia'))return;const A=SNAP.avia||[];const P=[],Z=[],L=[];
   A.forEach(a=>{const c=[a.lon,a.lat];const tgt=a.to&&a.to[0]||[31.5,49];const r=Math.atan2((tgt[0]-a.lon)*Math.cos(a.lat*Math.PI/180),tgt[1]-a.lat)*180/Math.PI;
     P.push({type:'Feature',properties:{ai:A.indexOf(a),r,f:a.fade||0,l:(a.kab?'пуски КАБ':'тактична авіація')+' · '+hm(a.t)+'\n'+a.area},geometry:{type:'Point',coordinates:c}});
@@ -738,7 +738,22 @@ $('#st-3d').onchange=e=>set3d(e.target.checked,true);
   const vol=document.getElementById('snd-vol');if(vol){vol.value=Math.round(g.vol*100);vol.oninput=()=>S.set('vol',vol.value/100);}
   const tb=document.getElementById('snd-test');if(tb)tb.onclick=()=>S.test();
   const vh=document.getElementById('snd-voice-hint');if(vh)setTimeout(()=>{fetch('/api/tts/status').then(r=>r.json()).then(t=>{vh.textContent=t.piper?'Голоси Лада, Тетяна, Микита, Олекса — українська нейромережева озвучка (Piper)':'Готую українську озвучку на сервері (перший раз кілька хвилин); поки — голос пристрою';}).catch(()=>{});},1200);})();
-$('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&Notification.permission!=='granted'){const r=await Notification.requestPermission();if(r!=='granted'){e.target.checked=false;toast('Браузер не дозволив сповіщення');}}PREF.sys=e.target.checked;savePref();};
+$('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&Notification.permission!=='granted'){const r=await Notification.requestPermission();if(r!=='granted'){e.target.checked=false;toast('Браузер не дозволив сповіщення');}}PREF.sys=e.target.checked;savePref();webPushSync(true);};
+/* ---------- Web Push: сповіщення від сервера навіть із закритим сайтом ---------- */
+function b64u(s){const p='='.repeat((4-s.length%4)%4);const b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0));}
+async function webPushSync(loud){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){if(loud&&PREF.sys)toast(/iPhone|iPad/.test(navigator.userAgent)?'На iPhone: «Поділитися → На початковий екран», потім відкрийте звідти':'Цей браузер не підтримує сповіщення із закритим сайтом');return;}
+  try{const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
+    if(!PREF.sys||!home||Notification.permission!=='granted'){
+      if(sub){fetch('/api/webpush/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});await sub.unsubscribe();try{localStorage.removeItem('wp_home');}catch(e){}}
+      if(loud&&PREF.sys&&!home)toast('Позначте своє місце — тоді сервер стежитиме за загрозами для нього');return;}
+    if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
+    const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
+    if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:home[0],lat:home[1],pre:PREF.pre!==false})});
+      if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
+  }catch(e){if(loud)toast('Не вдалося увімкнути сповіщення: '+(e&&e.message||e));}}
+if($('#st-pre')){$('#st-pre').checked=PREF.pre!==false;$('#st-pre').onchange=e=>{PREF.pre=e.target.checked;savePref();webPushSync(false);};}
+window.webPushSync=webPushSync;setTimeout(()=>webPushSync(false),4000);
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
 $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};

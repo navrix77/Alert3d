@@ -8,3 +8,4 @@ marisa-trie>=1.1
 num2words>=0.5
 # ukrainian-word-stress ставиться з --no-deps (словник наголосів без Stanza)
 shapely>=2.0
+pywebpush>=2.0

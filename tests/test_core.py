@@ -784,3 +784,33 @@ def test_visits_counter(tmp_path):
     v.hit("1.2.3.4", "Mozilla/5.0 iPhone", "view", t + 86400)
     assert v.db.execute("SELECT COUNT(*) FROM seen WHERE d < (SELECT MAX(d) FROM day)").fetchone()[0] == 0
     assert v.stats()["total_visitor_days"] == 3
+
+
+def test_webpush_subscribe_and_stage_send(tmp_path, monkeypatch):
+    """Web Push для сайту/PWA: підписка з координатами дому, ті самі етапи, що й у застосунку; 410 — підписку прибрано."""
+    import asyncio
+    import app.push as pushmod
+    from app.push import Push
+    monkeypatch.setattr(pushmod, "VAPID_KEY", tmp_path / "vapid.pem")
+    pu = Push(tmp_path / "push.sqlite")
+    assert len(pu.public_key()) == 87 and (tmp_path / "vapid.pem").exists()
+    sub = {"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "keys": {"p256dh": "BPk", "auth": "x1"}}
+    assert not pu.web_register({"endpoint": "http://evil"}, 36.23, 50.0)
+    assert not pu.web_register(sub, 2.35, 48.85)  # не Україна
+    assert pu.web_register(sub, 36.23, 50.0) and pu.count() == 1
+    got = []
+
+    async def fake(s, payload):
+        got.append((s["endpoint"], payload))
+        return 410
+
+    pu.web_sender = fake
+    tr = {"id": "Ш-1", "type": "shahed", "lat": 50.30, "lon": 36.23, "speed": 170, "hd": 180.0, "hd_src": "learned",
+          "route": [], "count": 1, "status": "active", "conf": 0.9}
+
+    class Cli:
+        async def post(self, *a, **k):
+            raise AssertionError("Expo не має викликатися для веб-підписок")
+    asyncio.run(pu.tick(Cli(), {"tracks": [tr]}))
+    assert len(got) == 1 and "курс на ваш район" in got[0][1]["title"]
+    assert pu.count() == 0  # 410 Gone — браузер скасував підписку

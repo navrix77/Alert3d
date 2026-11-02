@@ -16,3 +16,4 @@ data/daily/
 data/voices/
 data/tts_cache/
 keys/
+data/vapid_private.pem

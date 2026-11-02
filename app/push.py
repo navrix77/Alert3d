@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 import httpx
+import json as _json
 
 from .geo import bearing, dist_km, to_xy
 
@@ -22,6 +23,7 @@ DB = Path(__file__).resolve().parent.parent / "data" / "push.sqlite"
 TOKEN_RX = re.compile(r"^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_\-]{10,}\]$")
 FROM = ["півночі", "північного сходу", "сходу", "південного сходу", "півдня", "південного заходу", "заходу", "північного заходу"]
 NAME = {"shahed": "Шахед", "jet": "Реактивний БпЛА", "molniya": "«Молнія»", "cruise": "Крилата ракета", "ballistic": "Балістика"}
+VAPID_KEY = DB.parent / "vapid_private.pem"  # ключ сервера для Web Push (браузер/PWA/iPhone з початкового екрана)
 REARM = 600  # повтор по тій самій цілі — не раніше ніж за 10 хв після зникнення загрози
 
 # Розподіл похибки курсу (град., 20 квантилів) за джерелом курсу — бектест журналу 26.10–02.11: курс, що показувала мапа,
@@ -46,7 +48,15 @@ class Push:
     def __init__(self, path: Path = DB) -> None:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.execute("CREATE TABLE IF NOT EXISTS subs(token TEXT PRIMARY KEY, lon REAL, lat REAL, t REAL)")
+        # Web Push: сайт і PWA (Android Chrome, Windows, iPhone з «На початковий екран») — сповіщення навіть із закритим браузером
+        self.db.execute("CREATE TABLE IF NOT EXISTS websubs(endpoint TEXT PRIMARY KEY, sub TEXT, lon REAL, lat REAL, t REAL)")
+        try:  # «лише курс на ваш район» — без ранніх «можлива загроза» (менше сповіщень)
+            self.db.execute("ALTER TABLE websubs ADD COLUMN pre INTEGER DEFAULT 1")
+        except sqlite3.OperationalError:
+            pass
         self.db.commit()
+        self._vapid = None
+        self.web_sender = None  # для тестів: підміна відправлення
         self.fired: dict[tuple, float] = {}
         self.armed: dict[str, dict[str, float]] = {}  # телефон → цілі, про які вже була «загроза» (для явного відбою)
         self.sent = 0
@@ -59,12 +69,66 @@ class Push:
         self.db.commit()
         return True
 
+    # ---------- Web Push ----------
+    def vapid(self):
+        if self._vapid is None:
+            from py_vapid import Vapid02 as Vapid01  # RFC 8292 «vapid t=…, k=…» — потрібно Apple й іншим
+            if VAPID_KEY.exists():
+                self._vapid = Vapid01.from_file(str(VAPID_KEY))
+            else:
+                v = Vapid01()
+                v.generate_keys()
+                VAPID_KEY.parent.mkdir(parents=True, exist_ok=True)
+                v.save_key(str(VAPID_KEY))
+                self._vapid = v
+        return self._vapid
+
+    def public_key(self) -> str:
+        import base64
+        from cryptography.hazmat.primitives import serialization
+        raw = self.vapid().public_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+    def web_register(self, sub: dict, lon: float, lat: float, pre: bool = True) -> bool:
+        ep = str((sub or {}).get("endpoint", ""))
+        keys = (sub or {}).get("keys") or {}
+        if not ep.startswith("https://") or len(ep) > 1000 or not keys.get("p256dh") or not keys.get("auth"):
+            return False
+        if not (20 < lon < 42 and 43 < lat < 53):
+            return False
+        self.db.execute("INSERT INTO websubs(endpoint, sub, lon, lat, t, pre) VALUES(?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET sub=excluded.sub, lon=excluded.lon, lat=excluded.lat, t=excluded.t, pre=excluded.pre",
+                        (ep, _json.dumps({"endpoint": ep, "keys": {"p256dh": keys["p256dh"], "auth": keys["auth"]}}), round(lon, 2), round(lat, 2), time.time(), 1 if pre else 0))
+        self.db.commit()
+        return True
+
+    def web_unregister(self, endpoint: str) -> None:
+        self.db.execute("DELETE FROM websubs WHERE endpoint=?", (endpoint,))
+        self.db.commit()
+
+    def _web_send_sync(self, sub: dict, payload: dict) -> int:
+        from pywebpush import WebPushException, webpush
+        try:
+            webpush(subscription_info=sub, data=_json.dumps(payload, ensure_ascii=False), vapid_private_key=self.vapid(),
+                    vapid_claims={"sub": "https://sky.navryx.com.ua"}, ttl=600, headers={"Urgency": "high"}, timeout=10)
+            return 201
+        except WebPushException as e:
+            return getattr(e.response, "status_code", 0) or 0
+
+    async def _web_send(self, msgs: list[dict]) -> None:
+        for m in msgs:
+            payload = {"title": m["title"], "body": m["body"], "tag": (m.get("data") or {}).get("track") or "navryx", "url": "/"}
+            sub = _json.loads(m["sub"])
+            code = await (self.web_sender(sub, payload) if self.web_sender else asyncio.to_thread(self._web_send_sync, sub, payload))
+            self.sent += 1
+            if code in (404, 410):  # підписку скасовано в браузері
+                self.web_unregister(sub["endpoint"])
+
     def unregister(self, token: str) -> None:
         self.db.execute("DELETE FROM subs WHERE token=?", (token,))
         self.db.commit()
 
     def count(self) -> int:
-        return self.db.execute("SELECT COUNT(*) FROM subs").fetchone()[0]
+        return self.db.execute("SELECT COUNT(*) FROM subs").fetchone()[0] + self.db.execute("SELECT COUNT(*) FROM websubs").fetchone()[0]
 
     @staticmethod
     def assess(tr: dict, H: tuple[float, float]) -> dict | None:
@@ -122,6 +186,9 @@ class Push:
                     log.warning("push tick: %s", e)
 
     async def broadcast(self, title: str, body: str, data: dict | None = None) -> None:
+        web = self.db.execute("SELECT endpoint, sub FROM websubs").fetchall()
+        if web:
+            await self._web_send([{"to": e, "sub": s_, "title": title, "body": body, "data": data or {}} for e, s_ in web])
         subs = [r[0] for r in self.db.execute("SELECT token FROM subs").fetchall()]
         if not subs:
             return
@@ -136,6 +203,9 @@ class Push:
         Уроки: під час масованої атаки — одне зведене повідомлення на телефон за раз (800 полігонів поклали cell broadcast);
         після загрози — явне «можна виходити», а не тиша (Home Front Command, червень 2025)."""
         subs = self.db.execute("SELECT token, lon, lat FROM subs").fetchall()
+        webs = {r[0]: r[1] for r in self.db.execute("SELECT endpoint, sub FROM websubs").fetchall()}
+        no_pre = {r[0] for r in self.db.execute("SELECT endpoint FROM websubs WHERE pre=0").fetchall()}
+        subs += self.db.execute("SELECT endpoint, lon, lat FROM websubs").fetchall()
         if not subs:
             return
         now = time.time()
@@ -159,7 +229,7 @@ class Push:
                 if a["stage"] == "pre" and self.fired.get((token, tr["id"], "threat"), 0) > now - REARM:
                     continue  # уже попередили сильніше
                 (new_thr if a["stage"] == "threat" else new_pre).append((tr, a))
-            msg = self._compose(new_thr, new_pre)
+            msg = self._compose(new_thr, [] if token in no_pre else new_pre)
             if msg:
                 out.append({"to": token, "title": msg[0], "body": msg[1], "sound": "default", "priority": "high",
                             "channelId": "threats", "data": {"track": msg[2]}})
@@ -189,6 +259,10 @@ class Push:
                                         "Офіційний відбій — лише за сиреною та «Повітряною тривогою».",
                                 "sound": "default", "channelId": "threats", "data": {}})
         self.fired = {k: v for k, v in self.fired.items() if now - v < 3 * REARM}
+        web_out = [dict(m, sub=webs[m["to"]]) for m in out if m["to"] in webs]
+        out = [m for m in out if m["to"] not in webs]
+        if web_out:
+            await self._web_send(web_out)
         for i in range(0, len(out), 100):
             r = await cli.post("https://exp.host/--/api/v2/push/send", json=out[i:i + 100],
                                headers={"Accept": "application/json", "Content-Type": "application/json"})

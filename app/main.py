@@ -414,6 +414,26 @@ async def push_register(body: dict):
     return JSONResponse({"ok": ok}, status_code=200 if ok else 400)
 
 
+@app.get("/api/webpush/key")
+async def webpush_key():
+    return {"key": await asyncio.to_thread(pushsvc.public_key)}
+
+
+@app.post("/api/webpush/subscribe")
+async def webpush_subscribe(body: dict):
+    try:
+        ok = pushsvc.web_register(body.get("sub") or {}, float(body.get("lon", 0)), float(body.get("lat", 0)), bool(body.get("pre", True)))
+    except (TypeError, ValueError):
+        ok = False
+    return JSONResponse({"ok": ok}, status_code=200 if ok else 400)
+
+
+@app.post("/api/webpush/unsubscribe")
+async def webpush_unsubscribe(body: dict):
+    pushsvc.web_unregister(str(body.get("endpoint", "")))
+    return {"ok": True}
+
+
 @app.post("/api/push/unregister")
 async def push_unregister(body: dict):
     pushsvc.unregister(str(body.get("token", "")))
