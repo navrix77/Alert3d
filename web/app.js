@@ -172,11 +172,18 @@ function addOverlays(){
     const per=!ev.period?'':/ноч/.test(ev.period)?'за ніч':/дня/.test(ev.period)?'за день':/суток/.test(ev.period)?'за добу':'';
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'300px',className:'kab-pop ru-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
      '<div class="kp"><small>НАШІ ДРОНИ НАД РФ</small><h4>'+esc(p.n||'')+'</h4>'+
-     '<div class="kp-r"><span>Що</span><b>українські ударні БпЛА'+(p.cnt?' · ×'+p.cnt:'')+'</b></div>'+
-     '<div class="kp-r"><span>Коли</span><b>'+(per||'останнє зведення')+' · '+hm(ev.t)+'</b></div>'+
-     '<div class="kp-r"><span>Усього</span><b>'+ev.total+' над '+ev.regions.length+' рег.</b></div>'+
-     '<div class="kp-r"><span>Джерело</span><b>заява МО РФ («збито») — не підтверджено; влучання не розголошуються</b></div>'+
+     '<div class="kp-r"><span>Запущено</span><b>точну кількість не публікують; РФ сама визнала щонайменше '+(p.cnt||'кілька')+' над регіоном</b></div>'+
+     '<div class="kp-r"><span>Усього</span><b>≥ '+ev.total+' над '+ev.regions.length+' рег. · '+(per||'останнє зведення')+' · '+hm(ev.t)+'</b></div>'+
+     '<div class="kp-r"><span>Прильоти</span><b>жовті приціли на мапі — за Генштабом ЗСУ та ASTRA</b></div>'+
      (ev.link?'<div class="kp-ev"><a href="'+esc(ev.link)+'" target="_blank" rel="noopener" style="color:inherit">допис-першоджерело ↗</a></div>':'')+'</div>').addTo(map);});
+  map.on('click','hits',e=>{const f=e.features&&e.features[0];if(!f)return;const h=HITS[f.properties.hi];if(!h)return;
+    if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'300px',className:'kab-pop ru-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
+     '<div class="kp"><small>'+(h.src==='ASTRA'?'ПРИЛІТ НАШИХ ДРОНІВ':'УРАЖЕНО СИЛАМИ ОБОРОНИ')+'</small><h4>'+esc(h.place)+'</h4>'+
+     '<div class="kp-r"><span>Що</span><b>'+esc(h.what)+'</b></div>'+
+     '<div class="kp-r"><span>Коли</span><b>'+new Date(h.t*1000).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</b></div>'+
+     '<div class="kp-r"><span>Джерело</span><b>'+esc(h.src||'Генштаб ЗСУ')+'</b></div>'+
+     '<div class="kp-ev"><div>'+esc(h.detail||'')+'</div>'+(h.link?'<a href="'+esc(h.link)+'" target="_blank" rel="noopener" style="color:inherit">першоджерело ↗</a>':'')+'</div></div>').addTo(map);});
+  map.on('mouseenter','hits',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','hits',()=>map.getCanvas().style.cursor='');
   map.on('mouseenter','ru-dot',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','ru-dot',()=>map.getCanvas().style.cursor='');
   map.on('mouseenter','zones-t',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','zones-t',()=>map.getCanvas().style.cursor='');}
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
@@ -634,9 +641,10 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;
   F.push({type:'Feature',properties:{c:0,sum:true,l:'Наші дрони над РФ '+PER(ev.period)+': '+ev.total+' «збитих» за МО РФ · '+ev.regions.length+' рег. · '+fmt(ev.t)},geometry:{type:'Point',coordinates:[lo+1.5,la+0.6]}});
   map.getSource('ru').setData({type:'FeatureCollection',features:F});}
 setInterval(syncRu,5000);
+let HITS=[];
 function syncHits(){if(!SNAP||!map.getSource('hits'))return;const seen=new Map();
   for(const h of (SNAP.hits||[]).slice().sort((a,b)=>b.t-a.t)){const k=h.place+'|'+h.what;if(!seen.has(k))seen.set(k,h);}
-  map.getSource('hits').setData({type:'FeatureCollection',features:[...seen.values()].map(h=>({type:'Feature',properties:{l:'Уражено: '+h.what+'\n'+h.place+' · '+new Date(h.t*1000).toLocaleDateString('uk-UA',{day:'2-digit',month:'2-digit'}),link:h.link},geometry:{type:'Point',coordinates:[h.lon,h.lat]}}))});}
+  HITS=[...seen.values()];map.getSource('hits').setData({type:'FeatureCollection',features:HITS.map((h,hi)=>({type:'Feature',properties:{hi,l:(h.src==='ASTRA'?'Приліт: ':'Уражено: ')+h.what+'\n'+h.place+' · '+new Date(h.t*1000).toLocaleDateString('uk-UA',{day:'2-digit',month:'2-digit'}),link:h.link},geometry:{type:'Point',coordinates:[h.lon,h.lat]}}))});}
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};$('#st-tech').textContent='Джерела: '+(c.channels||'—')+' Telegram-каналів моніторингу (наживо '+(c.live||0)+'), офіційні тривоги й фіксації цілей alerts.in.ua (Повітряні сили / War Monitor), заяви МО РФ — для шару «куди летіли наші дрони». Роботу ППО й влучання в Україні не показуємо.';};
