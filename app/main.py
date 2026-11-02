@@ -181,6 +181,9 @@ async def learn_history() -> None:
 
 from .daily import Daily, current_day, last_finished  # noqa: E402
 
+from .learner import Learner  # noqa: E402
+
+LEARNER = Learner(tracker, brain)
 daily = Daily(brain, feed, parser, lambda: Tracker(config.SOURCES), [CTX, LASTC], pushsvc)
 _FC = (0.0, {})
 HIST: list[dict] = brain.hist_load(time.time() - 12 * 3600)
@@ -266,6 +269,7 @@ async def lifespan(app: FastAPI):
                 await asyncio.sleep(600)
                 await asyncio.to_thread(brain.snapshot)
         tasks.append(asyncio.create_task(_snap()))
+    tasks.append(asyncio.create_task(LEARNER.run()))
     if os.getenv("LAN_TLS", "1") == "1":
         tasks.append(asyncio.create_task(lan_tls.run()))
     if os.getenv("REPLAY") != "1":
@@ -288,6 +292,7 @@ def api_audit():
     from .audit import AUDIT
     st = AUDIT.state()
     st["pred_acc"] = brain.pred_acc() if hasattr(brain, "pred_acc") else None
+    st["learn"] = LEARNER.state()
     return st
 
 
