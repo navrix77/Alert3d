@@ -10,6 +10,9 @@ concurrency: { group: android, cancel-in-progress: true }
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      UPKS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+      UPPASS: ${{ secrets.ANDROID_UPLOAD_PASSWORD }}
     defaults: { run: { working-directory: capacitor } }
     steps:
       - uses: actions/checkout@v4
@@ -41,13 +44,27 @@ jobs:
       - run: cp android/app/build/outputs/apk/debug/app-debug.apk navryx-sky.apk && ls -la navryx-sky.apk
       - uses: actions/upload-artifact@v4
         with: { name: navryx-sky-apk, path: capacitor/navryx-sky.apk }
+      - name: Збірка для Google Play (AAB, підпис ключем завантаження)
+        if: env.UPKS != ''
+        run: |
+          echo "$UPKS" | base64 -d > upload.jks
+          npx cap build android --keystorepath "$PWD/upload.jks" --keystorepass "$UPPASS" --keystorealias upload --keystorealiaspass "$UPPASS" --androidreleasetype AAB
+          find android/app/build/outputs/bundle -name "*.aab" -exec cp {} navryx-sky-play.aab \;
+          rm -f upload.jks
+          ls -la navryx-sky-play.aab
+      - uses: actions/upload-artifact@v4
+        if: env.UPKS != ''
+        with: { name: navryx-sky-play-aab, path: capacitor/navryx-sky-play.aab }
       - name: Публікую як «android-latest» (постійне посилання для телефона)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
           name: NAVRYX SKY для Android (остання збірка)
           prerelease: true
-          files: capacitor/navryx-sky.apk
+          files: |
+            capacitor/navryx-sky.apk
+            capacitor/navryx-sky-play.aab
+          fail_on_unmatched_files: false
           body: |
             Остання збірка застосунку NAVRYX SKY для Android (1.0.${{ github.run_number }}).
             Завантажте navryx-sky.apk на телефоні й відкрийте; дозвольте встановлення з цього джерела.
