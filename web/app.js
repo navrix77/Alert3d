@@ -858,7 +858,8 @@ function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
-function syncRu(){if(!SNAP||!map.getSource('ru'))return;
+function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setData(EMPTY);return;// заяви МО РФ «скільки збили над регіоном» прибрано з мапи: застарілі зведення без місця й часу удару нічого не дають людині
+
   // останнє зведення МО РФ: на карті — лише точки регіонів (з кількістю, якщо названа) і ОДИН підсумковий підпис
   const ev=(SNAP.ru||[]).slice().sort((a,b)=>b.t-a.t)[0];if(!ev){map.getSource('ru').setData(EMPTY);return;}
   const PER=p=>!p?'':/ноч/.test(p)?'за ніч':/дня/.test(p)?'за день':/суток/.test(p)?'за добу':'';
@@ -869,7 +870,8 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;
 setInterval(syncRu,5000);
 let HITS=[];
 function syncHits(){if(!SNAP||!map.getSource('hits'))return;const seen=new Map();
-  for(const h of (SNAP.hits||[]).slice().sort((a,b)=>b.t-a.t)){const k=h.place+'|'+h.what;if(!seen.has(k))seen.set(k,h);}
+  const t24=Date.now()/1000+offset-86400;// лише свіжі (за добу) — вчорашні влучання не про сьогоднішню ніч
+  for(const h of (SNAP.hits||[]).filter(h=>h.t>=t24).sort((a,b)=>b.t-a.t)){const k=h.place+'|'+h.what;if(!seen.has(k))seen.set(k,h);}
   HITS=[...seen.values()];map.getSource('hits').setData({type:'FeatureCollection',features:HITS.map((h,hi)=>({type:'Feature',properties:{hi,l:(h.src==='ASTRA'?'Приліт: ':'Уражено: ')+h.what+'\n'+h.place+' · '+new Date(h.t*1000).toLocaleDateString('uk-UA',{day:'2-digit',month:'2-digit'}),link:h.link},geometry:{type:'Point',coordinates:[h.lon,h.lat]}}))});}
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
