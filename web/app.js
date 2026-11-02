@@ -55,7 +55,7 @@ async function setBase(kind){base=kind;localStorage.setItem('base2',kind);map.se
 function addImages(){
   // реалістичні спрайти цілей (вид згори, ніс на північ) + тіні
   for(const t of Object.keys(TYPE_COLOR))for(const v of ['','-d','-sh']){const id='t-'+t+v;if(map.hasImage(id))continue;
-    map.loadImage('sprites/t-'+t+v+'.png').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:2});}).catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
+    map.loadImage('sprites/t-'+t+v+'.png?v=ref2').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:2});}).catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
   if(!map.hasImage('home')){const c=drawHome(40);map.addImage('home',c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});}
   if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.88)';x.beginPath();x.roundRect(2,2,s-4,s-4,14);x.fill();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
 }
