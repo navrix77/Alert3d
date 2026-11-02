@@ -284,3 +284,12 @@ def test_night_0630_fixes():
     # Angry_Pol: «Житомирської та Київської областей» — не село Житомирське в Криму
     o = p.parse("БпЛА по межі Житомирської та Київської областей в напрямку Погребище ( Вінниччина)", "Angry_Pol")
     assert [r.place.name for r in o.places] == ["Погребище"]
+
+
+def test_zircon_not_tsyrkuny_and_expectations_not_targets():
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("◾️ Також у рамках нанесення комбінованого удару, очікується застосування балістичних ракет «Іскандер-М» та ракет РМ-48У, ракет «Циркон», корейських «KN-23»", "truexanewsua")
+    assert o.kind != "track" and not any(r.place.name == "Циркуни" for r in o.places)
+    assert p.parse("Циркон курсом на Київ").type == "ballistic"
+    assert [r.place.name for r in p.parse("Шахед на Циркуни").places] == ["Циркуни"]
