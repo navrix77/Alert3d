@@ -609,3 +609,23 @@ def test_strategic_aviation_moves_are_not_launches():
     L = bk.add(sites, typ, None, carrier, "monikppy", None, 1_793_615_280, False, "Пуски бандероль з району Азовського моря.")
     assert L and L[0].carrier is None  # не «кораблі (Калібр)»
     assert [s.name for s in launch.detect("Зафіксовано пуск крилатих ракет з Ту-95МС з району Енгельса", None)[0]] == ["Енгельс"]
+
+
+def test_zatoka_namesakes_2026_11_02():
+    """02.11 15:57–16:01: «Бандероль → Затока» показали біля Чугуєва (скрін користувача)."""
+    # підпис каналу й ім'я речника — не населені пункти
+    assert not P.parse("Український Телеграм", "novini_ukrtg").places
+    assert not P.parse("полковник Юрій Ігнат", "ppo_poltava").places
+    # «в сторону Затоки» від одеського каналу — курортна Затока, а не село Затоки на Хмельниччині
+    o = P.parse("Х-59 2 КАБ-и  Та до 6-7 бандеролєй   в сторону Затоки", "admiralbukhta", ctx=(46.45, 30.7))
+    assert names(o, "t") == ["Затока"] and o.places[0].place.lat < 47
+    # національний канал «на Затоку» з харківським контекстом: якщо бандеролі вже летять на одеську Затоку — це вони
+    tr = Tracker(SOURCES, learn=False)
+    t0 = 1_793_627_600.0
+    tr.ingest(P.parse("Бандероли курс Затока", "odessa_knight", ctx=(46.45, 30.7)), "odessa_knight", t0)
+    mk = P.parse('8 мКР "Бандероль та 2 Х-59, 2 авіабомби на Затоку.', "MK", ctx=(49.9, 36.3))
+    tr.ingest(mk, "MK", t0 + 240)
+    act = [x for x in tr.tracks if x.type == "banderol" and not x.closed and not x.merged]
+    assert len(act) == 1  # одна ціль, а не друга біля Чугуєва
+    lat = __import__("app.geo", fromlist=["from_xy"]).from_xy(*act[0].est(t0 + 240))[0]
+    assert lat < 47.5, "бандероль має лишатися на півдні, а не біля Чугуєва"

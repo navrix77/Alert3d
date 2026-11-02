@@ -323,6 +323,9 @@ class Tracker:
         else:
             pt = None
             tr = self._best_by_target(obs.type, route, t)
+            if tr and getattr(self, "_alias", None):
+                route = [self._alias.get(p.name, p) for p in route]
+                course_to = route[-1].name if route else None
         if tr:
             if pt is not None:
                 d = dist_km((tr.last.x, tr.last.y), pt)
@@ -359,6 +362,8 @@ class Tracker:
                 # пункт, до якого понад годину польоту, — це тезка з іншого кінця країни, не маршрут цієї цілі
                 here = tr.est(t)
                 route = [p for p in route if dist_km(here, p.xy) <= min(tr.speed * 1.0 + 60, 260 if tr.type == "shahed" else 900)]
+                if not route:
+                    course_to = None  # усі пункти — тезки з іншого кінця країни: «→ X» не показуємо
             if route:
                 # ціль змінила пункт призначення: послідовність «курсом на A» → «курсом на B» теж маршрут
                 old = tr.route[0] if tr.route else None
@@ -470,14 +475,21 @@ class Tracker:
         або до треку, з якого X досяжний за час, що минув."""
         if not route:
             return None
-        names = {p.name for p in route}
         best, bs = None, 1e9
+        alias, alias_t = None, 0.0
+        self._alias = {}
         for tr in self.tracks:
             if tr.type != typ or tr.closed or tr.merged or t - tr.last.t > TYPES[typ]["life"] or tr.id in self.exclude:
                 continue
-            shared = names & ({p.name for p in tr.route} | ({tr.course_to} if tr.course_to else set()))
+            # «той самий пункт» — за координатами, а не лише за назвою: Затока під Чугуєвом ≠ Затока на Одещині
+            tpl = list(tr.route) + ([type("P", (), {"name": tr.course_to, "xy": tr.course_xy})] if tr.course_to and tr.course_xy else [])
+            shared = {p.name for p in route if any(q.name == p.name and dist_km(p.xy, q.xy) < 10 for q in tpl)}
+            known = [q for q in list(tr.route) + [getattr(tr.last, "place", None)] if q is not None]
+            namesake = [(p, q) for p in route for q in known if q.name == p.name and dist_km(p.xy, q.xy) >= 10]
             e = tr.est(t)
             d = min(dist_km(e, p.xy) for p in route)
+            if namesake and not shared and tr.last.t > alias_t and t - tr.last.t < 1200:
+                alias, alias_t = (tr, namesake), tr.last.t
             if tr.id == self.prefer and d < 80:
                 return tr  # канал прямо пише «далі …» про ту саму ціль
             if not shared:
@@ -489,6 +501,12 @@ class Tracker:
             s = d - (40 if shared else 0)
             if s < bs:
                 best, bs = tr, s
+        if best is None and alias:
+            # національний канал назвав тезку («на Затоку»), а ціль такого типу вже летить на одноіменний пункт
+            # в іншому кінці країни — це та сама ціль; беремо її пункт, а не село-тезку
+            tr, pairs = alias
+            self._alias = {p.name: q for p, q in pairs}
+            return tr
         return best
 
     def _best(self, typ: str, pt, t: float, names: set | None = None) -> Track | None:

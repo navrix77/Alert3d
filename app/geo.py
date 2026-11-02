@@ -251,6 +251,12 @@ class Gazetteer:
         # точна назва («Лозове») — не змішуємо з іншими формами («Лозова»); але «Глухова», «Чугуєва» — це передусім
         # родовий від міст на -ів (Глухів), а не село Глухова на Житомирщині: тоді шукаємо разом з іншими формами
         if w in self.idx and not w.endswith(("ова", "ева", "єва")):
+            # «на Затоку» / «в сторону Затоки»: точна назва «Затоки» (село на Поділлі) — але це й родовий від Затока;
+            # тоді беремо обидві форми, а вибір робить контекст повідомлення/каналу
+            if len(w) >= 5 and w[-1] in "иі" and w[-2] not in "аеиіоуюяєї":
+                alt = [i for c in (w[:-1] + "а", w[:-1] + "я") for i in self.idx.get(c, [])]
+                if alt and max(self.places[i].pop for i in alt) >= max(self.places[i].pop for i in self.idx[w]):
+                    return self.idx[w] + [i for i in alt if i not in self.idx[w]]
             return self.idx[w]
         hits: list[int] = []
         for c in self.candidates(w):

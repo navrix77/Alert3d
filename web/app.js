@@ -719,7 +719,7 @@ $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers()
 $('#st-geo').onclick=()=>{$('#b-locate').click();};
 $('#st-pick').onclick=()=>{$('#settings').hidden=true;setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');};
 $('#st-clear').onclick=()=>{home=null;localStorage.removeItem('home');syncHome();toast('Дім прибрано');};
-let lanDone=false;function loadLan(){fetch('/api/lan').then(r=>r.json()).then(j=>{lanDone=true;const urls=j.urls||[];const host=location.hostname;
+let lanDone=false;function loadLan(){if(!$('#st-qr'))return;fetch('/api/lan').then(r=>r.json()).then(j=>{lanDone=true;const urls=j.urls||[];const host=location.hostname;
   const sec=(j.secure||[]).sort((a,b)=>(/\/\/192\.168\./.test(b)-/\/\/192\.168\./.test(a)));const best=sec[0]||((host!=='localhost'&&host!=='127.0.0.1')?location.origin:(urls[0]||location.origin));
   $('#st-urls').innerHTML=[...sec,...(urls.length?urls:[location.origin])].map(u=>'<code>'+esc(u)+'</code>').join('');
   try{$('#st-qr').innerHTML='';new QRCode($('#st-qr'),{text:best,width:132,height:132,colorDark:'#0B0F17',colorLight:'#ffffff'});}catch(e){$('#st-qr').textContent=best;}}).catch(()=>{});}
