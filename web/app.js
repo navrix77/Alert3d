@@ -359,7 +359,7 @@ function uncKm(tr,ageSec){const u=UNC[tr.type];if(!u||tr.type==='ballistic')retu
 function pToward(src,delta,dkm){const q=HD_Q[{from:'movement',course:'all'}[src]||src]||HD_Q.all;const w=Math.atan(15/Math.max(dkm,15))*180/Math.PI;
   let s=0;for(const e of q)s+=0.5*(Math.abs(delta-e)<=w)+0.5*(Math.abs(delta+e)<=w);return s/q.length;}
 function homeRel(tr,p){
-  if(!home)return null;const H=xy(home),P=xy(p);const d=dist(H,P);
+  if(!home||tr.nopos)return null;// канали назвали лише курс («на Харків») — де ціль зараз, невідомо: «N км від вас» було б вигадкоюconst H=xy(home),P=xy(p);const d=dist(H,P);
   let rel=null,eta=null;
   const path=[P,...tr.route.map(xy)];
   let acc=0,best={d:1e9,c:0};for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];const vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;let t=L2?((H[0]-a[0])*vx+(H[1]-a[1])*vy)/L2:0;t=Math.max(0,Math.min(1,t));const q=[a[0]+vx*t,a[1]+vy*t];const dd=dist(H,q);if(dd<best.d)best={d:dd,c:acc+Math.sqrt(L2)*t};acc+=Math.sqrt(L2);}
@@ -625,7 +625,10 @@ function fillSheet(first){
    else h=tr.from?'з боку '+esc(tr.from):'канали не вказали';
    if(en&&en[2])h+='<br><small>перша фіксація: '+esc(en[2])+' · '+fmt(en[3])+'</small>';
    $('#sh-from').innerHTML=h;}
-  $('#sh-conf').textContent=Math.round(tr.conf*100)+'%'+(tr.conf<0.5?' · непідтверджено':'');
+  {const E=tr.ev||{};const ind=(E.prim||tr.srcs||[]).length;const agoL=Math.max(0,Math.round(((E.age||0)+(Date.now()/1000+offset-SNAP.now))/60));
+   $('#sh-conf').innerHTML='<div>Наявність: '+(ind>=2?'<b class=ok>підтверджено '+ind+' незалежними джерелами</b>':'<b class=warn>одне джерело</b>')+'</div>'+
+     '<div>Місце: '+(tr.nopos?'<b class=warn>невідоме — канали назвали лише курс</b>':tr.pos_est?'оцінка SKY за курсом':'назвали канали')+' · '+agoL+' хв тому</div>'+
+     '<div>Тип: як написали канали'+(tr.likely?' (ймовірно)':'')+'</div>';}
   const serverT=Date.now()/1000+offset;const pos=DISP.get(tr.id);
   if(tr.route_names&&tr.route_names.length&&tr.route&&tr.route.length&&pos){let acc=0,prev=xy(pos.p);const items=tr.route.slice(0,tr.route_names.length).map((p,i)=>{const q=xy(p);acc+=dist(prev,q);prev=q;return '<li><b>~'+Math.max(1,Math.round(acc/tr.speed*60))+' хв</b> '+esc(tr.route_names[i])+'</li>';});
     if(home&&r&&r.eta!=null)items.push('<li class="home"><b>~'+Math.max(1,Math.round(r.eta))+' хв</b> ваш дім</li>');
@@ -735,13 +738,14 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)seenNow();e
 async function showChanges(force){
   if(!home||REPLAY)return;let seen=0;try{seen=+localStorage.getItem('seen')||0;}catch(e){}
   const nowS=Date.now()/1000+offset;if(!seen||(!force&&nowS-seen<180))return;
+  const away=Math.round((nowS-seen)/60);seen=Math.max(seen,nowS-3600);// давніше за годину — не «що змінилось», а історія: показуємо лише останню годину
   const ob=homeObl();const q='lon='+home[0].toFixed(2)+'&lat='+home[1].toFixed(2)+'&since='+Math.round(seen)+(ob?'&obl='+encodeURIComponent(ob):'')+(homeObl.r?'&raion='+encodeURIComponent(homeObl.r):'');
   let j;try{j=await fetch('/api/changes?'+q,{cache:'no-store'}).then(r=>r.json());}catch(e){return;}seenNow();
-  const min=Math.max(1,Math.round((nowS-seen)/60));const place=ob?esc(ob)+' обл.'+(homeObl.r?' · '+esc(homeObl.r)+' р-н':''):'Ваше місце';
+  const min=Math.max(1,Math.round((nowS-seen)/60));const span=away>60?'за останню годину':'за '+min+' хв, поки вас не було';const place=ob?esc(ob)+' обл.'+(homeObl.r?' · '+esc(homeObl.r)+' р-н':''):'Ваше місце';
   let el=$('#chg');if(!el){el=document.createElement('div');el.id='chg';document.body.appendChild(el);}
-  if(!j.total){el.hidden=true;toast('За '+min+' хв біля вашого місця змін не було');return;}
+  if(!j.total){el.hidden=true;toast('Біля вашого місця '+span.replace('за ','за ')+' змін не було');return;}
   const IC={official:'🔔',new:'＋',course:'↻',closer:'↘',away:'↗',lost:'?',closed:'✕'};
-  el.hidden=false;el.innerHTML='<div class="chg-h"><b>'+place+'</b> · зміни за '+min+' хв<button class="chg-x" aria-label="Закрити">✕</button></div>'+
+  el.hidden=false;el.innerHTML='<div class="chg-h"><b>'+place+'</b> · зміни '+span+'<button class="chg-x" aria-label="Закрити">✕</button></div>'+
     (()=>{const OF=ob?homeOfficial(ob):{on:j.official_now,t:j.official_now?'тривога':'тривоги немає'};return '<div class="me-off '+(OF.on===1?'on':OF.on===2?'part':'')+'"><i></i>Зараз: '+esc(OF.t)+'</div>';})()+
     '<ul>'+j.events.slice(0,6).map(e=>'<li class="k-'+e.k+'"><i>'+(IC[e.k]||'•')+'</i><span>'+esc(e.text)+' <small>'+fmt(e.t)+'</small></span></li>').join('')+'</ul>'+
     (j.total>6?'<div class="chg-more">ще '+(j.total-6)+'</div>':'')+

@@ -135,6 +135,13 @@ class Push:
         """Оцінка для дому: {d, eta, side, p, stage}: stage «threat» (маршрут поруч або P≥0.4), «pre» (P≥0.15), None."""
         P = to_xy(tr["lat"], tr["lon"])
         d = dist_km(H, P)
+        if tr.get("nopos"):
+            # канали назвали лише курс («на Харків»): де ціль — невідомо. Загроза — лише якщо названий пункт біля дому,
+            # без вигаданих «N км» і хвилин
+            pts = [to_xy(la, lo) for lo, la in tr.get("route") or []] or [P]
+            if any(dist_km(H, q) <= NEAR_KM for q in pts):
+                return {"d": None, "eta": None, "side": None, "p": 1.0, "stage": "threat"}
+            return None
         if d > 150:
             return None
         side = FROM[round(bearing(H, P) / 45) % 8]
@@ -283,7 +290,7 @@ class Push:
             n = sum(t.get("count") or 1 for t, _ in thr)
             title = (f"{NAME.get(tr['type'], 'Ціль')}" + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
                      + " — курс на ваш район") if len(thr) == 1 else f"{n} цілей — курс на ваш район"
-            body = f"{round(a['d'])} км з {a['side']}" + (f" · ~{max(1, round(a['eta']))} хв" if a["eta"] is not None else "") + \
+            body = (f"{round(a['d'])} км з {a['side']}" if a.get("d") is not None else "місце невідоме — канали назвали курс") + (f" · ~{max(1, round(a['eta']))} хв" if a["eta"] is not None else "") + \
                 (f" · → {tr['next']}" if tr.get("next") else "") + (f" · ймовірність {round(a['p'] * 100)}%" if a["p"] < 1 else "")
             return title, body, tr["id"]
         if pre:

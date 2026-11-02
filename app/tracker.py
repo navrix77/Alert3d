@@ -848,7 +848,7 @@ class Tracker:
             out.append({
                 "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
-                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est,
+                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "nopos": all(o.est for o in tr.obs),
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),

@@ -917,3 +917,16 @@ def test_kyiv_kharkivskyi_masyv_2026_11_02():
         o = P.parse(t, ch)
         assert o.places and all("(Київ)" in r.place.name or r.place.name == "Київ" for r in o.places), (t, names(o))
     assert names(P.parse("Шахед на Харків", "K")) == ["Харків"]
+
+
+def test_course_only_target_has_no_position():
+    """«Шахед на Харків» без місця: позначка — оцінка, не місце; push — «курс на ваш район» без вигаданих км/хв."""
+    from app.geo import to_xy
+    from app.push import Push
+    tr = Tracker(SOURCES, learn=False)
+    tr.ingest(P.parse("Шахед курсом на Харків", "K"), "K", 1_793_600_000.0)
+    s = [x for x in tr.snapshot(1_793_600_060.0)["tracks"]][0]
+    assert s["nopos"] is True
+    a = Push.assess(dict(s, route=[[36.23, 49.99]]), to_xy(50.0, 36.25))
+    assert a and a["stage"] == "threat" and a["d"] is None and a["eta"] is None
+    assert Push.assess(dict(s, route=[[30.5, 50.45]]), to_xy(50.0, 36.25)) is None  # курс на Київ — не загроза Харкову
