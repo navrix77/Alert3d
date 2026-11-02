@@ -190,6 +190,14 @@ function addOverlays(){
      '<div class="kp-r"><span>Усього</span><b>≥ '+ev.total+' над '+ev.regions.length+' рег. · '+(per||'останнє зведення')+' · '+hm(ev.t)+'</b></div>'+
      '<div class="kp-r"><span>Прильоти</span><b>багаття на мапі — за Генштабом ЗСУ та ASTRA</b></div>'+
      (ev.link?'<div class="kp-ev"><a href="'+esc(ev.link)+'" target="_blank" rel="noopener" style="color:inherit">допис-першоджерело ↗</a></div>':'')+'</div>').addTo(map);});
+  map.on('click','lsites',e=>{const f=e.features&&e.features[0];if(!f||!SNAP||!f.properties.lid)return;const L=(SNAP.launches||[]).find(x=>x.id===f.properties.lid);if(!L)return;const w=launchWhat(L);const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k].name)||k;
+    if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'320px',className:'kab-pop avia-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
+     '<div class="kp"><small>ПУСК ПО УКРАЇНІ</small><h4>'+esc(L.site)+'</h4>'+
+     '<div class="kp-r"><span>Що</span><b>'+esc(w.full)+'</b></div>'+
+     (L.count?'<div class="kp-r"><span>Кількість</span><b>'+L.count+'</b></div>':'')+(L.carrier?'<div class="kp-r"><span>Носій</span><b>'+esc(L.carrier)+'</b></div>':'')+
+     '<div class="kp-r"><span>Коли</span><b>'+fmt(L.t)+'</b></div>'+'<div class="kp-r"><span>Цілей привʼязано</span><b>'+(L.tracks||0)+'</b></div>'+
+     ((L.ev||[]).length?'<div class="kp-ev">'+L.ev.slice(-3).reverse().map(e=>'<div><i>'+fmt(e.t)+' · '+esc(nm(e.src))+'</i>'+esc(e.text||'')+'</div>').join('')+'</div>':'')+'</div>').addTo(map);});
+  map.on('mouseenter','lsites',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','lsites',()=>map.getCanvas().style.cursor='');
   map.on('click','hits',e=>{const f=e.features&&e.features[0];if(!f)return;const h=HITS[f.properties.hi];if(!h)return;
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'300px',className:'kab-pop ru-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
      '<div class="kp"><small>'+(h.src==='ASTRA'?'ПРИЛІТ НАШИХ ДРОНІВ':'УРАЖЕНО СИЛАМИ ОБОРОНИ')+'</small><h4>'+esc(h.place)+'</h4>'+
@@ -347,7 +355,7 @@ function frame(now){
      window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
        return {p:f.geometry.coordinates,c:t?[1,0.23,0.27]:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],a:f.properties.weak?0.3:0.7,s:t?sz*1.9:sz,ring:t};});}
     if(slow&&map.getSource('chains')){frame.ch=now;const ch=[],ls=new Map();
-      for(const L of (SNAP.launches||[]))ls.set(L.site,{type:'Feature',properties:{est:false,l:'ПУСК по Україні: '+(L.type?({shahed:'Шахеди',jet:'Реактивні БпЛА',molniya:'«Молнії»',cruise:'Крилаті ракети',ballistic:'Балістика',kab:'КАБи'})[L.type]||'':'')+(L.count?' ×'+L.count:'')+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});
+      for(const L of (SNAP.launches||[])){const w=launchWhat(L);ls.set(L.site,{type:'Feature',properties:{est:false,lid:L.id,l:'ПУСК: '+w.short+(L.count?' ×'+L.count:'')+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
         if(L.est&&!isSel)continue;
         ch.push({type:'Feature',properties:{c:L.est?'#FF8A8A':'#FF3B3B',o:isSel?0.95:(L.est?0.3:0.38),s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
@@ -425,6 +433,14 @@ function aviaInfo(a){const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k]
    '<div class="kp-r"><span>Зникне</span><b>~'+hm(a.until)+', якщо не буде нових згадок</b></div>'+
    '<div class="kp-r"><span>Позиція</span><b>типовий район пусків (оцінка), не точне місце літака</b></div>'+
    ((a.ev||[]).length?'<div class="kp-ev">'+a.ev.slice(-3).reverse().map(e=>'<div><i>'+hm(e.t)+' · '+esc(nm(e.src))+'</i>'+esc(e.text||'')+'</div>').join('')+'</div>':'')+'</div>';}
+// що саме пустили: тип з повідомлення → типи цілей, які вже привʼязані до цього пуску → типове для місця (позначено як припущення)
+function launchWhat(L){const N={shahed:'шахеди',jet:'реактивні БпЛА',molniya:'«Молнії»',cruise:'крилаті ракети',ballistic:'балістика',kab:'КАБи',geran5:'«Герань-5»',banderol:'«Бандеролі»'};
+  if(L.type)return {short:N[L.type]||L.type,full:(N[L.type]||L.type)+' (так написали канали)'};
+  const linked=[...new Set((SNAP.tracks||[]).filter(t=>t.launch&&t.launch.id===L.id&&!t.launch.est).map(t=>t.type))];
+  if(linked.length)return {short:linked.map(t=>N[t]||t).join(' + '),full:linked.map(t=>N[t]||t).join(' + ')+' (за цілями, що вже летять від цього пуску)'};
+  const st=(L.site_types||[]).filter(t=>t!=='kab'||L.site_kind==='аеродром');
+  if(st.length===1)return {short:'ймовірно '+(N[st[0]]||st[0]),full:'тип не названо; звідси зазвичай пускають '+(N[st[0]]||st[0])};
+  return {short:'тип не названо',full:'тип не названо'+(st.length?'; звідси пускають: '+st.map(t=>N[t]||t).join(', '):'')};}
 let kabPop=null;
 function syncZones(){syncAvia();if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap((z,zi)=>z.places.map(([lo,la])=>({type:'Feature',properties:{zi},geometry:{type:'Point',coordinates:[lo,la]}})))});}
 
@@ -486,7 +502,7 @@ function renderBanner(threats){
   b.onclick=()=>openSheet(t.tr.id);
   // кінематографічний переліт: нова загроза дому — камера плавно показує і дім, і ціль (якщо користувач не крутить карту)
   renderBanner.seen=renderBanner.seen||new Set();
-  if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);window.__beep&&window.__beep();
+  if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);
     note({k:'home:'+t.tr.id,lvl:'red',ic:'⚠️',title:TYPE_NAME[t.tr.type]+(t.tr.count>1?' ×'+t.tr.count:'')+' — '+(t.rel.rel==='route'?'маршрут біля вашого дому':'курс на ваш район'),sub:Math.round(t.rel.d)+' км '+t.rel.from+(t.rel.eta!=null?' · ~'+Math.max(1,Math.round(t.rel.eta))+' хв':''),go:()=>openSheet(t.tr.id)});const d=DISP.get(t.tr.id);
     if(d&&home&&introDone&&Date.now()-(window.__introAt||0)>9000&&Date.now()-(window.__touch||0)>20000){const b2=new maplibregl.LngLatBounds(home,home).extend(d.p);
       const cam=map.cameraForBounds(b2,{padding:{top:140,bottom:160,left:80,right:380}});if(cam)map.flyTo({...cam,zoom:Math.min(cam.zoom,10),pitch:tilt?55:20,bearing:tilt?-18:0,curve:1.5,speed:0.7,essential:true});}}
@@ -662,7 +678,7 @@ function applyTheme(force){const th=effTheme();document.documentElement.dataset.
   const want=PREF.base||(th==='night'?'night':'map');if(force||want!==base)setBase(want);
   $('#st-theme-note').textContent=PREF.theme==='auto'?('Зараз: '+(th==='night'?'ніч':'день')+' — перемикається само за сходом і заходом сонця над вашим домом.'):'';syncSettingsUI();}
 function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
-  $('#st-3d').checked=tilt;$('#st-sound').checked=!!PREF.sound;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
+  $('#st-3d').checked=tilt;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
@@ -689,7 +705,12 @@ document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('clic
   else if(k==='base'){PREF.base=v;savePref();setBase(v);setTimeout(syncSettingsUI,50);}
   else if(k==='shelter'){SHELTER=+v;localStorage.setItem('shelter',SHELTER);if($('#me-sh'))$('#me-sh').textContent=SHELTER;syncSettingsUI();}}));
 $('#st-3d').onchange=e=>set3d(e.target.checked,true);
-$('#st-sound').onchange=e=>{PREF.sound=e.target.checked;savePref();if(PREF.sound)beep();};
+(function(){const S=window.NXSound;if(!S)return;const g=S.get();
+  const segs={'snd-mode':'mode','snd-tone':'tone'};
+  Object.entries(segs).forEach(([id,k])=>{const box=document.getElementById(id);if(!box)return;box.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===g[k]);b.onclick=()=>{S.set(k,b.dataset.v);box.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));if(k==='tone'||b.dataset.v!=='off')S.test();};});});
+  const vol=document.getElementById('snd-vol');if(vol){vol.value=Math.round(g.vol*100);vol.oninput=()=>S.set('vol',vol.value/100);}
+  const tb=document.getElementById('snd-test');if(tb)tb.onclick=()=>S.test();
+  const vh=document.getElementById('snd-voice-hint');if(vh)setTimeout(()=>{vh.textContent=S.hasUkVoice()?'Голос: українська озвучка пристрою':'Українського голосу на пристрої не знайдено — озвучка може бути з акцентом';},1200);})();
 $('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&Notification.permission!=='granted'){const r=await Notification.requestPermission();if(r!=='granted'){e.target.checked=false;toast('Браузер не дозволив сповіщення');}}PREF.sys=e.target.checked;savePref();};
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
@@ -704,7 +725,7 @@ let lanDone=false;function loadLan(){fetch('/api/lan').then(r=>r.json()).then(j=
 let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.type='sine';o.frequency.value=880;o.connect(g);g.connect(actx.destination);
   const t=actx.currentTime;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.3,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.5);o.start(t);o.stop(t+0.55);
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
-window.__beep=()=>{if(PREF.sound)beep();};
+window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
 applyTheme(false);
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
@@ -725,7 +746,7 @@ function note(n){
   // на екрані щонайбільше 5 — найстаріші прибираються самі
   const cs=box.querySelectorAll('.note-c');for(let i=5;i<cs.length;i++)cs[i].remove();
   notesAll();
-  if(n.lvl==='red'||n.lvl==='orange'){window.__beep&&window.__beep();if(navigator.vibrate)try{navigator.vibrate([120,60,120]);}catch(e){}}
+  if(n.lvl==='red'||n.lvl==='orange'){window.__beep&&window.__beep((n.title||'')+(n.sub?'. '+String(n.sub).replace(/~/g,'приблизно ').replace(/·/g,','):''));if(navigator.vibrate)try{navigator.vibrate([120,60,120]);}catch(e){}}
   if(PREF.sys&&document.hidden&&'Notification' in window&&Notification.permission==='granted'){
     try{const sn=new Notification(n.title,{body:n.sub||'',tag:n.k,icon:'brand/icon-192.png',renotify:false});sn.onclick=()=>{window.focus();n.go&&n.go();sn.close();};}catch(e){}}
 }

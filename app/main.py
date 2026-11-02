@@ -82,7 +82,7 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
         # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
         sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type)
         if sites:
-            trk.launches.add(sites, ltyp, obs.count, carrier, key, link, ts, summary)
+            trk.launches.add(sites, ltyp, obs.count, carrier, key, link, ts, summary, seg)
             useful += 1
             if log:
                 brain.log_msg(ts, key, link, "launch", ltyp, obs.count, [{"r": "L", "n": s.name} for s in sites], None, seg)

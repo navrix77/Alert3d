@@ -80,6 +80,7 @@ class Launch:
     srcs: set = field(default_factory=set)
     links: list = field(default_factory=list)
     tracks: set = field(default_factory=set)
+    ev: list = field(default_factory=list)  # докази: [{t, src, text, link}]
 
 
 def detect(text: str, typ: str | None) -> tuple[list[Site], str | None, str | None, bool]:
@@ -123,7 +124,7 @@ class LaunchBook:
         self.items: list[Launch] = []
         self.n = 0
 
-    def add(self, sites, typ, count, carrier, src, link, t, summary: bool) -> list[Launch]:
+    def add(self, sites, typ, count, carrier, src, link, t, summary: bool, text: str | None = None) -> list[Launch]:
         if summary:  # ранковий підсумок — не живий пуск, але знання «звідки зазвичай»
             if self.brain:
                 for s in sites:
@@ -138,10 +139,13 @@ class LaunchBook:
                 ex.count = max(ex.count or 0, count or 0) or None
                 ex.type = ex.type or typ
                 ex.t = min(ex.t, t)
+                if text:
+                    ex.ev = (ex.ev + [{"t": int(t), "src": src, "text": text[:220], "link": link}])[-5:]
                 out.append(ex)
                 continue
             self.n += 1
-            L = Launch(f"L{self.n}", s, t, typ, count, carrier or s.carrier, {src}, [link] if link else [])
+            L = Launch(f"L{self.n}", s, t, typ, count, carrier or s.carrier, {src}, [link] if link else [],
+                       ev=[{"t": int(t), "src": src, "text": (text or "")[:220], "link": link}] if text else [])
             self.items.append(L)
             out.append(L)
         return out
@@ -222,4 +226,4 @@ class LaunchBook:
         self.prune(now)
         return [{"id": L.id, "site": L.site.name, "lat": L.site.lat, "lon": L.site.lon, "kind": L.site.kind, "t": int(L.t),
                  "type": L.type, "count": L.count, "carrier": L.carrier, "srcs": sorted(L.srcs), "links": L.links[-3:],
-                 "tracks": len(L.tracks)} for L in self.items if now - L.t < 6 * 3600]
+                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind} for L in self.items if now - L.t < 6 * 3600]
