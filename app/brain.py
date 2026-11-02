@@ -46,6 +46,7 @@ class Brain:
                 CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
                 CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
                 CREATE TABLE IF NOT EXISTS hist(t REAL PRIMARY KEY, j TEXT);
+                CREATE TABLE IF NOT EXISTS pacc(type TEXT PRIMARY KEY, hit REAL, tot REAL);
                 """
             )
         except sqlite3.Error:  # файл зайнятий іншим процесом — працюємо в пам'яті, моніторинг важливіший
@@ -60,10 +61,17 @@ class Brain:
                 CREATE TABLE IF NOT EXISTS seen(link TEXT PRIMARY KEY);
                 CREATE TABLE IF NOT EXISTS site(type TEXT, site TEXT, entry TEXT, n REAL, PRIMARY KEY(type, site, entry));
                 CREATE TABLE IF NOT EXISTS hist(t REAL PRIMARY KEY, j TEXT);
+                CREATE TABLE IF NOT EXISTS pacc(type TEXT PRIMARY KEY, hit REAL, tot REAL);
                 """
             )
         self.trans: dict[str, dict[str, dict[str, list]]] = {}  # type -> a -> b -> [n, blat, blon]
         self.pred: dict[str, dict[str, dict[str, list]]] = {}   # type -> b -> a -> [n, alat, alon]
+        self.pacc: dict[str, list] = {}
+        try:
+            for typ, h, n in self.db.execute("SELECT * FROM pacc"):
+                self.pacc[typ] = [h, n]
+        except sqlite3.Error:
+            pass
         for typ, a, b, n, alat, alon, blat, blon in self.db.execute("SELECT * FROM trans"):
             self.trans.setdefault(typ, {}).setdefault(a, {})[b] = [n, blat, blon]
             self.pred.setdefault(typ, {}).setdefault(b, {})[a] = [n, alat, alon]
@@ -174,6 +182,36 @@ class Brain:
             items.append((b, w, lat, lon))
         tot = sum(w for _, w, _, _ in items) or 1
         return sorted([(b, w / tot, lat, lon) for b, w, lat, lon in items], key=lambda x: -x[1])[:3]
+
+    def next_path(self, typ: str, name: str, heading, here, steps: int = 3) -> list[tuple[str, float, float, float]]:
+        """Ланцюжок найімовірніших пунктів (навчено на перельотах): [(назва, сукупна ймовірність, lat, lon)]."""
+        out, p, cur, hd, pos, seen = [], 1.0, name, heading, here, {name}
+        for _ in range(steps):
+            nx = [x for x in self.next_places(typ, cur, hd, pos) if x[0] not in seen]
+            if not nx or nx[0][1] < 0.25:
+                break
+            b, q, lat, lon = nx[0]
+            p *= q
+            if p < 0.12:
+                break
+            out.append((b, round(p, 2), lat, lon))
+            if pos is not None:
+                hd = (math.degrees(math.atan2((lon - pos[1]) * 73, (lat - pos[0]) * 111)) + 360) % 360
+            cur, pos = b, (lat, lon)
+            seen.add(b)
+        return out
+
+    # ---------------- самоперевірка прогнозу: чи справді ціль прилетіла туди, куди передбачили
+    def pred_score(self, typ: str, hit: bool) -> None:
+        st = self.pacc.setdefault(typ, [0.0, 0.0])
+        st[0] += 1.0 if hit else 0.0
+        st[1] += 1.0
+        with self.lock:
+            self._x("INSERT INTO pacc VALUES(?,?,?) ON CONFLICT(type) DO UPDATE SET hit=excluded.hit, tot=excluded.tot", (typ, st[0], st[1]))
+            self._tick()
+
+    def pred_acc(self) -> dict:
+        return {t: {"acc": round(h / n, 2), "n": int(n)} for t, (h, n) in self.pacc.items() if n >= 5}
 
     def prev_place(self, typ: str, name: str) -> tuple[str, float, float, float] | None:
         """Звідки найчастіше приходять у пункт (для «курсом на X» без поточного місця)."""

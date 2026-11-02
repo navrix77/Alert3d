@@ -66,6 +66,7 @@ class Track:
     credited: set[str] = field(default_factory=set)
     evidence: list = field(default_factory=list)  # [{t, src, link, text, why, dest, pos, key}]
     pred_src: str | None = None
+    last_pred: tuple | None = None  # (назва, xy, t) — перший крок навченого прогнозу, для самоперевірки
     closed: float | None = None
 
     @property
@@ -215,6 +216,11 @@ class Tracker:
                     if nom * 0.5 < meas < nom * 1.6:
                         tr.speed = tr.speed * 0.5 + meas * 0.5
                 prev = tr.last
+                lp = tr.last_pred
+                if lp and self.brain and self.learn and 120 < t - lp[2] < 2400 and pos.place.name != (prev.place.name if prev.place else None):
+                    # прогноз справдився, якщо нова фіксація в межах 20 км від передбаченого пункту
+                    self.brain.pred_score(tr.type, dist_km(pt, lp[1]) <= 20)
+                    tr.last_pred = None
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
                 if self.brain and self.learn and prev.place:
                     self.brain.learn_step(tr.type, prev.place, pos.place, 0.6 if prev.est else 1.0)
@@ -468,6 +474,13 @@ class Tracker:
                         rest = [to_xy(nx[0][2], nx[0][3])]
                         names = [nx[0][0]]
                         pred_src, pred_p = "learned", round(nx[0][1], 2)
+                        if not tr.last_pred or tr.last_pred[0] != nx[0][0]:
+                            tr.last_pred = (nx[0][0], rest[0], now)
+            # навчений маршрут на 3 кроки вперед від останнього названого пункту — показ «ймовірно далі»
+            lpath = []
+            if status == "active" and self.brain and tr.last.place:
+                la1, lo1 = from_xy(ex, ey)
+                lpath = [[round(lo, 4), round(la, 4), n, p] for n, p, la, lo in self.brain.next_path(tr.type, tr.last.place.name, tr.heading, (la1, lo1))]
             hd = bearing((ex, ey), rest[0]) if rest else tr.heading
             if hd is None and len(tr.obs) >= 2:  # курс за останніми двома точками
                 a_, b_ = tr.obs[-2], tr.obs[-1]
@@ -486,7 +499,7 @@ class Tracker:
             out.append({
                 "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"], "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
-                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "pred": pred_src, "pred_p": pred_p, "pos_est": tr.last.est,
+                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "pred": pred_src, "pred_p": pred_p, "lpath": lpath, "pos_est": tr.last.est,
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),

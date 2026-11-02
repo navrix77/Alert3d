@@ -216,6 +216,7 @@ def state() -> dict:
             HIST.pop(0)
     snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
     snap["daily"] = daily.ready
+    snap["pred_acc"] = brain.pred_acc()
     snap["health"] = {
         "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1" or webmon.state()["live"] > 0,
         "channels": webmon.state(),
