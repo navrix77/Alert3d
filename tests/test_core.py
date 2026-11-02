@@ -1004,3 +1004,11 @@ def test_damage_report_is_not_a_target():
     from app.parser import Parser
     o = Parser().parse("▪️у Харківському районі пошкоджено вантажний автомобіль, цивільне підприємство, електромережі (сел. Пересічне), господарчі споруди", "SG")
     assert o.kind != "track"
+
+
+def test_push_near_target_without_course_is_threat():
+    """Шахед за ~5 км від дому з невідомим курсом — загроза (раніше push мовчав)."""
+    from app.push import Push
+    from app.geo import to_xy
+    a = Push.assess({"lat": 50.03, "lon": 36.30, "speed": 170, "hd": None, "route": [], "type": "shahed"}, to_xy(49.99, 36.27))
+    assert a and a["stage"] == "threat" and a["eta"] is None

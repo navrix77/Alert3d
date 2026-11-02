@@ -573,6 +573,10 @@ function renderMe(threats){
   if(!tg){cls='me watch';word='Дані неповні';sub=offL+'Канали моніторів зараз не надходять.';}
   const mb=near.filter(x=>!x.r.rel&&x.r.maybe).sort((a,b)=>b.r.p-a.r.p)[0];
   if(!first&&mb){cls='me watch';word='Можлива загроза';sub=offL+esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · шанс пройти поруч ~'+Math.round(mb.r.p*100)+'%';}
+  // ціль поруч — загроза незалежно від курсу (03.11: дві цілі за 3–6 км від дому, а панель писала «Цілей у ваш бік немає»)
+  const HX=xy(home);const close=SNAP.tracks.filter(t=>t.status==='active'&&!t.nopos).map(t=>{const d=DISP.get(t.id);return d?{tr:t,d:dist(HX,xy(d.p)),side:FROM[Math.round(brg(HX,xy(d.p))/45)%8]}:null;}).filter(x=>x&&x.d<=15).sort((a,b)=>a.d-b.d);
+  if(!first&&close.length){const c0=close[0],n=close.reduce((a,x)=>a+(x.tr.count||1),0);cls=c0.d<=8?'me danger':'me watch';word=n>1?'Цілі поруч: '+n:'Ціль поруч';
+    sub=offL+esc(TYPE_NAME[c0.tr.type])+' · '+Math.max(1,Math.round(c0.d))+' км '+c0.side+(c0.tr.next?' · курс → '+esc(c0.tr.next):c0.tr.hd==null?' · курс невідомий':'')+(c0.tr.conf<0.5?' · ще не підтверджено':'')+(close.length>1?' · ще '+(close.length-1)+' в межах 15 км':'');}
   if(isStale){cls='me watch';word='Невідомо';sub=offL+'Немає звʼязку з сервером. Це <b>не відбій</b>.';}
   else if(first){const e=first.r.eta||0,byRoute=first.r.rel==='route';
     cls=e<=5&&byRoute?'me danger':'me watch';word=byRoute?(e<=5?'Летить на вас':'Маршрут поруч'):'Можливо у ваш бік';
@@ -584,10 +588,11 @@ function renderMe(threats){
       '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> · ~'+eta+' хв до вас<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+' · за повідомленнями каналів</span></div>';}
   $('#me-sub').innerHTML=sub;
   $('#me-list').innerHTML='';
-  (thr.length?thr:near).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
+  const nearIds=new Set(near.map(x=>x.tr.id));const closeAsNear=close.filter(x=>!nearIds.has(x.tr.id)).map(x=>({tr:x.tr,r:{d:x.d,from:x.side,eta:null,rel:null,away:false,maybe:false,p:0,near:true}}));
+  (thr.length?thr:closeAsNear.concat(near)).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
     const c=MEI[t.type]||(MEI[t.type]=drawTarget(t.type,22));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
     const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;
-    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':(r.away?'віддаляється':t.hd==null?'курс невідомий':r.maybe?'можливо у ваш бік · '+Math.round(r.p*100)+'%':'летить повз'))+'</span></div>'+
+    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':r.near?(t.next?'курс → '+esc(t.next):'поруч'):(r.away?'віддаляється':t.hd==null?'курс невідомий':r.maybe?'можливо у ваш бік · '+Math.round(r.p*100)+'%':'летить повз'))+'</span></div>'+
       (eta?'<div class="me-act '+(eta<=5&&r.rel==='route'?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить поруч':'напрямок за оцінкою, може наблизитися')+'</div>':'');
     li.querySelector('.me-row').prepend(cv);li.onclick=()=>openSheet(t.id);$('#me-list').appendChild(li);});
 }

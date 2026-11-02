@@ -145,6 +145,8 @@ class Push:
         if d > 150:
             return None
         side = FROM[round(bearing(H, P) / 45) % 8]
+        if d <= NEAR_KM:  # ціль уже поруч — загроза незалежно від курсу (03.11: шахеди за 3–6 км, курс невідомий → push не було)
+            return {"d": d, "eta": None, "side": side, "p": 1.0, "stage": "threat"}
         base = Push.threat(tr, H)
         if base and base[1] is not None and tr.get("route"):
             return {"d": d, "eta": None if tr.get("type") in ("ballistic", "rszv") else base[1], "side": side, "p": 1.0, "stage": "threat"}
