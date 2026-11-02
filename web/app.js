@@ -588,6 +588,7 @@ function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0'
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 document.querySelectorAll('.tools [data-b]').forEach(b=>b.onclick=()=>{const t=document.getElementById(b.dataset.b);if(!t)return;const keep=b.dataset.b==='b-3d'||b.dataset.b==='b-layers';if(!keep)$('#settings').hidden=true;t.click();});
 $('#b-daily').onclick=()=>{location.href='/daily.html';};
+if($('#b-an'))$('#b-an').onclick=()=>{location.href='/analysis.html';};
 $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 

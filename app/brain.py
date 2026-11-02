@@ -169,7 +169,13 @@ class Brain:
 
     def next_places(self, typ: str, name: str, heading: float | None = None, here=None) -> list[tuple[str, float, float, float]]:
         """Найімовірніші наступні пункти: [(назва, ймовірність, lat, lon)]. Курс (якщо є) відсікає зворотні напрямки."""
-        row = self.trans.get(typ, {}).get(name) or self.trans.get("shahed", {}).get(name) or {}
+        # переходи всіх типів: свій тип із вагою 1, інші — 0.5 (бектест 26.10–02.11: +33% влучань без втрати точності,
+        # бо дрони й реактивні часто йдуть тими самими коридорами, а досвіду для рідших типів мало)
+        row: dict = {}
+        for t_, tab in self.trans.items():
+            for b, (n, lat, lon) in (tab.get(name) or {}).items():
+                r = row.setdefault(b, [0.0, lat, lon])
+                r[0] += n * (1.0 if t_ == typ else 0.5)
         items = []
         for b, (n, lat, lon) in row.items():
             w = n
@@ -213,7 +219,18 @@ class Brain:
             self._tick()
 
     def pred_acc(self) -> dict:
-        return {t: {"acc": round(h / n, 2), "n": int(n)} for t, (h, n) in self.pacc.items() if n >= 5}
+        """Точність навченого прогнозу за метрикою v2 (див. Tracker._score_pred) і наївного базового для порівняння.
+        Старі лічильники (метрика v1, без «@2») більше не показуються — вони міряли не те."""
+        out = {}
+        for k, (h, n) in self.pacc.items():
+            if not k.endswith("@2") or n < 5:
+                continue
+            t = k[:-2]
+            out[t] = {"acc": round(h / n, 2), "n": int(n)}
+            b = self.pacc.get(k + ":naive")
+            if b and b[1] >= 5:
+                out[t]["naive"] = round(b[0] / b[1], 2)
+        return out
 
     def prev_place(self, typ: str, name: str) -> tuple[str, float, float, float] | None:
         """Звідки найчастіше приходять у пункт (для «курсом на X» без поточного місця)."""

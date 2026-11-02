@@ -94,7 +94,9 @@ class Track:
     credited: set[str] = field(default_factory=set)
     evidence: list = field(default_factory=list)  # [{t, src, link, text, why, dest, pos, key}]
     pred_src: str | None = None
-    last_pred: tuple | None = None  # (назва, xy, t) — перший крок навченого прогнозу, для самоперевірки
+    last_pred: tuple | None = None  # (назва, xy, t, звідки xy, наївний xy) — перший крок навченого прогнозу, для самоперевірки
+    pred_moved: int = 0
+    pred_naive_hit: bool = False
     closed: float | None = None
     merged: str | None = None  # дублікат іншого треку (той самий об'єкт, різні канали/назви)
 
@@ -330,11 +332,8 @@ class Tracker:
                     if nom * 0.5 < meas < nom * 1.6:
                         tr.speed = tr.speed * 0.5 + meas * 0.5
                 prev = tr.last
-                lp = tr.last_pred
-                if lp and self.brain and self.learn and 120 < t - lp[2] < 2400 and pos.place.name != (prev.place.name if prev.place else None):
-                    # прогноз справдився, якщо нова фіксація в межах 20 км від передбаченого пункту
-                    self.brain.pred_score(tr.type, dist_km(pt, lp[1]) <= 20)
-                    tr.last_pred = None
+                if tr.last_pred and self.brain and self.learn:
+                    self._score_pred(tr, pt, t)
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
                 if self.brain and self.learn and prev.place:
                     self.brain.learn_step(tr.type, prev.place, pos.place, 0.6 if prev.est else 1.0)
@@ -437,6 +436,32 @@ class Tracker:
                             "pos": (tr.obs[-1].x, tr.obs[-1].y) if moved else None, "est": bool(moved and tr.obs[-1].est)})
         tr.evidence = tr.evidence[-40:]
         return rec
+
+    def _score_pred(self, tr: Track, pt, t: float) -> None:
+        """Чесна самоперевірка навченого прогнозу «ймовірно далі X» (бектест 26.10–02.11 показав, що стара
+        метрика — «наступна фіксація ≤20 км від X» — карала прогноз за кожне підтвердження поточного місця).
+        Влучання: ціль названо ≤15 км від X протягом 40 хв. Промах: за 40 хв ціль названо деінде (>5 км від
+        місця прогнозу), але не біля X. Невідомо (ціль зникла) — не рахується. Поруч — наївний базовий прогноз
+        «30 км тим самим курсом», щоб було видно, чи навчання взагалі краще за просту екстраполяцію."""
+        name, xy, t0, origin, naive = tr.last_pred
+        if pt is not None and t - t0 <= 2400:
+            if naive is not None and dist_km(pt, naive) <= 15:
+                tr.pred_naive_hit = True
+            if dist_km(pt, xy) <= 15:
+                self.brain.pred_score(tr.type + "@2", True)
+                if naive is not None:
+                    self.brain.pred_score(tr.type + "@2:naive", tr.pred_naive_hit)
+                tr.last_pred, tr.pred_moved, tr.pred_naive_hit = None, 0, False
+                return
+            if dist_km(pt, origin) > 5 and (not tr.obs or dist_km(pt, (tr.obs[-1].x, tr.obs[-1].y)) > 5):
+                tr.pred_moved += 1  # нове, інше місце — не біля X
+        if tr.pred_moved >= 2 or (t - t0 > 2400 and tr.pred_moved):  # двічі назвали деінде або минуло 40 хв
+            self.brain.pred_score(tr.type + "@2", False)
+            if naive is not None:
+                self.brain.pred_score(tr.type + "@2:naive", tr.pred_naive_hit)
+            tr.last_pred, tr.pred_moved, tr.pred_naive_hit = None, 0, False
+        elif t - t0 > 2400:
+            tr.last_pred, tr.pred_moved, tr.pred_naive_hit = None, 0, False  # ціль зникла — невідомо, не рахуємо
 
     def _best_by_target(self, typ: str, route, t: float) -> Track | None:
         """Повідомлення без позиції («курсом на X») приєднуємо до треку з тим самим пунктом призначення
@@ -619,6 +644,8 @@ class Tracker:
         for tr in self.tracks:
             if tr.merged:
                 continue
+            if tr.last_pred and self.brain and self.learn and now - tr.last_pred[2] > 2400:
+                self._score_pred(tr, None, now)
             life = self.life(tr)
             age = now - tr.last.t
             status = "closed" if tr.closed else ("lost" if age > life else "active")
@@ -650,7 +677,10 @@ class Tracker:
                         pred_next = nx[0][0]
                         if not tr.last_pred or tr.last_pred[0] != nx[0][0]:
                             from .geo import to_xy
-                            tr.last_pred = (nx[0][0], to_xy(nx[0][2], nx[0][3]), now)
+                            o_ = (tr.last.x, tr.last.y)
+                            naive = move(o_, tr.heading, 30) if tr.heading is not None else None
+                            tr.last_pred = (nx[0][0], to_xy(nx[0][2], nx[0][3]), now, o_, naive)
+                            tr.pred_moved, tr.pred_naive_hit = 0, False
             # навчений маршрут на 3 кроки вперед від останнього названого пункту — показ «ймовірно далі»
             lpath = []
             if status == "active" and self.brain and tr.last.place:

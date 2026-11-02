@@ -483,3 +483,86 @@ def test_security_news_not_target():
     p = Parser()
     o = p.parse("Військова контррозвідка Служби безпеки затримала в Одесі ще одного російського агента. Ним виявився колишній моряк торговельного судна, який коригував обстріли портового міста.", "temporis_odesa")
     assert o.kind != "track" and o.no_target
+
+
+
+
+def test_analyst_sources_copies_and_nights():
+    """Аналітик: перепост (той самий текст іншого каналу за 5 хв) — не незалежне джерело; «хто перший» — у межах 15 хв;
+    ночі з іншим охопленням каналів не порівнюються."""
+    from app.analyst import journal_groups, night_compare, source_stats, summary, corridors, plural
+    t0 = 1_793_580_000
+    rows = []
+    for k in range(25):
+        b = t0 + k * 4000
+        rows += [(b, "KL", f"РБ-{k}", "jet", f"Реактивний БпЛА курсом на Боярку {k}"),
+                 (b + 4, "rozvidkaneba", f"РБ-{k}", "jet", f"Реактивний БпЛА курсом на Боярку {k}"),   # копія
+                 (b + 120, "K", f"РБ-{k}", "jet", f"🏍 Реактивний на Київщині {k}"),
+                 (b + 3000, "late", f"РБ-{k}", "jet", f"інший текст {k}")]                           # пізно — не «відставання»
+    st = {s["src"]: s for s in source_stats(journal_groups(rows))}
+    assert st["KL"]["first_share"] == 1.0 and st["K"]["lag_med_s"] == 120
+    assert st["rozvidkaneba"]["copy_share"] == 1.0 and "late" not in st
+    n = night_compare(journal_groups(rows), t0 + 25 * 4000)
+    assert n["comparable"] == 0 or n["avg_same_time"] is not None
+    assert plural(1, ("ціль", "цілі", "цілей")) == "ціль" and plural(12, ("ціль", "цілі", "цілей")) == "цілей" and plural(23, ("ціль", "цілі", "цілей")) == "цілі"
+    act = [{"id": "Ш-1", "type": "shahed", "lat": 49.6, "lon": 34.5, "hd": 270, "count": 3, "next": "Решетилівка"},
+           {"id": "Ш-2", "type": "shahed", "lat": 49.5, "lon": 34.6, "hd": 280, "count": 2, "next": "Решетилівка"}]
+    c = corridors(act)
+    assert c[0]["n"] == 5 and c[0]["dir"] == "захід" and c[0]["next"] == ["Решетилівка"]
+    r = {"active_n": 5, "active": {"shahed": 5}, "wave": {"new30": 5, "prev30": 1, "trend": "наростає", "peak12h": 5},
+         "corridors": c, "targets": [], "oblast_p60": [], "launches": [], "nights": None, "sources": [], "self": {}}
+    txt = " ".join(summary(r))
+    assert "5 шахедів" in txt and "наростає" in txt and "Полтавщині, курс на захід" in txt
+
+
+def test_pred_score_v2():
+    """Самоперевірка прогнозу v2: влучання — ціль названо ≤15 км від X; промах — двічі названо деінде."""
+    from app.brain import Brain
+    from app.geo import Place
+    from app.tracker import Point, Track
+    from pathlib import Path as P_
+    b = Brain(P_(":memory:"))
+    tr_ = Tracker(SOURCES, b)
+    t = Track("Ш-1", "shahed", 170)
+    t.obs = [Point(0, 0, 0, "x", "A", None)]
+    t.last_pred = ("X", (30.0, 0.0), 0, (0.0, 0.0), (0.0, 30.0))
+    tr_._score_pred(t, (28.0, 2.0), 600)
+    assert b.pacc["shahed@2"] == [1.0, 1.0] and t.last_pred is None
+    t.last_pred = ("X", (30.0, 0.0), 1000, (0.0, 0.0), None)
+    tr_._score_pred(t, (0.0, -20.0), 1300)
+    t.obs.append(Point(1300, 0.0, -20.0, "x", "B", None))
+    tr_._score_pred(t, (0.0, -40.0), 1600)
+    assert b.pacc["shahed@2"] == [1.0, 2.0]
+
+
+def test_journal_2026_11_02_sections_and_selfcheck_findings():
+    """Знахідки scripts/selfcheck.py на журналі 01–02.11."""
+    from app.parser import Parser
+    p = Parser()
+    names = lambda t, ch: [r.place.name for r in p.parse(t, ch).places]
+    # UkraineRadar_24_7: кожен «⚠️ …» пункт зведення — окремий сегмент зі своєю областю
+    t = ("⚠️ З Черкащини на Київщину 1х реактивний курсом на Переяслав.  ⚠️ 1х реактивний з Брянщини заходить на Чернігівщину, курсом на Городню.  "
+         "⚠️ На Миколаївщині ще 1х реактивний курсом на Березанку.  ⚠️ На Одещині реактивний курсом на Подільськ.")
+    segs = p.segments(t)
+    got = [[(r.place.name, round(r.place.lat, 1)) for r in p.parse(s, "UkraineRadar_24_7").places] for s in segs]
+    assert [g[0][0] for g in got] == ["Переяслав", "Городня", "Березанка", "Подільськ"]
+    assert got[1][0][1] > 51.5 and got[2][0][1] < 47.5  # Городня на Чернігівщині, Березанка на Миколаївщині
+    # область попереднього пункту діє на наступний
+    segs = p.segments("⚠️ На Дніпропетровщині реактивний курсом на Синельникове.  ⚠️ 4х БпЛА курсом на Покровське, ще 1х на Тернівку.")
+    pk = [r.place for r in p.parse(segs[1], "UkraineRadar_24_7").places if r.place.name == "Покровське"][0]
+    assert pk.lat < 48.5
+    # «Новий 1× уБпЛА», «Нові КАБи», «Нова версія»; але «Нова Слобода КАБ» — село
+    assert names("🛸 Новий 1× уБпЛА «Герань-2» / «Гербера» у напрямку м. Погребище з Київщини.", "vinnradar") == ["Погребище"]
+    assert "Нова" not in names("Нові КАБи на Межову/Слов'янку/Донеччину.", "shovnebi")
+    assert names("Нова Слобода КАБ", "rdsprostir") == ["Нова Слобода"]
+    assert names("Буду вам дуже дуже вдячний 🙏🏻❤️", "MU") == []
+    # тезка за сотні км від названої в тексті області — відкидаємо
+    assert names("БпЛА курсом на Глушкове (Полтавщина)", "KL") == []
+    assert names("БпЛА від Липовця бере курс на Вороновицю (Вінниччина)", "KL") == ["Вороновиця"]  # не Липовиця на Прикарпатті
+    # «Київський район» — район Одеси, а не Київщина; родовий множини «від Ромнів»
+    assert names("❗️1х реактивний на Одесу. Київський р-н", "odessa_infonews") == ["Одеса"]
+    assert names("1 від Ромнів курсом на Чернігівську область.", "sumyregion") == ["Ромни"]
+    assert names("БпЛА курсом на Васильків", "KL") == ["Васильків"] and names("1 БпЛА на Бердичів/передмістя.", "MK") == ["Бердичів"]
+    # «від Кривого Рогу»: раніше IndexError (повідомлення губилось), тепер Кривий Ріг
+    assert [r.place.name for r in p.parse("Дрон на півдні від Кривого Рогу курсом на Дніпро", "DN").places][0] == "Кривий Ріг (пд)"
+    assert names("Шахед на Кривой Рог", "DN") == ["Кривий Ріг"]

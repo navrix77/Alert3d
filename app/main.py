@@ -402,6 +402,20 @@ async def api_daily(d: str | None = None):
     return JSONResponse(await daily.get(day))
 
 
+_AN: list = [0.0, None]
+
+
+@app.get("/api/analysis")
+def api_analysis():
+    """Аналітична довідка: хвиля, напрямки, цілі, порівняння з попередніми ночами, швидкість і незалежність джерел,
+    самоперевірка прогнозу. Кожен розділ — з числами й id цілей, з яких зроблено висновок."""
+    from .analyst import analyze
+    if time.time() - _AN[0] > 30 or _AN[1] is None:
+        snap = state()
+        _AN[0], _AN[1] = time.time(), analyze(snap, HIST, brain, snap["now"])
+    return JSONResponse(_AN[1])
+
+
 @app.get("/api/history")
 def api_history():
     return JSONResponse({"frames": HIST})
