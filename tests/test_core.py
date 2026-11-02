@@ -1012,3 +1012,10 @@ def test_push_near_target_without_course_is_threat():
     from app.geo import to_xy
     a = Push.assess({"lat": 50.03, "lon": 36.30, "speed": 170, "hd": None, "route": [], "type": "shahed"}, to_xy(49.99, 36.27))
     assert a and a["stage"] == "threat" and a["eta"] is None
+
+
+def test_nickname_and_hypothetical_threat_not_a_target():
+    """«Міхалич, …щоб в разі загрози балістики…» — ім'я й умовна фраза, а не балістика в Михальче."""
+    from app.parser import Parser
+    o = Parser().parse("Міхалич, зніми червону тривогу для столиці, щоб в разі загрози балістики повторно увімкнути і розбудити людей", "eRadarrua")
+    assert o.kind != "track" and not any(p.place.name == "Михальче" for p in o.places)
