@@ -293,7 +293,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
     setTimeout(finish,2600);setTimeout(()=>el&&el.remove(),1800);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
-  if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;
+  if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').reduce((a,t)=>a+(t.count||1),0);// так само, як лічильники вгорі: з урахуванням ×N у групах
     st.textContent=(c.channels?c.live+' з '+c.channels+' джерел наживо · ':'')+(act?act+' цілей у небі':'небо поки чисте');}else st.textContent=['Підключаюсь до джерел…','Читаю монітори…','Збираю картину неба…'][n%3];},450);}
 map.once('idle',()=>introFly(false));
 setTimeout(()=>introFly(false),7000);
