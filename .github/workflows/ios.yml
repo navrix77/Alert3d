@@ -9,7 +9,7 @@ permissions:
 concurrency: { group: ios, cancel-in-progress: true }
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     defaults: { run: { working-directory: capacitor } }
     steps:
       - uses: actions/checkout@v4
