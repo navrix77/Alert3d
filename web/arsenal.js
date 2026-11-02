@@ -63,7 +63,7 @@ function build(){const el=document.getElementById('arsenal');if(el.dataset.ok)re
 function liveBtns(){const S=window.NX?NX.snap():null;
   document.querySelectorAll('#arsenal .ars-map').forEach(b=>{const t=b.dataset.t;let n=0;
     if(S){n=t==='kab'?(S.zones||[]).length:(S.tracks||[]).filter(x=>x.status==='active'&&x.type===t).reduce((s,x)=>s+(x.count||1),0);}
-    b.hidden=!n;b.textContent=t==='kab'?'Загроз КАБ зараз: '+n+' — показати':'У повітрі зараз: '+n+' — показати';});}
+    b.hidden=!n;b.textContent=t==='kab'?'Загроз КАБ зараз: '+n:'У повітрі зараз: '+n;});}
 window.openArsenal=function(){build();liveBtns();document.getElementById('arsenal').hidden=false;const s=document.getElementById('settings');if(s)s.hidden=true;};
 document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('b-ars');if(b)b.onclick=window.openArsenal;const c=document.getElementById('ars-close');if(c)c.onclick=()=>document.getElementById('arsenal').hidden=true;});
 })();
