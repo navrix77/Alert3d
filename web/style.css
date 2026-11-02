@@ -546,3 +546,4 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 :root[data-theme="light"] #xr-panel{background:rgba(255,255,255,.97);color:#111}:root[data-theme="light"] #xr-panel q{color:#333}
 
 .grid>.wide{grid-column:1/-1}.conf3{font-size:14px!important;font-weight:500!important;line-height:1.5}.conf3 .ok{color:#3ddc84}.conf3 .warn{color:#ffb020}
+#sh-eta{font-style:normal;font-weight:700;opacity:.8}.sheet .sh-g+.route,.sheet .route+.sh-g{margin-top:10px}#sh-now small,#sh-conf small{opacity:.7}

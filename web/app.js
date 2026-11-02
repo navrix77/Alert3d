@@ -615,28 +615,36 @@ function fillSheet(first){
   if(first||!fillSheet.icon||fillSheet.icon!==tr.type){const c=drawTarget(tr.type,40);$('#sh-icon').innerHTML='';$('#sh-icon').appendChild(c);fillSheet.icon=tr.type;}
   $('#sh-name').textContent=TYPE_NAME[tr.type]+(tr.count>1?' ×'+tr.count:'');
   $('#sh-course').innerHTML=tr.status!=='active'?(tr.status==='lost'?'Втрачено':'Більше не фіксується'):(tr.next?'Курс → <b>'+esc(tr.next)+'</b>':'Курс уточнюється');
-  const d=DISP.get(tr.id);const r=d&&homeRel(tr,d.p);
-  $('#sh-dist').textContent=r?Math.round(r.d)+' км '+r.side:'';$('#sh-dist').parentNode.hidden=!r;
-  $('#sh-eta').textContent=!r?'':r.eta!=null?'≈ '+Math.max(1,Math.round(r.eta))+' хв до вас':r.away?'віддаляється':tr.hd==null?'курс невідомий':'летить повз';$('#sh-eta').parentNode.hidden=!r;
-  const ago=Math.round((Date.now()/1000+offset-tr.first)/60);
-  $('#sh-first').textContent=fmt(tr.first)+' · '+ago+' хв тому';
-  $('#sh-src').textContent=tr.srcs.map(s=>SNAP.sources[s]?.name||s).join(', ')+(tr.srcs.length>1?'':'');
+  const d=DISP.get(tr.id);const r=d&&homeRel(tr,d.p);const nowT=Date.now()/1000+offset;const mago=t=>Math.max(0,Math.round((nowT-t)/60));
+  // 1) для вас: відстань і що ціль робить відносно дому — одним рядком
+  $('#sh-dist').textContent=r?Math.round(r.d)+' км на '+r.side:'';
+  $('#sh-eta').textContent=!r?'':r.eta!=null?'· ≈ '+Math.max(1,Math.round(r.eta))+' хв до вас':r.away?'· віддаляється':tr.hd==null?'· курс невідомий':'· летить повз';
+  $('#sh-dist').closest('div').hidden=!r;
+  // 2) де зараз: останній пункт від каналів і як давно; далі лише оцінка
+  {let h;const at=tr.at;
+   if(tr.nopos)h='<b class=warn>Невідомо</b> — канали назвали лише курс'+(tr.next?' на '+esc(tr.next):'');
+   else if(at)h='<b>'+esc(at[0])+'</b> — назвали канали '+mago(at[1])+' хв тому'+(mago(at[1])>=5?'<br><small>далі на мапі — оцінка SKY за курсом і швидкістю</small>':'');
+   else h=tr.pos_est?'оцінка SKY за курсом':'назвали канали';
+   $('#sh-now').innerHTML=h;}
+  // 3) звідки: перша фіксація, потім імовірне місце пуску
   {const L=tr.launch,en=tr.entry;let h='';
-   if(L)h=(L.est?'ймовірно ':'')+'<b>'+esc(L.site)+'</b>'+(L.carrier?' · '+esc(L.carrier):'')+(L.t?' · пуск '+fmt(L.t):'')+(L.est?' <small>(оцінка за курсом'+(L.p>=0.4?' і статистикою':'')+')</small>':' <small>('+(L.srcs||[]).map(s=>esc(SNAP.sources[s]?.name||s)).join(', ')+(L.link?' · <a href="'+esc(L.link)+'" target="_blank" rel="noopener">пост ↗</a>':'')+')</small>');
-   else h=tr.from?'з боку '+esc(tr.from):'канали не вказали';
-   if(en&&en[2])h+='<br><small>перша фіксація: '+esc(en[2])+' · '+fmt(en[3])+'</small>';
+   if(en&&en[2])h='Вперше: <b>'+esc(en[2])+'</b> о '+fmt(en[3])+' ('+mago(en[3])+' хв тому)';
+   else h='Вперше: '+fmt(tr.first)+' ('+mago(tr.first)+' хв тому)';
+   if(L)h+='<br>Пуск: '+(L.est?'ймовірно ':'')+'<b>'+esc(L.site)+'</b>'+(L.carrier?' · '+esc(L.carrier):'')+(L.t?' · '+fmt(L.t):'')+(L.est?' <small>(оцінка за курсом'+(L.p>=0.4?' і статистикою':'')+')</small>':' <small>('+(L.srcs||[]).map(s=>esc(SNAP.sources[s]?.name||s)).join(', ')+(L.link?' · <a href="'+esc(L.link)+'" target="_blank" rel="noopener">пост ↗</a>':'')+')</small>');
+   else if(tr.from)h+='<br>З боку: '+esc(tr.from);
    $('#sh-from').innerHTML=h;}
-  {const E=tr.ev||{};const ind=(E.prim||tr.srcs||[]).length;const agoL=Math.max(0,Math.round(((E.age||0)+(Date.now()/1000+offset-SNAP.now))/60));
-   $('#sh-conf').innerHTML='<div>Наявність: '+(ind>=2?'<b class=ok>підтверджено '+ind+' незалежними джерелами</b>':'<b class=warn>одне джерело</b>')+'</div>'+
-     '<div>Місце: '+(tr.nopos?'<b class=warn>невідоме — канали назвали лише курс</b>':tr.pos_est?'оцінка SKY за курсом':'назвали канали')+' · '+agoL+' хв тому</div>'+
-     '<div>Тип: як написали канали'+(tr.likely?' (ймовірно)':'')+'</div>';}
+  // 4) хто повідомив: незалежні джерела поіменно, тип — як написали
+  {const E=tr.ev||{};const P=(E.prim&&E.prim.length?E.prim:tr.srcs)||[];const ind=P.length;const cp=Math.max(0,(E.pubs||0)-ind);
+   $('#sh-conf').innerHTML=(ind>=2?'<b class=ok>'+ind+' незалежних джерел</b>':'<b class=warn>Одне джерело — ще не підтверджено</b>')+': '+P.map(s=>esc(SNAP.sources[s]?.name||s)).join(', ')+
+     (cp?'<br><small>ще '+cp+' повторів/копій — не рахуються як підтвердження</small>':'')+'<br><small>Тип — як написали канали'+(tr.likely?' (ймовірно)':'')+'</small>';}
   const serverT=Date.now()/1000+offset;const pos=DISP.get(tr.id);
   if(tr.route_names&&tr.route_names.length&&tr.route&&tr.route.length&&pos){let acc=0,prev=xy(pos.p);const items=tr.route.slice(0,tr.route_names.length).map((p,i)=>{const q=xy(p);acc+=dist(prev,q);prev=q;return '<li><b>~'+Math.max(1,Math.round(acc/tr.speed*60))+' хв</b> '+esc(tr.route_names[i])+'</li>';});
     if(home&&r&&r.eta!=null)items.push('<li class="home"><b>~'+Math.max(1,Math.round(r.eta))+' хв</b> ваш дім</li>');
     const why=tr.pred==='learned'?' <small>· вивчено з історії'+(tr.pred_p?' ('+Math.round(tr.pred_p*100)+'%)':'')+'</small>':tr.pred==='channels'?' <small>· за каналами</small>':'';
     $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо — позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'')+lpHtml(tr);}else $('#sh-route').innerHTML=lpHtml(tr);
   // «Чому я це показую»: першоджерело, копії, суперечності, давність, що змінило відображення
-  {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=(tr.ev&&tr.ev.items)?tr.ev.items:(REPLAY?null:evItems(tr.id,()=>{if(sel===tr.id)fillSheet();}));// машина часу: лише те, що було відомо на той моментE.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
+  {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=(tr.ev&&tr.ev.items)?tr.ev.items:(REPLAY?null:evItems(tr.id,()=>{if(sel===tr.id)fillSheet();}));// машина часу: лише те, що було відомо на той момент
+   E.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
    const head=E.pubs+' '+(E.pubs===1?'публікація':E.pubs<5?'публікації':'публікацій')+' · '+ind+' '+(ind===1?'першоджерело':ind<5?'першоджерела':'першоджерел')+' · '+(ind>=2?'<b class=ok>незалежне підтвердження є</b>':'<b class=warn>незалежного підтвердження немає</b>');
    const age=E.age;const ageTxt=age<120?'щойно':age<3600?Math.round(age/60)+' хв тому':'понад годину тому';
    let h='<h4>Чому я це показую</h4><p class=ev-head>'+head+'</p><p class=ev-age>Остання фіксація місця: '+ageTxt+(age>300?' — позиція далі лише оцінка, зона невизначеності росте':'')+'</p>';

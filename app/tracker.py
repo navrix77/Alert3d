@@ -870,6 +870,8 @@ class Tracker:
                 "ev": {k: v for k, v in self._ev_out(tr, now, (ex, ey)).items() if k != "items"},  # докази — /api/track/{id}
                 "from": tr.from_place.name if tr.from_place else None, "ts": now,
                 "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4), tr.obs[0].label, int(tr.obs[0].t)],
+                # останній пункт, який назвали самі канали (не оцінка SKY): «де ціль зараз» у картці
+                "at": next(([o.label, int(o.t)] for o in reversed(tr.obs) if not o.est and o.label), None),
                 "launch": self.launches.link(tr, now, hd) if status != "closed" or age < 1800 else None,
             })
         zones = []
