@@ -135,10 +135,24 @@ function addOverlays(){
   map.addLayer({id:'memo-br',type:'line',source:{type:'geojson',data:{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[36.44,45.25],[36.52,45.30],[36.60,45.36]]}}},paint:{'line-color':'rgba(255,90,90,.55)','line-width':2.5,'line-dasharray':[1,1]}});
   map.addLayer({id:'memo',type:'symbol',source:'memo',minzoom:4.6,layout:{'icon-image':['get','i'],'icon-size':['interpolate',['linear'],['zoom'],5,0.8,8,1.25],'icon-allow-overlap':true,'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['interpolate',['linear'],['zoom'],5,9.5,8,12],'text-letter-spacing':0.08,'text-offset':[0,1.3],'text-anchor':'top','text-rotate':-8,'text-optional':true,'text-max-width':20},paint:{'text-color':'rgba(255,215,140,.75)','text-halo-color':'rgba(0,0,0,.8)','text-halo-width':1.3,'icon-opacity':0.85}});
   map.addSource('ru',{type:'geojson',data:EMPTY});map.addSource('hits',{type:'geojson',data:EMPTY});
-  if(!map.hasImage('hit')){const c=document.createElement('canvas');c.width=c.height=40;const x=c.getContext('2d');x.translate(20,20);
-    x.fillStyle='rgba(255,213,0,.25)';x.beginPath();x.arc(0,0,18,0,7);x.fill();x.strokeStyle='#FFD500';x.lineWidth=2.5;x.beginPath();x.arc(0,0,11,0,7);x.stroke();
-    x.beginPath();for(const a of [0,90,180,270]){const r=a*Math.PI/180;x.moveTo(Math.sin(r)*6,-Math.cos(r)*6);x.lineTo(Math.sin(r)*17,-Math.cos(r)*17);}x.stroke();x.fillStyle='#2F7BFF';x.beginPath();x.arc(0,0,4,0,7);x.fill();
-    x.setTransform(1,0,0,1,0,0);map.addImage('hit',x.getImageData(0,0,40,40),{pixelRatio:2});}
+  // приліт по РФ — живе багаття: анімоване полум'я (оновлюється ~12 разів/с, лише коли карта й так перемальовується)
+  if(!map.hasImage('hit')){const S=72;const fire={width:S,height:S,data:new Uint8Array(S*S*4),t0:performance.now(),lt:0,
+    onAdd(){this.c=document.createElement('canvas');this.c.width=this.c.height=S;this.x=this.c.getContext('2d',{willReadFrequently:true});this.draw(0);},
+    draw(t){const x=this.x;x.clearRect(0,0,S,S);const cx=S/2,by=S*0.78;
+      // відсвіт на землі
+      let g=x.createRadialGradient(cx,by,2,cx,by,S*0.46);g.addColorStop(0,'rgba(255,140,40,.55)');g.addColorStop(1,'rgba(255,80,0,0)');x.fillStyle=g;x.beginPath();x.ellipse(cx,by,S*0.46,S*0.2,0,0,7);x.fill();
+      // язики полум'я
+      const tongues=[[0,1,1],[-7,0.72,1.7],[7,0.78,2.3],[-3,0.55,3.1],[4,0.5,0.6]];
+      for(const [dx,h,ph] of tongues){const fl=0.82+0.18*Math.sin(t*9+ph*3)*Math.sin(t*5.3+ph),H=S*0.5*h*fl,W=S*0.13*(0.7+0.3*h),sw=Math.sin(t*6+ph*2)*3*h;
+        g=x.createLinearGradient(0,by,0,by-H);g.addColorStop(0,'rgba(255,240,170,.95)');g.addColorStop(0.35,'rgba(255,170,40,.9)');g.addColorStop(0.75,'rgba(255,70,10,.75)');g.addColorStop(1,'rgba(200,20,0,0)');
+        x.fillStyle=g;x.beginPath();x.moveTo(cx+dx-W,by);x.quadraticCurveTo(cx+dx-W*0.9+sw*0.5,by-H*0.55,cx+dx+sw,by-H);x.quadraticCurveTo(cx+dx+W*0.9+sw*0.5,by-H*0.55,cx+dx+W,by);x.closePath();x.fill();}
+      // іскри
+      for(let i=0;i<4;i++){const k=((t*0.9+i*0.27)%1),sx=cx+Math.sin(i*2.1+t*2)*8*k,sy=by-S*0.25-k*S*0.4;x.fillStyle='rgba(255,210,120,'+(1-k).toFixed(2)+')';x.beginPath();x.arc(sx,sy,1.4,0,7);x.fill();}
+      // дрова
+      x.strokeStyle='rgba(60,30,15,.9)';x.lineWidth=3;x.lineCap='round';x.beginPath();x.moveTo(cx-11,by+3);x.lineTo(cx+11,by-1);x.moveTo(cx-11,by-1);x.lineTo(cx+11,by+3);x.stroke();
+      this.data.set(x.getImageData(0,0,S,S).data);},
+    render(){const now=performance.now();if(now-this.lt<80)return false;this.lt=now;this.draw((now-this.t0)/1000);return true;}};
+    map.addImage('hit',fire,{pixelRatio:2});}
   map.addLayer({id:'ru-glow',type:'circle',source:'ru',minzoom:3,filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':1,'circle-opacity':0.22,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ru-dot',type:'circle',source:'ru',filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,1.8,7,3.5],'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':['interpolate',['linear'],['zoom'],4,1,7,2],'circle-opacity':0.85}});
   map.addLayer({id:'ru-t',type:'symbol',source:'ru',minzoom:6,filter:['!',['has','sum']],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['has','sum'],12,10.5],'text-max-width':16,'text-offset':['case',['has','sum'],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['has','sum'],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
@@ -174,7 +188,7 @@ function addOverlays(){
      '<div class="kp"><small>НАШІ ДРОНИ НАД РФ</small><h4>'+esc(p.n||'')+'</h4>'+
      '<div class="kp-r"><span>Запущено</span><b>точну кількість не публікують; РФ сама визнала щонайменше '+(p.cnt||'кілька')+' над регіоном</b></div>'+
      '<div class="kp-r"><span>Усього</span><b>≥ '+ev.total+' над '+ev.regions.length+' рег. · '+(per||'останнє зведення')+' · '+hm(ev.t)+'</b></div>'+
-     '<div class="kp-r"><span>Прильоти</span><b>жовті приціли на мапі — за Генштабом ЗСУ та ASTRA</b></div>'+
+     '<div class="kp-r"><span>Прильоти</span><b>багаття на мапі — за Генштабом ЗСУ та ASTRA</b></div>'+
      (ev.link?'<div class="kp-ev"><a href="'+esc(ev.link)+'" target="_blank" rel="noopener" style="color:inherit">допис-першоджерело ↗</a></div>':'')+'</div>').addTo(map);});
   map.on('click','hits',e=>{const f=e.features&&e.features[0];if(!f)return;const h=HITS[f.properties.hi];if(!h)return;
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'300px',className:'kab-pop ru-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
