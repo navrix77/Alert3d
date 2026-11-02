@@ -453,3 +453,19 @@ def test_city_over_village_namesake_in_region():
     # TLK/CX (Харківщина) з контекстом біля Куп'янська: «на Лозовую» — місто Лозова, не село Лозова (50.18, 37.29)
     o = p.parse("2 Р. Шаболды на Лозовую⚠️", "TLK", (49.9, 37.5))
     assert o.places and abs(o.places[0].place.lat - 48.89) < 0.05
+
+
+def test_struck_closes_target():
+    import time
+    from app import config
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p, tr = Parser(), Tracker(config.SOURCES, learn=False)
+    t = time.time() - 300
+    tr.ingest(p.parse("Шахед у районі Чугуєва"), "x", t)
+    # Синєгубов: «Армія рф вдарила БПЛА по Чугуєву» — ціль уже вдарила, а не «змінила курс»
+    o = p.parse("🔻 Армія рф вдарила БПЛА по Чугуєву.")
+    assert o.kind == "filtered"
+    tr.ingest(o, "OVA", t + 100)
+    assert all(x["status"] != "active" for x in tr.snapshot()["tracks"])
+    assert p.parse("Ударний БпЛА на Чугуїв").kind == "track"
