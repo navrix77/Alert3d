@@ -26,7 +26,7 @@ const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,ka
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
 const INTRO=!sessionStorage.getItem('intro');
-const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[-5,28],[75,68]]});window.tryvogaMap=map;
+const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});window.tryvogaMap=map;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
@@ -78,8 +78,20 @@ function addRelief(){
     try{map.setLight({anchor:'map',position:[1.35,210,35],color:night?'#fff1dc':'#fff3e0',intensity:night?0.42:0.55});}catch(e){}
   }catch(e){console.warn('relief',e);}
 }
+// Детально — лише Україна: дрібні підписи, дороги й будівлі за кордоном не малюємо (великі міста та країни лишаються)
+let UAGEO=null;
+function uaDetail(){
+  const go=()=>{const st=map.getStyle();if(!st)return;const vs=Object.keys(st.sources).filter(k=>st.sources[k].type==='vector');
+    const IN=['within',UAGEO];const KEEP=/country|continent|state|ocean|sea|water_name|marine/;
+    st.layers.forEach(l=>{if(!vs.includes(l.source)||l._ua||KEEP.test(l.id))return;
+      if(l.type!=='symbol'&&l.type!=='line'&&l.type!=='fill-extrusion')return;
+      if(l.type==='fill-extrusion'){return;}  // будівлі — лише на великих масштабах, де й так Україна
+      if(/boundary|admin/.test(l.id))return;
+      let f=IN;if(/city|capital/.test(l.id))f=['any',IN,['<=',['coalesce',['get','rank'],99],3]];
+      try{const old=map.getFilter(l.id);map.setFilter(l.id,old?['all',old,f]:f);}catch(e){}});};
+  if(UAGEO)go();else fetch('/data/ua.geojson').then(r=>r.json()).then(g=>{UAGEO=g.geometry;go();}).catch(()=>{});}
 function addOverlays(){
-  addRelief();
+  addRelief();uaDetail();
   const st=map.getStyle();if(!st||!st.glyphs||map.getSource('obl'))return;
   addImages();
   const LV=['coalesce',['feature-state','lvl'],0];
@@ -99,7 +111,7 @@ function addOverlays(){
   map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#E0405A','line-width':['interpolate',['linear'],['zoom'],5,1,9,2.2],'line-opacity':0.85}});
   map.addSource('outside',{type:'geojson',data:'/data/outside.geojson',tolerance:0.2,buffer:256});
   // напис навскіс, напівпрозоро — над територією РФ (у площині карти)
-  map.addSource('rf-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[39.2,53.6],[44.5,50.4],[36.2,56.9],[46.5,55.4]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});
+  map.addSource('rf-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[39.2,53.6],[44.5,50.4],[36.2,56.9],[46.5,55.4]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.55,8,0.6]}});
   map.addLayer({id:'rf-mark',type:'symbol',source:'rf-mark',maxzoom:7.5,layout:{'text-field':'ДЕРЖАВА-ТЕРОРИСТ','text-font':['Noto Sans Bold'],
     'text-size':['interpolate',['exponential',1.6],['zoom'],3,13,5,26,7,46],'text-letter-spacing':0.18,'text-max-width':40,'text-rotate':-22,'text-rotation-alignment':'map','text-pitch-alignment':'map',
     'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,90,90,0.22)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});
