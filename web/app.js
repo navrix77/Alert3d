@@ -359,7 +359,8 @@ function uncKm(tr,ageSec){const u=UNC[tr.type];if(!u||tr.type==='ballistic')retu
 function pToward(src,delta,dkm){const q=HD_Q[{from:'movement',course:'all'}[src]||src]||HD_Q.all;const w=Math.atan(15/Math.max(dkm,15))*180/Math.PI;
   let s=0;for(const e of q)s+=0.5*(Math.abs(delta-e)<=w)+0.5*(Math.abs(delta+e)<=w);return s/q.length;}
 function homeRel(tr,p){
-  if(!home||tr.nopos)return null;// канали назвали лише курс («на Харків») — де ціль зараз, невідомо: «N км від вас» було б вигадкоюconst H=xy(home),P=xy(p);const d=dist(H,P);
+  if(!home||tr.nopos)return null;// канали назвали лише курс («на Харків») — де ціль зараз, невідомо: «N км від вас» було б вигадкою
+  const H=xy(home),P=xy(p);const d=dist(H,P);
   let rel=null,eta=null;
   const path=[P,...tr.route.map(xy)];
   let acc=0,best={d:1e9,c:0};for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];const vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;let t=L2?((H[0]-a[0])*vx+(H[1]-a[1])*vy)/L2:0;t=Math.max(0,Math.min(1,t));const q=[a[0]+vx*t,a[1]+vy*t];const dd=dist(H,q);if(dd<best.d)best={d:dd,c:acc+Math.sqrt(L2)*t};acc+=Math.sqrt(L2);}
