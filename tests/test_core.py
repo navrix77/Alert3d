@@ -983,3 +983,9 @@ def test_launch_not_linked_to_target_flying_back():
     tr = trk.tracks[0]
     L = trk.launches.link(tr, 1000.0 + 3 * 3600 + 60)
     assert not L or L.get("est") or L.get("site") != "Орел"
+
+
+def test_lancet_clear_does_not_close_other_targets():
+    from app.parser import Parser
+    o = Parser().parse("Вільнянськ, у вас по ланцету чисто", "shovnebi")
+    assert o.kind != "close"
