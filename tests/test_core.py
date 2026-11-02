@@ -749,3 +749,17 @@ def test_push_stages_like_israel():
         pu.armed["ExponentPushToken[abcdefghijkl]"][k] = _t.time() - 300
     asyncio.run(pu.tick(Cli(), {"tracks": [dict(t, status="lost") for t in many]}))
     assert len(sent) == 1 and "минула" in sent[0]["title"]
+
+
+def test_area_stats(tmp_path):
+    """«Ваш район» як архів Tzofar: цілі, що пройшли ≤ r км від дому, години, з якого боку, типи — за мапами доби."""
+    import json as _j
+    from app.areastats import area_stats
+    t0 = 1_793_580_000  # 02.11 01:00 Київ
+    day = {"tracks": [
+        {"id": "Ш-1", "type": "shahed", "pts": [[36.23, 50.60, t0], [36.23, 50.30, t0 + 600], [36.23, 49.90, t0 + 1500]]},  # з півночі через Харків
+        {"id": "РБ-1", "type": "jet", "pts": [[30.5, 50.4, t0], [30.6, 50.5, t0 + 300]]}]}                                  # Київ — далеко
+    (tmp_path / "2026-11-02.json").write_text(_j.dumps(day), encoding="utf-8")
+    r = area_stats(50.0, 36.23, 25, 14, tmp_path)
+    assert r["total"] == 1 and r["types"] == {"shahed": 1} and r["sides"] == {"півночі": 1}
+    assert sum(r["hours"]) == 1 and r["hours"][1] == 1

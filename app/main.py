@@ -416,6 +416,15 @@ def api_analysis():
     return JSONResponse(_AN[1])
 
 
+@app.get("/api/area")
+def api_area(lat: float, lon: float, r: float = 25, days: int = 14):
+    """Статистика району: скільки цілей проходило ≤ r км від точки за останні доби, години, боки, типи (за мапами доби)."""
+    from .areastats import area_stats
+    if not (43 < lat < 53 and 20 < lon < 42):
+        return JSONResponse({"error": "точка поза Україною"}, status_code=400)
+    return JSONResponse(area_stats(round(lat, 2), round(lon, 2), max(5.0, min(r, 60.0)), max(1, min(days, 60))))
+
+
 @app.get("/api/history")
 def api_history():
     return JSONResponse({"frames": HIST})

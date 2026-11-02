@@ -7,7 +7,6 @@
 <link rel="icon" href="brand/icon-192.png">
 <style>
 :root{--bg:#05070B;--card:rgba(255,255,255,.045);--rim:rgba(255,255,255,.10);--fg:#F2F5FA;--mute:#9AA4B6;--blue:#4C8DFF;--red:#E5484D;--yellow:#F5B83D;--green:#3DD68C}
-@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#F4F6FA;--card:#fff;--rim:rgba(0,0,0,.09);--fg:#0B0F17;--mute:#5A6478}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:980px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px 40px}
@@ -35,6 +34,9 @@ td.n{text-align:right}
 .bar{height:6px;border-radius:3px;background:var(--blue);min-width:2px}
 .mute{color:var(--mute)}.empty{color:var(--mute);font-size:13px}
 .ids{color:var(--mute);font-size:11px}
+.hrs{display:flex;align-items:flex-end;gap:2px;height:70px;margin:8px 0 2px}.hrs i{flex:1;background:var(--blue);border-radius:2px 2px 0 0;min-height:1px;opacity:.85}
+.hrl{display:flex;justify-content:space-between;color:var(--mute);font-size:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chips span{border:1px solid var(--rim);border-radius:10px;padding:3px 8px;font-size:12px}
 footer{color:var(--mute);font-size:12px;margin-top:16px;line-height:1.5}
 </style>
 </head>
@@ -46,6 +48,7 @@ footer{color:var(--mute);font-size:12px;margin-top:16px;line-height:1.5}
 </header>
 <section class="brief"><h2>Аналітична довідка</h2><ol id="summary"><li class="mute">…</li></ol></section>
 <section class="kpis" id="kpis"></section>
+<section class="card" id="area-card" style="margin-bottom:12px" hidden><h2>Ваш район · <span id="area-h"></span></h2><div id="area"></div></section>
 <section class="grid">
   <div class="card"><h2>Напрямки атаки</h2><div id="corr"></div></div>
   <div class="card"><h2>Куди летять (за каналами)</h2><div id="tg"></div></div>
@@ -93,6 +96,22 @@ function render(a){
     '<p class="mute" style="font-size:12px;margin:8px 0 0">Напрямок: курс, що показувала мапа після останньої названої позиції, проти того, куди ціль назвали далі (через 3–40 хв). </p>'+
     '<p class="mute" style="font-size:12px;margin:8px 0 0">Влучання: ціль названо ≤15 км від передбаченого пункту протягом 40 хв. Наївний — «30 км тим самим курсом» на тих самих подіях.</p>';
 }
+async function loadArea(){
+  let h=null;try{h=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
+  if(!h){return;}
+  try{const r=await (await fetch('/api/area?lon='+h[0]+'&lat='+h[1]+'&r=25&days=14',{cache:'no-store'})).json();if(r.error)return;
+    $('area-card').hidden=false;$('area-h').textContent='≤'+r.r_km+' км від дому, '+r.days+' '+pl(r.days,['доба','доби','діб']);
+    const mx=Math.max(1,...r.hours);
+    $('area').innerHTML=r.total?('<p style="margin:0;font-size:14px">Поруч пройшло <b>'+r.total+'</b> '+pl(r.total,['ціль','цілі','цілей'])+' (≈'+r.avg_per_day+' на добу)'+
+      (r.peak_hours.length?'; найчастіше о '+r.peak_hours.map(x=>String(x).padStart(2,'0')+':00').join(', '):'')+'.</p>'+
+      '<div class="hrs">'+r.hours.map((v,i)=>'<i title="'+String(i).padStart(2,'0')+':00 — '+v+'" style="height:'+Math.round(v/mx*100)+'%"></i>').join('')+'</div><div class="hrl"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>'+
+      '<div class="chips">'+Object.entries(r.sides).map(([k,v])=>'<span>з '+esc(k)+': '+v+'</span>').join('')+'</div>'+
+      '<div class="chips">'+Object.entries(r.types).map(([k,v])=>'<span>'+esc(TY[k]||k)+': '+v+'</span>').join('')+'</div>'+
+      '<p class="mute" style="font-size:12px;margin:8px 0 0">За мапами доби (треки системи; одна ціль іноді дає кілька треків). Дім береться з налаштувань мапи на цьому пристрої.</p>')
+      :'<div class="empty">За цей період поруч з домом цілей не було.</div>';
+  }catch(e){}
+}
+loadArea();setInterval(loadArea,600000);
 async function load(){try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}
 load();setInterval(load,60000);
 </script>

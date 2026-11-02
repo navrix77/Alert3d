@@ -229,6 +229,10 @@ function addOverlays(){
   map.addLayer({id:'hrom-t',type:'symbol',source:'hrom',minzoom:8,layout:{'text-field':['concat','тривога: ',['get','n']],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.4]},paint:{'text-color':'#FFD0D4','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4}});
   map.addLayer({id:'holo-top',type:'line',source:'holo',paint:{'line-color':['match',['get','l'],2,'#FF6B76','#FFD27A'],'line-width':1.2,'line-opacity':0.8}},firstLbl);
   map.addLayer({id:'ra-glow',type:'line',source:'ra',paint:{'line-color':'#FF3B4E','line-width':['interpolate',['linear'],['zoom'],5,2,9,5],'line-blur':['interpolate',['linear'],['zoom'],5,2,9,5],'line-opacity':['case',['==',LV,2],0.5,0]}});
+  // коло «де ціль може бути насправді» (68% випадків) — з реальної похибки позиції (бектест), росте з часом без нових повідомлень
+  map.addLayer({id:'tg-unc',type:'circle',source:'targets',filter:['all',['==',['get','active'],true],['has','u0'],['any',['==',['get','sk'],0],['get','thr'],['>=',['zoom'],8]]],
+    paint:{'circle-radius':['interpolate',['exponential',2],['zoom'],0,['get','u0'],22,['*',['get','u0'],4194304]],'circle-color':['get','c'],'circle-opacity':0.07,
+      'circle-stroke-color':['get','c'],'circle-stroke-width':1,'circle-stroke-opacity':0.45,'circle-pitch-alignment':'map'}},firstLbl);
   map.addLayer({id:'tg-hit',type:'circle',source:'targets',filter:['==',['get','active'],true],paint:{'circle-radius':22,'circle-opacity':0,'circle-stroke-opacity':0}});
   try{if(window.FxLayer&&!map.getLayer('fx'))map.addLayer(window.FxLayer);}catch(e){console.warn('fx',e);}
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['all',['>',['get','count'],1],['!',['has','next']]],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-anchor':'top','text-offset':['interpolate',['linear'],['zoom'],2,['literal',[0,1.30]],5,['literal',[0,1.68]],7,['literal',[0,2.04]],9.5,['literal',[0,2.48]]],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
@@ -299,6 +303,10 @@ function posAt(tr,serverT){
 }
 const HD_Q={channels:[0,0,0,0,0,5,7,10,14,19,22,28,32,42,50,56,63,82,93,145],learned:[0,0,0,0,0,0,0,0,12,14,18,19,25,26,29,46,55,69,78,110],
   movement:[4,6,7,7,10,13,13,23,26,26,34,36,76,94,97,97,97,156,158,164],all:[0,0,0,0,0,4,7,12,14,18,22,26,32,42,49,56,71,88,97,150]};
+// радіус «де може бути» (км, 68%): бектест 26.10–02.11 — шахед ≈11 км одразу після названої позиції, +~1.1 км/хв;
+// реактивний ≈14 км, +~3 км/хв (похибка назв пунктів і затримка каналів)
+const UNC={shahed:[11,1.1,45],jet:[14,3,90],geran5:[14,3,90],molniya:[8,0.8,30],recon:[8,0.8,30],banderol:[14,3,90],cruise:[15,4,120]};
+function uncKm(tr,ageSec){const u=UNC[tr.type];if(!u||tr.type==='ballistic')return 0;return Math.min(u[2],u[0]+u[1]*Math.max(0,ageSec)/60);}
 function pToward(src,delta,dkm){const q=HD_Q[{from:'movement',course:'all'}[src]||src]||HD_Q.all;const w=Math.atan(15/Math.max(dkm,15))*180/Math.PI;
   let s=0;for(const e of q)s+=0.5*(Math.abs(delta-e)<=w)+0.5*(Math.abs(delta+e)<=w);return s/q.length;}
 function homeRel(tr,p){
@@ -336,7 +344,9 @@ function frame(now){
       // кут на ЕКРАНІ: проєктуємо точку і точку на 3 км уздовж курсу — враховує нахил і поворот карти
       const unk=tr.hd==null;let sa=0;
       if(!unk){const P=xy(d.p),r=d.hd*D2R;const A=map.project(d.p),B=map.project(ll([P[0]+Math.sin(r)*3,P[1]+Math.cos(r)*3]));sa=Math.atan2(B.x-A.x,-(B.y-A.y))/D2R;}
-      feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,thr:!!(rel&&rel.rel),c:TYPE_COLOR[tr.type],count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
+      const uk=active?uncKm(tr,((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now)):0;
+      feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,thr:!!(rel&&rel.rel),c:TYPE_COLOR[tr.type],count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2,
+        u0:uk?uk*1000/(78271.517*Math.cos(d.p[1]*D2R)):undefined},geometry:{type:'Point',coordinates:d.p}});
       if(active){const tail=[d.p];let P=xy(d.p),left=Math.max(14,TYPES_KMH(tr.type)*0.09);
         for(const q of tr.trail.slice().reverse()){const Q=xy([q[0],q[1]]),dd=dist(P,Q);if(dd<0.5)continue;if(dd>=left){const f=left/dd;tail.push(ll([P[0]+(Q[0]-P[0])*f,P[1]+(Q[1]-P[1])*f]));left=0;break;}tail.push([q[0],q[1]]);left-=dd;P=Q;}
         if(left>0&&tr.hd!=null){const r=(d.hd+180)*D2R;tail.push(ll([P[0]+Math.sin(r)*left,P[1]+Math.cos(r)*left]));}
@@ -682,7 +692,9 @@ connect();
 setInterval(()=>{if(ws&&ws.readyState===1)ws.send('ping');},20000);
 
 /* ---------- налаштування, теми, шари ---------- */
-const PREF=Object.assign({theme:'auto',base:null,sound:false,ru:true,launch:true,zones:true},(()=>{try{return JSON.parse(localStorage.getItem('pref')||'{}');}catch(e){return {};}})());
+const PREF=Object.assign({theme:'night',base:null,sound:false,ru:true,launch:true,zones:true},(()=>{try{return JSON.parse(localStorage.getItem('pref')||'{}');}catch(e){return {};}})());
+// темна тема за замовчуванням (02.11): збережене раніше «Авто» переводимо в «Ніч» один раз; свідомий вибір після цього не чіпаємо
+if(!PREF.darkV2){if(PREF.theme==='auto')PREF.theme='night';PREF.darkV2=1;try{localStorage.setItem('pref',JSON.stringify(PREF));}catch(e){}}
 const savePref=()=>{try{localStorage.setItem('pref',JSON.stringify(PREF));}catch(e){}};
 function sunNight(){const p=home||[31.5,49];const d=new Date();const doy=Math.floor((d-new Date(d.getFullYear(),0,0))/864e5);
   const decl=23.44*Math.sin(2*Math.PI*(284+doy)/365)*D2R,lat=p[1]*D2R;const h0=Math.acos(Math.max(-1,Math.min(1,(Math.sin(-0.83*D2R)-Math.sin(lat)*Math.sin(decl))/(Math.cos(lat)*Math.cos(decl)))))/D2R;
