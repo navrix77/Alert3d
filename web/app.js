@@ -15,7 +15,9 @@ const FROM=['з півночі','з північного сходу','зі сх�
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
 let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base2')||'night';
-function syncReal3d(){const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
+function applySaver(){const on=window.NXPERF&&NXPERF.saver;['hillshade','bld3d'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');});const c=$('#st-saver');if(c){c.checked=!!(window.NXPERF&&localStorage.getItem('saver')==='1');c.onchange=e=>NXPERF.setSaver(e.target.checked);}}
+document.addEventListener('nxsaver',()=>{try{applySaver();}catch(e){}});
+function syncReal3d(){applySaver();const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
 window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m)};
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
@@ -26,7 +28,7 @@ const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,ka
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
 const INTRO=!sessionStorage.getItem('intro');
-const map=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});window.tryvogaMap=map;
+const map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,2),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});window.tryvogaMap=map;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
@@ -91,7 +93,7 @@ function uaDetail(){
       try{const old=map.getFilter(l.id);map.setFilter(l.id,old?['all',old,f]:f);}catch(e){}});};
   if(UAGEO)go();else fetch('/data/ua.geojson').then(r=>r.json()).then(g=>{UAGEO=g.geometry;go();}).catch(()=>{});}
 function addOverlays(){
-  addRelief();uaDetail();
+  addRelief();uaDetail();try{applySaver();}catch(e){}
   const st=map.getStyle();if(!st||!st.glyphs||map.getSource('obl'))return;
   addImages();
   const LV=['coalesce',['feature-state','lvl'],0];
@@ -265,6 +267,7 @@ function homeRel(tr,p){
 /* ---------- кадр ---------- */
 let lastLv='',lastFrame=performance.now();
 function frame(now){
+  {const f=window.NXPERF?NXPERF.fps():30;const tnow=performance.now();if(!f||tnow-(frame.lt||0)<1000/f-2){requestAnimationFrame(frame);return;}frame.lt=tnow;}
   const dt=Math.min(0.2,(now-lastFrame)/1000);
   if(SNAP&&map.getSource('targets')){lastFrame=now;const slow=now-(frame.sd||0)>500;if(slow)frame.sd=now;const fx=[];
     const serverT=Date.now()/1000+offset;

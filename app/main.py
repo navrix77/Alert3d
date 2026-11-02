@@ -203,7 +203,7 @@ def state() -> dict:
     snap["ru"] = ru.state()
     snap["hits"] = hits.state()
     global _FC
-    if time.time() - _FC[0] > 20:
+    if time.time() - _FC[0] > 120:  # панель прогнозу прихована — рахуємо рідко
         try:
             _FC = (time.time(), make_forecast(snap, tracker.launches.snapshot(snap["now"]), brain, parser.gaz))
         except Exception:  # noqa: BLE001

@@ -215,7 +215,7 @@
       }
       if (fl.length) { gl.blendFunc(gl.ONE, gl.ONE); this.draw(gl, this.quads(fl), fl.length); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
       if (top.length) this.draw(gl, this.quads(top), top.length);
-      map.triggerRepaint();
+      (window.nxRepaint?nxRepaint(map):map.triggerRepaint());
     },
   };
   window.FxLayer = FX;

@@ -71,7 +71,7 @@ const layer={id:'t3d',type:'custom',renderingMode:'3d',
       const m=args&&args.defaultProjectionData?args.defaultProjectionData.mainMatrix:args;
       const l=new THREE.Matrix4().makeTranslation(this.origin.x,this.origin.y,this.origin.z).scale(new THREE.Vector3(this.s,-this.s,this.s));
       this.camera.projectionMatrix=new THREE.Matrix4().fromArray(m).multiply(l);
-      this.renderer.resetState();this.renderer.render(this.scene,this.camera);this.map.triggerRepaint();
+      this.renderer.resetState();this.renderer.render(this.scene,this.camera);(window.nxRepaint?nxRepaint(this.map):this.map.triggerRepaint());
     }catch(e){console.error('3D',e);}
   }};
 const DEM='https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';

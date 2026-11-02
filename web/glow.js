@@ -67,7 +67,7 @@
       gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.disable(gl.DEPTH_TEST);
       gl.drawArrays(gl.TRIANGLES, 0, G.length * 6);
-      this.map.triggerRepaint();
+      (window.nxRepaint?nxRepaint(this.map):this.map.triggerRepaint());
     },
   };
 })();
