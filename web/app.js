@@ -180,7 +180,7 @@ function addOverlays(){
   map.addLayer({id:'myplaces-t',type:'symbol',source:'myplaces',minzoom:6,layout:{'text-field':['get','n'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':false},paint:{'text-color':'#fff','text-halo-color':'rgba(40,10,70,.9)','text-halo-width':1.8}});
   lastLv='';lastRa='';syncHome();syncMe();syncPlaces();
   if(tilt)set3d(true,'keep');
-  if(!map._scaleAdded){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
+  if(!map._scaleAdded&&innerWidth>640){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
 }
 map.on('style.load',addOverlays);
 // кінематографічне інтро: з космосу — на Україну вночі, поки збираються дані
@@ -524,7 +524,7 @@ let XRAY=false;
 function setXray(on){XRAY=on;document.body.classList.toggle('xray',on);$('#b-xray').classList.toggle('on',on);$('#xr-legend').hidden=!on;
   for(const id of ['xr-dim','xr-edge','xr-edge2','xr-node','xr-t'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none');
   for(const id of ['holo','holo-top','ra-glow'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');
-  syncXray();toast(on?'Рентген неба: повідомлення → підтвердження → припущення':'Звичайна карта');}
+  syncXray();toast(on?'Рентген неба увімкнено':'Звичайна карта');}
 $('#b-xray').onclick=()=>setXray(!XRAY);
 map.on('styledata',()=>{if(XRAY&&map.getLayer('xr-dim')&&map.getLayoutProperty('xr-dim','visibility')!=='visible')setXray(true);});
 function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;const F=[],nm=k=>SNAP.sources[k]?.name||k;

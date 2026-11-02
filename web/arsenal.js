@@ -1,0 +1,65 @@
+// «Арсенал»: чим РФ обстрілює Україну — ТТХ із відкритих джерел + що є на мапі NAVRYX SKY
+(function(){
+const A=[
+ {t:'shahed',n:'«Шахед-136» / «Герань-2»',k:'Ударний БпЛА-камікадзе',s:[['Швидкість','150–185 км/год'],['Дальність','до ~2000 км (оцінка)'],['Бойова частина','50–90 кг'],['Запуск','наземні пускові: Приморсько-Ахтарськ, Курщина, Брянщина, Орловщина, Крим']],
+  d:'Летить низько й повільно, характерний звук «мопеда». Разом із ним запускають «Гербери» та «Гарпії» — імітатори без БЧ, щоб перевантажити ППО. На мапі обидва — «Шахед».'},
+ {t:'jet',n:'«Герань-3» / «Герань-4»',k:'Реактивний ударний БпЛА',s:[['Швидкість','до ~500 км/год, маневри 300–400'],['Дальність','до 450 км («Герань-4», ГУР)'],['Бойова частина','50 або 90 кг'],['Двигун','турбореактивний']],
+  d:'Удвічі-втричі швидший за звичайний «Шахед» — часу на реакцію значно менше. Канали пишуть «реактивний БпЛА / реактивний шахед».'},
+ {t:'geran5',n:'«Герань-5»',k:'Реактивний дрон-ракета',s:[['Швидкість','450–600 км/год (ГУР)'],['Дальність','до ~950 км (оцінка ГУР)'],['Маса','~850 кг'],['Двигун','ТРД TELEFLY TF-TJ2000A (КНР)'],['Носії','наземний запуск; опрацьовують Су-25']],
+  d:'Ближчий до крилатої ракети, ніж до дрона. Показуємо окремо, лише коли канал прямо пише «Герань-5».'},
+ {t:'molniya',n:'«Молнія»',k:'Малий ударний БпЛА літакового типу',s:[['Швидкість','~100–120 км/год (оцінка)'],['Дальність','десятки км від лінії фронту'],['Бойова частина','кілька кг']],
+  d:'Дешевий дрон для ударів по прифронтових містах і техніці. Діє в межах кількох десятків кілометрів від фронту.'},
+ {t:'cruise',n:'Крилаті ракети: Х-101, «Калібр», Х-59/69, «Іскандер-К»',k:'Дозвукові крилаті ракети',s:[['Х-101','~700–900 км/год, до 4500+ км, БЧ ~400 кг; Ту-95МС/Ту-160'],['«Калібр» 3М14','до ~1500–2500 км, БЧ ~450 кг; кораблі й підводні човни'],['Х-59/Х-69','до 290/400 км, БЧ ~310 кг; Су-34/Су-35'],['«Іскандер-К»','наземний запуск, сотні км']],
+  d:'Летять низько, огинаючи рельєф, з маневрами. Від пуску до цілі — від десятків хвилин до кількох годин.'},
+ {t:'cruise',n:'Х-22 / Х-32',k:'Надзвукові протикорабельні ракети',s:[['Швидкість','до ~4000 км/год'],['Дальність','600–1000 км'],['Бойова частина','до ~950 кг (Х-22)'],['Носій','Ту-22М3']],
+  d:'Дуже неточні на суші, тому особливо небезпечні для житлових кварталів. На мапі — як крилата ракета.'},
+ {t:'banderol',n:'«Бандероль» (S8000)',k:'Мала крилата ракета',s:[['Швидкість','до 650 км/год, крейсерська ~560'],['Дальність','до 500 км'],['Бойова частина','114 кг (49,5 кг ВР)'],['Носії','БпЛА «Оріон», вертоліт Мі-28Н'],['Двигун','Swiwin SW800Pro (КНР)']],
+  d:'Порівняно дешева ракета з комерційним двигуном. Показуємо окремо, лише коли канал прямо пише «Бандероль».'},
+ {t:'ballistic',n:'Балістика: «Іскандер-М», KN-23, «Кинджал», С-300/С-400',k:'Балістичні й аеробалістичні ракети',s:[['«Іскандер-М» 9М723','до ~500 км, БЧ ~480 кг'],['KN-23 (КНДР)','до ~700 км'],['«Кинджал» Х-47М2','МіГ-31К, БЧ ~480 кг'],['С-300/С-400 по землі','до ~150–250 км']],
+  d:'Від пуску до удару — лічені хвилини. Якщо пишуть «загроза балістики», в укриття треба одразу.'},
+ {t:'kab',n:'КАБ: ФАБ/ОДАБ з УМПК',k:'Керовані авіабомби',s:[['Маса','250–3000 кг'],['Дальність планування','40–70 км (до ~90)'],['Носії','Су-34, Су-35'],['Звідки','з-над РФ і окупованих територій біля кордону']],
+  d:'Літак скидає бомбу, не заходячи в зону ППО. Тому на мапі ми показуємо не лише зону загрози КАБ, а й ворожу авіацію та район її пусків.'},
+ {t:'rszv',n:'РСЗВ: «Град», «Ураган», «Смерч», «Торнадо-С»',k:'Реактивні системи залпового вогню',s:[['«Град» 122 мм','~20–40 км'],['«Ураган» 220 мм','~35 км'],['«Смерч» / «Торнадо-С» 300 мм','~70–120 км']],
+  d:'Б\'ють по прифронтових і прикордонних громадах: Харківщина, Сумщина, Херсон, Нікополь. Показуємо, лише коли прямо пишуть «РСЗВ».'},
+ {t:'fpv',n:'FPV-дрони',k:'Тактичні дрони-камікадзе',s:[['Швидкість','80–150 км/год'],['Радіус','~10–20 км від лінії фронту'],['Бойова частина','1–3 кг']],
+  d:'Полюють на людей і транспорт у прифронтовій зоні. Показуємо, лише коли канал прямо пише «FPV».'},
+ {t:'fpvf',n:'FPV на оптоволокні',k:'FPV, яким керують по кабелю',s:[['Дальність','~10–40 км (довжина кабелю)'],['Особливість','не глушиться РЕБ']],
+  d:'Кабель тягнеться за дроном, тож радіоелектронна боротьба його не зупиняє. На мапі синій.'}
+];
+const LEG=[
+ ['dot','#FF3B3B','Місце пуску','червона точка в РФ / на окупованій території; пунктир — від пуску до цілей'],
+ ['plane','#FF3B3B','Ворожа тактична авіація','силует літака над типовим районом пусків КАБ; блякне з часом'],
+ ['ring','#FF5A5A','Зона пусків КАБ','пунктирне коло навколо району, звідки скидають КАБи'],
+ ['kab','#22E1FF','Загроза КАБ','значок авіабомби над громадою; зникає за 10–20 хв тиші або після «відбою»'],
+ ['trail','#FFA31A','Пройдений шлях','крапками — підтверджені каналами позиції цілі'],
+ ['pred','#FFFFFF','Ймовірно далі','штрихами — прогноз, навчений на попередніх перельотах (з точністю)'],
+ ['fill','#E8B931','Тривога','офіційна тривога: заливка області, району чи громади'],
+ ['ru','#FFD500','Наші дрони над РФ','жовто-сині точки — що відпрацювало по території РФ'],
+ ['fire','#FF7A1A','Вибухи (мапа доби)','приглушений вогонь там, де за добу фіксували прильоти'],
+];
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=72;const x=C.getContext('2d');x.translate(36,36);x.lineWidth=3;x.strokeStyle=c;x.fillStyle=c;
+  if(k==='dot'){x.beginPath();x.arc(0,0,11,0,7);x.fill();x.strokeStyle='#fff';x.stroke();}
+  else if(k==='plane'){const p=new Path2D('M0,-26 L3,-19 L3,-8 L22,5 L22,9 L3,5 L3,15 L9,20 L9,23 L0,21 L-9,23 L-9,20 L-3,15 L-3,5 L-22,9 L-22,5 L-3,-8 L-3,-19 Z');x.fill(p);x.strokeStyle='#fff';x.lineWidth=1.5;x.stroke(p);}
+  else if(k==='ring'){x.globalAlpha=.2;x.beginPath();x.arc(0,0,26,0,7);x.fill();x.globalAlpha=1;x.setLineDash([6,5]);x.stroke();}
+  else if(k==='kab'){const i=new Image();i.src='sprites/t-kab.png?v=ref1';i.onload=()=>{x.drawImage(i,-28,-28,56,56);};}
+  else if(k==='trail'){for(let i=-24;i<=24;i+=10){x.beginPath();x.arc(i,i*.4,3,0,7);x.fill();}}
+  else if(k==='pred'){x.setLineDash([8,6]);x.beginPath();x.moveTo(-26,12);x.quadraticCurveTo(0,-20,26,-8);x.stroke();}
+  else if(k==='fill'){x.globalAlpha=.45;x.fillRect(-26,-20,52,40);x.globalAlpha=1;x.strokeStyle='#fff';x.lineWidth=2;x.strokeRect(-26,-20,52,40);}
+  else if(k==='ru'){[[-14,-8],[8,-14],[2,10],[18,6]].forEach(([a,b])=>{x.beginPath();x.arc(a,b,5,0,7);x.fillStyle='#FFD500';x.fill();x.strokeStyle='#2F7BFF';x.lineWidth=2;x.stroke();});}
+  else if(k==='fire'){const g=x.createRadialGradient(0,4,2,0,0,26);g.addColorStop(0,'rgba(255,230,140,.9)');g.addColorStop(.4,'rgba(255,120,30,.6)');g.addColorStop(1,'rgba(255,60,0,0)');x.fillStyle=g;x.beginPath();x.arc(0,0,26,0,7);x.fill();}
+  return C;}
+function build(){const el=document.getElementById('arsenal');if(el.dataset.ok)return;el.dataset.ok=1;
+  const box=el.querySelector('.ars-list');
+  A.forEach(a=>{const c=document.createElement('article');c.className='ars-card';c.style.setProperty('--tc',(window.TYPE_COLOR||{})[a.t]||'#fff');
+    c.innerHTML='<div class="ars-img"><img loading="lazy" alt="" src="sprites/ref/'+a.t+'.png?v=ref1" onerror="this.src=\'sprites/t-'+a.t+'.png\'"></div><div class="ars-b"><small>'+esc(a.k)+'</small><h4>'+esc(a.n)+'</h4><dl>'+a.s.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><p>'+esc(a.d)+'</p><button class="ars-map">Показати на мапі</button></div>';
+    c.querySelector('.ars-map').onclick=()=>{const n=((typeof SNAP!=='undefined'&&SNAP)?SNAP.tracks:[]).filter(x=>x.status==='active'&&x.type===a.t).length;if(!n&&a.t!=='kab'){if(typeof toast==='function')toast('Зараз у повітрі не видно: '+a.n);return;}el.hidden=true;if(a.t==='kab'){const z=((typeof SNAP!=='undefined'&&SNAP)?SNAP.zones:[])[0];if(z&&window.tryvogaMap)tryvogaMap.flyTo({center:z.places[0],zoom:8});else if(typeof toast==='function')toast('Зараз загроз КАБ немає');return;}if(typeof focusType==='function')focusType(a.t);};
+    box.appendChild(c);});
+  const lg=el.querySelector('.ars-leg');
+  LEG.forEach(([k,c,n,d])=>{const r=document.createElement('div');r.className='ars-lr';r.appendChild(legIcon(k,c));const t=document.createElement('div');t.innerHTML='<b>'+esc(n)+'</b><span>'+esc(d)+'</span>';r.appendChild(t);lg.appendChild(r);});
+  const sp=document.createElement('div');sp.className='ars-lr';const cv=document.createElement('canvas');cv.width=cv.height=72;sp.appendChild(cv);
+  const g=cv.getContext('2d');let i=0;const ks=Object.keys(window.TYPE_COLOR||{}).filter(k=>k!=='kab');setInterval(()=>{if(el.hidden)return;const im=new Image();im.src='sprites/t-'+ks[i++%ks.length]+'.png';im.onload=()=>{g.clearRect(0,0,72,72);g.drawImage(im,6,6,60,60);};},1200);
+  sp.insertAdjacentHTML('beforeend','<div><b>Ціль у повітрі</b><span>колір = тип (див. картки вище); ×N — група; торкніться цілі, щоб побачити докази: які канали, коли й що написали</span></div>');lg.prepend(sp);}
+window.openArsenal=function(){build();document.getElementById('arsenal').hidden=false;const s=document.getElementById('settings');if(s)s.hidden=true;};
+document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('b-ars');if(b)b.onclick=window.openArsenal;const c=document.getElementById('ars-close');if(c)c.onclick=()=>document.getElementById('arsenal').hidden=true;});
+})();

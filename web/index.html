@@ -74,10 +74,19 @@
   <button id="b-feed" title="Стрічка"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
   <button class="dx" id="b-xray" title="Рентген неба"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="17" r="2.2"/><path d="M7.8 8.2 10.6 15M16.4 7.6 13.4 15.2M8.2 7h7.6" stroke-dasharray="2 2"/></svg></button>
   <button class="dx" id="b-time" title="Машина часу"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></button>
+  <button id="b-ars" title="Арсенал: чим б'є РФ і що на мапі"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.4 3.4 8 8 9 4.6-1 8-4.6 8-9V6z"/><path d="M12 7.5v9M9.2 10l2.8-2.5 2.8 2.5M9.5 16.5h5"/></svg></button>
   <button id="b-daily" title="Мапа доби (09:00–09:00)"><svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M5 15c3-1 4-6 7-6s3 4 7 2" stroke-dasharray="0"/></svg></button>
   <button class="dx" id="b-ar" title="Небо в камері"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg></button>
   <button id="b-set" title="Налаштування та інструменти"><svg viewBox="0 0 24 24"><path d="M10.3 3.2h3.4l.5 2.3 1.6.9 2.2-.8 1.7 2.9-1.7 1.6v1.8l1.7 1.6-1.7 2.9-2.2-.8-1.6.9-.5 2.3h-3.4l-.5-2.3-1.6-.9-2.2.8-1.7-2.9 1.7-1.6v-1.8L4.3 8.5 6 5.6l2.2.8 1.6-.9z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
 </nav>
+
+<aside class="settings arsenal" id="arsenal" hidden>
+  <div class="st-head"><h2>Арсенал</h2><button class="round" id="ars-close" aria-label="Закрити">✕</button></div>
+  <p class="ars-lead">Чим Росія обстрілює Україну — і як це виглядає на мапі NAVRYX SKY. ТТХ орієнтовні, з відкритих джерел (ГУР МО, ЗСУ, профільні медіа).</p>
+  <section><h3>Засоби ураження</h3><div class="ars-list"></div></section>
+  <section><h3>Що є на мапі</h3><div class="ars-leg"></div></section>
+  <section><h3>Джерела</h3><p class="ars-src">ГУР МО України (через <a href="https://armyinform.com.ua/2026/01/19/gur-rozkrylo-harakterystyky-ta-komponentnu-bazu-novogo-rosijskogo-bpla-geran-5/" target="_blank" rel="noopener">АрміяInform</a>, <a href="https://fakty.com.ua/ua/ukraine/20260730-raketa-banderol-osoblyvosti-ta-tehnichni-harakterystyky-novoyi-rosijskoyi-zbroyi/amp/" target="_blank" rel="noopener">Факти ICTV</a>, <a href="https://fakty.com.ua/ua/ukraine/20260525-novyj-reaktyvnyj-dron-rf-geran-4-harakterystyky-ta-dalnist-polotu/amp/" target="_blank" rel="noopener">Факти ICTV</a>), Повітряні сили ЗСУ, Defense Express. Зображення — ілюстрації NAVRYX, не фото.</p></section>
+</aside>
 
 <aside class="settings" id="settings" hidden>
   <div class="st-head"><h2>Налаштування</h2><button class="round" id="st-close" aria-label="Закрити">✕</button></div>
@@ -146,6 +155,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="fx.js"></script>
 <script src="app.js"></script>
+<script src="arsenal.js"></script>
 <script src="holo.js"></script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
 </body>
