@@ -1,0 +1,49 @@
+name: iOS IPA (NAVRYX SKY, без підпису)
+on:
+  push:
+    branches: [main]
+    paths: ['capacitor/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: ios, cancel-in-progress: true }
+jobs:
+  build:
+    runs-on: macos-15
+    defaults: { run: { working-directory: capacitor } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npx cap add ios
+      - name: Іконки й заставка
+        run: npx capacitor-assets generate --ios --iconBackgroundColor "#07090E" --iconBackgroundColorDark "#07090E" --splashBackgroundColor "#07090E" --splashBackgroundColorDark "#07090E"
+      - name: Дозволи (місце, камера, сповіщення), версія
+        run: |
+          P=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'Щоб показати, що летить саме до вас. Місце зберігається лише на телефоні.'" $P
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Для режиму «Небо в камері»: відео обробляється лише на телефоні.'" $P
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" -c "Add :UIBackgroundModes:0 string remote-notification" $P
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'NAVRYX SKY'" $P || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'NAVRYX SKY'" $P
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = ${{ github.run_number }};/g" ios/App/App.xcodeproj/project.pbxproj
+      - run: npx cap sync ios
+      - name: Збірка (без підпису — підписує Sideloadly/AltStore або Apple Developer)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -20
+          mkdir -p Payload && cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry navryx-sky.ipa Payload && ls -la navryx-sky.ipa
+      - uses: actions/upload-artifact@v4
+        with: { name: navryx-sky-ipa, path: capacitor/navryx-sky.ipa }
+      - name: Публікую як «ios-latest»
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-latest
+          name: NAVRYX SKY для iPhone (остання збірка, без підпису)
+          prerelease: true
+          files: capacitor/navryx-sky.ipa
+          body: |
+            Збірка 1.0.${{ github.run_number }} для iPhone (iOS 15+). Файл без підпису Apple:
+            встановлюється через Sideloadly / AltStore з вашим Apple ID або підписується акаунтом Apple Developer.
