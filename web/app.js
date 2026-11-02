@@ -156,7 +156,7 @@ function addOverlays(){
   map.addLayer({id:'ru-glow',type:'circle',source:'ru',minzoom:3,filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':1,'circle-opacity':0.22,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ru-dot',type:'circle',source:'ru',filter:['!',['has','sum']],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,1.8,7,3.5],'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':['interpolate',['linear'],['zoom'],4,1,7,2],'circle-opacity':0.85}});
   map.addLayer({id:'ru-t',type:'symbol',source:'ru',minzoom:6,filter:['!',['has','sum']],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['has','sum'],12,10.5],'text-max-width':16,'text-offset':['case',['has','sum'],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['has','sum'],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
-  map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':['interpolate',['linear'],['zoom'],4,0.6,7,1],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',6.5,['get','l']],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':'#FFE36B','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
+  map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':['interpolate',['linear'],['zoom'],4,0.9,7,1.5,10,2],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',6.5,['get','l']],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':'#FFE36B','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addSource('xr',{type:'geojson',data:EMPTY});
   map.addLayer({id:'xr-dim',type:'background',layout:{visibility:'none'},paint:{'background-color':'#02040A','background-opacity':0.62}});
   map.addLayer({id:'xr-edge',type:'line',source:'xr',filter:['all',['==',['geometry-type'],'LineString'],['==',['get','k'],'confirm']],layout:{visibility:'none','line-cap':'round'},paint:{'line-color':['match',['get','k'],'confirm','#34C759','copy','#8892A6','assume','#B48CFF','contra','#F5B83D','#fff'],'line-width':['match',['get','k'],'confirm',2.5,1.6],'line-opacity':0.9}});map.addLayer({id:'xr-edge2',type:'line',source:'xr',filter:['all',['==',['geometry-type'],'LineString'],['!=',['get','k'],'confirm']],layout:{visibility:'none','line-cap':'round'},paint:{'line-dasharray':[1.5,2],'line-color':['match',['get','k'],'confirm','#34C759','copy','#8892A6','assume','#B48CFF','contra','#F5B83D','#fff'],'line-width':['match',['get','k'],'confirm',2.5,1.6],'line-opacity':0.9}});
@@ -453,31 +453,30 @@ function renderAsOf(){
   el.innerHTML='<i class="live-dot'+(ok?'':' wait')+'"></i>'+(h.replay?'Демо':ok?'Наживо':'Дані затримуються')+' · '+fmt(SNAP.now);
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
-let SHELTER=+(localStorage.getItem('shelter')||3);$('#me-sh').textContent=SHELTER;
-$('#me-set').onclick=()=>{const v=[1,2,3,5,7,10];SHELTER=v[(v.indexOf(SHELTER)+1)%v.length];localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;toast('До укриття: '+SHELTER+' хв');};
+let SHELTER=+(localStorage.getItem('shelter')||3);if($('#me-sh'))$('#me-sh').textContent=SHELTER;
+if($('#me-set'))$('#me-set').onclick=()=>{const v=[1,2,3,5,7,10];SHELTER=v[(v.indexOf(SHELTER)+1)%v.length];localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;toast('До укриття: '+SHELTER+' хв');};
 const MEI={};
 function renderMe(threats){
-  const box=$('#me');if(!home){box.className='me';$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас і скільки хвилин є до укриття.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
+  const box=$('#me');if(!home){box.className='me';$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>20;
   const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
   const thr=near.filter(x=>x.r.rel);const first=thr[0];
   let cls='me',word='Над вами чисто',sub='Підтверджених цілей у бік дому немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
   if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
-  else if(first){const m=Math.max(0,(first.r.eta||0)-SHELTER);cls=m<=3?'me danger':'me watch';word=m<=0?'В укриття зараз':m<=3?'Виходь в укриття':'Увага';
-    sub=(m<=0?'Ціль прибуде раніше, ніж ви дійдете до укриття. Правило двох стін.':'Маєте <b>~'+Math.floor(m)+' хв</b>, щоб зібратися, потім '+SHELTER+' хв до укриття.');}
+  else if(first){const e=first.r.eta||0;cls=e<=5?'me danger':'me watch';word=e<=5?'Летить на вас':'У ваш бік';
+    sub=esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':'');}
   box.className=cls;$('#me-word').textContent=word;
   // ГОЛОВНЕ: скільки хвилин саме у вас — великим числом з кільцем
   if(first&&!isStale&&first.r.eta!=null){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
     sub='<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
-      '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> над вашим домом приблизно через '+eta+' хв<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+'</span></div>'+
-      '<p class="big-a">'+(eta-SHELTER<=0?'Ідіть в укриття зараз. Якщо не встигаєте — правило двох стін.':'Маєте ~'+Math.floor(eta-SHELTER)+' хв, щоб зібратися; '+SHELTER+' хв — дорога до укриття.')+'</p>';}
+      '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> · ~'+eta+' хв до вас<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+'</span></div>';}
   $('#me-sub').innerHTML=sub;
   $('#me-list').innerHTML='';
   (thr.length?thr:near).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
     const c=MEI[t.type]||(MEI[t.type]=drawTarget(t.type,22));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
-    const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;const span=Math.max(eta||0,SHELTER)+3;
+    const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;
     li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':'—')+'</span></div>'+
-      (eta?'<div class="me-bar"><i class="sh" style="width:'+(SHELTER/span*100)+'%"></i><i class="tg" style="left:'+(eta*0.8/span*100)+'%;width:'+Math.max(3,eta*0.5/span*100)+'%"></i></div><div class="me-act '+(eta-SHELTER<=3?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить біля дому':'курс у ваш бік')+'</div>':'');
+      (eta?'<div class="me-act '+(eta<=5?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить поруч':'курс у ваш бік')+'</div>':'');
     li.querySelector('.me-row').prepend(cv);li.onclick=()=>openSheet(t.id);$('#me-list').appendChild(li);});
 }
 function renderBanner(threats){
@@ -667,7 +666,7 @@ $('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.pref,v=b.dataset.v;
   if(k==='theme'){PREF.theme=v;PREF.base=null;savePref();applyTheme(true);}
   else if(k==='base'){PREF.base=v;savePref();setBase(v);setTimeout(syncSettingsUI,50);}
-  else if(k==='shelter'){SHELTER=+v;localStorage.setItem('shelter',SHELTER);$('#me-sh').textContent=SHELTER;syncSettingsUI();}}));
+  else if(k==='shelter'){SHELTER=+v;localStorage.setItem('shelter',SHELTER);if($('#me-sh'))$('#me-sh').textContent=SHELTER;syncSettingsUI();}}));
 $('#st-3d').onchange=e=>set3d(e.target.checked,true);
 $('#st-sound').onchange=e=>{PREF.sound=e.target.checked;savePref();if(PREF.sound)beep();};
 $('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&Notification.permission!=='granted'){const r=await Notification.requestPermission();if(r!=='granted'){e.target.checked=false;toast('Браузер не дозволив сповіщення');}}PREF.sys=e.target.checked;savePref();};
@@ -759,12 +758,12 @@ function notesCheck(s){
   // 3) тривога / відбій у моїх областях і громадах
   const Z=myZones();
   for(const o of Z.obl){const lv=(s.levels||{})[o]||0,pv=NZLV.get('o:'+o);
-    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'A:'+o+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Повітряна тривога: '+o+' обл.',sub:'Пройдіть в укриття'});
+    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'A:'+o+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Повітряна тривога: '+o+' обл.',sub:'офіційна тривога'});
       else if(pv&&!lv)note({k:'O:'+o+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій тривоги: '+o+' обл.',sub:'У межах окремих громад тривога може ще тривати'});}
     NZLV.set('o:'+o,lv);}
   const HL=((s.official||{}).hromadas)||{};
   for(const h of Z.hrom){const lv=HL[h.id]||((s.levels||{})[h.o]?1:0),pv=NZLV.get('h:'+h.id);
-    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'AH:'+h.id+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Тривога: '+h.n+' громада',sub:h.o+' обл. · пройдіть в укриття'});
+    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'AH:'+h.id+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Тривога: '+h.n+' громада',sub:h.o+' обл.'});
       else if(pv&&!lv)note({k:'OH:'+h.id+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій: '+h.n+' громада',sub:h.o+' обл.'});}
     NZLV.set('h:'+h.id,lv);}
   // 0) мапа доби о 09:00
@@ -833,7 +832,7 @@ setInterval(()=>{
       const side=FROM[Math.round(brg(P,xy(p0))/45)%8];
       note({k:'F:'+key+':'+level+':'+Math.floor(now/600000),lvl:'red',ic:inside?'🚨':'⚠️',
         title:(TYPE_NAME[tr.type]||'Ціль')+(tr.count>1?' ×'+tr.count:'')+(inside?' — '+Math.max(1,Math.round(d))+' км '+W.label:' — за ~'+eta+' хв у '+R+' км '+W.label),
-        sub:Math.round(d)+' км '+side+(tr.next?' · курс → '+tr.next:'')+(W.k==='me'?' · пройдіть в укриття':''),go:()=>openSheet(tr.id)});
+        sub:Math.round(d)+' км '+side+(tr.next?' · курс → '+tr.next:''),go:()=>openSheet(tr.id)});
       if(W.k==='me'&&navigator.vibrate)try{navigator.vibrate(inside?[300,120,300,120,300]:[200,100,200]);}catch(e){}
     }
   }
