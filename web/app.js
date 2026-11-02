@@ -357,7 +357,7 @@ function frame(now){
     if(slow){map.getSource('trails').setData({type:'FeatureCollection',features:trails});
     map.getSource('preds').setData({type:'FeatureCollection',features:preds});if(map.getSource('lpred'))map.getSource('lpred').setData({type:'FeatureCollection',features:lpf});}
     if(slow&&map.getSource('sel')){const d=sel&&DISP.get(sel);const tr=sel&&SNAP.tracks.find(t=>t.id===sel);map.getSource('sel').setData(d&&tr?{type:'FeatureCollection',features:[{type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:{type:'Point',coordinates:d.p}}]}:EMPTY);}
-    if(follow&&sel){const d=DISP.get(sel);if(d)map.easeTo({center:d.p,duration:0});}
+    if(follow&&sel&&!map.isMoving()){const d=DISP.get(sel);if(d){const c=map.getCenter();const k=0.12;map.jumpTo({center:[c.lng+(d.p[0]-c.lng)*k,c.lat+(d.p[1]-c.lat)*k]});}}
     if(slow)renderBanner(threats);
     if(map.getSource('ticks')&&now-(frame.tk||0)>800){frame.tk=now;const tk=[];const serverT=Date.now()/1000+offset;
       for(const tr of SNAP.tracks){if(tr.status!=='active'||sel!==tr.id)continue;const c=TYPE_COLOR[tr.type];
@@ -497,7 +497,7 @@ function renderBanner(threats){
 // навчений прогноз траєкторії: куди такі цілі з цього місця летіли раніше + власна точність прогнозу
 function lpHtml(tr){const L=tr.lpath||[];if(!L.length)return '';const A=(SNAP.pred_acc||{})[tr.type];
   return '<h4>Ймовірно далі <small>· навчено на попередніх перельотах'+(A?' · точність '+Math.round(A.acc*100)+'% з '+A.n:'')+'</small></h4><ol class="lp">'+L.map(x=>'<li><b>'+Math.round(x[3]*100)+'%</b> '+esc(x[2])+'</li>').join('')+'</ol>';}
-function openSheet(id){sel=id;follow=false;$('#sh-follow').classList.remove('on');$('#sh-follow').textContent='Стежити за ціллю';$('#sheet').hidden=false;fillSheet(true);const d=DISP.get(id);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),8.5),curve:1.3,speed:1.1,essential:true});}
+function openSheet(id){if(follow&&id!==sel)stopFollow();sel=id;$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити стеження':'Стежити за ціллю';$('#sheet').hidden=false;fillSheet(true);const d=DISP.get(id);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),8.5),curve:1.3,speed:1.1,essential:true});}
 function fillSheet(first){
   const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr){$('#sheet').hidden=true;sel=null;return;}
   if(first||!fillSheet.icon||fillSheet.icon!==tr.type){const c=drawTarget(tr.type,40);$('#sh-icon').innerHTML='';$('#sh-icon').appendChild(c);fillSheet.icon=tr.type;}
@@ -531,8 +531,24 @@ function fillSheet(first){
    $('#sh-proof').innerHTML=h;}
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }
-$('#sh-close').onclick=()=>{sel=null;follow=false;$('#sheet').hidden=true;};
-$('#sh-follow').onclick=()=>{follow=!follow;$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Стежу · зупинити':'Стежити за ціллю';};
+$('#sh-close').onclick=()=>{$('#sheet').hidden=true;if(!follow)sel=null;};
+// «Стежити за ціллю»: камера веде ціль, картка ховається, зверху — компактна плашка з живими даними і «Зупинити»
+let followPrev=null;
+function startFollow(){if(!sel)return;follow=true;const d=DISP.get(sel);$('#sheet').hidden=true;
+  if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),9.2),pitch:tilt?50:0,duration:1400,essential:true});
+  const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);followPrev=tr?{last:tr.last,next:tr.next}:null;renderFollow();toast('Стежу за ціллю — камера рухається разом з нею');}
+function stopFollow(msg){if(!follow)return;follow=false;$('#follow-pill').hidden=true;if(msg)toast(msg);}
+function renderFollow(){const el=$('#follow-pill');if(!follow||!sel){el.hidden=true;return;}
+  const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr||tr.status!=='active'){stopFollow('Ціль більше не фіксується — стеження зупинено');return;}
+  const d=DISP.get(sel);const r=d&&homeRel(tr,d.p);
+  let ev='';if(followPrev&&tr.last!==followPrev.last){ev='нова фіксація '+fmt(tr.last);el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
+  if(followPrev&&tr.next!==followPrev.next&&tr.next)ev='змінила курс → '+tr.next;followPrev={last:tr.last,next:tr.next,ev:ev||followPrev.ev};
+  el.innerHTML='<span class="fp-dot" style="background:'+TYPE_COLOR[tr.type]+'"></span><div class="fp-t"><b>'+esc(TYPE_NAME[tr.type])+(tr.count>1?' ×'+tr.count:'')+(tr.next?' → '+esc(tr.next):'')+'</b><span>'+
+    (r?Math.round(r.d)+' км '+r.side+' від вас'+(r.eta!=null?' · ~'+Math.max(1,Math.round(r.eta))+' хв до вас':''):'')+(followPrev.ev?' · '+esc(followPrev.ev):'')+' · фіксація '+fmt(tr.last)+'</span></div><button id="fp-card">Картка</button><button id="fp-stop">Зупинити</button>';
+  el.hidden=false;$('#fp-stop').onclick=e=>{e.stopPropagation();stopFollow('Стеження зупинено');};$('#fp-card').onclick=e=>{e.stopPropagation();$('#sheet').hidden=false;fillSheet(true);};}
+$('#sh-follow').onclick=()=>{if(follow)stopFollow('Стеження зупинено');else startFollow();$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити стеження':'Стежити за ціллю';};
+map.on('dragstart',e=>{if(follow&&e.originalEvent)stopFollow('Ви зсунули карту — стеження зупинено');});
+setInterval(()=>{if(follow)renderFollow();},1000);
 
 /* ---------- стрічка ---------- */
 function renderFeed(){
@@ -603,9 +619,14 @@ function setXray(on){XRAY=on;document.body.classList.toggle('xray',on);$('#b-xra
   for(const id of ['holo','holo-top','ra-glow'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');
   syncXray();toast(on?'Рентген неба увімкнено':'Звичайна карта');}
 $('#b-xray').onclick=()=>setXray(!XRAY);
+{const L=$('#xr-legend');if(L){L.addEventListener('click',()=>setXray(false));L.title='Натисніть, щоб вимкнути рентген';}
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&XRAY)setXray(false);});
+ map.on('moveend',()=>{if(XRAY)syncXray();});}
 map.on('styledata',()=>{if(XRAY&&map.getLayer('xr-dim')&&map.getLayoutProperty('xr-dim','visibility')!=='visible')setXray(true);});
 function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;const F=[],nm=k=>SNAP.sources[k]?.name||k;
-  for(const tr of SNAP.tracks){if(tr.status!=='active'||!tr.ev)continue;if(sel&&tr.id!==sel&&SNAP.tracks.length>12)continue;
+  // лише обрана ціль, або до 6 найсвіжіших цілей у кадрі — інакше «павутиння» на пів країни
+  const bb=map.getBounds();const pool=SNAP.tracks.filter(t=>t.status==='active'&&t.ev&&(sel?t.id===sel:bb.contains([t.lon,t.lat]))).sort((a,b)=>b.last-a.last).slice(0,sel?1:6);
+  for(const tr of pool){
     const d=DISP.get(tr.id);const items=tr.ev.items.filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
     items.forEach((it,ix)=>{let p=it.p;if(it.copy&&primAt[it.copy]){const a=ix*1.3;p=[primAt[it.copy][0]+Math.cos(a)*0.035,primAt[it.copy][1]+Math.sin(a)*0.024];
         F.push({type:'Feature',properties:{k:'copy'},geometry:{type:'LineString',coordinates:[primAt[it.copy],p]}});}
