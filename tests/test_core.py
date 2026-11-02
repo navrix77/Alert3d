@@ -1029,3 +1029,23 @@ def test_russian_cities_not_ukrainian_namesakes():
         names = [p.place.name for p in P.parse(t, "K").places]
         assert not set(names) & {"Брянське", "Курське", "Орел"}, (t, names)
     assert any(p.place.name == "Орлівка" for p in P.parse("Орлівка, шахед", "K").places)
+
+
+def test_tracker_state_roundtrip():
+    """Стан трекера переживає перезапуск: ті самі цілі, пуски з тими самими місцями (тотожність Site)."""
+    from app.parser import Parser
+    from app.tracker import Tracker
+    from app.config import SOURCES
+    from app import launch
+    import time as _t
+    P, a = Parser(), Tracker(SOURCES)
+    now = _t.time()
+    o = P.parse("Шахед біля Люботина курсом на Польову", "K"); o.raw = "x"
+    a.ingest(o, "K", now - 60, None)
+    s_, ty, car, sm = launch.detect("Пуск шахедів з Орла", "shahed")
+    a.launches.add(s_, ty, None, car, "K", None, now - 120, sm, "Пуск шахедів з Орла")
+    b = Tracker(SOURCES)
+    assert b.load_state(a.dump_state())
+    assert [t.id for t in b.tracks] == [t.id for t in a.tracks]
+    assert b.launches.items and b.launches.items[0].site is launch.SITE_LIST[[x.name for x in launch.SITE_LIST].index("Орел")]
+    assert not Tracker(SOURCES).load_state(a.dump_state(), max_age=-1)

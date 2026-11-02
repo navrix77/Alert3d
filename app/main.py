@@ -146,7 +146,13 @@ def raion_centroid(n: str):
     return None
 
 
+STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "tracker_state.pkl"
+RESTORED: dict[str, float] = {}  # посилання на пости, вже враховані у відновленому стані трекера
+
+
 def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
+    if link and link in RESTORED:
+        return  # пост уже в стані, відновленому після перезапуску: вдруге не додаємо (інакше дублі спостережень)
     if time.time() - ts < 300:
         alerts.fast_signal(text, ts)  # швидкий старт/відбій тривоги з ретрансляцій каналів
     # повідомлення, яке вже бачили до перезапуску, відновлює трек, але не вчить модель вдруге
@@ -314,7 +320,27 @@ async def lifespan(app: FastAPI):
         log.info("відновлено пусків з журналу: %d повідомлень", len(rows))
     except Exception as e:  # noqa: BLE001
         log.warning("відновлення пусків: %s", e)
-    tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
+    # стан трекера з попереднього запуску (якщо йому ≤15 хв): цілі не зникають і не дублюються після оновлення
+    try:
+        if STATE_FILE.exists() and tracker.load_state(STATE_FILE.read_bytes()):
+            since = time.time() - 2 * 3600
+            for (lk,) in brain.db.execute("SELECT DISTINCT link FROM msg WHERE t > ? AND t <= ? AND link IS NOT NULL", (since, tracker.restored_at)):
+                RESTORED[lk] = 1
+            log.info("стан трекера відновлено: %d цілей, %d постів позначено як враховані", len(tracker.tracks), len(RESTORED))
+    except Exception as e:  # noqa: BLE001
+        log.warning("відновлення стану трекера: %s", e)
+
+    async def _save_state():
+        while True:
+            await asyncio.sleep(60)
+            try:
+                raw = tracker.dump_state()  # у потоці подій: трекер не змінюється під час серіалізації
+                tmp = STATE_FILE.with_suffix(".tmp")
+                await asyncio.to_thread(tmp.write_bytes, raw)
+                await asyncio.to_thread(tmp.replace, STATE_FILE)
+            except Exception as e:  # noqa: BLE001
+                log.warning("збереження стану трекера: %s", e)
+    tasks = [asyncio.create_task(pusher()), asyncio.create_task(_save_state()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     tasks.append(asyncio.create_task(pushsvc.run(state)))
     tasks.append(asyncio.create_task(ru.run()))
     tasks.append(asyncio.create_task(occupied.run()))
@@ -354,6 +380,10 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(learn_history()))
     log.info("Тривога запущена: %d каналів", len(config.CHANNELS))
     yield
+    try:
+        STATE_FILE.write_bytes(tracker.dump_state())  # при зупинці — останній стан
+    except Exception as e:  # noqa: BLE001
+        log.warning("стан трекера при зупинці: %s", e)
     for t in tasks:
         t.cancel()
 

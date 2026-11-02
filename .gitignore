@@ -17,3 +17,5 @@ data/voices/
 data/tts_cache/
 keys/
 data/vapid_private.pem
+data/tracker_state.pkl
+data/tracker_state.tmp

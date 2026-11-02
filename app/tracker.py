@@ -253,6 +253,33 @@ class Tracker:
         self.exclude: set[str] = set()
         self.prefer: str | None = None
 
+    # ---------------- стан між перезапусками
+    # Без цього кожен перезапуск сервера (оновлення) обнуляв цілі, і 30 хв каналів дочитувались наново:
+    # під час атаки 02–03.11 це давало стрибки лічильника (29 → 87 шахедів). Зберігаємо стан щохвилини.
+    _STATE = ("tracks", "zones", "avia", "counters", "log", "last_update", "speed_over")
+
+    def dump_state(self) -> bytes:
+        import pickle
+        return pickle.dumps({"v": 1, "saved": time.time(), **{k: getattr(self, k) for k in self._STATE},
+                             "launches": self.launches.items, "launch_n": self.launches.n}, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_state(self, raw: bytes, max_age: float = 900) -> bool:
+        import pickle
+        from .launch import SITE_LIST
+        d = pickle.loads(raw)
+        if d.get("v") != 1 or time.time() - d.get("saved", 0) > max_age:
+            return False
+        for k in self._STATE:
+            setattr(self, k, d[k])
+        by_name = {s.name: s for s in SITE_LIST}
+        for L in d["launches"]:  # місця пусків порівнюються за тотожністю об'єкта — повертаємо ті самі екземпляри
+            L.site = by_name.get(L.site.name, L.site)
+        known = {(L.site.name, L.type, int(L.t)) for L in self.launches.items}
+        self.launches.items += [L for L in d["launches"] if (L.site.name, L.type, int(L.t)) not in known]
+        self.launches.n = max(self.launches.n, d["launch_n"])
+        self.restored_at = d["saved"]
+        return True
+
     # ---------------- прийом повідомлення
     def ingest(self, obs: Observation, src: str, t: float | None = None, link: str | None = None) -> dict:
         t = t or time.time()
