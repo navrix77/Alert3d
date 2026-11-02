@@ -76,6 +76,7 @@ function render(a){
   $('summary').innerHTML=(a.summary||[]).map(s=>'<li>'+esc(s)+'</li>').join('')||'<li class="mute">Немає даних</li>';
   const w=a.wave||{};const k=[[a.active_n,'у повітрі зараз',''],[w.new30,'нових за 30 хв',w.trend==='наростає'?'up':(w.trend==='спадає'?'down':'')],[w.prev30,'за попередні 30 хв',''],[w.peak12h,'пік за 12 год','']];
   if(a.nights)k.push([a.nights.tonight_n,(a.nights.period==='ніч'?'треків від 18:00':'треків від 09:00'),'']);
+  if(VIS)k.push([VIS.today,'відвідувачів сьогодні · онлайн '+VIS.online,'']);
   $('kpis').innerHTML=k.map(([v,l,c])=>'<div class="kpi '+c+'"><b>'+(v??'—')+'</b><span>'+l+'</span></div>').join('');
   $('corr').innerHTML=table(['Що й де','Курс · далі','К-сть'],(a.corridors||[]).slice(0,8).map(c=>[esc(TY[c.type]||c.type)+'<div class="mute">'+esc(c.obl)+'</div>',(c.dir?esc(c.dir)+(c.spread!=null?' <span class="mute">±'+c.spread+'°</span>':''):'<span class="mute">курс невідомий</span>')+(c.next&&c.next.length?'<div>→ '+esc(c.next.join(', '))+'</div>':'')+'<div class="ids">'+esc(c.ids.join(' '))+'</div>',c.n]));
   $('tg').innerHTML=table(['Пункт','Типи','Підліт','Цілей'],(a.targets||[]).slice(0,10).map(x=>[esc(x.name)+'<div class="ids">'+esc(x.ids.join(' '))+'</div>',esc(Object.keys(x.types).map(t=>TY[t]||t).join(', ')),x.eta_min!=null?'≈'+x.eta_min+' хв':'—',x.n]));
@@ -112,7 +113,9 @@ async function loadArea(){
   }catch(e){}
 }
 loadArea();setInterval(loadArea,600000);
-async function load(){try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}
+let VIS=null;
+async function loadVis(){try{VIS=await (await fetch('/api/visits?days=30',{cache:'no-store'})).json();}catch(e){VIS=null;}}
+async function load(){await loadVis();try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}
 load();setInterval(load,60000);
 </script>
 </body>

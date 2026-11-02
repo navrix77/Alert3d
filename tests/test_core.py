@@ -763,3 +763,20 @@ def test_area_stats(tmp_path):
     r = area_stats(50.0, 36.23, 25, 14, tmp_path)
     assert r["total"] == 1 and r["types"] == {"shahed": 1} and r["sides"] == {"півночі": 1}
     assert sum(r["hours"]) == 1 and r["hours"][3] == 1
+
+
+def test_visits_counter(tmp_path):
+    """Лічильник відвідувань: унікальні за добу без збереження IP; боти не рахуються; старі хеші видаляються."""
+    from app.visits import Visits
+    v = Visits(tmp_path / "v.sqlite")
+    t = 1_793_620_000
+    v.hit("1.2.3.4", "Mozilla/5.0 iPhone", "view", t)
+    v.hit("1.2.3.4", "Mozilla/5.0 iPhone", "view", t + 60)
+    v.hit("5.6.7.8", "Mozilla/5.0 Android", "ws", t + 120)
+    v.hit("9.9.9.9", "Googlebot/2.1", "view", t)
+    rows = v.db.execute("SELECT uniq, views, ws FROM day").fetchall()
+    assert rows == [(2, 2, 1)]
+    assert not any("1.2.3.4" in str(r) for r in v.db.execute("SELECT * FROM seen").fetchall())
+    v.hit("1.2.3.4", "Mozilla/5.0 iPhone", "view", t + 86400)
+    assert v.db.execute("SELECT COUNT(*) FROM seen WHERE d < (SELECT MAX(d) FROM day)").fetchone()[0] == 0
+    assert v.stats()["total_visitor_days"] == 3

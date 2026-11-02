@@ -6,6 +6,7 @@ data/gazetteer_osm.json
 .pytest_cache/
 data/brain.sqlite*
 data/push.sqlite*
+data/visits.sqlite*
 data/tls/
 data/occupied.geojson
 data/audit*.jsonl

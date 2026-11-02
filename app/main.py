@@ -320,6 +320,34 @@ app = FastAPI(title="NAVRYX SKY", lifespan=lifespan)
 from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
 app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)  # geojson і скрипти стискаються в 3-5 разів
 
+from .visits import PAGES, Visits  # noqa: E402
+
+VISITS = Visits()
+
+
+def _client_ip(scope_client, headers) -> str | None:
+    xff = headers.get("x-forwarded-for")
+    return xff.split(",")[0].strip() if xff else (scope_client[0] if scope_client else None)
+
+
+@app.middleware("http")
+async def count_visits(request, call_next):
+    """Відвідування сторінок (без cookies і без збереження IP — див. app/visits.py)."""
+    resp = await call_next(request)
+    if request.method == "GET" and request.url.path in PAGES and resp.status_code < 400:
+        try:
+            VISITS.hit(_client_ip(request.client, request.headers), request.headers.get("user-agent"), "view")
+        except Exception:  # noqa: BLE001
+            pass
+    return resp
+
+
+@app.get("/api/visits")
+def api_visits(days: int = 30):
+    st = VISITS.stats(max(1, min(days, 365)))
+    st["online"] = len(clients)
+    return JSONResponse(st)
+
 
 @app.get("/api/tts")
 async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
@@ -462,6 +490,11 @@ def healthz():
 async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     clients.add(ws)
+    try:
+        VISITS.hit(_client_ip(ws.client, ws.headers), ws.headers.get("user-agent"), "ws")
+        VISITS.online(len(clients))
+    except Exception:  # noqa: BLE001
+        pass
     try:
         await ws.send_text(json.dumps(state(), ensure_ascii=False))
         while True:
