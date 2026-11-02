@@ -47,6 +47,15 @@ CARRIER = [(re.compile(r"ту-95|ту95|ту-160|ту160"), "Ту-95МС/Ту-16
            (re.compile(r"калібр|калибр|корабл|крейсер|підводн|подводн|носі[їй] калібр"), "кораблі (Калібр)", "cruise")]
 SUMMARY_RX = re.compile(r"в ніч на|у ніч на|в ночь на|протягом ночі|за ніч|за минулу добу|атакував[аи]?\s+\d|загалом")
 FORECAST_RX = re.compile(r"передислокац|перебазув|перелетіл|перелетели|очікуєм|очікуєть|ожидаем|ожидает|прогноз|через \d+[-–]?\d* (?:дн|дня|днів|год)|найближчим часом")
+# стратегічна авіація: переліт/посадка/«перебувають на аеродромі»/спорядження — підготовка, а не пуск ракет
+# (02.11: PhantomChe «3 Ту-95МС сіли на ае «Оленья»», rozvidkaneba «4 борти здійснили посадку…», «2 борти перебувають на
+#  аеродромі «Енгельс-2»», radar_ukr «+3 борти переліт на ае Оленья», tryvoga_chomu «Ту-95мс летить на Енгельс» — усе ставало «Пуск»)
+PUSK_RX = re.compile(r"пуск|запуск|пустил|пустили|запущ|відстріл|отстрел|стартува")
+TAKEOFF_RX = re.compile(r"зліт|злет|взлет|взлёт|виліт|вилітати|вылет|підняли|подняли")
+REPOSITION_RX = re.compile(r"переліт|перелет|перельот|передислок|перебаз|перекида|прибул|прибыл|посадк|(?<![а-яіїє])сіли|(?<![а-яіїє])сели|приземл|"
+                           r"перебува|находят|знаходят|летить на|летят на|летит на|для спорядж|в напрямку аеродром|на аеродром|на ае(?:\.|родром)")
+SPECUL_RX = re.compile(r"можлив\w*\s+(?:\w+\s+)?пуск|возможн\w*\s+(?:\w+\s+)?пуск|ймовірн\w*\s+(?:\w+\s+)?пуск|не виключ")
+AVIA_CTX = re.compile(r"ту-?95|ту-?160|ту-?22|борт|аеродром|аэродром|(?<![а-яіїє])ае\.|аер\.|стратег")
 STRIKE_RX = re.compile(r"вибух|взрыв|прил[её]т|влучан|попадан|пожеж|пожар|бавовн|хлопок")
 SPEED = {"shahed": 170, "molniya": 120, "jet": 450, "cruise": 800, "ballistic": 2000, "kab": 600, "geran5": 550, "banderol": 650, "rszv": 1500, "fpv": 100, "fpvf": 80, "recon": 110}
 MAXAGE = {"shahed": 9 * 3600, "molniya": 2 * 3600, "jet": 2 * 3600, "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60, "geran5": 3 * 3600, "banderol": 2 * 3600, "rszv": 10 * 60, "fpv": 30 * 60, "fpvf": 30 * 60, "recon": 4 * 3600}
@@ -111,6 +120,24 @@ def detect(text: str, typ: str | None) -> tuple[list[Site], str | None, str | No
                 found.append(site)
     if not found or (STRIKE_RX.search(t) and not LAUNCH_RX.search(t)) or FORECAST_RX.search(t):
         return [], None, None, False
+    # «Українка» — це й місто на Київщині: «повз Українку», «від Українки, 4800» (K, kyiv_airdef, Northern_Sich_ukr, nebo_raketa)
+    if not AVIA_CTX.search(t):
+        found = [s_ for s_ in found if s_.name != "Українка"]
+    # аеродроми стратегічної авіації: пуск — лише коли так і написано; зліт/переліт/посадка — ні
+    # Зліт з бойового аеродрому (Енгельс, Оленья…) — так, це раннє попередження; але переліт/посадка/«перебувають»/
+    # спорядження — ні; а зліт з далекосхідної «Українки» — це завжди переліт на бойові аеродроми.
+    strat = [s_ for s_ in found if s_.kind == "аеродром" and "cruise" in s_.types]
+    if strat and not PUSK_RX.search(t):
+        if REPOSITION_RX.search(t) or not TAKEOFF_RX.search(t):
+            found = [s_ for s_ in found if s_ not in strat]
+        else:
+            found = [s_ for s_ in found if s_.name != "Українка"]
+    if SPECUL_RX.search(t):  # «Можливо пуски бандеролєй з Азовського моря» — припущення, не факт
+        return [], None, None, False
+    if not found:
+        return [], None, None, False
+    if "бандерол" in t:
+        typ = "banderol"
     if ctype == "cruise" and typ in (None, "kab", "shahed"):
         typ = "cruise"
     return found, typ or ctype, carrier, bool(SUMMARY_RX.search(t))
@@ -144,7 +171,7 @@ class LaunchBook:
                 out.append(ex)
                 continue
             self.n += 1
-            L = Launch(f"L{self.n}", s, t, typ, count, carrier or s.carrier, {src}, [link] if link else [],
+            L = Launch(f"L{self.n}", s, t, typ, count, carrier or (None if typ == "banderol" else s.carrier),  # бандероль — не з кораблів {src}, [link] if link else [],
                        ev=[{"t": int(t), "src": src, "text": (text or "")[:220], "link": link}] if text else [])
             self.items.append(L)
             out.append(L)
