@@ -664,7 +664,9 @@ if($('#sh-why'))$('#sh-why').onclick=()=>{if(!sel)return;
 if($('#sh-then'))$('#sh-then').onclick=async()=>{const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr)return;const t0=tr.first||tr.last;
   try{if(!HISTF.length){const j=await fetch('/api/history').then(r=>r.json());HISTF=j.frames||[];}}catch(e){}
   if(!HISTF.length)return toast('Історія ще збирається');let i=HISTF.findIndex(f=>f.t>=t0);if(i<0)i=HISTF.length-1;
-  $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;play(false);showFrame(i);toast('Карта станом на '+fmt(HISTF[i].t));};
+  const id=tr.id;$('#sheet').hidden=true;$('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;play(false);showFrame(i);
+  const ft=(HISTF[i].tracks||[]).find(x=>x.id===id);if(ft){map.flyTo({center:[ft.lon,ft.lat],zoom:Math.max(map.getZoom(),9),duration:900});}
+  toast('Так було о '+fmt(HISTF[i].t)+(ft?' — ціль у центрі':'')+'. «Наживо» — повернутись');};
 $('#sh-follow').onclick=()=>{if(follow)stopFollow('Стеження зупинено');else startFollow();$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити стеження':'Стежити за ціллю';};
 map.on('dragstart',e=>{if(follow&&e.originalEvent)stopFollow('Ви зсунули карту — стеження зупинено');});
 setInterval(()=>{if(follow)renderFollow();},1000);
@@ -710,7 +712,7 @@ fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{const P=j.features.map
 /* ---------- машина часу ---------- */
 let HISTF=[],tbTimer=null;
 $('#b-time').onclick=()=>{fetch('/api/history').then(r=>r.json()).then(j=>{HISTF=j.frames||[];if(!HISTF.length)return toast('Історія ще збирається — кадр щохвилини');
-  $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;r.value=0;showFrame(0);play(true);});};
+  $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;const t30=Date.now()/1000+offset-1800;let i0=HISTF.findIndex(f=>f.t>=t30);if(i0<0)i0=HISTF.length-1;play(false);showFrame(i0);toast('Машина часу: 30 хв тому. ▶ — програти до зараз, −5/+5 — крок');});};
 function showFrame(i){const f=HISTF[i];if(!f)return;document.body.classList.add('replay');$('#tb-range').value=i;$('#tb-time').textContent=new Date(f.t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
   REPLAY=f;SNAP=Object.assign({},LIVE||{},{now:f.t,levels:f.levels,official:Object.assign({},(LIVE&&LIVE.official)||{},{raion_levels:f.raions,points:[]}),
     tracks:f.tracks.map(t=>Object.assign({status:'active',speed:0,route:[],trail:[],route_names:[],srcs:(t.ev&&t.ev.prim)||[],links:[],first:f.t,last:f.t,ts:f.t,entry:[t.lon,t.lat,'',f.t],ev:{pubs:0,prim:[],items:[],contra:[],age:0}},t)),launches:[],zones:[],ru:[]});
@@ -718,7 +720,9 @@ function showFrame(i){const f=HISTF[i];if(!f)return;document.body.classList.add(
   // докази кадру (хто й що писав ДО цього моменту) — догружаємо лише для кадру, на якому зупинились
   clearTimeout(showFrame.ft);if(!f.full)showFrame.ft=setTimeout(()=>{if(REPLAY!==f)return;fetch('/api/history/frame?t='+f.t).then(r=>r.json()).then(g=>{if(!g||!g.tracks)return;g.full=1;HISTF[i]=g;if(REPLAY===f)showFrame(i);if(sel)fillSheet();}).catch(()=>{});},tbTimer?1500:250);
   offset=f.t-Date.now()/1000;recvAt=Date.now();DISP.clear();renderCounters();syncLevels();syncRaions();}
-function play(on){clearInterval(tbTimer);$('#tb-play').textContent=on?'❚❚':'▶';if(!on)return;tbTimer=setInterval(()=>{const r=$('#tb-range');const i=+r.value+1;if(i>=HISTF.length){play(false);return;}showFrame(i);},140);}
+function play(on){clearInterval(tbTimer);tbTimer=null;$('#tb-play').textContent=on?'❚❚':'▶';if(!on)return;tbTimer=setInterval(()=>{const r=$('#tb-range');const i=+r.value+1;if(i>=HISTF.length){play(false);return;}showFrame(i);},250);}
+const tbStep=k=>{play(false);const r=$('#tb-range');const i=Math.max(0,Math.min(HISTF.length-1,+r.value+k));showFrame(i);};
+if($('#tb-back'))$('#tb-back').onclick=()=>tbStep(-5);if($('#tb-fwd'))$('#tb-fwd').onclick=()=>tbStep(5);
 $('#tb-play').onclick=()=>play(!tbTimer||$('#tb-play').textContent==='▶');
 $('#tb-range').oninput=e=>{play(false);showFrame(+e.target.value);};
 $('#tb-live').onclick=()=>{play(false);REPLAY=null;document.body.classList.remove('replay');$('#timebar').hidden=true;DISP.clear();lastLv='';lastRa='';if(LIVE)onSnap(LIVE);};
