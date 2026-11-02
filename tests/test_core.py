@@ -305,3 +305,12 @@ def test_kab_aftermath_and_raions():
     o = p.parse("Повторные пуски Каб на Изюмский район", "CX")
     assert o.kind == "zone" and [r.place.name for r in o.places] == ["Ізюмський р-н"]
     assert [r.place.name for r in p.parse("Пуски Каб Изюм /район⚠️", "R").places] == ["Ізюм"]
+
+
+def test_tts_stress_fix():
+    import pytest
+    pytest.importorskip("piper")
+    pytest.importorskip("ukrainian_word_stress")
+    from app import tts
+    ph = "".join(p for s in tts.phonemize_text("Шахед летить, вісім хвилин") for p in s)
+    assert "ʃaxˈɛd" in ph and "lɛt̪ˈɪt" in ph and "ɣβɪlˈɪn" in ph  # шахе́д, лети́ть, хвили́н — не ша́хед/ле́тить/хви́лин

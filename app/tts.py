@@ -33,9 +33,14 @@ _install = {"state": "idle", "error": None}
 def piper_ok() -> bool:
     try:
         import piper  # noqa: F401
-        return True
     except Exception:
         return False
+    try:  # рушій є, але словника наголосів ще немає — доставляємо у фоні (сервер уже працює зі старою вимовою)
+        import ukrainian_word_stress  # noqa: F401
+        import num2words  # noqa: F401
+    except Exception:
+        _install_bg()
+    return True
 
 
 def _install_bg():
@@ -45,7 +50,8 @@ def _install_bg():
 
     def go():
         try:
-            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "piper-tts"], check=True, timeout=900)
+            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "piper-tts", "marisa-trie", "num2words"], check=True, timeout=900)
+            subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "--no-deps", "ukrainian-word-stress"], check=True, timeout=600)
             _install["state"] = "done"
             log.info("piper-tts встановлено")
         except Exception as e:  # noqa: BLE001
@@ -84,12 +90,129 @@ def _voice(path: Path):
         return v
 
 
+# ---- наголоси: espeak-ng ставить їх часто неправильно (ша́хед, ле́тить, хви́лин). Беремо словник наголосів
+# lang-uk/ukrainian-word-stress (без важкого Stanza) + власні слова, і переносимо наголос у фонемах кожного слова.
+OVERRIDE = {"шахед": "шахе́д", "шахеди": "шахе́ди", "шахедів": "шахе́дів", "шахедом": "шахе́дом", "герань": "гера́нь",
+            "гербера": "ге́рбера", "молнія": "мо́лнія", "каб": "ка́б", "каби": "ка́би", "кабів": "ка́бів", "дрон": "дро́н",
+            "дрони": "дро́ни", "безпілотник": "безпіло́тник", "fpv": "еф-пе-ве́", "рсзв": "ер-ес-зе-ве́", "харків": "ха́рків",
+            "харкова": "ха́ркова", "курсом": "ку́рсом", "напрямку": "напря́мку", "тривога": "триво́га", "відбій": "відбі́й",
+            "реактивний": "реакти́вний", "реактивні": "реакти́вні", "балістика": "балі́стика", "ракета": "раке́та"}
+VOW = set("аеєиіїоуюя")
+PH_VOW = set("aɛeɪiouɐʊəɔæ")
+_stress = None
+
+
+def _stressifier():
+    global _stress
+    if _stress is None:
+        try:
+            from ukrainian_word_stress import OnAmbiguity, Stressifier, StressSymbol
+            _stress = Stressifier(stress_symbol=StressSymbol.CombiningAcuteAccent, on_ambiguity=OnAmbiguity.First,
+                                  disambiguation="dictionary")
+        except Exception as e:  # noqa: BLE001
+            log.info("словник наголосів недоступний: %s", e)
+            _stress = False
+    return _stress
+
+
+def normalize(text: str) -> str:
+    import re as _re
+    t = text.replace("~", " приблизно ").replace("≈", " приблизно ").replace("×", " ").replace("·", ",").replace("→", " курсом на ")
+    t = _re.sub(r"(\d+)\s*км\b", r"\1 кілометрів", t)
+    t = _re.sub(r"(\d+)\s*хв\b", r"\1 хвилин", t)
+    t = _re.sub(r"\bобл\.", "області", t)
+    for a, b in (("БпЛА", "безпілотник"), ("БПЛА", "безпілотник"), ("бпла", "безпілотник"), ("р-н", "район"), ("FPV", "еф пе ве"),
+                 ("КАБи", "каби"), ("РСЗВ", "ер ес зе ве"), ("ППО", "пе пе о"), ("РФ", "ер еф"), ("ЗСУ", "зе ес у")):
+        t = _re.sub(rf"(?<![\w]){_re.escape(a)}(?![\w])", b, t)
+    try:
+        from num2words import num2words
+        t = _re.sub(r"\d+", lambda m: num2words(int(m.group()), lang="uk"), t)
+    except Exception:
+        pass
+    return " ".join(t.split())
+
+
+def stressed_index(word: str) -> int | None:
+    """Номер наголошеного голосного (0..) у слові або None."""
+    low = word.lower()
+    w = OVERRIDE.get(low)
+    if w is None:
+        st = _stressifier()
+        w = st(word) if st else word
+    if "\u0301" not in w:
+        return None
+    k = -1
+    for ch in w:
+        if ch.lower() in VOW:
+            k += 1
+        elif ch == "\u0301":
+            return max(k, 0)
+    return None
+
+
+def word_phonemes(ph_engine, word: str) -> list[str]:
+    out = [p for sent in ph_engine.phonemize("uk", word) for p in sent]
+    k = stressed_index(word)
+    vowels = [i for i, p in enumerate(out) if p in PH_VOW]
+    if k is None or k >= len(vowels) or len(vowels) < 2:
+        return out  # невідоме слово або один склад — як у espeak
+    out = [p for p in out if p not in ("ˈ", "ˌ")]
+    vowels = [i for i, p in enumerate(out) if p in PH_VOW]
+    out.insert(vowels[k], "ˈ")
+    return out
+
+
+def phonemize_text(text: str) -> list[list[str]]:
+    import re as _re
+    from piper.phonemize_espeak import EspeakPhonemizer
+    eng = getattr(phonemize_text, "eng", None) or EspeakPhonemizer()
+    phonemize_text.eng = eng
+    sents, cur = [], []
+    for tok in _re.findall(r"[\w'’ʼ\-]+|[.,!?;:]", normalize(text)):
+        if _re.match(r"[.,!?;:]", tok):
+            cur.append(tok)
+            if tok in ".!?":
+                sents.append(cur)
+                cur = []
+            else:
+                cur.append(" ")
+            continue
+        if cur and cur[-1] != " ":
+            cur.append(" ")
+        cur += word_phonemes(eng, tok)
+    if cur:
+        sents.append(cur)
+    return [s_ for s_ in sents if any(p.strip() for p in s_)]
+
+
 def _synth(path: Path, text: str, rate: float) -> bytes:
+    import numpy as np
     from piper.config import SynthesisConfig
     v = _voice(path)
+    cfg = SynthesisConfig(length_scale=max(0.6, min(1.6, 1 / max(0.5, rate))))
+    chunks = []
+    try:
+        for ph in phonemize_text(text):
+            ph = [p for p in ph if p in v.config.phoneme_id_map]
+            audio = v.phoneme_ids_to_audio(v.phonemes_to_ids(ph), cfg)
+            if isinstance(audio, tuple):
+                audio = audio[0]
+            m = float(np.max(np.abs(audio))) or 1.0
+            chunks.append(np.clip(audio / m, -1, 1))
+            chunks.append(np.zeros(int(v.config.sample_rate * 0.18), dtype=np.float32))
+        pcm = (np.concatenate(chunks) * 32767).astype(np.int16).tobytes()
+    except Exception as e:  # noqa: BLE001 — запасний шлях: стандартна вимова Piper
+        log.warning("наголоси: %s — без корекції", e)
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            v.synthesize_wav(normalize(text), w, syn_config=cfg)
+        return buf.getvalue()
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
-        v.synthesize_wav(text, w, syn_config=SynthesisConfig(length_scale=max(0.6, min(1.6, 1 / max(0.5, rate)))))
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(v.config.sample_rate)
+        w.writeframes(pcm)
     return buf.getvalue()
 
 
@@ -100,7 +223,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes 
     if not piper_ok():
         _install_bg()
         return None, "installing" if _install["state"] == "running" else f"no-piper:{_install['state']}"
-    cache = BASE / "cache" / f"{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.wav"
+    cache = BASE / "cache" / f"{hashlib.sha1(f'v2|{key}|{rate}|{text}'.encode()).hexdigest()}.wav"
     if cache.exists():
         return cache.read_bytes(), "cache"
     try:
