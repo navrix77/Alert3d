@@ -14,7 +14,7 @@ const SIDE=['на північ','на північний схід','на схі�
 const FROM=['з півночі','з північного сходу','зі сходу','з південного сходу','з півдня','з південного заходу','з заходу','з північного заходу'];
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
-let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=(()=>{try{if(!localStorage.getItem('mapv2')){localStorage.setItem('mapv2','1');localStorage.setItem('t3d','0');}}catch(e){}return localStorage.getItem('t3d')==='1';})(),base=(()=>{try{if(!localStorage.getItem('mapv3')){localStorage.setItem('mapv3','1');localStorage.setItem('base2','navryx');const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base='navryx';localStorage.setItem('pref',JSON.stringify(p));}}catch(e){}return localStorage.getItem('base2')||'navryx';})();
+let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=(()=>{try{if(!localStorage.getItem('mapv2')){localStorage.setItem('mapv2','1');localStorage.setItem('t3d','0');}}catch(e){}return localStorage.getItem('t3d')==='1';})(),base=localStorage.getItem('base2')||'night';
 function applySaver(){const on=window.NXPERF&&NXPERF.saver;['hillshade','bld3d'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');});const c=$('#st-saver');if(c){c.checked=!!(window.NXPERF&&localStorage.getItem('saver')==='1');c.onchange=e=>NXPERF.setSaver(e.target.checked);}}
 document.addEventListener('nxsaver',()=>{try{applySaver();}catch(e){}});
 function syncReal3d(){applySaver();const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
@@ -29,44 +29,12 @@ const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/M
 let CFG={vectorStyle:'https://tiles.openfreemap.org/styles/liberty'};
 const INTRO=!sessionStorage.getItem('intro');
 const map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,2),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});window.tryvogaMap=map;
-// «Схема NAVRYX»: власна векторна мапа — графітово-синя (не чорна), чіткі межі й підписи, без супутника; легка й швидка
-function navryxStyle(vec){
-  const P=(l,k,v)=>{l.paint=l.paint||{};l.paint[k]=v;};
-  vec.layers=vec.layers.filter(l=>l.type!=='raster');
-  for(const l of vec.layers){const id=l.id,sl=l['source-layer']||'';
-    if(l.type==='background')P(l,'background-color','#1A2232');
-    else if(l.type==='fill'){
-      if(sl==='water')P(l,'fill-color','#0E2944');
-      else if(/wood|park/.test(id))(P(l,'fill-color','#1B2A2A'),P(l,'fill-opacity',0.7));
-      else if(/grass|wetland/.test(id))(P(l,'fill-color','#1C2828'),P(l,'fill-opacity',0.45));
-      else if(/residential/.test(id))(P(l,'fill-color','#232D3F'),P(l,'fill-opacity',0.9));
-      else if(sl==='building')(P(l,'fill-color','#2B3548'),P(l,'fill-outline-color','#323D52'));
-      else (P(l,'fill-color','#222B3B'),P(l,'fill-opacity',0.8));}
-    else if(l.type==='line'){
-      if(sl==='waterway')P(l,'line-color','#1C426B');
-      else if(sl==='boundary')(P(l,'line-color','#8E9BB5'),P(l,'line-opacity',0.6));
-      else if(sl==='transportation'){
-        if(/casing/.test(id))P(l,'line-color','#141B27');
-        else if(/motorway|trunk/.test(id))P(l,'line-color','#6E7C99');
-        else if(/primary/.test(id))P(l,'line-color','#59667F');
-        else if(/secondary|tertiary/.test(id))P(l,'line-color','#47526B');
-        else if(/rail/.test(id))(P(l,'line-color','#3B4558'),P(l,'line-opacity',0.6));
-        else P(l,'line-color','#323C51');}
-      else if(/park_outline/.test(id))P(l,'line-opacity',0);
-      else P(l,'line-color','#333D52');}
-    else if(l.type==='fill-extrusion')P(l,'fill-extrusion-color','#2E394D');
-    else if(l.type==='symbol'&&l.paint!==undefined||l.type==='symbol'){
-      const city=/place|city|town|capital|state|country/.test(id),water=/water/.test(id),road=/road|highway|transportation/.test(id);
-      P(l,'text-color',water?'#6F9CCB':road?'#97A3B9':city?'#F2F6FC':'#C9D2E1');P(l,'text-halo-color','#121826');P(l,'text-halo-width',1.5);
-      if(l.layout&&l.layout['icon-image'])P(l,'icon-opacity',0.5);}}
-  return vec;}
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
   const UK=['coalesce',['get','name:uk'],['get','name']];
   vec.layers.forEach(l=>{if(l.type==='symbol'&&l.layout&&l.layout['text-field']&&JSON.stringify(l.layout['text-field']).includes('name'))l.layout['text-field']=UK;});
   if(kind==='map')return vec;
-  if(kind==='navryx')return navryxStyle(vec);
   const NIGHT=kind==='night';
   // супутник + підписи й дороги з векторної карти
   const keep=vec.layers.filter(l=>l.type==='symbol'||/boundary|road_(trunk|motorway|primary)|highway/.test(l.id)).map(l=>{
@@ -248,8 +216,6 @@ function addOverlays(){
   map.addLayer({id:'ticks-t',type:'symbol',source:'ticks',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,-1.1],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addLayer({id:'preds',type:'line',source:'preds',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':2,'line-dasharray':[1.5,2],'line-opacity':0.9}});
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':1,'icon-allow-overlap':true,'text-field':'Дім','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
-  // чесна давність: про ціль понад 10 хв ніхто не писав — підпис «застаріло · N хв»
-  map.addLayer({id:'tg-stale',type:'symbol',source:'targets',filter:['>',['get','old'],0],minzoom:5.5,layout:{'text-field':['concat','застаріло · ',['to-string',['get','old']],' хв'],'text-font':['Noto Sans Bold'],'text-size':10,'text-offset':[0,-2.1],'text-anchor':'bottom','text-allow-overlap':false,'text-optional':true},paint:{'text-color':'#C9D2E1','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.3,'text-opacity':0.85}});
   map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['has','next'],['==',['get','active'],true],['any',['get','thr'],['==',['get','sk'],0],['>=',['zoom'],7]]],layout:{'text-field':['concat',['case',['>',['get','count'],1],['concat','×',['to-string',['get','count']],'  '],''],'→ ',['get','next']],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[3,7,3,7],'text-anchor':'top','text-offset':['interpolate',['linear'],['zoom'],2,['literal',[0,1.30]],5,['literal',[0,1.68]],7,['literal',[0,2.04]],9.5,['literal',[0,2.48]]],'icon-allow-overlap':false,'text-allow-overlap':false,'text-optional':false,'symbol-sort-key':['get','sk']},paint:{'text-color':'#fff'}});
   const TGS=['interpolate',['linear'],['zoom'],4,0.55,7,0.85,9,1.15,12,1.55];
   // голограма тривоги: об'єми над районами (червоні вищі), «дихають»
@@ -303,7 +269,7 @@ map.once('idle',()=>introFly(false));
 setTimeout(()=>introFly(false),7000);
 {const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
 map.on('click',e=>{if(!setHomeMode)return;const f=map.queryRenderedFeatures(e.point,{layers:['tg-hit']});if(f.length)return;home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));setHomeMode=false;$('#b-home').classList.remove('on');syncHome();toast('Дім збережено');});
-fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};window.NXCFG=CFG;syncReal3d();}).catch(()=>{}).finally(()=>setBase(base==='__init'?'navryx':base));
+fetch('/api/config').then(r=>r.json()).then(c=>{CFG={...CFG,...c};window.NXCFG=CFG;syncReal3d();}).catch(()=>{}).finally(()=>setBase(base==='__init'?'night':base));
 
 let HPDATA=null,HPPREV={},HPLOADING=false;
 function syncHromadas(H){
@@ -359,7 +325,7 @@ function frame(now){
       // кут на ЕКРАНІ: проєктуємо точку і точку на 3 км уздовж курсу — враховує нахил і поворот карти
       const unk=tr.hd==null;let sa=0;
       if(!unk){const P=xy(d.p),r=d.hd*D2R;const A=map.project(d.p),B=map.project(ll([P[0]+Math.sin(r)*3,P[1]+Math.cos(r)*3]));sa=Math.atan2(B.x-A.x,-(B.y-A.y))/D2R;}
-      feats.push({type:'Feature',properties:{old:active&&serverT-tr.last>600?Math.round((serverT-tr.last)/60):0,id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,thr:!!(rel&&rel.rel),c:TYPE_COLOR[tr.type],count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
+      feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,hd:d.hd,sa,unk,active,weak,thr:!!(rel&&rel.rel),c:TYPE_COLOR[tr.type],count:tr.count||1,next:tr.next||undefined,sk:active?(sel===tr.id?0:1):2},geometry:{type:'Point',coordinates:d.p}});
       if(active){const tail=[d.p];let P=xy(d.p),left=Math.max(14,TYPES_KMH(tr.type)*0.09);
         for(const q of tr.trail.slice().reverse()){const Q=xy([q[0],q[1]]),dd=dist(P,Q);if(dd<0.5)continue;if(dd>=left){const f=left/dd;tail.push(ll([P[0]+(Q[0]-P[0])*f,P[1]+(Q[1]-P[1])*f]));left=0;break;}tail.push([q[0],q[1]]);left-=dd;P=Q;}
         if(left>0&&tr.hd!=null){const r=(d.hd+180)*D2R;tail.push(ll([P[0]+Math.sin(r)*left,P[1]+Math.cos(r)*left]));}
@@ -615,7 +581,7 @@ function renderFeed(){
 $('#b-home').onclick=()=>{if(home&&!setHomeMode){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Довге натискання — змінити дім');return;}setHomeMode=!setHomeMode;$('#b-home').classList.toggle('on',setHomeMode);toast(setHomeMode?'Торкніться карти, щоб позначити дім':'Скасовано');};
 let pressT;$('#b-home').addEventListener('pointerdown',()=>{pressT=setTimeout(()=>{setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім');},650);});$('#b-home').addEventListener('pointerup',()=>clearTimeout(pressT));
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
-$('#b-layers').onclick=()=>{const nx={navryx:'sat',sat:'night',night:'map',map:'navryx'}[base]||'navryx';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
+$('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D) — без перспективних спотворень; у 3D лише коротша тінь
   if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
 function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
@@ -709,7 +675,7 @@ function sunNight(){const p=home||[31.5,49];const d=new Date();const doy=Math.fl
   const noonUTC=12-p[0]/15;const rise=noonUTC-h0/15,set=noonUTC+h0/15;const u=d.getUTCHours()+d.getUTCMinutes()/60;return !(u>rise&&u<set);}
 function effTheme(){return PREF.theme==='auto'?(sunNight()?'night':'day'):PREF.theme;}
 function applyTheme(force){const th=effTheme();document.documentElement.dataset.theme=th;window.FXDAY=th==='day';
-  const want=PREF.base||'navryx';if(force||want!==base)setBase(want);
+  const want=PREF.base||(th==='night'?'night':'map');if(force||want!==base)setBase(want);
   $('#st-theme-note').textContent=PREF.theme==='auto'?('Зараз: '+(th==='night'?'ніч':'день')+' — перемикається само за сходом і заходом сонця над вашим домом.'):'';syncSettingsUI();}
 function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
   $('#st-3d').checked=tilt;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
