@@ -223,8 +223,15 @@ class LaunchBook:
         first = tr.obs[0]
         p0 = (first.x, first.y)
         hd = tr.heading if hd is None else hd
+        last = (tr.obs[-1].x, tr.obs[-1].y)
+        if hd is None and tr.route:
+            hd = bearing(last, tr.route[0].xy)  # куди летить за каналами
         best, bs = None, 1e9
         for L in self.items:
+            # ціль, що зараз летить НАЗАД у бік місця пуску, звідти не «прилетіла» — не прив'язуємо
+            # (03.11: «ПУСК з Орла» лінією до шахеда біля Люботина, що летить на північ, на Польову)
+            if hd is not None and dist_km(L.site.xy, last) > 60 and abs((bearing(L.site.xy, last) - hd + 180) % 360 - 180) > 100:
+                continue
             if L.stage == "takeoff":
                 continue  # виліт носіїв ≠ пуск: ракету не «домальовуємо» від літака
             if L.type and L.type != tr.type and not (L.type == "shahed" and tr.type == "molniya"):

@@ -965,3 +965,21 @@ def test_strategic_takeoff_is_not_launch():
         assert L2 is L and L.stage == "launch" and L.count is None
     snap = lb.snapshot(1600.0)
     assert snap[0]["stage"] in ("takeoff", "launch")
+
+
+def test_launch_not_linked_to_target_flying_back():
+    """Шахед біля Люботина летить на північ (на Польову) — не прив'язуємо його до пуску з Орла (на півночі)."""
+    from app.parser import Parser
+    from app.tracker import Tracker
+    from app.config import SOURCES
+    from app import launch
+    P, trk = Parser(), Tracker(SOURCES)
+    t0 = "Пуск шахедів з Орла"
+    sites, typ, car, summ = launch.detect(t0, "shahed")
+    trk.launches.add(sites, typ, None, car, "K", None, 1000.0, summ, t0)
+    txt = "Шахед біля Люботина курсом на Польову"
+    o = P.parse(txt, "K"); o.raw = txt
+    trk.ingest(o, "K", 1000.0 + 3 * 3600, None)
+    tr = trk.tracks[0]
+    L = trk.launches.link(tr, 1000.0 + 3 * 3600 + 60)
+    assert not L or L.get("est") or L.get("site") != "Орел"
