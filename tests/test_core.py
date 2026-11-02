@@ -1019,3 +1019,13 @@ def test_nickname_and_hypothetical_threat_not_a_target():
     from app.parser import Parser
     o = Parser().parse("Міхалич, зніми червону тривогу для столиці, щоб в разі загрози балістики повторно увімкнути і розбудити людей", "eRadarrua")
     assert o.kind != "track" and not any(p.place.name == "Михальче" for p in o.places)
+
+
+def test_russian_cities_not_ukrainian_namesakes():
+    """«з Брянська», «з Курська», «з Орла» — міста РФ, не кримські Брянське/Курське і не Орел на Одещині."""
+    from app.parser import Parser
+    P = Parser()
+    for t in ("Загроза балістики з Брянська", "Шахеди з Курська на Суми", "Шахед з Орла на Глухів"):
+        names = [p.place.name for p in P.parse(t, "K").places]
+        assert not set(names) & {"Брянське", "Курське", "Орел"}, (t, names)
+    assert any(p.place.name == "Орлівка" for p in P.parse("Орлівка, шахед", "K").places)
