@@ -429,8 +429,8 @@ function frame(now){
     if(slow&&map.getSource('chains')){frame.ch=now;const ch=[],ls=new Map();
       for(const L of (SNAP.launches||[])){const w=launchWhat(L);ls.set(L.site,{type:'Feature',properties:{est:false,lid:L.id,l:(isTO(L)?'НОСІЇ В ПОВІТРІ'+(L.count?' · '+cntL(L):''):'ПУСК: '+w.short+(L.count?' ×'+L.count:''))+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
-        if(L.est&&!isSel)continue;
-        // звʼязок «пуск → ціль» — оцінка: для всіх ледь помітний світлий, для вибраної цілі яскравий
+        // звʼязок «пуск → ціль» — оцінка SKY, а не факт: лише для вибраної цілі. Віялом до всіх цілей це виглядало як «190 пусків з однієї точки»
+        if(!isSel||tr.status!=='active')continue;
         ch.push({type:'Feature',properties:{c:isSel?(L.est?'#FF8A8A':'#FF3B3B'):'#E8ECF4',o:isSel?0.95:0.1,s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
         if(!ls.has(L.site))ls.set(L.site,{type:'Feature',properties:{est:true,l:'ймовірно · '+L.site.replace(/ \(.*\)/,'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       map.getSource('chains').setData({type:'FeatureCollection',features:ch});map.getSource('lsites').setData({type:'FeatureCollection',features:[...ls.values()]});}
