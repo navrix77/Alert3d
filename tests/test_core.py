@@ -710,3 +710,42 @@ def test_analyst_direction_and_likely_next():
          "sources": [], "self": {"hd_acc": {"shahed": {"acc": 0.72, "n": 90}}}}
     txt = " ".join(summary(r))
     assert "Напрямок відомий для 2 з 3" in txt and "Решетилівка (2 цілі, 60%)" in txt and "шахед 72% з 90" in txt
+
+
+def test_push_stages_like_israel():
+    """Етапи сповіщень (як Home Front Command): «можлива загроза» → «курс на ваш район» → явний «відбій для вас»;
+    під час масованої атаки — одне повідомлення на телефон за раз."""
+    import asyncio
+    from pathlib import Path as P_
+    from app.geo import to_xy
+    from app.push import Push, p_toward
+    # калібровка: прямо на дім (40 км) — ~0.5; під 45° — ~0.15; під 120° — ~0
+    assert 0.45 <= p_toward("channels", 0, 40) <= 0.75 and p_toward("channels", 120, 40) < 0.05
+    H = to_xy(50.00, 36.23)
+    straight = {"id": "Ш-1", "type": "shahed", "lat": 50.30, "lon": 36.23, "speed": 170, "hd": 180.0, "hd_src": "learned", "route": [], "count": 1, "status": "active", "conf": 0.9}
+    side = dict(straight, id="Ш-2", hd=215.0)
+    away = dict(straight, id="Ш-3", hd=0.0)
+    assert Push.assess(straight, H)["stage"] == "threat"
+    assert Push.assess(side, H)["stage"] == "pre"
+    assert Push.assess(away, H)["stage"] is None
+    sent = []
+
+    class Cli:
+        async def post(self, url, json=None, headers=None):
+            sent.extend(json)
+
+            class R:
+                def json(self_):
+                    return {"data": []}
+            return R()
+    pu = Push(P_(":memory:"))
+    pu.db.execute("INSERT INTO subs VALUES('ExponentPushToken[abcdefghijkl]', 36.23, 50.0, 0)")
+    many = [dict(straight, id=f"Ш-{i}") for i in range(10, 30)]
+    asyncio.run(pu.tick(Cli(), {"tracks": many}))
+    assert len(sent) == 1 and sent[0]["title"].startswith("20 цілей")  # одне зведене, а не 20 сповіщень
+    sent.clear()
+    import time as _t
+    for k in pu.armed["ExponentPushToken[abcdefghijkl]"]:
+        pu.armed["ExponentPushToken[abcdefghijkl]"][k] = _t.time() - 300
+    asyncio.run(pu.tick(Cli(), {"tracks": [dict(t, status="lost") for t in many]}))
+    assert len(sent) == 1 and "минула" in sent[0]["title"]

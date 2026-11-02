@@ -297,16 +297,24 @@ function posAt(tr,serverT){
   const n=pts.length,h=brg(pts[n-2],pts[n-1]),r=h*D2R,ex=Math.min(km-acc,cap);
   return {p:ll([pts[n-1][0]+Math.sin(r)*ex,pts[n-1][1]+Math.cos(r)*ex]),hd:h};
 }
+const HD_Q={channels:[0,0,0,0,0,5,7,10,14,19,22,28,32,42,50,56,63,82,93,145],learned:[0,0,0,0,0,0,0,0,12,14,18,19,25,26,29,46,55,69,78,110],
+  movement:[4,6,7,7,10,13,13,23,26,26,34,36,76,94,97,97,97,156,158,164],all:[0,0,0,0,0,4,7,12,14,18,22,26,32,42,49,56,71,88,97,150]};
+function pToward(src,delta,dkm){const q=HD_Q[{from:'movement',course:'all'}[src]||src]||HD_Q.all;const w=Math.atan(15/Math.max(dkm,15))*180/Math.PI;
+  let s=0;for(const e of q)s+=0.5*(Math.abs(delta-e)<=w)+0.5*(Math.abs(delta+e)<=w);return s/q.length;}
 function homeRel(tr,p){
   if(!home)return null;const H=xy(home),P=xy(p);const d=dist(H,P);
   let rel=null,eta=null;
   const path=[P,...tr.route.map(xy)];
   let acc=0,best={d:1e9,c:0};for(let i=1;i<path.length;i++){const a=path[i-1],b=path[i];const vx=b[0]-a[0],vy=b[1]-a[1],L2=vx*vx+vy*vy;let t=L2?((H[0]-a[0])*vx+(H[1]-a[1])*vy)/L2:0;t=Math.max(0,Math.min(1,t));const q=[a[0]+vx*t,a[1]+vy*t];const dd=dist(H,q);if(dd<best.d)best={d:dd,c:acc+Math.sqrt(L2)*t};acc+=Math.sqrt(L2);}
+  // ймовірність пройти ≤15 км від дому — з розподілу похибки курсу (бектест; той самий, що й у push.py)
+  const pr=tr.hd!=null?pToward(tr.hd_src,angd(tr.hd,brg(P,H)),d):0;
+  let maybe=false;
   if(best.d<8){rel='route';eta=best.c/tr.speed*60;}
-  else if(tr.hd!=null&&angd(tr.hd,brg(P,H))<20){rel='heading';eta=d/tr.speed*60;}
+  else if(tr.hd!=null&&pr>=0.4){rel='heading';eta=d/tr.speed*60;}
+  else if(tr.hd!=null&&pr>=0.15&&d<=150&&d/tr.speed*60<=45)maybe=true;// «можлива загроза»: широке попередження, ще не тривога
   if(rel&&(d>150||eta>45)){rel=null;eta=null;}
   const away=tr.hd!=null&&angd(tr.hd,brg(P,H))>100;
-  return {d,rel,eta,away,side:SIDE[Math.round((brg(H,P))/45)%8],from:FROM[Math.round((brg(H,P))/45)%8]};
+  return {d,rel,eta,away,maybe,p:pr,side:SIDE[Math.round((brg(H,P))/45)%8],from:FROM[Math.round((brg(H,P))/45)%8]};
 }
 
 /* ---------- кадр ---------- */
@@ -481,6 +489,8 @@ function renderMe(threats){
   const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
   const thr=near.filter(x=>x.r.rel);const first=thr[0];
   let cls='me',word='Над вами чисто',sub='Підтверджених цілей у ваш бік немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
+  const mb=near.filter(x=>!x.r.rel&&x.r.maybe).sort((a,b)=>b.r.p-a.r.p)[0];
+  if(!first&&mb){cls='me watch';word='Можлива загроза';sub=esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · ймовірність пройти поруч ~'+Math.round(mb.r.p*100)+'%. Будьте поруч з укриттям — це ще не тривога.';}
   if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
   else if(first){const e=first.r.eta||0;cls=e<=5?'me danger':'me watch';word=e<=5?'Летить на вас':'У ваш бік';
     sub=esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':'');}
@@ -494,7 +504,7 @@ function renderMe(threats){
   (thr.length?thr:near).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
     const c=MEI[t.type]||(MEI[t.type]=drawTarget(t.type,22));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
     const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;
-    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':(r.away?'віддаляється':t.hd==null?'курс невідомий':'летить повз'))+'</span></div>'+
+    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':(r.away?'віддаляється':t.hd==null?'курс невідомий':r.maybe?'можливо у ваш бік · '+Math.round(r.p*100)+'%':'летить повз'))+'</span></div>'+
       (eta?'<div class="me-act '+(eta<=5?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить поруч':'курс у ваш бік')+'</div>':'');
     li.querySelector('.me-row').prepend(cv);li.onclick=()=>openSheet(t.id);$('#me-list').appendChild(li);});
 }
