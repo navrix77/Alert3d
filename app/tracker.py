@@ -43,6 +43,15 @@ LAUNCH_AREA = {"Харківська": (50.62, 36.85, "Бєлгородщина"
                "Луганська": (48.65, 39.35, "окупована Луганщина"), "Запорізька": (47.20, 35.95, "окупована Запорізька"),
                "Дніпропетровська": (47.45, 36.55, "окупована Запорізька"), "Херсонська": (46.50, 33.25, "лівобережжя Херсонщини"),
                "Миколаївська": (46.50, 33.25, "лівобережжя Херсонщини")}
+# конкретніші райони — для зони КАБ беремо найближчий (Ізюм → Сватівський напрямок, а не Бєлгород)
+LAUNCH_SPOTS = [(50.62, 36.85, "Бєлгородщина"), (51.40, 35.35, "Курщина"), (52.40, 32.95, "Брянщина"),
+                (49.45, 38.15, "окупована Луганщина (Сватове)"), (48.05, 38.10, "окупована Донеччина"),
+                (47.20, 35.95, "окупована Запорізька"), (46.50, 33.25, "лівобережжя Херсонщини")]
+
+
+def launch_spot(p) -> tuple:
+    from .geo import dist_km as _d, to_xy as _xy
+    return min(LAUNCH_SPOTS, key=lambda a: _d(_xy(a[0], a[1]), p.xy))
 ZONE_LIFE = 12 * 60
 
 
@@ -672,15 +681,15 @@ class Tracker:
             age = now - (z.last or z.t)
             zones.append({"places": [[p.lon, p.lat, p.name] for p in z.places], "t": int(z.t), "last": int(z.last or z.t),
                           "n": z.n, "obl": z.obl, "platform": z.platform, "fade": round(min(1.0, age / KAB_QUIET), 2),
-                          "ev": z.ev, "launch": (lambda a: {"area": LAUNCH_AREA[z.obl][2], "lat": LAUNCH_AREA[z.obl][0], "lon": LAUNCH_AREA[z.obl][1],
-                                                            "avia_t": int(a["act"]) if a and a.get("act") else None} if z.obl in LAUNCH_AREA else None)(self.avia.get(z.obl)),
+                          "ev": z.ev, "launch": (lambda a, sp: {"area": sp[2], "lat": sp[0], "lon": sp[1],
+                                                                "avia_t": int(a["act"]) if a and a.get("act") else None})(self.avia.get(z.obl), launch_spot(z.places[0])),
                           "until": int((z.last or z.t) + (KAB_AVIA if (self.avia.get(z.obl) or {}).get("act", 0) > now - 720 else KAB_QUIET))})
             for p in z.places:
                 up(obl.of(p.lon, p.lat), 2)
         avia = []
         for o, a in self.avia.items():
-            la, lo, area = LAUNCH_AREA[o]
             kz = [z for z in self.zones if z.obl == o]
+            la, lo, area = launch_spot(kz[0].places[0]) if kz else LAUNCH_AREA[o]
             avia.append({"obl": o, "lat": la, "lon": lo, "area": area, "t": int(a["t"]), "first": int(a["first"]), "n": a["n"],
                          "platform": a.get("platform") or "тактична авіація", "kab": len(kz),
                          "to": [[z.places[0].lon, z.places[0].lat] for z in kz][:4],
