@@ -186,6 +186,10 @@ from .daily import Daily, current_day, last_finished  # noqa: E402
 from .learner import Learner  # noqa: E402
 
 LEARNER = Learner(tracker, brain)
+from .discover import Discover, apply as _apply_auto, load as _load_auto  # noqa: E402
+
+DISCOVER = Discover(parser)
+_apply_auto(_load_auto())  # джерела, знайдені раніше, — одразу в моніторинг
 daily = Daily(brain, feed, parser, lambda: Tracker(config.SOURCES), [CTX, LASTC], pushsvc)
 _FC = (0.0, {})
 HIST: list[dict] = brain.hist_load(time.time() - 12 * 3600)
@@ -278,6 +282,8 @@ async def lifespan(app: FastAPI):
                 await asyncio.to_thread(brain.snapshot)
         tasks.append(asyncio.create_task(_snap()))
     tasks.append(asyncio.create_task(LEARNER.run()))
+    if os.getenv("REPLAY") != "1" and os.getenv("AUTO_SOURCES", "1") == "1":
+        tasks.append(asyncio.create_task(DISCOVER.run()))
     if os.getenv("LAN_TLS", "1") == "1":
         tasks.append(asyncio.create_task(lan_tls.run()))
     if os.getenv("REPLAY") != "1":
@@ -292,6 +298,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="NAVRYX SKY", lifespan=lifespan)
 from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
 app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)  # geojson і скрипти стискаються в 3-5 разів
+
+
+@app.get("/api/sources_auto")
+def api_sources_auto():
+    """Автопошук джерел: прийняті (з доказами), перевірені в останньому проході, відхилені."""
+    st = DISCOVER.state
+    return {"last": st["last"], "accepted": st["accepted"], "checked": st["checked"], "rejected_n": len(st["rejected"])}
 
 
 @app.get("/api/audit")

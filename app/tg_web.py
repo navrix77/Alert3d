@@ -136,6 +136,9 @@ class WebMonitor:
 
             while True:
                 t0 = time.time()
+                if len(config.CHANNELS) != len(chans):  # автопошук додав нові джерела — підхоплюємо без перезапуску
+                    chans = [(k, u) for k, u, *_ in config.CHANNELS]
+                    slow = [(k, u) for k, u in chans if k not in config.FAST]
                 if time.time() < getattr(self, "backoff", 0):
                     await asyncio.sleep(5)
                     continue
