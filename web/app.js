@@ -31,7 +31,11 @@ const INTRO=!sessionStorage.getItem('intro');
 /* ---------- без WebGL карта не стартує: текстовий режим замість вічної заставки (аудит 02.11) ---------- */
 const hasGL=(()=>{try{const c=document.createElement('canvas');return !!(c.getContext('webgl2')||c.getContext('webgl'));}catch(e){return false;}})();
 if(!hasGL||!window.maplibregl){liteMode();return;}
-function liteMode(){
+// запобіжник: якщо за 15 с мапа так і не отримала даних (помилка в коді, старий index у кеші телефона тощо) —
+// показуємо текстовий режим із тими самими даними, а не вічне «Підключення…»
+window.addEventListener('error',e=>{(window.__errs=window.__errs||[]).push(String(e.message||e));});
+setTimeout(()=>{if(!window.__snapOK&&!document.getElementById('lite'))liteMode(true);},15000);
+function liteMode(fallback){
   const ix=document.getElementById('intro');if(ix)ix.remove();document.body.classList.remove('intro');
   const el=document.createElement('div');el.id='lite';document.body.appendChild(el);
   const st=document.createElement('style');st.textContent='#lite{position:fixed;inset:0;overflow:auto;background:#07090E;color:#E8ECF4;font:15px/1.45 system-ui,sans-serif;padding:16px;z-index:9999}#lite h1{font-size:20px;margin:0 0 4px}#lite .n{color:#9AA4B8;font-size:13px}#lite h2{font-size:15px;margin:18px 0 6px;color:#fff}#lite li{margin:3px 0}#lite .on{color:#ff6b6b}#lite button{margin-top:8px;padding:8px 14px;border-radius:10px;border:1px solid #2B6BFF;background:#13224A;color:#fff;font:inherit}';document.head.appendChild(st);
@@ -40,7 +44,7 @@ function liteMode(){
   let last=0;
   const draw=s=>{last=Date.now();const now=s.now;const O=s.official||{};const obl=Object.keys(s.levels||{}).sort();const part=(O.alert_obl||[]).filter(o=>!obl.includes(o));
     const act=(s.tracks||[]).filter(t=>t.status==='active').sort((a,b)=>b.last-a.last);
-    el.innerHTML='<h1>NAVRYX SKY · текстовий режим</h1><div class=n>Карта не запускається на цьому пристрої (немає WebGL / графічного прискорення). Дані ті самі, наживо. Станом на '+hm(now)+'.</div>'+
+    el.innerHTML='<h1>NAVRYX SKY · текстовий режим</h1><div class=n>'+(fallback?'Карта не змогла отримати дані (збій оновлення). Дані ті самі, наживо':'Карта не запускається на цьому пристрої (немає WebGL / графічного прискорення). Дані ті самі, наживо')+'. Станом на '+hm(now)+'.</div>'+
       '<h2>Офіційні тривоги</h2>'+(obl.length?'<ul>'+obl.map(o=>'<li class=on>'+e(o)+' обл. — уся область</li>').join('')+'</ul>':'<div class=n>Тривог на всю область немає.</div>')+
       (part.length?'<div class=n>Тривога в частині області: '+part.map(e).join(', ')+'</div>':'')+
       '<h2>Цілі за повідомленнями моніторів ('+act.length+')</h2>'+(act.length?'<ul>'+act.slice(0,60).map(t=>'<li><b>'+e(N[t.type]||t.type)+(t.count>1?' ×'+t.count:'')+'</b>'+(t.next?' → '+e(t.next):'')+' <span class=n>· '+Math.max(0,Math.round((now-t.last)/60))+' хв тому · '+(t.conf>=0.5?'підтверджено':'непідтверджено')+'</span></li>').join('')+'</ul>':'<div class=n>Активних цілей немає. Це не відбій — орієнтуйтеся на офіційні сигнали.</div>')+
@@ -658,9 +662,9 @@ function renderFollow(){const el=$('#follow-pill');if(!follow||!sel){el.hidden=t
     (r?Math.round(r.d)+' км '+r.side+' від вас'+(r.eta!=null?' · ~'+Math.max(1,Math.round(r.eta))+' хв до вас':''):'')+(followPrev.ev?' · '+esc(followPrev.ev):'')+' · фіксація '+fmt(tr.last)+'</span></div><button id="fp-card">Картка</button><button id="fp-stop">Зупинити</button>';
   el.hidden=false;$('#fp-stop').onclick=e=>{e.stopPropagation();stopFollow('Стеження зупинено');};$('#fp-card').onclick=e=>{e.stopPropagation();$('#sheet').hidden=false;fillSheet(true);};}
 /* «Чому тут?» — рентген саме цієї цілі; «Карта на той момент» — машина часу на першу публікацію про ціль */
-$('#sh-why').onclick=()=>{if(!sel)return;if(!XRAY)setXray(true);else syncXray();const d=DISP.get(sel);if(d)map.easeTo({center:d.p,zoom:Math.max(map.getZoom(),9),duration:700});
+if($('#sh-why'))$('#sh-why').onclick=()=>{if(!sel)return;if(!XRAY)setXray(true);else syncXray();const d=DISP.get(sel);if(d)map.easeTo({center:d.p,zoom:Math.max(map.getZoom(),9),duration:700});
   toast('Суцільні точки — де канали назвали ціль; кільця — копії/перепости; пунктир — оцінка SKY');};
-$('#sh-then').onclick=async()=>{const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr)return;const t0=tr.first||tr.last;
+if($('#sh-then'))$('#sh-then').onclick=async()=>{const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr)return;const t0=tr.first||tr.last;
   try{if(!HISTF.length){const j=await fetch('/api/history').then(r=>r.json());HISTF=j.frames||[];}}catch(e){}
   if(!HISTF.length)return toast('Історія ще збирається');let i=HISTF.findIndex(f=>f.t>=t0);if(i<0)i=HISTF.length-1;
   $('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;play(false);showFrame(i);toast('Карта станом на '+fmt(HISTF[i].t)+' — лише те, що було відомо тоді. «Наживо» — повернутись');};
@@ -695,7 +699,7 @@ $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 
 /* ---------- живий потік ---------- */
-function onSnap(s){LIVE=s;if(REPLAY)return;SNAP=s;try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
+function onSnap(s){window.__snapOK=true;LIVE=s;if(REPLAY)return;SNAP=s;try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
 let LIVE=null,REPLAY=null;
 /* ---------- прогноз ---------- */
 function renderForecast(){const el=$('#fc');if(!el)return;el.innerHTML='';el.hidden=true;return;if(!SNAP||!SNAP.forecast||!SNAP.forecast.oblasts){el.innerHTML='';return;}const O=SNAP.forecast.oblasts;
