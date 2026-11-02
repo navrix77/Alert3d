@@ -730,10 +730,10 @@ async function showChanges(force){
   let j;try{j=await fetch('/api/changes?'+q,{cache:'no-store'}).then(r=>r.json());}catch(e){return;}seenNow();
   const min=Math.max(1,Math.round((nowS-seen)/60));const place=ob?esc(ob)+' обл.'+(homeObl.r?' · '+esc(homeObl.r)+' р-н':''):'Ваше місце';
   let el=$('#chg');if(!el){el=document.createElement('div');el.id='chg';document.body.appendChild(el);}
-  if(!j.total){el.hidden=true;toast('За '+min+' хв біля вашого місця змін не було'+(j.official_now?' · тривога триває':''));return;}
+  if(!j.total){el.hidden=true;toast('За '+min+' хв біля вашого місця змін не було');return;}
   const IC={official:'🔔',new:'＋',course:'↻',closer:'↘',away:'↗',lost:'?',closed:'✕'};
   el.hidden=false;el.innerHTML='<div class="chg-h"><b>'+place+'</b> · зміни за '+min+' хв<button class="chg-x" aria-label="Закрити">✕</button></div>'+
-    (j.official_now?'<div class="chg-o on">Офіційна тривога триває.</div>':'<div class="chg-o">Офіційної тривоги зараз немає.</div>')+
+    (()=>{const OF=ob?homeOfficial(ob):{on:j.official_now,t:j.official_now?'тривога':'тривоги немає'};return '<div class="me-off '+(OF.on===1?'on':OF.on===2?'part':'')+'"><i></i>Зараз: '+esc(OF.t)+'</div>';})()+
     '<ul>'+j.events.slice(0,6).map(e=>'<li class="k-'+e.k+'"><i>'+(IC[e.k]||'•')+'</i><span>'+esc(e.text)+' <small>'+fmt(e.t)+'</small></span></li>').join('')+'</ul>'+
     (j.total>6?'<div class="chg-more">ще '+(j.total-6)+'</div>':'')+
     (j.events.some(e=>e.from||e.to)?'<button class="pill chg-go">Показати '+(j.events.filter(e=>e.from||e.to).length)+' змін на карті →</button>':'');
