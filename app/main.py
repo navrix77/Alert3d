@@ -524,6 +524,17 @@ def api_history(full: int = 0, hours: float = 12):
     return JSONResponse({"frames": fr if full else [_lite_frame(f) for f in fr]})
 
 
+@app.get("/api/changes")
+def api_changes(lon: float, lat: float, since: float, r: float = 60, obl: str | None = None, raion: str | None = None):
+    """«Що змінилося, поки мене не було?» для точки: тривога, нові цілі (з першоджерелами й перепостами),
+    уточнені курси (хто й коли), наближення/віддалення, втрачені й закриті позначки."""
+    from .changes import changes
+    from .tracker import TYPES as _T
+    snap = state()
+    since = max(since, time.time() - 12 * 3600)
+    return changes(HIST, snap, lon, lat, since, r, {k: v["name"] for k, v in _T.items()}, tracker.track_evidence, obl, raion)
+
+
 @app.get("/api/near")
 def api_near(lon: float, lat: float, r: float = 60):
     """Коли востаннє позначка цілі була в межах r км від точки — за кадрами машини часу (до 12 год) і поточним станом."""

@@ -861,3 +861,29 @@ def test_history_lite_and_frame():
     fr = _j.loads(M.api_history_frame(1010).body)
     assert fr["t"] == 1000 and fr["tracks"][0]["ev"]["items"][0]["src"] == "M"  # пізніше повідомлення K ще не видно
     M.HIST.clear()
+
+
+def test_changes_digest():
+    """«Що змінилося»: тривога оголошена, нова ціль з перепостами, курс уточнено (хто), втрачена позначка — не відбій."""
+    from app.changes import changes
+    H = (36.25, 50.0)
+    t0 = 1_793_600_000
+    frames = [{"t": t0, "levels": {}, "raions": {}, "tracks": [
+        {"id": "Ш-1", "type": "shahed", "lat": 50.3, "lon": 36.25, "hd": 180.0, "next": "Дергачі"},
+        {"id": "Ш-2", "type": "shahed", "lat": 49.8, "lon": 36.0, "hd": 90.0, "next": None}]},
+        {"t": t0 + 300, "levels": {"Харківська": 1}, "raions": {}, "tracks": []}]
+    now = {"now": t0 + 720, "levels": {"Харківська": 1}, "official": {"raion_levels": {}}, "tracks": [
+        {"id": "Ш-1", "type": "shahed", "lat": 50.15, "lon": 36.25, "hd": 180.0, "next": "Харків", "status": "active", "first": t0 - 600, "last": t0 + 700},
+        {"id": "Ш-2", "type": "shahed", "lat": 49.8, "lon": 36.0, "hd": 90.0, "status": "lost", "last": t0 + 60},
+        {"id": "Ш-3", "type": "shahed", "lat": 50.2, "lon": 36.6, "hd": 230.0, "status": "active", "first": t0 + 500, "last": t0 + 500,
+         "count": 2, "ev": {"pubs": 5, "indep": 1, "prim": ["KL"]}}]}
+    ev_of = lambda tid: {"items": [{"t": t0 + 650, "src": "R", "why": "змінило курс", "dest": "Харків"}]} if tid == "Ш-1" else {}
+    r = changes(frames, now, *H, since=t0 + 10, names={"shahed": "Шахед"}, ev_of=ev_of, obl="Харківська")
+    k = [e["k"] for e in r["events"]]
+    assert k[0] == "official" and "тривогу" in r["events"][0]["text"] and r["events"][0]["t"] == t0 + 300
+    new = next(e for e in r["events"] if e["k"] == "new")
+    assert "Одне першоджерело" in new["text"] and "повторили ще 4" in new["text"]
+    crs = next(e for e in r["events"] if e["k"] == "course")
+    assert "було → Дергачі" in crs["text"] and "тепер → Харків" in crs["text"] and "R о" in crs["text"]
+    lost = next(e for e in r["events"] if e["k"] == "lost")
+    assert "не відбій" in lost["text"]
