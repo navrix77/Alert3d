@@ -26,6 +26,8 @@ ALERT_STATUS = re.compile(r"(^|[^а-яіїє])развед\w*\.?\s+бпла|ро
 ALERT_LINE = re.compile(r"^\W*(?:🛸|🟢|◻|⚪|⬜|🔴|🟠|🟡)\W*(?:\d{1,2}:\d{2}\s+[А-ЯІЇЄҐ][\w'’\- ]{2,30}$|[А-ЯІЇЄҐ][\w'’\- ]{2,30}\s*\([А-ЯІЇЄҐ][\w'’\-]+ обл\.?\))", re.M)
 # загальні попередження («очікується застосування…», «можливий комбінований удар») — не конкретна ціль з місцем
 EXPECT = re.compile(r"очікуєт\w*|ожидает\w*|можлив\w*\s+(?:масован|комбінован|застосуван|удар|пуск)|возможн\w*\s+(?:массирован|комбинирован|применени|удар|пуск)|ймовірн\w*\s+(?:масован|комбінован|застосуван)|у рамках нанесення|в рамках нанесения|загроза застосування|угроза применения|готуєт\w*\s+(?:удар|пуск)|готовит\w*\s+(?:удар|пуск)")
+# підсумки й наслідки («пошкоджено», «на фото», «за добу», «поранено») — новини про минуле, а не ціль у повітрі
+AFTERMATH = re.compile(r"пошкоджен|зруйнован|на фото|на відео|внаслідок|загинул|поранен|постраждал|травмован|за минулу добу|протягом (минулої )?доби|за добу|минулої доби|ліквідац\w* наслідк|повреждени|разрушен|пострадал|ранен[ыо]|погиб|за сутки|в результате")
 # тактичні дрони (FPV, «Мавіки», скиди), «активність дрона, повідомляють очевидці» — не шахеди й не ракети
 NONSTRAT = re.compile(r"стежити за обстановкою|підтримати канал|підпишись|подпишись|підписуйтесь|донат|реклам|з аеродрому|с аэродрома|з полігону|с полигона|мавік|мавик|mavic|скид|активність дрона|активность дрона|ймовірна активність|розвідувальн\w* дрон|розвід\w* бпла")
 # «По ударным» / «По Р. Шаболдам» у TLK — закриття по типу
@@ -75,6 +77,33 @@ MORE_HINTS = [(re.compile(r"житомирщ|житомирськ\w* обл|жи
               (re.compile(r"прикарпатт|франківщ|франківськ\w* обл"), "Івано-Франківська"),
               (re.compile(r"закарпатт"), "Закарпатська"),
               (re.compile(r"буковин|чернівецьк\w* обл"), "Чернівецька")]
+_RAIONS = None
+
+
+def raion_center(adj: str):
+    """«ізюмського», «изюмский» → Place(«Ізюмський р-н», центр полігону району)."""
+    global _RAIONS
+    if _RAIONS is None:
+        import json
+        from pathlib import Path
+        try:
+            fc = json.loads((Path(__file__).resolve().parent.parent / "data" / "raions.geojson").read_text(encoding="utf-8"))
+            from shapely.geometry import shape
+            _RAIONS = [(f["properties"]["n"], shape(f["geometry"]).representative_point()) for f in fc["features"]]
+        except Exception:
+            _RAIONS = []
+    ru = bool(re.search(r"(ский|ского|ском|ская|цкий|цкого)$", adj))
+    stem = re.sub(r"(ського|ському|ський|ській|ськім|ська|ского|ском|ский|ская|цького|цький|цкого|цкий|зького|зький)$", "", adj)
+    if ru:
+        stem = stem.translate(str.maketrans({"и": "і", "ы": "и", "э": "е", "ё": "е"}))
+    if len(stem) < 3:
+        return None
+    for n, pt in _RAIONS:
+        if norm(n).startswith(stem):
+            return Place(f"{n} р-н", pt.y, pt.x, "R", 20000)
+    return None
+
+
 SUMLINE = re.compile(r"^[^\w\d]*\d+\s+на\s+([А-ЯІЇЄҐа-яіїєґ']+?)(щині|ччині)\s*[–—-]\s*(.+)$")
 LISTITEM = re.compile(r"^[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+(?:\s+[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+)?(?:\s*\(\d+\))?$")
 POS_MARK = "⟐"  # маркер: сегмент — поточне місце цілі (з кількістю), а не пункт призначення
@@ -209,7 +238,7 @@ class Parser:
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         m = COUNT.search(t)
         alert_status = bool(ALERT_STATUS.search(t)) or bool(ALERT_LINE.search(text))
-        nonstrat = bool(NONSTRAT.search(t)) or bool(EXPECT.search(t))
+        nonstrat = bool(NONSTRAT.search(t)) or bool(EXPECT.search(t)) or bool(AFTERMATH.search(t))
         if nonstrat:
             alert_status = True
         if alert_status:
@@ -300,7 +329,14 @@ class Parser:
             ahead = " ".join(norm(x) for x in words[i + 1:i + 4])
             adj_gen = norm(w).endswith(("ської", "цької", "зької", "ської,", "ской", "цкой")) or (
                 norm(w).endswith(("ського", "цького", "зького", "ского", "цкого")) and re.search(r"район|област|обл\b|громад", ahead))
-            if adj_gen or norm(w) in SKIP or nxt.startswith(("област", "обл", "громад", "район", "р-н")) or any(rx.search(norm(w)) for _k, rx in TYPES):
+            raion_adj = nxt.startswith(("район", "р-н")) and re.search(r"(ськ|цьк|зьк|ск|цк)(ого|ому|ий|ій|ім|им|ая|ий)$", norm(w))
+            if raion_adj:
+                rc = raion_center(norm(w))
+                if rc:  # «на Ізюмський район» → центр району (позначено як район, не село)
+                    before = norm(words[i - 1]) if i else ""
+                    role_ = "f" if before in ("з", "із", "зі", "с", "со", "от", "из") else ("p" if before in POS_PREV else "t")
+                    dist_found.append((len(dist_found) + 1000, PlaceRef(role_, rc)))
+            if adj_gen or raion_adj or norm(w) in SKIP or nxt.startswith(("област", "обл", "громад")) or any(rx.search(norm(w)) for _k, rx in TYPES):
                 i += 1
                 continue
             ids, used = None, 1

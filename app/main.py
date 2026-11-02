@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config, replay, telegram_src
+from . import parser as parser_mod
 from .tg_web import WebMonitor
 from .alerts import OfficialAlerts
 from .parser import Parser
@@ -64,6 +65,9 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
         ctx = (la, lo)
         CTX[key] = (ts, la, lo)
     msg_type = whole.type if len(segs) > 1 else None
+    if len(segs) > 1 and parser_mod.AFTERMATH.search(text.lower()):
+        msg_type = None  # підсумок/наслідки — тип із заголовка не переносимо на перелічені пункти
+        segs = [sg for sg in segs if not parser_mod.AFTERMATH.search(sg.lower())]
     if typ_hint and not msg_type:
         msg_type = typ_hint  # повтор із журналу: тип був у заголовку початкового повідомлення
     summary = bool(launch.SUMMARY_RX.search(text.lower()))

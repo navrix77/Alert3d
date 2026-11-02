@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 
 from .geo import Place, ang_diff, bearing, dist_km, from_xy, move, oblasts
+from .geo import to_xy as _gxy
 import re as _re
 
 
@@ -706,7 +707,9 @@ class Tracker:
             la, lo, area = launch_spot(kz[0].places[0]) if kz else LAUNCH_AREA[o]
             avia.append({"obl": o, "lat": la, "lon": lo, "area": area, "t": int(a["t"]), "first": int(a["first"]), "n": a["n"],
                          "platform": a.get("platform") or "тактична авіація", "kab": len(kz),
-                         "to": [[z.places[0].lon, z.places[0].lat] for z in kz][:4],
+                         # лінії «звідки пускали» — лише до зон у межах дальності КАБ (≤130 км від району пусків)
+                         "to": [[z.places[0].lon, z.places[0].lat] for z in kz
+                                if dist_km(_gxy(la, lo), z.places[0].xy) <= 130][:4],
                          "fade": round(min(1.0, (now - a["t"]) / AVIA_LIFE), 2), "ev": a.get("ev", []),
                          "act": int(a["act"]) if a.get("act") else None, "until": int(a["t"] + AVIA_LIFE),
                          "targets": [z.places[0].name for z in kz][:6]})

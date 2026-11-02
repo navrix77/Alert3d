@@ -293,3 +293,15 @@ def test_zircon_not_tsyrkuny_and_expectations_not_targets():
     assert o.kind != "track" and not any(r.place.name == "Циркуни" for r in o.places)
     assert p.parse("Циркон курсом на Київ").type == "ballistic"
     assert [r.place.name for r in p.parse("Шахед на Циркуни").places] == ["Циркуни"]
+
+
+def test_kab_aftermath_and_raions():
+    from app.parser import Parser
+    p = Parser()
+    # kharkivlife: підсумок наслідків — не зона КАБ
+    assert p.parse("На фото сел. Васищеве, м. Ізюм та м. Лозова", "kharkivlife").kind != "zone"
+    assert p.parse("▪️у Чугуївському районі пошкоджено складську будівлю (м. Чугуїв), трактор (сел. Пролісне).", "kharkivlife").kind != "zone"
+    # CX: «Повторные пуски Каб на Изюмский район» → центр Ізюмського району
+    o = p.parse("Повторные пуски Каб на Изюмский район", "CX")
+    assert o.kind == "zone" and [r.place.name for r in o.places] == ["Ізюмський р-н"]
+    assert [r.place.name for r in p.parse("Пуски Каб Изюм /район⚠️", "R").places] == ["Ізюм"]
