@@ -8,3 +8,9 @@ data/brain.sqlite*
 data/push.sqlite*
 data/tls/
 data/occupied.geojson
+data/audit*.jsonl
+data/learn.json
+data/sources_auto.json
+data/daily/
+data/voices/
+data/tts_cache/
