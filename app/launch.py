@@ -45,6 +45,7 @@ LAUNCH_RX = re.compile(r"пуск|запуск|зліт|злет|взлет|вз
 CARRIER = [(re.compile(r"ту-95|ту95|ту-160|ту160"), "Ту-95МС/Ту-160", "cruise"), (re.compile(r"ту-22|ту22"), "Ту-22М3", "cruise"),
            (re.compile(r"су-34|су-35|су34"), "Су-34", "kab"), (re.compile(r"міг-31|миг-31"), "МіГ-31К", "ballistic"),
            (re.compile(r"калібр|калибр|корабл|крейсер|підводн|подводн|носі[їй] калібр"), "кораблі (Калібр)", "cruise")]
+STRAT = {"Ту-95МС/Ту-160", "Ту-22М3"}
 SUMMARY_RX = re.compile(r"в ніч на|у ніч на|в ночь на|протягом ночі|за ніч|за минулу добу|атакував[аи]?\s+\d|загалом")
 FORECAST_RX = re.compile(r"може\s+застосов|можуть\s+застосов|може\s+застосува|можуть\s+застосува|может\s+примен|могут\s+примен|маю попередж|є попередж|попереджаю|"
                          r"загроза застосуван|можливе застосуван|можливий масован|не думаю|будуть застосован|в готовності|у готовності|готуют|готують|"
@@ -92,6 +93,10 @@ class Launch:
     links: list = field(default_factory=list)
     tracks: set = field(default_factory=set)
     ev: list = field(default_factory=list)  # докази: [{t, src, text, link}]
+    # «takeoff» — носії стратегічної авіації в повітрі (зліт/«у повітрі»/район), пуску ракет ще не повідомлено;
+    # «launch» — джерело прямо написало про пуск. Для takeoff count — кількість БОРТІВ, а не ракет, і ракети до
+    # нього не прив'язуються: носій і ракета мають окремі траєкторії (методика Ту-95МС/Ту-160, 03.11).
+    stage: str = "launch"
 
 
 def detect(text: str, typ: str | None) -> tuple[list[Site], str | None, str | None, bool]:
@@ -160,14 +165,22 @@ class LaunchBook:
                     self.brain.learn_site(typ or "shahed", s.name, None, 1.0)
             return []
         out = []
+        nt = norm(text or "")
+        pusk = bool(PUSK_RX.search(nt))
         for s in sites:
+            strat_site = s.kind == "аеродром" and "cruise" in (s.types or set())
+            stage = "takeoff" if (carrier in STRAT or strat_site) and not pusk else "launch"
             ex = next((L for L in self.items if L.site is s and (L.type == typ or not typ or not L.type) and abs(t - L.t) < 1200), None)
             if ex:
                 ex.srcs.add(src)
                 ex.links = (ex.links + [link])[-6:] if link else ex.links
-                ex.count = max(ex.count or 0, count or 0) or None
+                if not (stage == "launch" and ex.stage == "takeoff"):
+                    ex.count = max(ex.count or 0, count or 0) or None
                 ex.type = ex.type or typ
                 ex.t = min(ex.t, t)
+                if stage == "launch" and ex.stage == "takeoff":
+                    ex.stage = "launch"  # спершу зліт, потім джерело повідомило про пуск
+                    ex.count = count  # бортів ≠ ракет: числа з різних категорій не змішуємо
                 if text:
                     ex.ev = (ex.ev + [{"t": int(t), "src": src, "text": text[:220], "link": link}])[-5:]
                 out.append(ex)
@@ -178,7 +191,9 @@ class LaunchBook:
             # (02.11: «Курськ (кораблі (Калібр))» — назву носія з іншої частини посту приписали аеродрому)
             if car and "Калібр" in car and ("море" not in s.name or typ == "ballistic"):
                 car = None
-            L = Launch(f"L{self.n}", s, t, typ, count, car or (None if typ in ("banderol", "ballistic") and "море" in s.name else (None if typ == "banderol" else s.carrier)),  # бандероль — не з кораблів {src}, [link] if link else [],
+            # бандероль не з кораблів
+            car = car or (None if typ in ("banderol", "ballistic") and "море" in s.name else (None if typ == "banderol" else s.carrier))
+            L = Launch(f"L{self.n}", s, t, typ, count, car, {src}, [link] if link else [], stage=stage,
                        ev=[{"t": int(t), "src": src, "text": (text or "")[:220], "link": link}] if text else [])
             self.items.append(L)
             out.append(L)
@@ -194,6 +209,8 @@ class LaunchBook:
         hd = tr.heading if hd is None else hd
         best, bs = None, 1e9
         for L in self.items:
+            if L.stage == "takeoff":
+                continue  # виліт носіїв ≠ пуск: ракету не «домальовуємо» від літака
             if L.type and L.type != tr.type and not (L.type == "shahed" and tr.type == "molniya"):
                 continue
             if not L.type and tr.type not in L.site.types:
@@ -261,4 +278,4 @@ class LaunchBook:
         self.prune(now)
         return [{"id": L.id, "site": L.site.name, "lat": L.site.lat, "lon": L.site.lon, "kind": L.site.kind, "t": int(L.t),
                  "type": L.type, "count": L.count, "carrier": L.carrier, "srcs": sorted(L.srcs), "links": L.links[-3:],
-                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind} for L in self.items if now - L.t < 6 * 3600]
+                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind, "stage": L.stage} for L in self.items if now - L.t < 6 * 3600]

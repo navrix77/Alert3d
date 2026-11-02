@@ -947,3 +947,21 @@ def test_repost_does_not_refresh_track():
     assert rec.get("copy_of") == "K"
     assert tr.last.t == 1000.0
     assert tr.evidence[-1]["why"] == "перепост"
+
+
+def test_strategic_takeoff_is_not_launch():
+    """«Зліт Ту-95МС» — носії в повітрі, не пуск: кількість — борти, ракети до нього не прив'язуються."""
+    from app import launch
+    from app.parser import Parser
+    P, lb = Parser(), launch.LaunchBook()
+    t = "Зліт 7 Ту-95МС з аеродрому Оленья"
+    sites, typ, car, summ = launch.detect(t, P.parse(t, "K").type)
+    L = lb.add(sites, typ, 7, car, "K", "https://t.me/x/1", 1000.0, summ, t)[0]
+    assert L.stage == "takeoff" and L.srcs == {"K"} and L.links
+    t2 = "Пуски Х-101 з Ту-95МС з району Оленьї"
+    sites2, typ2, car2, _ = launch.detect(t2, "cruise")
+    if sites2 and sites2[0] is sites[0]:
+        L2 = lb.add(sites2, typ2, None, car2, "D", None, 1500.0, False, t2)[0]
+        assert L2 is L and L.stage == "launch" and L.count is None
+    snap = lb.snapshot(1600.0)
+    assert snap[0]["stage"] in ("takeoff", "launch")

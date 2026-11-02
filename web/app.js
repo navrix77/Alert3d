@@ -218,9 +218,9 @@ function addOverlays(){
      (ev.link?'<div class="kp-ev"><a href="'+esc(ev.link)+'" target="_blank" rel="noopener" style="color:inherit">допис-першоджерело ↗</a></div>':'')+'</div>').addTo(map);});
   map.on('click','lsites',e=>{const f=e.features&&e.features[0];if(!f||!SNAP||!f.properties.lid)return;const L=(SNAP.launches||[]).find(x=>x.id===f.properties.lid);if(!L)return;const w=launchWhat(L);const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k].name)||k;
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'320px',className:'kab-pop avia-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
-     '<div class="kp"><small>ПУСК ПО УКРАЇНІ</small><h4>'+esc(L.site)+'</h4>'+
-     '<div class="kp-r"><span>Що</span><b>'+esc(w.full)+'</b></div>'+
-     (L.count?'<div class="kp-r"><span>Кількість</span><b>'+L.count+'</b></div>':'')+(L.carrier?'<div class="kp-r"><span>Носій</span><b>'+esc(L.carrier)+'</b></div>':'')+
+     '<div class="kp"><small>'+(isTO(L)?'НОСІЇ В ПОВІТРІ':'ПУСК ПО УКРАЇНІ')+'</small><h4>'+esc(L.site)+'</h4>'+
+     (isTO(L)?'<div class="kp-r"><span>Пуски</span><b>джерела про пуск ракет ще не повідомили</b></div>':'<div class="kp-r"><span>Що</span><b>'+esc(w.full)+'</b></div>')+
+     (L.count?'<div class="kp-r"><span>'+(isTO(L)?'Бортів (як написало джерело)':'Кількість')+'</span><b>'+L.count+'</b></div>':'')+(L.carrier?'<div class="kp-r"><span>Носій</span><b>'+esc(L.carrier)+'</b></div>':'')+
      '<div class="kp-r"><span>Коли</span><b>'+fmt(L.t)+'</b></div>'+'<div class="kp-r"><span>Цілей привʼязано</span><b>'+(L.tracks||0)+'</b></div>'+
      ((L.ev||[]).length?'<div class="kp-ev">'+L.ev.slice(-3).reverse().map(e=>'<div><i>'+fmt(e.t)+' · '+esc(nm(e.src))+'</i>'+esc(e.text||'')+'</div>').join('')+'</div>':'')+'</div>').addTo(map);});
   map.on('mouseenter','lsites',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','lsites',()=>map.getCanvas().style.cursor='');
@@ -427,7 +427,7 @@ function frame(now){
      window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
        return {p:f.geometry.coordinates,c:t?[1,0.23,0.27]:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],a:f.properties.weak?0.3:0.7,s:t?sz*1.9:sz,ring:t};});}
     if(slow&&map.getSource('chains')){frame.ch=now;const ch=[],ls=new Map();
-      for(const L of (SNAP.launches||[])){const w=launchWhat(L);ls.set(L.site,{type:'Feature',properties:{est:false,lid:L.id,l:'ПУСК: '+w.short+(L.count?' ×'+L.count:'')+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
+      for(const L of (SNAP.launches||[])){const w=launchWhat(L);ls.set(L.site,{type:'Feature',properties:{est:false,lid:L.id,l:(isTO(L)?'НОСІЇ В ПОВІТРІ'+(L.count?' · '+cntL(L):''):'ПУСК: '+w.short+(L.count?' ×'+L.count:''))+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
         if(L.est&&!isSel)continue;
         ch.push({type:'Feature',properties:{c:L.est?'#FF8A8A':'#FF3B3B',o:isSel?0.95:(L.est?0.3:0.38),s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
@@ -506,6 +506,8 @@ function aviaInfo(a){const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k]
    '<div class="kp-r"><span>Позиція</span><b>типовий район пусків (оцінка), не точне місце літака</b></div>'+
    ((a.ev||[]).length?'<div class="kp-ev">'+a.ev.slice(-3).reverse().map(e=>'<div><i>'+hm(e.t)+' · '+esc(nm(e.src))+'</i>'+esc(e.text||'')+'</div>').join('')+'</div>':'')+'</div>';}
 // що саме пустили: тип з повідомлення → типи цілей, які вже привʼязані до цього пуску → типове для місця (позначено як припущення)
+// носії стратегічної авіації в повітрі (stage=takeoff) — не пуск: кількість — борти, ракет ще не повідомлено
+const isTO=L=>L&&L.stage==='takeoff';const cntL=L=>L.count?(isTO(L)?L.count+' борт.':'×'+L.count):'';
 function launchWhat(L){const N={shahed:'шахеди',jet:'реактивні БпЛА',molniya:'«Молнії»',cruise:'крилаті ракети',ballistic:'балістика',kab:'КАБи',geran5:'«Герань-5»',banderol:'«Бандеролі»'};
   if(L.type)return {short:N[L.type]||L.type,full:(N[L.type]||L.type)+' (так написали канали)'};
   const linked=[...new Set((SNAP.tracks||[]).filter(t=>t.launch&&t.launch.id===L.id&&!t.launch.est).map(t=>t.type))];
@@ -691,7 +693,7 @@ function renderFeed(){
   const kindTxt={launch:'Пуск',filtered:'Повідомлення про роботу ППО або влучання приховано фільтром безпеки.',close:'Ціль більше не фіксується',zone:'Загроза КАБ',info:'Без географічної привʼязки'};
   {const h=SNAP.health||{},c=h.channels||{};$('#dr-tech').textContent=(c.channels?'Канали: '+c.live+'/'+c.channels+(c.all_every?' · повний обхід '+c.all_every+' с':''):'')+(SNAP.official&&SNAP.official.source?' · тривоги: '+SNAP.official.source:'')+(h.version?'':' · стара версія сервера');}
   const LS=(SNAP.launches||[]).slice().reverse();
-  const lh=LS.length?'<li class="launches"><div class="m"><span>Пуски за 6 год</span></div>'+LS.map(L=>'<div>'+fmt(L.t)+' · <b>'+esc(L.site)+'</b>'+(L.type?' · '+esc(TYPE_NAME[L.type]||L.type):'')+(L.count?' ×'+L.count:'')+(L.carrier?' · '+esc(L.carrier):'')+(L.tracks?' · цілей звідти: '+L.tracks:'')+'</div>').join('')+'</li>':'';
+  const lh=LS.length?'<li class="launches"><div class="m"><span>Пуски за 6 год</span></div>'+LS.map(L=>'<div>'+fmt(L.t)+' · <b>'+esc(L.site)+'</b>'+(isTO(L)?' · носії в повітрі, пуску ще не повідомлено':(L.type?' · '+esc(TYPE_NAME[L.type]||L.type):''))+(L.count?' · '+cntL(L):'')+(L.carrier?' · '+esc(L.carrier):'')+(L.tracks?' · цілей звідти: '+L.tracks:'')+'</div>').join('')+'</li>':'';
   $('#feed').innerHTML=lh+SNAP.log.slice().reverse().map(r=>{const src=SNAP.sources[r.src]?.name||r.src;
     let txt=kindTxt[r.kind]||'';if(r.kind==='track'||r.kind==='zone'){const tg=r.places.filter(p=>p.r==='t').map(p=>p.n),pos=r.places.find(p=>p.r==='p'),fr=r.places.find(p=>p.r==='f');txt=(TYPE_NAME[r.type]||'Ціль')+(r.count?' ×'+r.count:'')+(fr?' · з боку '+fr.n:'')+(pos?' · в районі '+pos.n:'')+(tg.length?(r.kind==='zone'?' · загроза для: ':' · курсом на ')+tg.slice(0,6).join(', '):'');}
     return '<li><div class="m"><span>'+fmt(r.t)+'</span><span>'+esc(src)+'</span>'+(r.track?'<span>→ '+esc(r.track)+'</span>':'')+(r.link?'<a href="'+esc(r.link)+'" target="_blank" rel="noopener">пост ↗</a>':'')+'</div><div class="'+(r.kind==='filtered'?'f':'')+'">'+esc(txt)+'</div></li>';}).join('')||'<li>Повідомлень ще немає.</li>';
@@ -998,8 +1000,8 @@ function renderZones(){const ul=$('#st-zones-list');if(!ul)return;const Z=myZone
 function notesCheck(s){
   const first=!NBASE;NBASE=true;const now=s.now||Date.now()/1000;
   // 1) пуски, за налаштуванням (типово так: пуск стосується всієї країни)
-  for(const L of (s.launches||[])){const k='L:'+L.site+':'+Math.round((L.t||0)/60);if(first||now-(L.t||now)>1200||PREF.nLaunch===false){NSEEN.add(k);continue;}
-    note({k,t:L.t,lvl:'red',ic:'🚀',title:'Пуск: '+L.site,sub:[L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',L.count?'×'+L.count:'',L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
+  for(const L of (s.launches||[])){const k='L:'+L.site+':'+Math.round((L.t||0)/60)+(isTO(L)?':to':'');if(first||now-(L.t||now)>1200||PREF.nLaunch===false){NSEEN.add(k);continue;}
+    note({k,t:L.t,lvl:'red',ic:'🚀',title:(isTO(L)?'Носії в повітрі: ':'Пуск: ')+L.site,sub:[isTO(L)?'про пуски ракет ще не повідомлено':L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',cntL(L),L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
   // 2) нові цілі, лише ті, що в моїх громадах/областях або летять туди протягом 30 хв (або всі, якщо так обрано)
   const serverT=Date.now()/1000+offset;
   for(const t of (s.tracks||[])){if(t.status!=='active')continue;const k='T:'+t.id;
