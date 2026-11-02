@@ -101,7 +101,11 @@ function addOverlays(){
   map.addSource('rf-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[39.2,53.6],[44.5,50.4],[36.2,56.9],[46.5,55.4]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.5,8,0.35]}});
   map.addLayer({id:'rf-mark',type:'symbol',source:'rf-mark',maxzoom:7.5,layout:{'text-field':'ДЕРЖАВА-ТЕРОРИСТ','text-font':['Noto Sans Bold'],
     'text-size':['interpolate',['exponential',1.6],['zoom'],3,13,5,26,7,46],'text-letter-spacing':0.18,'text-max-width':40,'text-rotate':-22,'text-rotation-alignment':'map','text-pitch-alignment':'map',
-    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,90,90,0.22)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});syncOutside();
+    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,90,90,0.22)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});
+  map.addSource('by-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[27.6,53.4],[29.4,52.2]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});
+  map.addLayer({id:'by-mark',type:'symbol',source:'by-mark',maxzoom:7.5,layout:{'text-field':'ПОСІПАКИ ТЕРОРИСТІВ','text-font':['Noto Sans Bold'],
+    'text-size':['interpolate',['exponential',1.6],['zoom'],3,9,5,18,7,32],'text-letter-spacing':0.16,'text-max-width':40,'text-rotate':-18,'text-rotation-alignment':'map','text-pitch-alignment':'map',
+    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,150,90,0.2)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});syncOutside();
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
   // «пам'ятні місця»: крейсер «Москва» на дні та Кримський міст
   if(!map.hasImage('moskva')){const c=document.createElement('canvas');c.width=120;c.height=60;const x=c.getContext('2d');
