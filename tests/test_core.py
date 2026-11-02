@@ -469,3 +469,10 @@ def test_struck_closes_target():
     tr.ingest(o, "OVA", t + 100)
     assert all(x["status"] != "active" for x in tr.snapshot()["tracks"])
     assert p.parse("Ударний БпЛА на Чугуїв").kind == "track"
+
+
+def test_geran34_is_jet():
+    from app.parser import Parser
+    p = Parser()
+    assert p.parse("🛸 Ще потенційні 2× рБпЛА «Герань-4» у напрямку Вінниці", "vinnradar").type == "jet"
+    assert p.parse("Герань на Київ").type == "shahed"
