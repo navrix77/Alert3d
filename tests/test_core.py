@@ -998,3 +998,9 @@ def test_lancet_clear_does_not_close_other_targets():
     la = [x for x in trk.tracks if x.type == "lancet"]
     assert sh and not sh[0].closed
     assert la and la[0].closed
+
+
+def test_damage_report_is_not_a_target():
+    from app.parser import Parser
+    o = Parser().parse("▪️у Харківському районі пошкоджено вантажний автомобіль, цивільне підприємство, електромережі (сел. Пересічне), господарчі споруди", "SG")
+    assert o.kind != "track"

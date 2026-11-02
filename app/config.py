@@ -37,6 +37,9 @@ _C = [
     ("R", "radar_kharkov", "Радар Харків", 0.80, False, "Харківська", True),
     ("TRK", "tryvoga_rakety", "Радар Ракета | Шахеди", 0.55, False, None, True),
     ("TLK", "tlknewsua", "TLK News Харків", 0.88, False, "Харківська", True),
+    # пріоритет для Харкова (03.11, Андрій): опитуються щоцикла; довіра стартова — далі її вчить журнал
+    ("KHN", "KharkovNews2023", "KHARKOV-News", 0.60, False, "Харківська", True),
+    ("KHL", "kharkivlife", "Kharkiv Life", 0.60, False, "Харківська", True),
     ("KM", "kharkov_media", "Харьков INFO", 0.75, False, "Харківська", True),
     ("ND", "NochnojDozorKh", "Ночной Дозор Харків", 0.75, False, "Харківська", True),
     ("CX", "cxidua", "СХІD", 0.65, False, "Харківська", True),
