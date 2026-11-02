@@ -45,18 +45,18 @@ _SLOW = {
     "Волинська": "lutsk_radar lutsk_info volynblog",
     "Житомирська": "zhytomyr_operativ zhitomirtrivoga Angry_Pol korostentoday",
     "Івано-Франківська": "ifalarm",
-    "Київська": "truexakyiv kievreal1 kievinfo_kyiv kiev_levyy_bereg kyiv_golovne KyivCityOfficial ppo_kiev kyivradar kyiv_alarm kyev_radar kyiv_nebo kiev_nebo kyiv_airdef monitoring_kyiv shahedradar kievinform_ua1 nebo_raketa k_dvizh",
-    "Кіровоградська": "krop_vanek",
+    "Київська": "truexakyiv kievreal1 kievinfo_kyiv kiev_levyy_bereg kyiv_golovne KyivCityOfficial ppo_kiev kyivradar kyiv_alarm kyev_radar kyiv_nebo kiev_nebo kyiv_airdef monitoring_kyiv shahedradar kievinform_ua1 nebo_raketa k_dvizh radar_ukr",
+    "Кіровоградська": "krop_vanek kirovograd_official",
     "Львівська": "lviv_raketna rocket_danger_lviv",
-    "Полтавська": "ppo_poltava poltava_alarm PoltavaRanger ppopoltavanightfighters kremen_sv region_poltava_syrena",
-    "Рівненська": "mapa_novinyr",
+    "Полтавська": "ppo_poltava poltava_alarm PoltavaRanger ppopoltavanightfighters kremen_sv region_poltava_syrena truexapoltava",
+    "Рівненська": "mapa_novinyr truexarivne",
     "Сумська": "rdsprostir sumygo sumyregion krolevetsnews svessainfo",
-    "Тернопільська": "ternopil_ternopol",
-    "Хмельницька": "khmlv",
+    "Тернопільська": "ternopil_ternopol truexaternopil",
+    "Хмельницька": "khmlv tviy_Khmelnytskyi truexaxmelnitskyy",
     "Черкаська": "cherkasy_monitor cherkasy_nebbo",
     "Чернігівська": "Northern_Sich_ukr PhantomChe RadarChernihiv ShahedChernihiv horizon_of_war_Official my_safety_Chernigiv taktychna_rukavuchkaa",
     "Чернівецька": "goodchernivtsi",
-    "Дніпропетровська": "Radar_Dnipra dnipromonitor pavlograd_radar nikalert dnepr_nagladach shovnebi",
+    "Дніпропетровська": "Radar_Dnipra dnipromonitor pavlograd_radar nikalert dnepr_nagladach shovnebi svoikr truexakrivojrog",
     "Донецька": "operatyvnyi_donbas",
     "Запорізька": "radar_zp eyes_everywhere_ua operatyvnohlep gnilayachereha info_zp zaborzp",
     "Миколаївська": "vanek_nikolaev korabely_media pivden_FPV",
@@ -65,7 +65,8 @@ _SLOW = {
     "Херсонська": "kherson_monitoring kherson_non_drone",
 }
 _NEWS = {"truexanewsua", "operativnoZSU", "novini_ukrtg", "suspilnenews", "tgsn_ua", "zahid_golovne_ua", "truexakyiv", "kievreal1", "kievinfo_kyiv", "kiev_levyy_bereg", "kyiv_golovne", "newspn", "kharkivlife", "kharkov_media", "place_kharkiv", "tlknewsua", "kievinform_ua1", "odessa_infonews", "xydessa_live",
-         "lutsk_info", "volynblog", "korostentoday", "sumyregion", "krolevetsnews", "svessainfo", "info_zp", "zaborzp", "odessa_inform", "kuptg", "Karkivw"}
+         "lutsk_info", "volynblog", "korostentoday", "sumyregion", "krolevetsnews", "svessainfo", "info_zp", "zaborzp", "odessa_inform", "kuptg", "Karkivw",
+         "svoikr", "truexakrivojrog", "kirovograd_official", "truexarivne", "truexapoltava"}
 _seen = {u.lower() for _, u, *_ in _C}
 for region, names in _SLOW.items():
     for u in names.split():
