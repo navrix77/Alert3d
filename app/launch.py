@@ -45,7 +45,7 @@ LAUNCH_RX = re.compile(r"пуск|запуск|зліт|злет|взлет|вз
 CARRIER = [(re.compile(r"ту-95|ту95|ту-160|ту160"), "Ту-95МС/Ту-160", "cruise"), (re.compile(r"ту-22|ту22"), "Ту-22М3", "cruise"),
            (re.compile(r"су-34|су-35|су34"), "Су-34", "kab"), (re.compile(r"міг-31|миг-31"), "МіГ-31К", "ballistic"),
            (re.compile(r"калібр|калибр|корабл|крейсер|підводн|подводн|носі[їй] калібр"), "кораблі (Калібр)", "cruise")]
-STRAT = {"Ту-95МС/Ту-160", "Ту-22М3"}
+STRAT = {"Ту-95МС/Ту-160", "Ту-22М3", "МіГ-31К"}  # зліт носія ≠ пуск: «Кинджал» відлічується лише з пуску
 
 
 def car_bad(carrier, typ) -> bool:
@@ -66,9 +66,11 @@ REPOSITION_RX = re.compile(r"переліт|перелет|перельот|пе
 SPECUL_RX = re.compile(r"можлив\w*\s+(?:\w+\s+)?пуск|возможн\w*\s+(?:\w+\s+)?пуск|ймовірн\w*\s+(?:\w+\s+)?пуск|не виключ")
 AVIA_CTX = re.compile(r"ту-?95|ту-?160|ту-?22|борт|аеродром|аэродром|(?<![а-яіїє])ае\.|аер\.|стратег")
 STRIKE_RX = re.compile(r"вибух|взрыв|прил[её]т|влучан|попадан|пожеж|пожар|бавовн|хлопок")
-SPEED = {"shahed": 170, "molniya": 120, "jet": 450, "cruise": 800, "ballistic": 2000, "kab": 600, "geran5": 550, "banderol": 650, "rszv": 1500, "fpv": 100, "fpvf": 80, "recon": 110}
-MAXAGE = {"shahed": 9 * 3600, "molniya": 2 * 3600, "jet": int(3.5 * 3600), "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60, "geran5": 3 * 3600, "banderol": 2 * 3600, "rszv": 10 * 60, "fpv": 30 * 60, "fpvf": 30 * 60, "recon": 4 * 3600}
-RANGE = {"shahed": 1800, "molniya": 200, "jet": 900, "cruise": 3000, "ballistic": 600, "kab": 120, "geran5": 950, "banderol": 500, "rszv": 120, "fpv": 30, "fpvf": 40, "recon": 300}
+SPEED = {"shahed": 170, "molniya": 120, "jet": 450, "cruise": 700, "ballistic": 2000, "kab": 600, "geran5": 550, "banderol": 540, "rszv": 1500, "fpv": 100, "fpvf": 80, "recon": 110}
+# скільки ціль може бути в повітрі від пуску до першої фіксації — верхні межі з довідника «час у повітрі» (03.11):
+# шахед ≈14 год (2500 км ÷ 180), реактивний ≈3 год 20 хв (серія «У»), «Герань-5» до 2 год, «Бандероль» ≈1 год, «Орлан-10» до 16 год
+MAXAGE = {"shahed": 14 * 3600, "molniya": 2 * 3600, "jet": int(3.5 * 3600), "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60, "geran5": int(2.25 * 3600), "banderol": int(1.25 * 3600), "rszv": 10 * 60, "fpv": 40 * 60, "fpvf": 40 * 60, "recon": 16 * 3600}
+RANGE = {"shahed": 2500, "molniya": 200, "jet": 1000, "cruise": 3000, "ballistic": 600, "kab": 120, "geran5": 950, "banderol": 500, "rszv": 120, "fpv": 30, "fpvf": 40, "recon": 300}
 
 
 @dataclass

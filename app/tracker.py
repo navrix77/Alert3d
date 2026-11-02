@@ -20,14 +20,16 @@ def _norm_key(s: str) -> str:
 from .launch import LaunchBook
 from .parser import Observation
 
+# швидкості — з відкритих характеристик (03.11, методика «час у повітрі»): крилата 700 (Х-101 190–200 м/с),
+# «Бандероль» 540 (крейсерська 520–560); шахед і реактивні — як було, їх перевіряє бектест
 TYPES = {
     "shahed": {"label": "Ш", "name": "Шахед/Гербера", "speed": 170, "life": 25 * 60},
     "jet": {"label": "РБ", "name": "Реактивний БпЛА", "speed": 450, "life": 15 * 60},
     "molniya": {"label": "М", "name": "«Молнія»", "speed": 120, "life": 20 * 60},
-    "cruise": {"label": "КР", "name": "Крилата ракета", "speed": 800, "life": 8 * 60},
+    "cruise": {"label": "КР", "name": "Крилата ракета", "speed": 700, "life": 8 * 60},
     "ballistic": {"label": "Б", "name": "Балістика", "speed": 2000, "life": 3 * 60},
     "geran5": {"label": "Г5", "name": "«Герань-5»", "speed": 550, "life": 12 * 60},
-    "banderol": {"label": "БД", "name": "«Бандероль»", "speed": 700, "life": 8 * 60},
+    "banderol": {"label": "БД", "name": "«Бандероль»", "speed": 540, "life": 8 * 60},
     "rszv": {"label": "РС", "name": "РСЗВ", "speed": 1500, "life": 3 * 60},
     "fpv": {"label": "FPV", "name": "FPV-дрон", "speed": 80, "life": 8 * 60},
     "fpvf": {"label": "FPV", "name": "FPV на оптоволокні", "speed": 60, "life": 8 * 60},

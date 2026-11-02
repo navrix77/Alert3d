@@ -371,6 +371,7 @@ function homeRel(tr,p){
   else if(tr.hd!=null&&pr>=0.4){rel='heading';eta=d/tr.speed*60;}
   else if(tr.hd!=null&&pr>=0.15&&d<=150&&d/tr.speed*60<=45)maybe=true;// «можлива загроза»: широке попередження, ще не тривога
   if(rel&&(d>150||eta>45)){rel=null;eta=null;}
+  if(tr.type==='ballistic'||tr.type==='rszv')eta=null;// без відстані й траєкторії пуску зворотного відліку для балістики немає
   const away=tr.hd!=null&&angd(tr.hd,brg(P,H))>100;
   return {d,rel,eta,away,maybe,p:pr,side:SIDE[Math.round((brg(H,P))/45)%8],from:FROM[Math.round((brg(H,P))/45)%8]};
 }
