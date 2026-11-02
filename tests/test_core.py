@@ -566,3 +566,16 @@ def test_journal_2026_11_02_sections_and_selfcheck_findings():
     # «від Кривого Рогу»: раніше IndexError (повідомлення губилось), тепер Кривий Ріг
     assert [r.place.name for r in p.parse("Дрон на півдні від Кривого Рогу курсом на Дніпро", "DN").places][0] == "Кривий Ріг (пд)"
     assert names("Шахед на Кривой Рог", "DN") == ["Кривий Ріг"]
+
+
+def test_daleko_not_village_and_avia_short_life():
+    import time
+    from app import config
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p = Parser()
+    # shovnebi: «Далеко не полетять» — коментар, а не село Далеке
+    assert not p.parse("Далеко не полетять", "shovnebi").places
+    tr = Tracker(config.SOURCES, learn=False)
+    tr.ingest(p.parse("Активність тактичної авіації на північно-східному напрямку"), "x", time.time() - 13 * 60)
+    assert not tr.snapshot()["avia"]  # літак не «висить» на рубежі пусків пів години
