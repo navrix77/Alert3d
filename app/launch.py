@@ -48,9 +48,9 @@ CARRIER = [(re.compile(r"ту-95|ту95|ту-160|ту160"), "Ту-95МС/Ту-16
 SUMMARY_RX = re.compile(r"в ніч на|у ніч на|в ночь на|протягом ночі|за ніч|за минулу добу|атакував[аи]?\s+\d|загалом")
 FORECAST_RX = re.compile(r"передислокац|перебазув|перелетіл|перелетели|очікуєм|очікуєть|ожидаем|ожидает|прогноз|через \d+[-–]?\d* (?:дн|дня|днів|год)|найближчим часом")
 STRIKE_RX = re.compile(r"вибух|взрыв|прил[её]т|влучан|попадан|пожеж|пожар|бавовн|хлопок")
-SPEED = {"shahed": 170, "molniya": 120, "jet": 450, "cruise": 800, "ballistic": 2000, "kab": 600, "geran5": 550, "banderol": 650, "rszv": 1500, "fpv": 100, "fpvf": 80}
-MAXAGE = {"shahed": 9 * 3600, "molniya": 2 * 3600, "jet": 2 * 3600, "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60, "geran5": 3 * 3600, "banderol": 2 * 3600, "rszv": 10 * 60, "fpv": 30 * 60, "fpvf": 30 * 60}
-RANGE = {"shahed": 1800, "molniya": 200, "jet": 900, "cruise": 3000, "ballistic": 600, "kab": 120, "geran5": 950, "banderol": 500, "rszv": 120, "fpv": 30, "fpvf": 40}
+SPEED = {"shahed": 170, "molniya": 120, "jet": 450, "cruise": 800, "ballistic": 2000, "kab": 600, "geran5": 550, "banderol": 650, "rszv": 1500, "fpv": 100, "fpvf": 80, "recon": 110}
+MAXAGE = {"shahed": 9 * 3600, "molniya": 2 * 3600, "jet": 2 * 3600, "cruise": 4 * 3600, "ballistic": 20 * 60, "kab": 30 * 60, "geran5": 3 * 3600, "banderol": 2 * 3600, "rszv": 10 * 60, "fpv": 30 * 60, "fpvf": 30 * 60, "recon": 4 * 3600}
+RANGE = {"shahed": 1800, "molniya": 200, "jet": 900, "cruise": 3000, "ballistic": 600, "kab": 120, "geran5": 950, "banderol": 500, "rszv": 120, "fpv": 30, "fpvf": 40, "recon": 300}
 
 
 @dataclass

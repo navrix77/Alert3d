@@ -446,13 +446,13 @@ function syncZones(){syncAvia();if(!SNAP||!map.getSource('zones'))return;map.get
 
 /* ---------- лічильники, статус ---------- */
 const CNTI={};
-const CNT_LBL={shahed:'шахеди',jet:'реактивні',cruise:'крилаті',ballistic:'балістика',molniya:'«молнії»',kab:'КАБи',geran5:'Герань-5',banderol:'бандеролі',rszv:'РСЗВ',fpv:'FPV',fpvf:'FPV-оптоволокно'};
+const CNT_LBL={shahed:'шахеди',jet:'реактивні',cruise:'крилаті',ballistic:'балістика',molniya:'«молнії»',kab:'КАБи',geran5:'Герань-5',banderol:'бандеролі',rszv:'РСЗВ',fpv:'FPV',fpvf:'FPV-оптоволокно',recon:'розвідники'};
 // натиск на лічильник — показати всі цілі цього типу
 function focusType(t){const ps=SNAP.tracks.filter(x=>x.status==='active'&&x.type===t).map(x=>(DISP.get(x.id)||{p:[x.lon,x.lat]}).p);if(!ps.length)return;
   const b=ps.reduce((a,p)=>a.extend(p),new maplibregl.LngLatBounds(ps[0],ps[0]));map.fitBounds(b,{padding:{top:140,bottom:180,left:60,right:60},maxZoom:9,duration:900});toast(TYPE_NAME[t]+': '+ps.length);}
 function renderCounters(){
   const act=SNAP.tracks.filter(t=>t.status==='active');const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+(t.count||1));
-  const order=['shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','fpv','fpvf'];
+  const order=['shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','fpv','fpvf'];
   $('#counters').innerHTML='';
   order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];const c=CNTI[t]||(CNTI[t]=drawTarget(t,28));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);const w=document.createElement('div');w.className='cw';const b=document.createElement('b');b.textContent=by[t];if(renderCounters.prev&&renderCounters.prev[t]!==by[t])b.className='pop';
     const l=document.createElement('small');l.textContent=CNT_LBL[t]||TYPE_NAME[t];w.appendChild(b);w.appendChild(l);d.appendChild(w);d.style.setProperty('--tc',TYPE_COLOR[t]);d.onclick=()=>focusType(t);$('#counters').appendChild(d);});
@@ -754,7 +754,7 @@ function notesAll(){const box=$('#notes');let a=box.querySelector('.all');const 
   if(n>=2&&!a){a=document.createElement('button');a.className='all';a.textContent='Закрити всі';a.onclick=()=>{box.innerHTML='';};box.prepend(a);}
   if(n<2&&a)a.remove();}
 function flyP(p,z){map.flyTo({center:p,zoom:Math.max(map.getZoom(),z||7),essential:true});}
-const TNAME_PL={shahed:'Шахеди',jet:'Реактивні шахеди',molniya:'«Молнії»',cruise:'Крилаті ракети',ballistic:'Балістика',kab:'КАБи',geran5:'«Герань-5»',banderol:'«Бандеролі»',rszv:'РСЗВ',fpv:'FPV-дрони',fpvf:'FPV на оптоволокні'};
+const TNAME_PL={shahed:'Шахеди',jet:'Реактивні шахеди',molniya:'«Молнії»',cruise:'Крилаті ракети',ballistic:'Балістика',kab:'КАБи',geran5:'«Герань-5»',banderol:'«Бандеролі»',rszv:'РСЗВ',fpv:'FPV-дрони',fpvf:'FPV на оптоволокні',recon:'Дрони-розвідники'};
 /* ---------- мої громади й області для сповіщень ---------- */
 const NZLV=new Map();
 function myZones(){const Z=PREF.nz||{obl:[],hrom:[]};if(!Z.obl.length&&!Z.hrom.length&&home&&window.OBLPOLY){const o=window.OBLPOLY(home[0],home[1]);if(o)return {obl:[o],hrom:[],auto:true};}return Z;}

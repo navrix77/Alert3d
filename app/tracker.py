@@ -31,6 +31,7 @@ TYPES = {
     "rszv": {"label": "РС", "name": "РСЗВ", "speed": 1500, "life": 3 * 60},
     "fpv": {"label": "FPV", "name": "FPV-дрон", "speed": 80, "life": 8 * 60},
     "fpvf": {"label": "FPV", "name": "FPV на оптоволокні", "speed": 60, "life": 8 * 60},
+    "recon": {"label": "Р", "name": "Дрон-розвідник", "speed": 110, "life": 20 * 60},
 }
 FAST_TYPES = ("cruise", "ballistic", "banderol", "rszv", "geran5")
 # КАБ: зона живе, поки про неї пишуть або поки біля кордону активна тактична авіація
@@ -126,7 +127,7 @@ class Track:
 
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
-SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5}
+SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5, "recon": 15}
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:

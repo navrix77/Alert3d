@@ -117,7 +117,7 @@ def test_tlk_slang():
     assert P.parse("Р. Шаболда на Изюм⚠️", "TLK").type == "jet"
     assert P.parse("Ударный на Дергачи⚠️", "TLK").type == "shahed"
     assert P.parse("По ударным", "TLK").kind == "close"
-    assert P.parse("Развед. БПЛА над Изюмом⚠️", "TLK").kind == "info"
+    assert P.parse("Развед. БПЛА над Изюмом⚠️", "TLK").type == "recon"  # розвідники — окремий тип (на прохання користувача)
     assert [r.place.name for r in P.parse("Далее ЛГ/Залютино/ХГ⚠️", "TLK").places][0] == "Лиса Гора (Харків)"
 
 
