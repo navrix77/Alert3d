@@ -65,7 +65,7 @@ footer{color:var(--mute);font-size:12px;margin-top:16px;line-height:1.5}
 Перепости (той самий текст за 5 хв) не вважаються незалежним підтвердженням.</footer>
 </main>
 <script>
-const TY={shahed:'Шахеди',jet:'Реактивні',molniya:'«Молнія»',cruise:'Крилаті ракети',ballistic:'Балістика',geran5:'«Герань-5»',banderol:'«Бандероль»',rszv:'РСЗВ',fpv:'FPV',fpvf:'FPV'};
+const TY={lancet:'«Ланцети»',shahed:'Шахеди',jet:'Реактивні',molniya:'«Молнія»',cruise:'Крилаті ракети',ballistic:'Балістика',geran5:'«Герань-5»',banderol:'«Бандероль»',rszv:'РСЗВ',fpv:'FPV',fpvf:'FPV'};
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const $=id=>document.getElementById(id);
 const pl=(n,f)=>{n=Math.abs(n);return n%10==1&&n%100!=11?f[0]:(n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?f[1]:f[2]);};

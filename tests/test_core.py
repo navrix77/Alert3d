@@ -986,6 +986,15 @@ def test_launch_not_linked_to_target_flying_back():
 
 
 def test_lancet_clear_does_not_close_other_targets():
+    """«По ланцету чисто» закриває лише «Ланцет», а не шахеда поруч."""
     from app.parser import Parser
-    o = Parser().parse("Вільнянськ, у вас по ланцету чисто", "shovnebi")
-    assert o.kind != "close"
+    from app.tracker import Tracker
+    from app.config import SOURCES
+    P, trk = Parser(), Tracker(SOURCES)
+    for txt, t in [("Шахед над Вільнянськом", 1000.0), ("Ланцет над Вільнянськом", 1010.0), ("Вільнянськ, у вас по ланцету чисто", 1100.0)]:
+        o = P.parse(txt, "shovnebi"); o.raw = txt
+        trk.ingest(o, "shovnebi", t, None)
+    sh = [x for x in trk.tracks if x.type == "shahed"]
+    la = [x for x in trk.tracks if x.type == "lancet"]
+    assert sh and not sh[0].closed
+    assert la and la[0].closed
