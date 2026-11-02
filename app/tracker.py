@@ -94,6 +94,8 @@ class Track:
     credited: set[str] = field(default_factory=set)
     evidence: list = field(default_factory=list)  # [{t, src, link, text, why, dest, pos, key}]
     pred_src: str | None = None
+    route_src: str | None = None  # хто назвав поточний пункт призначення (для зважування суперечливих версій)
+    route_t: float = 0.0
     hd_src: str | None = None  # звідки курс: channels (названий пункт) / course (написано «курс на захід») / learned / movement
     last_pred: tuple | None = None  # (назва, xy, t, звідки xy, наївний xy) — перший крок навченого прогнозу, для самоперевірки
     pred_moved: int = 0
@@ -374,6 +376,7 @@ class Tracker:
                     self._score_pred(tr, pt, t)
                 if self.brain and self.learn:
                     self._score_heading(tr, pt, t)
+                    self._score_dir_claims(tr, pt, t)
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
                 # кінематично неможливий «перехід» (той самий пост/хвилина, сусідні села різних дронів групи,
                 # >1.8× номінальної швидкості) — це не рух однієї цілі: не вчимо маршрут і не беремо з нього курс.
@@ -415,12 +418,23 @@ class Tracker:
                 route = [p for p in route if dist_km(here, p.xy) <= min(tr.speed * 1.0 + 60, 260 if tr.type == "shahed" else 900)]
                 if not route:
                     course_to = None  # усі пункти — тезки з іншого кінця країни: «→ X» не показуємо
+            if route and tr.route and tr.route_src and tr.route_src != src and t - tr.route_t < 600 and self.brain and hasattr(self.brain, "dir_rel"):
+                # дві версії курсу від різних каналів за 10 хв: якщо попередній канал доведено точніший у напрямках
+                # (апостеріорна частка ≥ на 0.15 вища, ≥15 перевірених заяв) — лишаємо його версію; нова йде в докази як «інша версія»
+                here_ = (tr.last.x, tr.last.y)
+                if ang_diff(bearing(here_, tr.route[0].xy), bearing(here_, route[0].xy)) > 60:
+                    a_old, n_old = self.brain.dir_rel(tr.route_src)
+                    a_new, _n_new = self.brain.dir_rel(src)
+                    if n_old >= 15 and a_old - a_new >= 0.15:
+                        route, course_to = [], tr.course_to
+                        rec["kept_version"] = tr.route_src
             if route:
                 # ціль змінила пункт призначення: послідовність «курсом на A» → «курсом на B» теж маршрут
                 old = tr.route[0] if tr.route else None
                 if self.brain and self.learn and old and old.name not in names:
                     self.brain.learn_step(tr.type, old, route[0], 0.7)
                 tr.route = route
+                tr.route_src, tr.route_t = src, t
             elif pt is not None:
                 tr.route = [p for p in tr.route if dist_km(p.xy, pt) > 3]
             tr.route = [p for p in tr.route if dist_km(p.xy, (tr.last.x, tr.last.y)) > 1.5]
@@ -447,6 +461,8 @@ class Tracker:
                 else:
                     tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
             tr.route = [p for p in route if dist_km(p.xy, (tr.last.x, tr.last.y)) > 2]
+            if tr.route:
+                tr.route_src, tr.route_t = src, t
             if tr.route:
                 tr.heading, tr.hd_src = bearing((tr.last.x, tr.last.y), tr.route[0].xy), "channels"
             elif obs.course is not None:
@@ -512,6 +528,25 @@ class Tracker:
         if shown is None:
             return
         self.brain.pred_score(tr.type + "@hd", ang_diff(shown, bearing(a, pt)) <= 45)
+
+    def _score_dir_claims(self, tr: Track, pt, t: float) -> None:
+        """Точність напрямку кожного каналу: «курсом на X» — чи ціль потім (3–40 хв) справді рушила в бік X (≤30°).
+        Журнал 26.10–02.11: у середньому 67% (n=184), між каналами 50–93% — але вибірки по 5–28 заяв,
+        тож вагу каналу беремо лише з апостеріорної оцінки й лише за ≥15 перевірених заяв."""
+        if not hasattr(self.brain, "pred_score"):
+            return
+        real = [o for o in tr.obs if not o.est]
+        for e in tr.evidence:
+            if e.get("sc") or not e.get("dxy") or not 180 <= t - e["t"] <= 2400:
+                continue
+            before = [o for o in real if o.t <= e["t"]]
+            if not before:
+                continue
+            p0 = (before[-1].x, before[-1].y)
+            if dist_km(p0, e["dxy"]) < 10 or dist_km(p0, pt) <= 8:
+                continue
+            e["sc"] = 1
+            self.brain.pred_score("dir:" + e["src"], ang_diff(bearing(p0, pt), bearing(p0, e["dxy"])) <= 30)
 
     def _learned_heading(self, tr: Track, place, pt) -> float | None:
         if not self.brain or not place or not hasattr(self.brain, "next_places"):

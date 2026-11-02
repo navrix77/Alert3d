@@ -235,7 +235,9 @@ def state() -> dict:
         brain.hist_add(fr)
         while HIST and snap["now"] - HIST[0]["t"] > 12 * 3600:
             HIST.pop(0)
-    snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url} for k, s in config.SOURCES.items()}
+    _dt = brain.dir_table(10)
+    snap["sources"] = {k: {"name": s.name, "rel": round(brain.rel(k, s.rel), 2), "prior": s.rel, "official": s.official, "url": s.url,
+                           **({"dir": _dt[k]} if k in _dt else {})} for k, s in config.SOURCES.items()}
     snap["daily"] = daily.ready
     snap["pred_acc"] = brain.pred_acc()
     snap["health"] = {

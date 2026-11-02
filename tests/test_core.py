@@ -887,3 +887,23 @@ def test_changes_digest():
     assert "було → Дергачі" in crs["text"] and "тепер → Харків" in crs["text"] and "R о" in crs["text"]
     lost = next(e for e in r["events"] if e["k"] == "lost")
     assert "не відбій" in lost["text"]
+
+
+def test_source_direction_reliability():
+    """Точність напрямку каналу вчиться онлайн; суперечлива версія від менш точного каналу не перебиває курс."""
+    from pathlib import Path as P_
+    from app.brain import Brain
+    b = Brain(P_(":memory:"))
+    for _ in range(30):
+        b.pred_score("dir:GOOD", True)
+    for _ in range(30):
+        b.pred_score("dir:BAD", False)
+    g, ng = b.dir_rel("GOOD")
+    bad, _ = b.dir_rel("BAD")
+    assert ng == 30 and g > 0.9 and bad < 0.25 and b.dir_rel("NEW")[0] == b.DIR_PRIOR
+    tr = Tracker(SOURCES, b, learn=False)
+    t0 = 1_793_600_000.0
+    tr.ingest(P.parse("Шахед у районі Чугуєва курсом на Харків", "M"), "GOOD", t0)
+    rec = tr.ingest(P.parse("Шахед у районі Чугуєва курсом на Балаклію", "M"), "BAD", t0 + 60)
+    t = tr.tracks[0]
+    assert t.route and t.route[0].name == "Харків" and rec.get("kept_version") == "GOOD"

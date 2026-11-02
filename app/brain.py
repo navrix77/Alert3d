@@ -218,6 +218,17 @@ class Brain:
             self._x("INSERT INTO pacc VALUES(?,?,?) ON CONFLICT(type) DO UPDATE SET hit=excluded.hit, tot=excluded.tot", (typ, st[0], st[1]))
             self._tick()
 
+    DIR_PRIOR, DIR_W = 0.67, 10.0  # середня точність напрямку каналів (журнал 26.10–02.11) і вага апріорі
+
+    def dir_rel(self, src: str) -> tuple[float, int]:
+        """Апостеріорна точність напрямку каналу (частка «курсом на X», що справдились ≤30°) і кількість перевірок."""
+        h, n = self.pacc.get("dir:" + src, (0.0, 0.0))
+        return (h + self.DIR_PRIOR * self.DIR_W) / (n + self.DIR_W), int(n)
+
+    def dir_table(self, min_n: int = 5) -> dict:
+        return {k[4:]: {"acc": round(self.dir_rel(k[4:])[0], 2), "raw": round(h / n, 2), "n": int(n)}
+                for k, (h, n) in self.pacc.items() if k.startswith("dir:") and n >= min_n}
+
     def hd_acc(self) -> dict:
         """Частка випадків, коли показаний на мапі курс збігся (≤45°) з тим, куди ціль назвали далі."""
         return {k[:-3]: {"acc": round(h / n, 2), "n": int(n)} for k, (h, n) in self.pacc.items() if k.endswith("@hd") and n >= 5}

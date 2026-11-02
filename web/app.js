@@ -642,7 +642,8 @@ function fillSheet(first){
    if(E.contra.length)h+='<div class=ev-contra><b>Версії розходяться:</b>'+E.contra.map(v=>'<div>→ '+esc(v.dest||'?')+' <small>('+v.srcs.map(nm).join(', ')+')</small></div>').join('')+'</div>';
    if(!got)h+='<div class=note>Завантажую публікації…</div>';
    h+='<ol class=ev-list>'+E.items.slice().sort((a,b)=>b.t-a.t).map(it=>{const tag=it.copy?(it.copy===it.src?'<i class=cp>повтор</i>':'<i class=cp>копія '+nm(it.copy)+'</i>'):(it.why==='нова ціль'?'<i class=nw>першоджерело</i>':it.why==='змінило позицію'?'<i class=mv>змінило позицію</i>':it.why==='змінило курс'?'<i class=cr>змінило курс</i>':'<i class=cf>підтвердження</i>');
-     return '<li class="'+(it.copy?'copy':'')+'"><div class=ev-m><span>'+fmt(it.t)+'</span><b>'+nm(it.src)+'</b>'+tag+(it.link?'<a href="'+esc(it.link)+'" target=_blank rel=noopener>пост ↗</a>':'')+'</div>'+(it.text?'<q>'+esc(it.text)+'</q>':'')+'</li>';}).join('')+'</ol>';
+     const dr=SNAP.sources&&SNAP.sources[it.src]&&SNAP.sources[it.src].dir;const dt=dr&&it.dest?'<i class=cp title="Як часто напрямок від цього каналу справджувався (≤30°), перевірено '+dr.n+' разів">курс ✓'+Math.round(dr.acc*100)+'%</i>':'';
+     return '<li class="'+(it.copy?'copy':'')+'"><div class=ev-m><span>'+fmt(it.t)+'</span><b>'+nm(it.src)+'</b>'+dt+tag+(it.link?'<a href="'+esc(it.link)+'" target=_blank rel=noopener>пост ↗</a>':'')+'</div>'+(it.text?'<q>'+esc(it.text)+'</q>':'')+'</li>';}).join('')+'</ol>';
    $('#sh-proof').innerHTML=h;}
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }
