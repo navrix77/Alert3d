@@ -455,3 +455,22 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 }
 .ars-map[hidden]{display:none}
 .ars-map{background:color-mix(in srgb,var(--tc) 22%,transparent)}
+/* Світла тема v2 — суцільні білі панелі й контрастний текст (як у Apple Maps / «Повітряна тривога»), без напівпрозорого «скла», крізь яке просвічує карта */
+:root[data-theme="day"]{--fg:#0A0F1A;--mute:#3E4859;--line:rgba(10,20,40,.10);--glass:#fff;--glass-strong:#F4F6FA;--rim:rgba(10,20,40,.08)}
+:root[data-theme="day"] .cnt,:root[data-theme="day"] .asof,:root[data-theme="day"] .dock,:root[data-theme="day"] .me,:root[data-theme="day"] .sheet,:root[data-theme="day"] .drawer,:root[data-theme="day"] .toast,:root[data-theme="day"] .xr-legend,:root[data-theme="day"] .notes>*{
+  background:rgba(255,255,255,.97)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+  border:1px solid rgba(10,20,40,.08)!important;box-shadow:0 1px 2px rgba(15,25,45,.08),0 8px 28px rgba(15,25,45,.16)!important;color:var(--fg)!important}
+:root[data-theme="day"] .settings{background:#F4F6FA!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-left:1px solid rgba(10,20,40,.08);box-shadow:-12px 0 40px rgba(15,25,45,.18)}
+:root[data-theme="day"] .settings section{border-top-color:rgba(10,20,40,.08)}
+:root[data-theme="day"] .settings h3{color:#5A6475}
+:root[data-theme="day"] .ars-card{background:#fff;border-color:rgba(10,20,40,.08);box-shadow:0 1px 2px rgba(15,25,45,.06)}
+:root[data-theme="day"] .ars-img{background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--tc) 18%,#fff),#E9EDF3 75%)}
+:root[data-theme="day"] .ars-b small{color:color-mix(in srgb,var(--tc) 70%,#000)}
+:root[data-theme="day"] .ars-b dd{color:#0A0F1A}
+:root[data-theme="day"] .ars-map{color:#0A0F1A;background:color-mix(in srgb,var(--tc) 16%,#fff);border-color:color-mix(in srgb,var(--tc) 55%,#fff)}
+:root[data-theme="day"] .sheet .grid>div{background:#F2F4F8!important;border-color:rgba(10,20,40,.06)!important}
+:root[data-theme="day"] .me-sub{color:#3E4859!important}
+:root[data-theme="day"] .me.danger{border-color:#E5484D!important;box-shadow:0 0 0 2px rgba(229,72,77,.35),0 8px 28px rgba(229,72,77,.25)!important}
+:root[data-theme="day"] .me.watch{border-color:#E0A21E!important;box-shadow:0 0 0 2px rgba(245,184,61,.35),0 8px 28px rgba(15,25,45,.16)!important}
+:root[data-theme="day"] .cnt small{color:color-mix(in srgb,var(--tc) 75%,#000)!important}
+:root[data-theme="day"] .xr-legend{color:#0A0F1A!important}
