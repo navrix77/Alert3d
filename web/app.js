@@ -656,8 +656,10 @@ function renderFollow(){const el=$('#follow-pill');if(!follow||!sel){el.hidden=t
     (r?Math.round(r.d)+' км '+r.side+' від вас'+(r.eta!=null?' · ~'+Math.max(1,Math.round(r.eta))+' хв до вас':''):'')+(followPrev.ev?' · '+esc(followPrev.ev):'')+' · фіксація '+fmt(tr.last)+'</span></div><button id="fp-card">Картка</button><button id="fp-stop">Зупинити</button>';
   el.hidden=false;$('#fp-stop').onclick=e=>{e.stopPropagation();stopFollow('Стеження зупинено');};$('#fp-card').onclick=e=>{e.stopPropagation();$('#sheet').hidden=false;fillSheet(true);};}
 /* «Чому тут?» — рентген саме цієї цілі; «Карта на той момент» — машина часу на першу публікацію про ціль */
-if($('#sh-why'))$('#sh-why').onclick=()=>{if(!sel)return;if(!XRAY)setXray(true);else syncXray();const d=DISP.get(sel);if(d)map.easeTo({center:d.p,zoom:Math.max(map.getZoom(),9),duration:700});
-  toast('Точки — де назвали канали, пунктир — оцінка SKY');};
+if($('#sh-why'))$('#sh-why').onclick=()=>{if(!sel)return;
+  // картка закриває мапу — ховаємо її (ціль лишається вибраною), вмикаємо рентген лише цієї цілі й летимо до неї
+  $('#sheet').hidden=true;if(!XRAY)setXray(true);const d=DISP.get(sel);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),9.5),duration:900,essential:true});
+  setTimeout(syncXray,950);toast('Точки — де ціль назвали канали; кільця — копії; пунктир — оцінка SKY. Торкніться ціль — повернутись до картки');};
 if($('#sh-then'))$('#sh-then').onclick=async()=>{const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr)return;const t0=tr.first||tr.last;
   try{if(!HISTF.length){const j=await fetch('/api/history').then(r=>r.json());HISTF=j.frames||[];}}catch(e){}
   if(!HISTF.length)return toast('Історія ще збирається');let i=HISTF.findIndex(f=>f.t>=t0);if(i<0)i=HISTF.length-1;
