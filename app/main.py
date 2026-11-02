@@ -250,24 +250,53 @@ def state() -> dict:
     return snap
 
 
+HIDDEN: set = set()  # клієнти, чия вкладка/застосунок у фоні — їм рідше
+
+
 async def pusher() -> None:
+    """Повний стан — лише коли щось змінилось (нове повідомлення каналу чи офіційна тривога) або раз на 10 с як «пульс»;
+    фоновим вкладкам — раз на 30 с. Мапа між оновленнями сама рухає цілі. Довідник джерел і журнал (≈28 КБ) — раз на 30 с.
+    Раніше: ~290 КБ кожні 2 с кожному — до ~80 МБ/год на телефон з відкритою мапою."""
+    last_sig, last_full, last_sent = None, 0.0, {}
     while True:
         await asyncio.sleep(config.PUSH_SEC)
         if not clients:
             continue
+        now = time.time()
         try:
-            msg = json.dumps(state(), ensure_ascii=False)
+            off = alerts.state()
+            sig = (tracker.last_update, json.dumps(off.get("levels"), sort_keys=True), len(tracker.tracks))
+        except Exception:  # noqa: BLE001
+            sig = None
+        due = [ws for ws in list(clients)
+               if sig != last_sig or now - last_sent.get(id(ws), 0) >= (30 if ws in HIDDEN else 10)]
+        if not due:
+            continue
+        try:
+            snap = state()
         except Exception:  # одна погана ціль не має зупиняти оновлення для всіх
             log.exception("state() failed")
             continue
+        full = now - last_full >= 30
+        if full:
+            last_full = now
+        else:
+            snap = {k: v for k, v in snap.items() if k not in ("sources", "log")}
+        msg = json.dumps(snap, ensure_ascii=False)
+        last_sig = sig
         dead = []
-        for ws in list(clients):
+        for ws in due:
             try:
                 await ws.send_text(msg)
+                last_sent[id(ws)] = now
             except Exception:
                 dead.append(ws)
         for ws in dead:
             clients.discard(ws)
+            HIDDEN.discard(ws)
+        if len(last_sent) > 4 * len(clients) + 50:
+            alive = {id(w) for w in clients}
+            last_sent = {k: v for k, v in last_sent.items() if k in alive}
 
 
 @asynccontextmanager
@@ -518,11 +547,17 @@ async def ws_endpoint(ws: WebSocket):
     try:
         await ws.send_text(json.dumps(state(), ensure_ascii=False))
         while True:
-            await ws.receive_text()  # ping від клієнта
+            m = await ws.receive_text()  # ping / hidden / visible від клієнта
+            if m == "hidden":
+                HIDDEN.add(ws)
+            elif m == "visible":
+                HIDDEN.discard(ws)
+                await ws.send_text(json.dumps(state(), ensure_ascii=False))  # повернувся — одразу свіжий стан
     except WebSocketDisconnect:
         pass
     finally:
         clients.discard(ws)
+        HIDDEN.discard(ws)
 
 
 @app.get("/data/{name}")

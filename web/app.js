@@ -502,7 +502,7 @@ function renderAsOf(){
   // для людей: лише «наживо» і час; технічні деталі — у стрічці
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
   if(!SNAP){el.className='asof';el.innerHTML='<i class="live-dot wait"></i>Підключення…';return;}
-  if(age>20){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Немає звʼязку '+Math.round(age)+' с — це не відбій';return;}
+  if(age>30){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Немає звʼязку '+Math.round(age)+' с — це не відбій';return;}
   const h=SNAP.health,ok=h.telegram||h.replay;
   el.className='asof'+(ok?'':' stale');
   el.innerHTML='<i class="live-dot'+(ok?'':' wait')+'"></i>'+(h.replay?'Демо':ok?'Наживо':'Дані затримуються')+' · '+fmt(SNAP.now);
@@ -513,7 +513,7 @@ if($('#me-set'))$('#me-set').onclick=()=>{const v=[1,2,3,5,7,10];SHELTER=v[(v.in
 const MEI={};
 function renderMe(threats){
   const box=$('#me');if(!home){box.className='me'+(box.classList.contains('open')?' open':'');$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
-  const isStale=!SNAP||(Date.now()-recvAt)/1000>20;
+  const isStale=!SNAP||(Date.now()-recvAt)/1000>(document.hidden?75:30);
   const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
   const thr=near.filter(x=>x.r.rel);const first=thr[0];
   let cls='me',word='Над вами чисто',sub='Підтверджених цілей у ваш бік немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
@@ -702,12 +702,14 @@ $('#b-ar').onclick=()=>{location.href='ar.html';};
 let ws,backoff=1000;
 function connect(){
   const proto=location.protocol==='https:'?'wss':'ws';ws=new WebSocket(proto+'://'+location.host+'/ws');
-  ws.onmessage=e=>{backoff=1000;onSnap(JSON.parse(e.data));};
+  ws.onmessage=e=>{backoff=1000;const s=JSON.parse(e.data);if(LIVE){if(!s.sources)s.sources=LIVE.sources;if(!s.log)s.log=LIVE.log;}s.sources=s.sources||{};s.log=s.log||[];onSnap(s);};ws.onopen=()=>{if(document.hidden)ws.send('hidden');};
   ws.onclose=()=>{setTimeout(connect,backoff);backoff=Math.min(backoff*2,15000);};
   ws.onerror=()=>ws.close();
 }
 connect();
 setInterval(()=>{if(ws&&ws.readyState===1)ws.send('ping');},20000);
+// фонова вкладка / згорнутий застосунок: сервер шле рідше (економія трафіку й батареї); повернення — одразу свіжий стан
+document.addEventListener('visibilitychange',()=>{if(ws&&ws.readyState===1)ws.send(document.hidden?'hidden':'visible');});
 
 /* ---------- налаштування, теми, шари ---------- */
 const PREF=Object.assign({theme:'night',base:null,sound:false,ru:true,launch:true,zones:true},(()=>{try{return JSON.parse(localStorage.getItem('pref')||'{}');}catch(e){return {};}})());
