@@ -175,10 +175,13 @@ class LaunchBook:
         pusk = bool(PUSK_RX.search(nt))
         for s in sites:
             strat_site = s.kind == "аеродром" and "cruise" in (s.types or set())
-            stage = "takeoff" if (carrier in STRAT or strat_site) and not pusk else "launch"
+            # аеродром стратегічної авіації — завжди лише зліт: ракети пускають з інших районів (Каспій, Волгодонськ…),
+            # тож «пуск з Українки/Оленьї/Енгельса» — це виліт носіїв, а тип ракети звідти не випливає
+            stage = "takeoff" if strat_site or (carrier in STRAT and not pusk) else "launch"
+            typ_s = None if strat_site else typ
             if car_bad(carrier, typ):
                 carrier = None
-            ex = next((L for L in self.items if L.site is s and (L.type == typ or not typ or not L.type) and abs(t - L.t) < 1200), None)
+            ex = next((L for L in self.items if L.site is s and (L.type == typ_s or not typ_s or not L.type) and abs(t - L.t) < 1200), None)
             if ex and link and link in ex.links:
                 out.append(ex)  # той самий пост ще раз (відновлення з журналу + дочитування каналів)
                 continue
@@ -187,7 +190,7 @@ class LaunchBook:
                 ex.links = (ex.links + [link])[-6:] if link else ex.links
                 if not (stage == "launch" and ex.stage == "takeoff"):
                     ex.count = max(ex.count or 0, count or 0) or None
-                ex.type = ex.type or typ
+                ex.type = ex.type or typ_s
                 ex.t = min(ex.t, t)
                 if stage == "launch" and ex.stage == "takeoff":
                     ex.stage = "launch"  # спершу зліт, потім джерело повідомило про пуск
@@ -204,9 +207,9 @@ class LaunchBook:
                 car = None
             # бандероль не з кораблів
             car = car or (None if typ in ("banderol", "ballistic") and "море" in s.name else (None if typ == "banderol" else s.carrier))
-            if car_bad(car, typ):
+            if car_bad(car, typ_s):
                 car = None
-            L = Launch(f"L{self.n}", s, t, typ, count, car, {src}, [link] if link else [], stage=stage,
+            L = Launch(f"L{self.n}", s, t, typ_s, count, car, {src}, [link] if link else [], stage=stage,
                        ev=[{"t": int(t), "src": src, "text": (text or "")[:220], "link": link}] if text else [])
             self.items.append(L)
             out.append(L)
