@@ -17,6 +17,27 @@ def _norm_key(s: str) -> str:
     s = _re.sub(r"[^а-яіїєґa-z0-9]+", " ", s).strip()
     return s[:90]
 
+def _grams(s: str) -> frozenset:
+    """Символьні трійки нормалізованого тексту (без назв каналів), для впізнавання переказу того самого посту."""
+    s = s.lower()
+    s = _re.sub(r"https?://\S+|@\w+|підпи\w*.*|подпи\w*.*", " ", s)
+    s = _re.sub(r"[^а-яіїєґa-z0-9]+", " ", s).strip()[:200]
+    return frozenset(s[i:i + 3] for i in range(len(s) - 2)) if len(s) >= 40 else frozenset()
+
+
+def _same_claim(e: dict, key: str, grams: frozenset, topo: tuple, cnt) -> bool:
+    """Та сама заява іншими словами: точний текст, або переказ (Жаккар трійок ≥ 0.8) з тими самими назвами й кількістю.
+    Журнал 26.10–02.11: крім 4550 точних копій ще ~250 переказів («🏍 Рівненщина: реактивний БпЛА курсом на Сарни» ≈
+    «Реактивний БпЛА курсом на Сарни (Рівненщина)»). Без умови назв і кількості схожість дає хибні збіги
+    («Роменський район — тривога» ≈ «Ізюмський район — тривога», «2х БпЛА» ≈ «БпЛА»)."""
+    if key and len(key) >= 25 and e.get("key") == key:
+        return True
+    g0 = e.get("g")
+    if not grams or not g0 or e.get("topo") != topo or e.get("cnt") != cnt:
+        return False
+    return len(grams & g0) / len(grams | g0) >= 0.8
+
+
 from .launch import LaunchBook
 from .parser import Observation
 
@@ -365,16 +386,19 @@ class Tracker:
             if tr and getattr(self, "_alias", None):
                 route = [self._alias.get(p.name, p) for p in route]
                 course_to = route[-1].name if route else None
+        orig = None
         if tr:
             # «Хибна свіжість»: інший канал переслав той самий текст пізніше. Журнал 26.10–02.11: 24.5% надходжень —
             # копії, 639 із них старші за 5 хв (до 94 хв). Копія не є новим спостереженням: не скидає годинник цілі
             # (інакше позначка «замерзає» або повертається на стару точку) і не рахується незалежним підтвердженням.
             raw_ = (getattr(obs, "raw", "") or "").strip()
             key_ = _norm_key(raw_)
-            orig = next((e for e in tr.evidence if len(key_) >= 25 and e.get("key") == key_ and e["src"] != src), None) if key_ else None
+            g_ = _grams(raw_)
+            topo_ = tuple(sorted(p.place.name for p in places))
+            orig = next((e for e in tr.evidence if e["src"] != src and t - e["t"] <= 7200 and _same_claim(e, key_, g_, topo_, obs.count)), None)
             if orig is not None and t - orig["t"] > 60:
                 tr.evidence.append({"t": t, "src": src, "link": link, "text": raw_[:220], "why": "перепост", "key": key_,
-                                    "dest": None, "dxy": None, "pos": None, "est": False})
+                                    "dest": None, "dxy": None, "pos": None, "est": False, "g": g_, "topo": topo_, "cnt": obs.count, "orig": orig["src"]})
                 tr.evidence = tr.evidence[-40:]
                 tr.srcs.add(src)
                 rec["track"] = tr.id
@@ -496,7 +520,8 @@ class Tracker:
         if self.brain and self.learn and real is not None and route:
             self.brain.learn_step(obs.type, real.place, route[0], 0.5)
         # довіра: друге незалежне джерело підтверджує всіх, хто вже повідомив про цю ціль
-        if src not in tr.srcs and tr.srcs and self.brain and self.learn:
+        # копія/переказ навіть у першу хвилину — не незалежне підтвердження (методика: подвійний рахунок)
+        if src not in tr.srcs and tr.srcs and self.brain and self.learn and orig is None:
             for s_ in list(tr.srcs) + [src]:
                 if s_ not in tr.credited:
                     self.brain.rel_update(s_, True)
@@ -527,6 +552,8 @@ class Tracker:
         why = "нова ціль" if len(tr.evidence) == 0 else ("змінило позицію" if moved else ("змінило курс" if route else "підтвердження"))
         txt = (getattr(obs, "raw", "") or "").strip()
         tr.evidence.append({"t": t, "src": src, "link": link, "text": txt[:220], "why": why, "key": _norm_key(txt),
+                            "g": _grams(txt), "topo": tuple(sorted(p.place.name for p in places)), "cnt": obs.count,
+                            "orig": orig["src"] if orig is not None else None,
                             "dest": route[0].name if route else None, "dxy": route[0].xy if route else None,
                             "pos": (tr.obs[-1].x, tr.obs[-1].y) if moved else None, "est": bool(moved and tr.obs[-1].est)})
         tr.evidence = tr.evidence[-40:]
@@ -763,7 +790,8 @@ class Tracker:
         """Групуємо публікації: однаковий текст протягом 5 хв, копія першої (перепост/ретрансляція)."""
         groups: list[dict] = []
         for e in tr.evidence:
-            g = next((g for g in groups if e["key"] and g["key"] == e["key"] and e["t"] - g["t"] < 300), None)
+            g = next((g for g in groups if (e.get("orig") == g["src"] and e["t"] - g["t"] < 7200)
+                      or (e["key"] and g["key"] == e["key"] and e["t"] - g["t"] < 300)), None)
             if g:
                 g["copies"].append(e["src"])
                 e["copy_of"] = g["src"]
