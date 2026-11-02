@@ -264,3 +264,12 @@ def test_learned_prediction_not_course():
     tr.ingest(p.parse("Шахед у районі Лозової"), "x", time.time())
     t = [x for x in tr.snapshot()["tracks"] if x["status"] == "active"][0]
     assert t["next"] is None and t["route_names"] == []  # навчене — не курс
+
+
+def test_summary_lines_are_positions():
+    from app.parser import Parser
+    p = Parser()
+    segs = p.segments("Шахеди:\n3 на Дніпропетровщині – Тернівка (1), Шахтарське (1), Петропавлівка (1).")
+    obs = [p.parse(s, "kiev_nebo") for s in segs]
+    pos = [(r.role, r.place.name) for o in obs for r in o.places]
+    assert ("p", "Тернівка") in pos and all(r == "p" for r, _ in pos)  # місця зараз, а не «курс → Петропавлівка»

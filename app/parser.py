@@ -73,6 +73,8 @@ MORE_HINTS = [(re.compile(r"житомирщ|житомирськ\w* обл|жи
               (re.compile(r"прикарпатт|франківщ|франківськ\w* обл"), "Івано-Франківська"),
               (re.compile(r"закарпатт"), "Закарпатська"),
               (re.compile(r"буковин|чернівецьк\w* обл"), "Чернівецька")]
+SUMLINE = re.compile(r"^\d+\s+на\s+([А-ЯІЇЄҐа-яіїєґ']+?)(щині|ччині)\s*[–—-]\s*(.+)$")
+POS_MARK = "⟐"  # маркер: сегмент — поточне місце цілі (з кількістю), а не пункт призначення
 SKIP = {
     "реактивний", "реактивный", "реактивні", "реактивних", "реактивные", "реактивных", "шахед", "шахеды", "шахеда",
     "станом", "станом на", "ракета", "ракеты", "ракети", "угроза", "загроза", "молния", "молнія", "ціль", "відбій", "перебувайте", "ударный",
@@ -165,6 +167,17 @@ class Parser:
     def segments(self, text: str) -> list[str]:
         """Ділить зведення на окремі повідомлення про цілі; заголовок області («Полтавщина:») переносить на наступні рядки."""
         out, header = [], ""
+        # зведення «3 на Дніпропетровщині – Тернівка (1), Шахтарське (1)» — це ПОТОЧНІ місця з кількістю, а не маршрут
+        lines = []
+        for ln in text.split("\n"):
+            m = SUMLINE.match(ln.strip())
+            if m:
+                for name, cnt in re.findall(r"([А-ЯІЇЄҐ][\w'’ʼ\- ]{1,40}?)\s*\((\d+)\)", m.group(3)):
+                    lines.append(f"{POS_MARK}{cnt} {name.strip()} ({m.group(1)}{m.group(2)})")
+            else:
+                lines.append(ln)
+        if len(lines) != len(text.split("\n")) or any(x.startswith(POS_MARK) for x in lines):
+            return [x for x in lines if x.startswith(POS_MARK)] + [s_ for s_ in self.segments("\n".join(x for x in lines if not x.startswith(POS_MARK))) if s_.strip()] if any(not x.startswith(POS_MARK) and x.strip() for x in lines) else [x for x in lines if x.startswith(POS_MARK)]
         for raw in SEG_SPLIT.split(text):
             seg = (raw or "").strip(" \t-•–—")
             if not seg:
@@ -298,6 +311,8 @@ class Parser:
                 found.append((role, ids))
             i += used
         obs.places = [r for _, r in sorted(dist_found, key=lambda x: x[0])] + self._disambiguate(found, bbox, ctx)
+        if text.startswith(POS_MARK):
+            obs.places = [PlaceRef("p", r.place) for r in obs.places[:1]]
         mc = COURSE.search(t)
         if mc:
             g = mc.group(1) or mc.group(2)
