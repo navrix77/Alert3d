@@ -329,7 +329,8 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
     data, why = await tts.speak(text, voice, rate)
     if not data:
         return JSONResponse({"ok": False, "why": why, **tts.status()}, status_code=503)
-    return Response(data, media_type="audio/wav", headers={"Cache-Control": "max-age=86400"})
+    mt = "audio/mpeg" if why.startswith("google") else "audio/wav"
+    return Response(data, media_type=mt, headers={"Cache-Control": "max-age=86400", "X-TTS": why})
 
 
 @app.get("/api/msgs")

@@ -2,6 +2,16 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+# локальні секрети (ключі API) — у файлі .env поруч із застосунком; він не потрапляє в git
+_ENV = Path(__file__).resolve().parent.parent / ".env"
+if _ENV.exists():
+    for _ln in _ENV.read_text(encoding="utf-8-sig").splitlines():
+        _ln = _ln.strip()
+        if _ln and not _ln.startswith("#") and "=" in _ln:
+            _k, _v = _ln.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
 from .tracker import Source
 

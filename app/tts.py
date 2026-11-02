@@ -223,10 +223,57 @@ def _synth(path: Path, text: str, rate: float) -> bytes:
     return buf.getvalue()
 
 
+# ---- Google Cloud Text-to-Speech (якщо задано GOOGLE_TTS_KEY): нейромережеві голоси uk-UA з правильними наголосами.
+GKEY = os.getenv("GOOGLE_TTS_KEY") or os.getenv("GOOGLE_TILES_KEY_TTS") or ""
+_gvoices: dict = {}
+
+
+async def _google_voices() -> dict:
+    """Найкращі доступні голоси uk-UA: Chirp3-HD > Neural2 > Wavenet > Standard, окремо жіночий і чоловічий."""
+    if _gvoices or not GKEY:
+        return _gvoices
+    async with httpx.AsyncClient(timeout=15) as cli:
+        r = await cli.get("https://texttospeech.googleapis.com/v1/voices", params={"languageCode": "uk-UA", "key": GKEY})
+        r.raise_for_status()
+        rank = lambda n: next((i for i, k in enumerate(("Chirp3-HD", "Chirp-HD", "Neural2", "Wavenet", "Standard")) if k in n), 9)
+        vs = sorted(r.json().get("voices", []), key=lambda v: rank(v["name"]))
+        for v in vs:
+            g = v.get("ssmlGender", "").lower()
+            _gvoices.setdefault("female" if g == "female" else "male" if g == "male" else "any", v["name"])
+    return _gvoices
+
+
+async def _google(text: str, key: str, rate: float) -> bytes | None:
+    vs = await _google_voices()
+    want = "male" if key in ("mykyta", "oleksa") else "female"
+    name = vs.get(want) or vs.get("female") or vs.get("any") or vs.get("male")
+    if not name:
+        return None
+    import base64
+    async with httpx.AsyncClient(timeout=20) as cli:
+        r = await cli.post("https://texttospeech.googleapis.com/v1/text:synthesize", params={"key": GKEY},
+                           json={"input": {"text": text}, "voice": {"languageCode": "uk-UA", "name": name},
+                                 "audioConfig": {"audioEncoding": "MP3", "speakingRate": max(0.7, min(1.4, rate))}})
+        r.raise_for_status()
+        return base64.b64decode(r.json()["audioContent"])
+
+
 async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes | None, str]:
     text = " ".join((text or "").split())[:300]
     if not text:
         return None, "empty"
+    if GKEY:
+        gcache = BASE / "cache" / f"g-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
+        if gcache.exists():
+            return gcache.read_bytes(), "google-cache"
+        try:
+            data = await _google(normalize(text), key, rate)
+            if data:
+                gcache.parent.mkdir(parents=True, exist_ok=True)
+                gcache.write_bytes(data)
+                return data, "google"
+        except Exception as e:  # noqa: BLE001 — недоступний Google → локальний Piper
+            log.warning("google tts: %s", e)
     if not piper_ok():
         _install_bg()
         return None, "installing" if _install["state"] == "running" else f"no-piper:{_install['state']}"
@@ -247,5 +294,5 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes 
 
 
 def status() -> dict:
-    return {"piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
+    return {"google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
             "ready": bool(list((BASE / VOICES[k][0]).glob('*.onnx')))} for k in VOICES]}
