@@ -643,3 +643,16 @@ def test_tsyrkuny_stale_course_2026_11_02():
     assert len(snap) == 1
     s = snap[0]
     assert s["next"] != "Циркуни", "ціль уже в Циркунах — «→ Циркуни» не показуємо"
+
+
+def test_no_context_prefers_significant_place():
+    """02.11: національні канали без контексту — значущий пункт, а не тезка біля Харкова (старий умовний центр)."""
+    from app.parser import Parser
+    p = Parser()
+    pl = lambda t, ch: [(r.place.name, round(r.place.lat, 1)) for r in p.parse(t, ch).places]
+    assert pl("Затока там ще 2 КАБ-и летять Та штук 5 бандеролєй", "admiralbukhta") == [("Затока", 46.1)]  # 16:07, а не село на Харківщині
+    assert pl("🫡 ХМЕЛЬНИЦЬКИЙ — відбій червоної тривоги!", "zahid_golovne_ua") == [("Хмельницький", 49.4)]
+    assert pl("Реактивний БпЛА курсом на Запоріжжя", "KL") == [("Запоріжжя", 47.9)]
+    assert pl("🔴⚠️Герань-5 падає на Рівне.", "MU") == [("Рівне", 50.6)]
+    assert pl("🛵 Реактивний на Трипілля", "eRadarrua") == [("Трипілля", 50.1)]
+    assert pl("КАБ на Золочів", None) == [("Золочів", 50.3)]  # КАБ — біля фронту (Харківщина), не Львівщина

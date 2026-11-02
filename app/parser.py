@@ -223,6 +223,8 @@ FIRST_NAMES = {"юрій", "юрия", "юрія", "олександр", "оле
 POS_PREV = {"між", "между", "районе", "районі", "над", "біля", "возле", "повз", "через", "около", "поблизу", "район"}
 FROM_PREV = {"из", "з", "со", "от", "від"}
 KH = (49.99, 36.23)
+UA_CENTER = (48.9, 31.4)  # «без жодного контексту» — центр країни, а не Харків
+FRONTLINE = {"kab", "fpv", "fpvf", "molniya", "rszv", "recon"}  # типи, що діють лише біля лінії фронту
 # Райони й мікрорайони міст: монітори пишуть «Ударний на Холодну Гору» — у загальному газетирі таких назв немає
 DISTRICTS = [
     (r"холодн\w*\s+гор", "Холодна Гора (Харків)", 49.983, 36.185), (r"залютин", "Залютине (Харків)", 49.975, 36.163),
@@ -350,6 +352,7 @@ class Parser:
         text = AIRFIELD.sub(" ", text)
         t = norm(text)
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
+        self._typ = typ
         m = COUNT.search(t)
         alert_status = bool(ALERT_STATUS.search(t)) or bool(ALERT_LINE.search(text))
         nonstrat = bool(NONSTRAT.search(t)) or bool(EXPECT.search(t)) or bool(AFTERMATH.search(t)) or bool(NEWS.search(t))
@@ -532,7 +535,8 @@ class Parser:
             if ctx:  # контекст усього повідомлення / недавніх повідомлень каналу
                 cen = ((cen[0] + ctx[0]) / 2, (cen[1] + ctx[1]) / 2)
         else:
-            cen = ctx or (((bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2) if bbox else KH)
+            # без контексту: КАБ/FPV/«Молнія» б'ють біля фронту («КАБ на Золочів» — Харківщина, не Львівщина)
+            cen = ctx or (((bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2) if bbox else (KH if getattr(self, "_typ", None) in FRONTLINE else UA_CENTER))
         out: list[PlaceRef] = []
         for role, ids in found:
             cand = ids
@@ -596,6 +600,14 @@ class Parser:
                 city = (25 if ctx or uniq else 70) if p.pop >= 20000 else 0
                 return d - math.log10(1 + p.pop) * (3 if ctx else 6) - city
 
+            if not ctx and not uniq and not bbox and getattr(self, "_typ", None) not in FRONTLINE:
+                # жодного контексту (національний канал, перше повідомлення, область не названа): обирає не відстань
+                # від умовного центру, а значущість. «ХМЕЛЬНИЦЬКИЙ — відбій червоної тривоги» (zahid_golovne_ua) — місто,
+                # а не село на Донеччині; «курсом на Запоріжжя» (KL, MK, K) — місто, а не село під Дніпром;
+                # «Затока там ще… бандеролєй» (admiralbukhta) — курортна Затока під Одесою, а не село на Харківщині
+                top = max(P[i].pop for i in cand)
+                if top >= 2000:
+                    cand = [i for i in cand if P[i].pop == top]
             best = min(cand, key=score)
             out.append(PlaceRef(role, P[best]))
         return out
