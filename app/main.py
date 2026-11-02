@@ -292,10 +292,16 @@ async def lifespan(app: FastAPI):
         await asyncio.sleep(20)
         if not tts.piper_ok():
             tts._install_bg()
-        try:
-            await tts._ensure_model("lada")
-        except Exception as e:  # noqa: BLE001
-            log.info("tts warm: %s", e)
+        for k in ("lada", "tetiana", "mykyta", "oleksa"):
+            try:
+                await tts._ensure_model(k)
+            except Exception as e:  # noqa: BLE001
+                log.info("tts warm %s: %s", k, e)
+        for _ in range(60):  # рушій міг ще ставитися — чекаємо й «розігріваємо» голос, щоб перше сповіщення звучало одразу
+            if tts.piper_ok():
+                await tts.speak("Готово", "lada")
+                break
+            await asyncio.sleep(10)
     tasks.append(asyncio.create_task(_tts_warm()))
     if os.getenv("REPLAY") != "1" and os.getenv("AUTO_SOURCES", "1") == "1":
         tasks.append(asyncio.create_task(DISCOVER.run()))
