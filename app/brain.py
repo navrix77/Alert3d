@@ -173,6 +173,8 @@ class Brain:
         items = []
         for b, (n, lat, lon) in row.items():
             w = n
+            if here is not None and math.hypot((lat - here[0]) * 111, (lon - here[1]) * 73) > 90:
+                continue  # «наступний пункт» за сотні км — навчена помилка/тезка, не крок маршруту
             if heading is not None and here is not None:
                 az = (math.degrees(math.atan2((lon - here[1]) * 73, (lat - here[0]) * 111)) + 360) % 360
                 diff = abs((az - heading + 180) % 360 - 180)

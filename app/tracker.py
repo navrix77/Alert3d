@@ -632,18 +632,20 @@ class Tracker:
                         rest.append(b)
             names = [p.name for p in tr.route if dist_km(p.xy, (ex, ey)) > 2 and p.xy in rest] or []
             pred_src, pred_p = ("channels" if rest else tr.pred_src), None
+            pred_next = None
             if not rest and status == "active" and self.brain:
                 base = tr.last.place.name if tr.last.place else None
                 if base:
                     la0, lo0 = from_xy(ex, ey)
                     nx = self.brain.next_places(tr.type, base, tr.heading, (la0, lo0))
                     if nx and nx[0][1] >= 0.3:
-                        from .geo import to_xy
-                        rest = [to_xy(nx[0][2], nx[0][3])]
-                        names = [nx[0][0]]
+                        # навчений прогноз — НЕ курс: у «next» (підпис «→ X» на мапі) лише те, що написали канали.
+                        # Прогноз іде окремо (pred_next / lpath) і показується лише в картці цілі як «ймовірно далі».
                         pred_src, pred_p = "learned", round(nx[0][1], 2)
+                        pred_next = nx[0][0]
                         if not tr.last_pred or tr.last_pred[0] != nx[0][0]:
-                            tr.last_pred = (nx[0][0], rest[0], now)
+                            from .geo import to_xy
+                            tr.last_pred = (nx[0][0], to_xy(nx[0][2], nx[0][3]), now)
             # навчений маршрут на 3 кроки вперед від останнього названого пункту — показ «ймовірно далі»
             lpath = []
             if status == "active" and self.brain and tr.last.place:
@@ -667,7 +669,7 @@ class Tracker:
             out.append({
                 "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"], "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
-                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "pred": pred_src, "pred_p": pred_p, "lpath": lpath, "pos_est": tr.last.est,
+                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "pred": pred_src, "pred_p": pred_p, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est,
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),

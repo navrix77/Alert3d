@@ -238,3 +238,29 @@ def test_night_audit_fixes():
     # «Петропавлівська Борщагівка» — село, а не київський мікрорайон
     o = p.parse("Реактивний БпЛА курсом на Петропавлівську Борщагівку (Київщина)", "rozvidkaneba")
     assert [r.place.name for r in o.places] == ["Петропавлівська Борщагівка"]
+
+
+def test_learned_prediction_not_course():
+    import time
+    from app import config
+    from app.parser import Parser
+    from app.tracker import Tracker
+
+    class B:  # мозок, що «навчився» хибного кроку за 200 км
+        def next_places(self, *a, **k):
+            return [("Циркуни", 0.9, 50.08, 36.39)]
+
+        def next_path(self, *a, **k):
+            return []
+
+        def rel(self, s, prior):
+            return prior
+
+        def __getattr__(self, n):
+            return lambda *a, **k: None
+    p = Parser()
+    assert [r.place.name for r in p.parse("🟧 Р. Шахед курсом на Лозовую/Днепропетровскую область", "CX").places] == ["Лозова"]
+    tr = Tracker(config.SOURCES, B(), learn=False)
+    tr.ingest(p.parse("Шахед у районі Лозової"), "x", time.time())
+    t = [x for x in tr.snapshot()["tracks"] if x["status"] == "active"][0]
+    assert t["next"] is None and t["route_names"] == []  # навчене — не курс

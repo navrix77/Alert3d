@@ -356,7 +356,9 @@ class Parser:
             hint = getattr(self, "_hint", None)
             if hint and len(cand) > 1:
                 from .geo import oblasts as _ob
-                inobl = [i for i in cand if _ob().of(P[i].lon, P[i].lat) == hint]
+                # точно в області з повідомлення; велике місто поруч (у прямокутнику області) теж лишаємо:
+                # «на Лозовую/Днепропетровскую область» — це місто Лозова, а не село Лозове
+                inobl = [i for i in cand if _ob().of(P[i].lon, P[i].lat) == hint or P[i].pop >= 20000]
                 if inobl:
                     cand = inobl  # точно в області з повідомлення/каналу, а не лише в її прямокутнику
             import math
