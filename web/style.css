@@ -489,3 +489,4 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 :root[data-theme="day"] .kab-pop .maplibregl-popup-tip{border-top-color:#fff!important;border-bottom-color:#fff!important}
 :root[data-theme="day"] .kp-ev{color:#2E3746}:root[data-theme="day"] .kp-r{border-top-color:rgba(10,20,40,.08)}:root[data-theme="day"] .kp small{color:#0A8FA8}
 .avia-pop .maplibregl-popup-content{border-color:rgba(255,80,80,.45)}.avia-pop .kp small{color:#FF6B6B}
+.ru-pop .maplibregl-popup-content{border-color:rgba(255,213,0,.5)}.ru-pop .kp small{color:#FFD500}

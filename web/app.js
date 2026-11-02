@@ -168,6 +168,16 @@ function addOverlays(){
   map.on('click','avia',e=>{const f=e.features&&e.features[0];if(!f||!SNAP)return;const a=(SNAP.avia||[])[f.properties.ai];if(!a)return;
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'320px',className:'kab-pop avia-pop',offset:20}).setLngLat(f.geometry.coordinates).setHTML(aviaInfo(a)).addTo(map);});
   map.on('mouseenter','avia',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','avia',()=>map.getCanvas().style.cursor='');
+  map.on('click','ru-dot',e=>{const f=e.features&&e.features[0];if(!f||!SNAP)return;const ev=(SNAP.ru||[]).slice().sort((a,b)=>b.t-a.t)[0];if(!ev)return;const p=f.properties;
+    const per=!ev.period?'':/ноч/.test(ev.period)?'за ніч':/дня/.test(ev.period)?'за день':/суток/.test(ev.period)?'за добу':'';
+    if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'300px',className:'kab-pop ru-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
+     '<div class="kp"><small>НАШІ ДРОНИ НАД РФ</small><h4>'+esc(p.n||'')+'</h4>'+
+     '<div class="kp-r"><span>Що</span><b>українські ударні БпЛА'+(p.cnt?' · ×'+p.cnt:'')+'</b></div>'+
+     '<div class="kp-r"><span>Коли</span><b>'+(per||'останнє зведення')+' · '+hm(ev.t)+'</b></div>'+
+     '<div class="kp-r"><span>Усього</span><b>'+ev.total+' над '+ev.regions.length+' рег.</b></div>'+
+     '<div class="kp-r"><span>Джерело</span><b>заява МО РФ («збито») — не підтверджено; влучання не розголошуються</b></div>'+
+     (ev.link?'<div class="kp-ev"><a href="'+esc(ev.link)+'" target="_blank" rel="noopener" style="color:inherit">допис-першоджерело ↗</a></div>':'')+'</div>').addTo(map);});
+  map.on('mouseenter','ru-dot',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','ru-dot',()=>map.getCanvas().style.cursor='');
   map.on('mouseenter','zones-t',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','zones-t',()=>map.getCanvas().style.cursor='');}
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['case',['get','est'],3,4],7,['case',['get','est'],5,7]],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
@@ -619,7 +629,7 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;
   // останнє зведення МО РФ: на карті — лише точки регіонів (з кількістю, якщо названа) і ОДИН підсумковий підпис
   const ev=(SNAP.ru||[]).slice().sort((a,b)=>b.t-a.t)[0];if(!ev){map.getSource('ru').setData(EMPTY);return;}
   const PER=p=>!p?'':/ноч/.test(p)?'за ніч':/дня/.test(p)?'за день':/суток/.test(p)?'за добу':'';
-  const F=ev.regions.map(r=>({type:'Feature',properties:{c:r.cnt?Math.min(12,r.cnt/3):3,l:r.cnt?'×'+r.cnt:''},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}));
+  const F=ev.regions.map(r=>({type:'Feature',properties:{c:r.cnt?Math.min(12,r.cnt/3):3,l:r.cnt?'×'+r.cnt:'',n:r.n,cnt:r.cnt||0},geometry:{type:'Point',coordinates:[r.lon,r.lat]}}));
   const lo=ev.regions.reduce((s,r)=>s+r.lon,0)/ev.regions.length,la=ev.regions.reduce((s,r)=>s+r.lat,0)/ev.regions.length;
   F.push({type:'Feature',properties:{c:0,sum:true,l:'Наші дрони над РФ '+PER(ev.period)+': '+ev.total+' «збитих» за МО РФ · '+ev.regions.length+' рег. · '+fmt(ev.t)},geometry:{type:'Point',coordinates:[lo+1.5,la+0.6]}});
   map.getSource('ru').setData({type:'FeatureCollection',features:F});}
