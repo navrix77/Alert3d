@@ -10,6 +10,7 @@ const angd=(a,b)=>{let d=Math.abs(a-b)%360;return d>180?360-d:d;};
 const fmt=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
 const fmtS=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SIDE=['на північ','на північний схід','на схід','на південний схід','на південь','на південний захід','на захід','на північний захід'];
 const FROM=['з півночі','з північного сходу','зі сходу','з південного сходу','з півдня','з південного заходу','з заходу','з північного заходу'];
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
@@ -236,7 +237,8 @@ function homeRel(tr,p){
   if(best.d<8){rel='route';eta=best.c/tr.speed*60;}
   else if(tr.hd!=null&&angd(tr.hd,brg(P,H))<20){rel='heading';eta=d/tr.speed*60;}
   if(rel&&(d>150||eta>45)){rel=null;eta=null;}
-  return {d,rel,eta,from:FROM[Math.round((brg(H,P))/45)%8]};
+  const away=tr.hd!=null&&angd(tr.hd,brg(P,H))>100;
+  return {d,rel,eta,away,side:SIDE[Math.round((brg(H,P))/45)%8],from:FROM[Math.round((brg(H,P))/45)%8]};
 }
 
 /* ---------- кадр ---------- */
@@ -425,8 +427,8 @@ function fillSheet(first){
   $('#sh-name').textContent=TYPE_NAME[tr.type]+(tr.count>1?' ×'+tr.count:'');
   $('#sh-course').innerHTML=tr.status!=='active'?(tr.status==='lost'?'Втрачено':'Більше не фіксується'):(tr.next?'Курс → <b>'+esc(tr.next)+'</b>':'Курс уточнюється');
   const d=DISP.get(tr.id);const r=d&&homeRel(tr,d.p);
-  $('#sh-dist').textContent=!home?'вкажіть дім':r?Math.round(r.d)+' км '+r.from:'—';
-  $('#sh-eta').textContent=!home?'—':(r&&r.eta!=null?'~'+Math.max(1,Math.round(r.eta))+' хв':'не в бік дому');
+  $('#sh-dist').textContent=!home?'вкажіть дім':r?Math.round(r.d)+' км '+r.side:'—';
+  $('#sh-eta').textContent=!home?'—':!r?'—':r.eta!=null?'≈ '+Math.max(1,Math.round(r.eta))+' хв':r.away?'віддаляється':tr.hd==null?'курс невідомий':'летить повз';
   const ago=Math.round((Date.now()/1000+offset-tr.first)/60);
   $('#sh-first').textContent=fmt(tr.first)+' · '+ago+' хв тому';
   $('#sh-src').textContent=tr.srcs.map(s=>SNAP.sources[s]?.name||s).join(', ')+(tr.srcs.length>1?'':'');
