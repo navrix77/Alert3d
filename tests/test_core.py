@@ -907,3 +907,13 @@ def test_source_direction_reliability():
     rec = tr.ingest(P.parse("Шахед у районі Чугуєва курсом на Балаклію", "M"), "BAD", t0 + 60)
     t = tr.tracks[0]
     assert t.route and t.route[0].name == "Харків" and rec.get("kept_version") == "GOOD"
+
+
+def test_kyiv_kharkivskyi_masyv_2026_11_02():
+    """02.11 22:37: «шахед над Києвом курсом на Харківський масив» — показали шахед за 8 км від дому в Харкові (4 канали)."""
+    for t, ch in [("⚠️Звичайний шахед над Києвом курсом на Харківський масив, Позняки.", "MU"),
+                  ("Герань на Харківський масив, Київ!", "Ukrainian_Intelligence"),
+                  ("БпЛА над Києвом повз Харківський масив", "kiev_nebo")]:
+        o = P.parse(t, ch)
+        assert o.places and all("(Київ)" in r.place.name or r.place.name == "Київ" for r in o.places), (t, names(o))
+    assert names(P.parse("Шахед на Харків", "K")) == ["Харків"]
