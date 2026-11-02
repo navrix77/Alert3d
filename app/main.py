@@ -322,6 +322,20 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
     return Response(data, media_type="audio/wav", headers={"Cache-Control": "max-age=86400"})
 
 
+@app.get("/api/msgs")
+def api_msgs(kind: str | None = None, type: str | None = None, hours: float = 3, q: str | None = None, limit: int = 200):
+    """Журнал розібраних повідомлень — докази для самоаналізу (що написав канал і як ми це зрозуміли)."""
+    sql, args = "SELECT t, src, link, kind, type, places, text FROM msg WHERE t >= ?", [time.time() - hours * 3600]
+    if kind:
+        sql += " AND kind = ?"; args.append(kind)
+    if type:
+        sql += " AND type = ?"; args.append(type)
+    if q:
+        sql += " AND text LIKE ?"; args.append(f"%{q}%")
+    rows = brain.db.execute(sql + " ORDER BY t DESC LIMIT ?", (*args, min(limit, 1000))).fetchall()
+    return [{"t": int(r[0]), "src": r[1], "link": r[2], "kind": r[3], "type": r[4], "places": r[5], "text": r[6]} for r in rows]
+
+
 @app.get("/api/tts/status")
 def api_tts_status():
     from . import tts
