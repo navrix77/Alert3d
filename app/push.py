@@ -166,20 +166,27 @@ class Push:
             # відбій для вас: усі цілі, що загрожували, зникли або віддаляються
             arm = self.armed.get(token) or {}
             if arm and not new_thr:
-                gone = []
+                gone, silent = [], []
                 for tid in list(arm):
                     tr = tracks.get(tid)
-                    if tr is None or tr["status"] != "active":
+                    # «зникла з повідомлень» (lost) — НЕ відбій: шахед може летіти мовчки між постами каналів.
+                    # Відбій лише з доказом: канали написали «збито / не фіксується» (closed) або ціль явно віддаляється.
+                    if tr is None or tr["status"] == "lost":
+                        silent.append(tid)
+                        continue
+                    if tr["status"] == "closed":
                         gone.append(tid)
                         continue
                     a = self.assess(tr, H)
-                    if a is None or (a["stage"] is None and a.get("delta", 0) > 90):
+                    if a is not None and a["stage"] is None and a.get("delta", 0) > 90:
                         gone.append(tid)
-                if gone and len(gone) == len(arm) and now - max(arm.values()) > 120:
+                if silent and len(silent) + len(gone) == len(arm) and now - max(arm.values()) > 1800:
+                    self.armed.pop(token, None)  # пів години без новин — тихо забуваємо, але «відбою» не обіцяємо
+                elif gone and len(gone) == len(arm) and now - max(arm.values()) > 120:
                     self.armed.pop(token, None)
-                    out.append({"to": token, "title": "Загроза для вашого району минула",
-                                "body": "Цілі, що йшли у ваш бік, віддалились або зникли з повідомлень каналів. "
-                                        "Офіційний відбій — за сиреною та «Повітряною тривогою».",
+                    out.append({"to": token, "title": "Цілі, що йшли до вас, віддалились",
+                                "body": "За повідомленнями каналів цілі, що летіли у ваш бік, віддаляються або більше не фіксуються. "
+                                        "Офіційний відбій — лише за сиреною та «Повітряною тривогою».",
                                 "sound": "default", "channelId": "threats", "data": {}})
         self.fired = {k: v for k, v in self.fired.items() if now - v < 3 * REARM}
         for i in range(0, len(out), 100):

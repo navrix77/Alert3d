@@ -747,8 +747,12 @@ def test_push_stages_like_israel():
     import time as _t
     for k in pu.armed["ExponentPushToken[abcdefghijkl]"]:
         pu.armed["ExponentPushToken[abcdefghijkl]"][k] = _t.time() - 300
+    # канали замовкли (lost) — це не доказ, що загроза минула: відбою не надсилаємо
     asyncio.run(pu.tick(Cli(), {"tracks": [dict(t, status="lost") for t in many]}))
-    assert len(sent) == 1 and "минула" in sent[0]["title"]
+    assert sent == []
+    # канали написали «збито / не фіксується» (closed) — тоді так
+    asyncio.run(pu.tick(Cli(), {"tracks": [dict(t, status="closed") for t in many]}))
+    assert len(sent) == 1 and "віддалились" in sent[0]["title"]
 
 
 def test_area_stats(tmp_path):
