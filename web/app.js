@@ -14,7 +14,7 @@ const SIDE=['на північ','на північний схід','на схі�
 const FROM=['з півночі','з північного сходу','зі сходу','з південного сходу','з півдня','з південного заходу','з заходу','з північного заходу'];
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
-let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=(()=>{try{if(!localStorage.getItem('mapv2')){localStorage.setItem('mapv2','1');localStorage.setItem('t3d','0');}}catch(e){}return localStorage.getItem('t3d')==='1';})(),base=localStorage.getItem('base2')||'night';
+let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=(()=>{try{if(!localStorage.getItem('mapv2')){localStorage.setItem('mapv2','1');localStorage.setItem('t3d','0');}}catch(e){}return localStorage.getItem('t3d')==='1';})(),base=(()=>{try{if(localStorage.getItem('base2')==='navryx'){localStorage.setItem('base2','night');const p=JSON.parse(localStorage.getItem('pref')||'{}');if(p.base==='navryx'){delete p.base;localStorage.setItem('pref',JSON.stringify(p));}}}catch(e){}return localStorage.getItem('base2')||'night';})();
 function applySaver(){const on=window.NXPERF&&NXPERF.saver;['hillshade','bld3d'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');});const c=$('#st-saver');if(c){c.checked=!!(window.NXPERF&&localStorage.getItem('saver')==='1');c.onchange=e=>NXPERF.setSaver(e.target.checked);}}
 document.addEventListener('nxsaver',()=>{try{applySaver();}catch(e){}});
 function syncReal3d(){applySaver();const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
@@ -706,11 +706,11 @@ document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('clic
   else if(k==='shelter'){SHELTER=+v;localStorage.setItem('shelter',SHELTER);if($('#me-sh'))$('#me-sh').textContent=SHELTER;syncSettingsUI();}}));
 $('#st-3d').onchange=e=>set3d(e.target.checked,true);
 (function(){const S=window.NXSound;if(!S)return;const g=S.get();
-  const segs={'snd-mode':'mode','snd-tone':'tone'};
-  Object.entries(segs).forEach(([id,k])=>{const box=document.getElementById(id);if(!box)return;box.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===g[k]);b.onclick=()=>{S.set(k,b.dataset.v);box.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));if(k==='tone'||b.dataset.v!=='off')S.test();};});});
+  const segs={'snd-mode':'mode','snd-tone':'tone','snd-voice':'voice'};
+  Object.entries(segs).forEach(([id,k])=>{const box=document.getElementById(id);if(!box)return;box.querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===g[k]);b.onclick=()=>{S.set(k,b.dataset.v);box.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));if(k==='voice'){S.speakOnly('Привіт. Так звучить голос '+b.textContent+'.');}else if(k==='tone'||b.dataset.v!=='off')S.test();};});});
   const vol=document.getElementById('snd-vol');if(vol){vol.value=Math.round(g.vol*100);vol.oninput=()=>S.set('vol',vol.value/100);}
   const tb=document.getElementById('snd-test');if(tb)tb.onclick=()=>S.test();
-  const vh=document.getElementById('snd-voice-hint');if(vh)setTimeout(()=>{vh.textContent=S.hasUkVoice()?'Голос: українська озвучка пристрою':'Українського голосу на пристрої не знайдено — озвучка може бути з акцентом';},1200);})();
+  const vh=document.getElementById('snd-voice-hint');if(vh)setTimeout(()=>{fetch('/api/tts/status').then(r=>r.json()).then(t=>{vh.textContent=t.piper?'Голоси Лада, Тетяна, Микита, Олекса — українська нейромережева озвучка (Piper)':'Готую українську озвучку на сервері (перший раз кілька хвилин); поки — голос пристрою';}).catch(()=>{});},1200);})();
 $('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&Notification.permission!=='granted'){const r=await Notification.requestPermission();if(r!=='granted'){e.target.checked=false;toast('Браузер не дозволив сповіщення');}}PREF.sys=e.target.checked;savePref();};
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};

@@ -3,3 +3,4 @@ uvicorn[standard]==0.32.1
 httpx==0.28.1
 telethon==1.38.1
 cryptography>=42
+piper-tts>=1.3

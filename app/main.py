@@ -282,6 +282,17 @@ async def lifespan(app: FastAPI):
                 await asyncio.to_thread(brain.snapshot)
         tasks.append(asyncio.create_task(_snap()))
     tasks.append(asyncio.create_task(LEARNER.run()))
+
+    async def _tts_warm():  # українська озвучка: рушій і голос «Лада» готуються у фоні одразу після старту
+        from . import tts
+        await asyncio.sleep(20)
+        if not tts.piper_ok():
+            tts._install_bg()
+        try:
+            await tts._ensure_model("lada")
+        except Exception as e:  # noqa: BLE001
+            log.info("tts warm: %s", e)
+    tasks.append(asyncio.create_task(_tts_warm()))
     if os.getenv("REPLAY") != "1" and os.getenv("AUTO_SOURCES", "1") == "1":
         tasks.append(asyncio.create_task(DISCOVER.run()))
     if os.getenv("LAN_TLS", "1") == "1":
@@ -298,6 +309,23 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="NAVRYX SKY", lifespan=lifespan)
 from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
 app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)  # geojson і скрипти стискаються в 3-5 разів
+
+
+@app.get("/api/tts")
+async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
+    """Українська озвучка (Piper). 503 — поки ставиться рушій або голос; клієнт тоді говорить голосом пристрою."""
+    from fastapi import Response
+    from . import tts
+    data, why = await tts.speak(text, voice, rate)
+    if not data:
+        return JSONResponse({"ok": False, "why": why, **tts.status()}, status_code=503)
+    return Response(data, media_type="audio/wav", headers={"Cache-Control": "max-age=86400"})
+
+
+@app.get("/api/tts/status")
+def api_tts_status():
+    from . import tts
+    return tts.status()
 
 
 @app.get("/api/sources_auto")
