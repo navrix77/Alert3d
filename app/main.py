@@ -38,7 +38,7 @@ brain = Brain()
 pushsvc = Push()
 ru = RuStrikes()
 hits = UaStrikes(parser.gaz)
-tracker = Tracker(config.SOURCES, brain)
+tracker = Tracker(config.SOURCES, brain, audit=True)
 alerts = OfficialAlerts()
 alerts.on_threat = lambda ev: on_threat(ev)
 webmon = WebMonitor()
@@ -50,7 +50,7 @@ CTX: dict[str, tuple[float, float, float]] = {}
 LASTC: dict[str, tuple[float, str, str]] = {}
 
 
-def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool) -> None:
+def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool, typ_hint: str | None = None) -> None:
     """Одне повідомлення каналу може містити кілька цілей — ділимо на сегменти й кожен веде в трекер."""
     segs = parser.segments(text)
     # контекст для одноіменних сіл: усі пункти повідомлення разом + що канал називав останні 30 хв
@@ -64,6 +64,8 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
         ctx = (la, lo)
         CTX[key] = (ts, la, lo)
     msg_type = whole.type if len(segs) > 1 else None
+    if typ_hint and not msg_type:
+        msg_type = typ_hint  # повтор із журналу: тип був у заголовку початкового повідомлення
     summary = bool(launch.SUMMARY_RX.search(text.lower()))
     useful = 0
     trk.exclude = set()
@@ -73,7 +75,7 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     trk.prefer = last[2] if cont and last and ts - last[0] < 420 else None
     for seg in segs:
         obs = parser.parse(seg, key, ctx)
-        if obs.type is None and msg_type and obs.places and not obs.close and not obs.no_target:
+        if obs.type is None and msg_type and obs.places and not obs.close and not obs.no_target and (len(segs) > 1 or typ_hint):
             obs.type = msg_type
         if obs.type is None and obs.places and not obs.close and not obs.no_target and trk.prefer and last:
             obs.type = last[1]
@@ -198,6 +200,8 @@ def state() -> dict:
     # КАБ без тривоги в області не буває: якщо офіційна тривога там знята — зону й авіацію прибираємо
     if off.get("ok") and off.get("alert_obl") is not None:
         ao = set(off["alert_obl"])
+        if "Київ" in ao or "Київська" in ao:
+            ao |= {"Київ", "Київська"}
         snap["zones"] = [z for z in snap.get("zones", []) if not z.get("obl") or z["obl"] in ao]
         snap["avia"] = [a for a in snap.get("avia", []) if a["obl"] in ao]
     snap["ru"] = ru.state()
@@ -243,7 +247,11 @@ async def pusher() -> None:
         await asyncio.sleep(config.PUSH_SEC)
         if not clients:
             continue
-        msg = json.dumps(state(), ensure_ascii=False)
+        try:
+            msg = json.dumps(state(), ensure_ascii=False)
+        except Exception:  # одна погана ціль не має зупиняти оновлення для всіх
+            log.exception("state() failed")
+            continue
         dead = []
         for ws in list(clients):
             try:

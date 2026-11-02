@@ -25,7 +25,7 @@ class Learner:
         self.tr, self.brain = tracker, brain
         self.base = {k: v["speed"] for k, v in tracker_types().items()}
         self.speeds: dict[str, list] = collections.defaultdict(list)   # тип -> [[км/год, трек, від, до, t]]
-        self.seen: set = set()
+        self.seen: dict = {}  # впорядковано за часом додавання
         self.type_conf: dict[str, dict] = collections.defaultdict(lambda: {"ok": 0, "dup": 0})
         self.merges: collections.Counter = collections.Counter()
         self.runs, self.last = 0, 0.0
@@ -56,7 +56,8 @@ class Learner:
         now = now or time.time()
         found = 0
         for tr in list(self.tr.tracks):
-            obs = [o for o in tr.obs if not o.est]
+            srcs = set(tr.srcs)
+            obs = [o for o in list(tr.obs) if not o.est]
             for a, b in zip(obs, obs[1:]):
                 key = (tr.id, int(a.t), int(b.t))
                 if key in self.seen:
@@ -68,23 +69,25 @@ class Learner:
                 base = self.base.get(tr.type)
                 if not base or not (base * 0.35 < v < base * 2.2):
                     continue  # явний «телепорт» або стояння — не вимір
-                self.seen.add(key)
+                self.seen[key] = 1
+                if any(x[2] == a.label and x[3] == b.label and x[4] == int(b.t) for x in self.speeds[tr.type][-300:]):
+                    continue  # той самий вимір уже записано (наприклад, до перезапуску)
                 self.speeds[tr.type].append([round(v), tr.id, a.label, b.label, int(b.t)])
                 self.speeds[tr.type] = self.speeds[tr.type][-300:]
                 found += 1
             if tr.merged and ("m", tr.id) not in self.seen:
-                self.seen.add(("m", tr.id))
+                self.seen[("m", tr.id)] = 1
                 keep = next((x for x in self.tr.tracks if x.id == tr.merged), None)
                 self.merges[f"{tr.type}->{keep.type if keep else '?'}"] += 1
                 if keep and keep.type != tr.type:
-                    for s in tr.srcs - keep.srcs:
+                    for s in srcs - set(keep.srcs):
                         self.type_conf[s]["dup"] += 1
             elif not tr.merged and tr.closed and ("c", tr.id) not in self.seen and len(tr.srcs) >= 2:
-                self.seen.add(("c", tr.id))
-                for s in tr.srcs:
+                self.seen[("c", tr.id)] = 1
+                for s in srcs:
                     self.type_conf[s]["ok"] += 1
         if len(self.seen) > 20000:
-            self.seen = set(list(self.seen)[-8000:])
+            self.seen = dict.fromkeys(list(self.seen)[-8000:], 1)  # лишаємо найновіші
         changed = self.apply_speeds()
         self.runs += 1
         self.last = now
@@ -98,20 +101,22 @@ class Learner:
         """Медіана щонайменше 8 вимірів → номінальна швидкість типу (обмежено 0.6–1.5× паспортної)."""
         T = tracker_types()
         out = {}
+        cur = self.tr.speed_over
         for typ, arr in self.speeds.items():
             if typ not in T or len(arr) < 8:
                 continue
             med = statistics.median(x[0] for x in arr[-120:])
             base = self.base.get(typ, T[typ]["speed"])
             new = int(max(base * 0.6, min(base * 1.5, med)))
-            if abs(new - T[typ]["speed"]) >= 5:
-                out[typ] = [T[typ]["speed"], new, len(arr)]
-                T[typ]["speed"] = new
+            old = cur.get(typ, base)
+            if abs(new - old) >= 5:
+                out[typ] = [old, new, len(arr)]
+                cur[typ] = new  # лише живий трекер; глобальні TYPES (і мапа доби) не змінюються
         return out
 
     def state(self) -> dict:
         T = tracker_types()
-        sp = {k: {"learned": T[k]["speed"] if k in T else None, "passport": self.base.get(k), "samples": len(v),
+        sp = {k: {"learned": self.tr.speed_over.get(k, self.base.get(k)), "passport": self.base.get(k), "samples": len(v),
                   "evidence": v[-5:]} for k, v in self.speeds.items()}
         tc = {s: {**c, "dup_rate": round(c["dup"] / max(1, c["dup"] + c["ok"]), 2)} for s, c in self.type_conf.items()
               if c["dup"] + c["ok"] >= 5}

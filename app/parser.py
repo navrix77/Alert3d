@@ -8,7 +8,7 @@ from .geo import OBLAST_HINTS, Gazetteer, Place, dist_km, norm
 
 TYPES = [
     # нові типи — лише коли канал прямо так пише
-    ("geran5", re.compile(r"гер[ао]н[ья]?[-\s]*5|гербер\w*[-\s]*5")),
+    ("geran5", re.compile(r"(гер[ао]н[ья]?|гербер\w*)(-|–|№\s?)?5(?![\d.,])(?!\s*(шт|од|ціл|цел|x\b|х\b))(?=\W|$)")),  # лише «Герань-5», не «герань 5 штук»
     ("banderol", re.compile(r"бандерол")),
     ("rszv", re.compile(r"рсзв|рсзо|реактивн\w* систем\w* залпов|систем\w* залпового")),
     ("fpvf", re.compile(r"оптоволок")),
@@ -57,7 +57,7 @@ CHANNEL_CITY = {"M": "Харків", "R": "Харків", "TLK": "Харків",
 HEADER = re.compile(r"^\s*([А-ЯІЇЄҐ][а-яіїєґ'’]+(?:щина|ччина|еччина|ччини|щини))\s*:", re.M)
 SEG_SPLIT = re.compile(r"\n+|(?=🛵)|(?=🚀)|(?=💥)|(?=🟠)|(?=🟡)|(?=🔴)|(?=🟢)|;\s*|\s+-\s+")
 SEA = re.compile(r"(?i)(з |із |с |в |у )?(акваторії |акватории |акваторію )?(чорного|черного|азовського|азовского|чорне|черное|азовське|азовское|чорному|черном) мор\w*|(з |із |с )?акватор\w*")
-ORIGIN_OBL = re.compile(r"(^|[^а-яіїє])(з|із|зі|с|со|от|зі сторони)\s+[а-яіїє]+(щини|ччини|ської області|ской области|ської обл\.?|ской обл\.?)")
+ORIGIN_OBL = re.compile(r"(^|[^а-яіїє])(з|із|зі|с|со|от|зі сторони)\s+[а-яіїєы]+(щини|ччини|щины|чины|ської області|ской области|ської обл\.?|ской обл\.?)")
 MORE_HINTS = [(re.compile(r"житомирщ|житомирськ\w* обл|житомирск\w* обл"), "Житомирська"),
               (re.compile(r"черкащ|черкаськ\w* обл|черкасск\w* обл"), "Черкаська"),
               (re.compile(r"вінниччин|вінницьк\w* обл|винницк\w* обл"), "Вінницька"),
@@ -140,6 +140,7 @@ class Observation:
     course: float | None = None
     avia: list | None = None  # активність авіації: області-напрямки ([] — без напрямку)
     avia_off: bool = False
+    su: bool = False  # згадано Су-34/Су-35 — носії КАБ
     no_target: bool = False  # статус тривоги / FPV / новина — не ціль, тип з інших рядків не підставляти
 
     @property
@@ -150,8 +151,8 @@ class Observation:
             return "close"
         if self.avia is not None and self.type != "kab":
             return "avia"
-        if self.type == "kab" or (self.aviation and not self.type):
-            return "zone"
+        if self.type == "kab" or (self.aviation and not self.type and self.su):
+            return "zone"  # зона КАБ — лише від тактичної авіації (Су-34/35), не від Ту-22/МіГ-31К
         if self.type and self.places:
             return "track"
         return "info"
@@ -203,9 +204,11 @@ class Parser:
             launch=bool(LAUNCH.search(t)),
             threat=bool(THREAT.search(t)),
             aviation=bool(AVIATION.search(t)),
+            su=bool(re.search(r"су-?3[45]", t)),
         )
         if AVIA_OFF.search(t):
             obs.avia_off, obs.type, obs.close = True, "kab", True
+            obs.avia = next((o for rx, o in AVIA_DIR if rx.search(t)), [])
         elif AVIA_ACT.search(t) and typ in (None, "kab"):
             obs.avia = next((o for rx, o in AVIA_DIR if rx.search(t)), [])
         bbox = None
@@ -271,7 +274,8 @@ class Parser:
                 i += 1
                 continue
             nxt = norm(words[i + 1]) if i + 1 < len(words) else ""
-            if norm(w) in SKIP or nxt.startswith(("област", "обл", "громад")):
+            # «Шахеди», «Гербери», «Герані», «Бандероль» — назви цілей, а не села Шахи / Гербине
+            if norm(w) in SKIP or nxt.startswith(("област", "обл", "громад")) or any(rx.search(norm(w)) for _k, rx in TYPES):
                 i += 1
                 continue
             ids, used = None, 1

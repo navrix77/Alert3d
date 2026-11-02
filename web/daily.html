@@ -122,10 +122,8 @@ function intro(){
   const end={center:map.getCenter(),zoom:map.getZoom()};
   map.jumpTo({center:[end.center.lng+1.2,end.center.lat-1.6],zoom:end.zoom-0.7,pitch:58,bearing:-24});
   map.easeTo({center:end.center,zoom:end.zoom,pitch:0,bearing:0,duration:6500,easing:t=>1-Math.pow(1-t,3)});
-  playing=true;$('#pl').textContent='❚❚';CUR=0;const t0=performance.now(),DUR=6500;
-  const step=now=>{if(!playing)return;const u=Math.min(1,(now-t0)/DUR);CUR=1-Math.pow(1-u,2);$('#tt').value=CUR*1000;draw(CUR);
-    if(u<1)requestAnimationFrame(step);else{playing=false;$('#pl').textContent='▶';draw(1);}};
-  requestAnimationFrame(step);
+  // програвання доби — з обраною швидкістю (за замовчуванням 2.5 с на годину), а не за 6 секунд
+  CUR=0;draw(0);$('#tt').value=0;playing=false;setTimeout(()=>{if(!playing&&CUR===0)$('#pl').click();},700);
 }
 function fit(){// уся Україна в кадрі, з урахуванням панелей
   const m=mobile(),hh=document.querySelector('.head').offsetHeight;

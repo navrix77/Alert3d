@@ -172,7 +172,9 @@ class Zone:
 
 
 class Tracker:
-    def __init__(self, sources: dict[str, Source], brain=None, learn: bool = True) -> None:
+    def __init__(self, sources: dict[str, Source], brain=None, learn: bool = True, audit: bool = False) -> None:
+        self.speed_over: dict[str, float] = {}  # навчені швидкості (лише живий трекер; повтори доби — паспортні)
+        self.audit = audit  # самоаналіз лише для живого трекера (не для повторів доби/історії)
         self.sources = sources
         self.brain = brain
         self.learn = learn
@@ -201,7 +203,7 @@ class Tracker:
             if fast:
                 done = 0
                 for tr in sorted(self.tracks, key=lambda x: -x.last.t):
-                    if tr.closed or tr.type not in fast or t - tr.last.t > TYPES[tr.type]["life"]:
+                    if tr.closed or tr.merged or tr.type not in fast or t - tr.last.t > TYPES[tr.type]["life"]:
                         continue
                     e = tr.est(t)
                     ends = [e] + ([tr.route[-1].xy] if tr.route else [])
@@ -223,12 +225,14 @@ class Tracker:
             regs = set(obs.avia or []) | {o for o in (obl_of(p.place) for p in places) if o}
             for z in list(self.zones):
                 near = places and any(dist_km(p.place.xy, q.xy) < 40 for p in places for q in z.places)
-                if near or (not places and (z.obl in regs or (not regs and (z.obl == reg or z.src == src)))):
+                if near or (not places and (z.obl in regs or (not regs and (z.obl == reg or any(e.get("src") == src for e in z.ev))))):
                     self.zones.remove(z)
                     n += 1
             if obs.avia_off:
-                for o in list(self.avia):
-                    if o in regs or (not regs and (o == reg or reg is None)):
+                for o, a in list(self.avia.items()):
+                    mine = any(e.get("src") == src for e in a.get("ev", []))
+                    # без напрямку: регіональний канал — лише своя область; національний — лише те, про що писав сам
+                    if o in regs or (not regs and (o == reg or (reg is None and mine))):
                         self.avia.pop(o, None)
             rec["closed"] = n
             return rec
@@ -238,7 +242,7 @@ class Tracker:
             reg = CHANNEL_REGION.get(src)
             obl = oblasts()
             for tr in self.tracks:
-                if tr.closed or (obs.type and tr.type != obs.type):
+                if tr.closed or tr.merged or (obs.type and tr.type != obs.type):
                     continue
                 e = tr.est(t)
                 if places and not any(dist_km(p.place.xy, e) < 45 for p in places):
@@ -285,7 +289,7 @@ class Tracker:
                     z.places += [p for p in pl if all(dist_km(p.xy, q.xy) > 3 for q in z.places)]
                     z.places = z.places[-6:]
                 else:
-                    z = Zone(pl, t, src, "Су-34" if obs.aviation else None, t, 1, obl_of(pl[0]),
+                    z = Zone(pl, t, src, "Су-34/Су-35" if getattr(obs, "su", False) else None, t, 1, obl_of(pl[0]),
                              [{"t": int(t), "src": src, "text": (getattr(obs, "raw", "") or "")[:220], "link": link}])
                     self.zones.append(z)
                 # КАБ летять — отже авіація в цьому напрямку активна
@@ -365,7 +369,7 @@ class Tracker:
                 tr.heading = obs.course
         else:
             c = self.counters[obs.type] = self.counters.get(obs.type, 0) + 1
-            tr = Track(f"{TYPES[obs.type]['label']}-{c}", obs.type, TYPES[obs.type]["speed"])
+            tr = Track(f"{TYPES[obs.type]['label']}-{c}", obs.type, self.speed_over.get(obs.type, TYPES[obs.type]["speed"]))
             if pos is not None:
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
             else:
@@ -410,12 +414,13 @@ class Tracker:
         if obs.count:
             tr.count = max(tr.count or 0, obs.count) if t - tr.obs[0].t < 900 else obs.count
         rec["track"] = tr.id
-        try:
-            from .audit import AUDIT
-            from .config import CHANNEL_REGION
-            AUDIT.check(tr, obs, src, CHANNEL_REGION.get(src), oblasts().of, TYPES[tr.type]["speed"], self.brain, self.learn)
-        except Exception:
-            pass
+        if self.audit:
+            try:
+                from .audit import AUDIT
+                from .config import CHANNEL_REGION
+                AUDIT.check(tr, obs, src, CHANNEL_REGION.get(src), oblasts().of, TYPES[tr.type]["speed"], self.brain, self.learn, t)
+            except Exception:
+                pass
         # «Чому я це показую»: що саме змінило відображення цієї цілі
         moved = bool(tr.obs and tr.obs[-1].t == t and tr.obs[-1].src == src)
         if moved and len(tr.obs) > 1 and dist_km((tr.obs[-1].x, tr.obs[-1].y), (tr.obs[-2].x, tr.obs[-2].y)) < 1.5 and tr.evidence:
@@ -511,6 +516,9 @@ class Tracker:
                 else:
                     continue
                 if d > lim or not same_way(a, b):
+                    continue
+                # той самий канал майже одночасно написав про дві цілі («шахед на Чугуїв» + «ще шахед на Чугуїв») — це різні
+                if a.srcs & b.srcs and abs(a.obs[0].t - b.obs[0].t) < 120:
                     continue
                 keep, drop = (a, b) if rank(a) >= rank(b) else (b, a)
                 if a.type != b.type and keep.type == "jet" and len(drop.srcs) >= len(keep.srcs):

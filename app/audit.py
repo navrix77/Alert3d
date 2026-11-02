@@ -23,8 +23,8 @@ class Audit:
         self.by_place: collections.Counter = collections.Counter()
         self.seen = 0
 
-    def add(self, kind: str, src: str, text: str | None, **kw) -> None:
-        rec = {"t": int(time.time()), "kind": kind, "src": src, "text": (text or "")[:200], **kw}
+    def add(self, kind: str, src: str, text: str | None, t: float | None = None, **kw) -> None:
+        rec = {"t": int(t or time.time()), "kind": kind, "src": src, "text": (text or "")[:200], **kw}
         self.recent.append(rec)
         self.count[kind] += 1
         self.by_src[src][kind] += 1
@@ -33,12 +33,14 @@ class Audit:
         if os.getenv("PYTEST_CURRENT_TEST"):
             return
         try:
+            if FILE.exists() and FILE.stat().st_size > 5_000_000:  # ротація: тримаємо ~5 МБ + попередній файл
+                FILE.replace(FILE.with_suffix(".1.jsonl"))
             with FILE.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         except Exception:
             pass
 
-    def check(self, tr, obs, src: str, region: str | None, obl_of_xy, nominal: float, brain=None, learn=True) -> None:
+    def check(self, tr, obs, src: str, region: str | None, obl_of_xy, nominal: float, brain=None, learn=True, t: float | None = None) -> None:
         """Викликається після кожного оновлення треку."""
         self.seen += 1
         text = getattr(obs, "raw", None)
@@ -49,7 +51,7 @@ class Audit:
                 dt = max(30.0, b.t - a.t)
                 v = d / dt * 3600
                 if d > 25 and v > nominal * 3:
-                    self.add("teleport", src, text, track=tr.id, type=tr.type, km=round(d), kmh=round(v),
+                    self.add("teleport", src, text, t, track=tr.id, type=tr.type, km=round(d), kmh=round(v),
                              place=b.label, prev=a.label)
                     if brain and learn:
                         brain.rel_update(src, False, 0.3)
@@ -58,13 +60,13 @@ class Audit:
             far = max(dist_km(here, p.xy) for p in tr.route)
             lim = 700 if tr.type in ("cruise", "ballistic") else 450
             if far > lim:
-                self.add("far_course", src, text, track=tr.id, type=tr.type, km=round(far),
+                self.add("far_course", src, text, t, track=tr.id, type=tr.type, km=round(far),
                          place=tr.route[-1].name, at=tr.last.label)
         if region and tr.obs and tr.last.src == src:
             la, lo = from_xy(tr.last.x, tr.last.y)
             o = obl_of_xy(lo, la)
             if o and not region.startswith(o[:5]):
-                self.add("off_region", src, text, track=tr.id, place=tr.last.label, obl=o, region=region)
+                self.add("off_region", src, text, t, track=tr.id, place=tr.last.label, obl=o, region=region)
 
     def state(self) -> dict:
         top_src = sorted(((s, sum(c.values())) for s, c in self.by_src.items()), key=lambda x: -x[1])[:15]

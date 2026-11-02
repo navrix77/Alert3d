@@ -200,3 +200,31 @@ def test_kab_zone_lifecycle():
     assert not tr.snapshot()["zones"]
     tr.ingest(p.parse("КАБ на Золочів"), "x", time.time() - 11 * 60)  # 11 хв тиші, авіації вже нема
     assert not tr.snapshot()["zones"]
+
+
+def test_review_regressions():
+    import time
+    from app import config
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p = Parser()
+    # назви цілей — не села Шахи / Гербине
+    o = p.parse("Шахеди на Полтаву", "K")
+    assert [r.place.name for r in o.places] == ["Полтава"]
+    assert p.parse("Герань 5 штук курсом на Полтаву").type == "shahed"
+    assert p.parse("Герань-5 на Полтаву").type == "geran5"
+    # Ту-22 / МіГ-31К — не зона КАБ
+    assert p.parse("МіГ-31К злетів. Загроза для Києва").kind != "zone"
+    # нові типи не валять snapshot (launch.link)
+    tr = Tracker(config.SOURCES, learn=False)
+    t = time.time()
+    for s in ["Герань-5 на Охтирку", "Бандероль на Харків", "РСЗВ по Нікополю", "FPV у районі Білозерки"]:
+        tr.ingest(p.parse(s), "x", t)
+    tr.snapshot()
+    # дві цілі від одного каналу в одному пункті не зливаються
+    tr2 = Tracker(config.SOURCES, learn=False)
+    tr2.ingest(p.parse("Шахед у районі Чугуєва"), "k", t)
+    tr2.exclude = {tr2.tracks[0].id}
+    tr2.ingest(p.parse("Шахед у районі Чугуєва"), "k", t + 5)
+    tr2.exclude = set()
+    assert len([x for x in tr2.snapshot()["tracks"] if x["status"] == "active"]) == 2

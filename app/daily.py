@@ -210,7 +210,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
             if link and (link, text) in seen_links:
                 continue
             seen_links.add((link, text))
-            feed(shadow, text, src, ts, link, False)
+            feed(shadow, text, src, ts, link, False, typ if kind in ("track", "zone") else None)
             if time.monotonic() - t_yield > 0.02:
                 await asyncio.sleep(0.005)
                 t_yield = time.monotonic()
