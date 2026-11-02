@@ -666,6 +666,14 @@ class Tracker:
         return {"pubs": info["pubs"], "prim": info["prim"], "indep": len(info["prim"]), "items": items,
                 "contra": vers if len(vers) > 1 else [], "age": int(now - last_real)}
 
+    def track_evidence(self, tid: str, now: float | None = None) -> dict | None:
+        """Повні докази однієї цілі — за запитом (панель цілі / рентген), а не в кожному знімку для всіх."""
+        now = now or time.time()
+        tr = next((t for t in self.tracks if t.id == tid), None)
+        if tr is None:
+            return None
+        return self._ev_out(tr, now, tr.est(now))
+
     # ---------------- знімок стану для клієнтів
     def evidence(self, tr: Track) -> dict:
         """Групуємо публікації: однаковий текст протягом 5 хв — копія першої (перепост/ретрансляція)."""
@@ -778,7 +786,7 @@ class Tracker:
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),
                 "links": [o.link for o in tr.obs[-5:] if o.link],
-                "ev": self._ev_out(tr, now, (ex, ey)),
+                "ev": {k: v for k, v in self._ev_out(tr, now, (ex, ey)).items() if k != "items"},  # докази — /api/track/{id}
                 "from": tr.from_place.name if tr.from_place else None, "ts": now,
                 "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4), tr.obs[0].label, int(tr.obs[0].t)],
                 "launch": self.launches.link(tr, now, hd) if status != "closed" or age < 1800 else None,

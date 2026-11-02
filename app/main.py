@@ -443,6 +443,14 @@ async def push_register(body: dict):
     return JSONResponse({"ok": ok}, status_code=200 if ok else 400)
 
 
+@app.get("/api/track/{tid}")
+async def api_track(tid: str):
+    ev = tracker.track_evidence(tid)
+    if ev is None:
+        return JSONResponse({"error": "немає такої цілі"}, status_code=404)
+    return JSONResponse(ev)
+
+
 @app.get("/api/webpush/key")
 async def webpush_key():
     return {"key": await asyncio.to_thread(pushsvc.public_key)}

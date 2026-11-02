@@ -555,6 +555,11 @@ function renderBanner(threats){
 function lpHtml(tr){const L=tr.lpath||[];if(!L.length)return '';const A=(SNAP.pred_acc||{})[tr.type];
   return '<h4>Ймовірно далі <small>· навчено на попередніх перельотах'+(A?' · точність '+Math.round(A.acc*100)+'% з '+A.n:'')+'</small></h4><ol class="lp">'+L.map(x=>'<li><b>'+Math.round(x[3]*100)+'%</b> '+esc(x[2])+'</li>').join('')+'</ol>';}
 function openSheet(id){if(follow&&id!==sel)stopFollow();sel=id;$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити стеження':'Стежити за ціллю';$('#sheet').hidden=false;fillSheet(true);const d=DISP.get(id);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),8.5),curve:1.3,speed:1.1,essential:true});}
+/* докази цілі (список публікацій) — за запитом, кеш 15 с; у знімку їх більше немає (були >50% трафіку) */
+const EVC=new Map();function evItems(id,cb){const c=EVC.get(id);const now=Date.now();if(c&&now-c.t<15000)return c.items;
+  if(c&&c.pending)return c.items||null;EVC.set(id,{t:c?c.t:0,items:c?c.items:null,pending:true});
+  fetch('/api/track/'+encodeURIComponent(id),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{EVC.set(id,{t:Date.now(),items:j?j.items:[],contra:j?j.contra:[]});if(cb)cb();}).catch(()=>EVC.set(id,{t:Date.now()-10000,items:c?c.items:[]}));
+  return c?c.items:null;}
 function fillSheet(first){
   const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr){$('#sheet').hidden=true;sel=null;return;}
   if(first||!fillSheet.icon||fillSheet.icon!==tr.type){const c=drawTarget(tr.type,40);$('#sh-icon').innerHTML='';$('#sh-icon').appendChild(c);fillSheet.icon=tr.type;}
@@ -578,11 +583,12 @@ function fillSheet(first){
     const why=tr.pred==='learned'?' <small>· вивчено з історії'+(tr.pred_p?' ('+Math.round(tr.pred_p*100)+'%)':'')+'</small>':tr.pred==='channels'?' <small>· за каналами</small>':'';
     $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо — позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'')+lpHtml(tr);}else $('#sh-route').innerHTML=lpHtml(tr);
   // «Чому я це показую»: першоджерело, копії, суперечності, давність, що змінило відображення
-  {const E=tr.ev||{items:[],prim:[],pubs:0,contra:[],age:0};const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
+  {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=evItems(tr.id,()=>{if(sel===tr.id)fillSheet();});E.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
    const head=E.pubs+' '+(E.pubs===1?'публікація':E.pubs<5?'публікації':'публікацій')+' · '+ind+' '+(ind===1?'першоджерело':ind<5?'першоджерела':'першоджерел')+' · '+(ind>=2?'<b class=ok>незалежне підтвердження є</b>':'<b class=warn>незалежного підтвердження немає</b>');
    const age=E.age;const ageTxt=age<120?'щойно':age<3600?Math.round(age/60)+' хв тому':'понад годину тому';
    let h='<h4>Чому я це показую</h4><p class=ev-head>'+head+'</p><p class=ev-age>Остання фіксація місця: '+ageTxt+(age>300?' — позиція далі лише оцінка, зона невизначеності росте':'')+'</p>';
    if(E.contra.length)h+='<div class=ev-contra><b>Версії розходяться:</b>'+E.contra.map(v=>'<div>→ '+esc(v.dest||'?')+' <small>('+v.srcs.map(nm).join(', ')+')</small></div>').join('')+'</div>';
+   if(!got)h+='<div class=note>Завантажую публікації…</div>';
    h+='<ol class=ev-list>'+E.items.slice().sort((a,b)=>b.t-a.t).map(it=>{const tag=it.copy?(it.copy===it.src?'<i class=cp>повтор</i>':'<i class=cp>копія '+nm(it.copy)+'</i>'):(it.why==='нова ціль'?'<i class=nw>першоджерело</i>':it.why==='змінило позицію'?'<i class=mv>змінило позицію</i>':it.why==='змінило курс'?'<i class=cr>змінило курс</i>':'<i class=cf>підтвердження</i>');
      return '<li class="'+(it.copy?'copy':'')+'"><div class=ev-m><span>'+fmt(it.t)+'</span><b>'+nm(it.src)+'</b>'+tag+(it.link?'<a href="'+esc(it.link)+'" target=_blank rel=noopener>пост ↗</a>':'')+'</div>'+(it.text?'<q>'+esc(it.text)+'</q>':'')+'</li>';}).join('')+'</ol>';
    $('#sh-proof').innerHTML=h;}
@@ -685,7 +691,7 @@ function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;const F=[],nm=k
   // лише обрана ціль, або до 6 найсвіжіших цілей у кадрі — інакше «павутиння» на пів країни
   const bb=map.getBounds();const pool=SNAP.tracks.filter(t=>t.status==='active'&&t.ev&&(sel?t.id===sel:bb.contains([t.lon,t.lat]))).sort((a,b)=>b.last-a.last).slice(0,sel?1:6);
   for(const tr of pool){
-    const d=DISP.get(tr.id);const items=tr.ev.items.filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
+    const d=DISP.get(tr.id);const items=(evItems(tr.id,syncXray)||[]).filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
     items.forEach((it,ix)=>{let p=it.p;if(it.copy&&primAt[it.copy]){const a=ix*1.3;p=[primAt[it.copy][0]+Math.cos(a)*0.035,primAt[it.copy][1]+Math.sin(a)*0.024];
         F.push({type:'Feature',properties:{k:'copy'},geometry:{type:'LineString',coordinates:[primAt[it.copy],p]}});}
       const k=it.copy?'copy':(it.pt==='dest'?'dest':(it.pt==='est'?'est':'prim'));

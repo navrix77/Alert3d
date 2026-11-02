@@ -6,6 +6,7 @@
 <title>Аналітика · NAVRYX SKY</title>
 <link rel="icon" href="brand/icon-192.png">
 <style>
+.btn-s{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:inherit;border-radius:10px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer}
 :root{--bg:#05070B;--card:rgba(255,255,255,.045);--rim:rgba(255,255,255,.10);--fg:#F2F5FA;--mute:#9AA4B6;--blue:#4C8DFF;--red:#E5484D;--yellow:#F5B83D;--green:#3DD68C}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
@@ -72,7 +73,7 @@ const hm=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'
 function table(head,rows){if(!rows.length)return '<div class="empty">Немає даних</div>';
   return '<div class="tw"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map((c,i)=>'<td'+(i&&typeof c==='number'?' class="n"':'')+'>'+c+'</td>').join('')+'</tr>').join('')+'</table></div>';}
 function render(a){
-  $('asof').textContent='станом на '+hm(a.t)+' · оновлюється щохвилини';
+  $('asof').innerHTML='станом на '+hm(a.t)+' · <button id="refresh" class="btn-s">Оновити</button>';$('refresh').onclick=()=>{$('refresh').textContent='…';load();};
   $('summary').innerHTML=(a.summary||[]).map(s=>'<li>'+esc(s)+'</li>').join('')||'<li class="mute">Немає даних</li>';
   const w=a.wave||{};const k=[[a.active_n,'у повітрі зараз',''],[w.new30,'нових за 30 хв',w.trend==='наростає'?'up':(w.trend==='спадає'?'down':'')],[w.prev30,'за попередні 30 хв',''],[w.peak12h,'пік за 12 год','']];
   if(a.nights)k.push([a.nights.tonight_n,(a.nights.period==='ніч'?'треків від 18:00':'треків від 09:00'),'']);
@@ -115,8 +116,8 @@ async function loadArea(){
 loadArea();setInterval(()=>{if(!document.hidden)loadArea();},600000);
 let VIS=null;
 async function loadVis(){try{VIS=await (await fetch('/api/visits?days=30',{cache:'no-store'})).json();}catch(e){VIS=null;}}
-async function load(){await loadVis();try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}
-load();setInterval(()=>{if(!document.hidden)load();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+async function load(){window.__lt=Date.now();await loadVis();try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}
+load();document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-(window.__lt||0)>120000)load();});
 </script>
 </body>
 </html>
