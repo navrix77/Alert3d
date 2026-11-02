@@ -98,6 +98,7 @@ class Track:
     pred_moved: int = 0
     pred_naive_hit: bool = False
     closed: float | None = None
+    likely: bool = False  # тип — непряма ознака («ймовірно розвідник»)
     merged: str | None = None  # дублікат іншого треку (той самий об'єкт, різні канали/назви)
 
     @property
@@ -374,6 +375,7 @@ class Tracker:
         else:
             c = self.counters[obs.type] = self.counters.get(obs.type, 0) + 1
             tr = Track(f"{TYPES[obs.type]['label']}-{c}", obs.type, self.speed_over.get(obs.type, TYPES[obs.type]["speed"]))
+            tr.likely = bool(getattr(obs, "likely", False))
             if pos is not None:
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
             else:
@@ -702,7 +704,7 @@ class Tracker:
                         la, lo = from_xy(*p)
                         up(obl.of(lo, la), 1)
             out.append({
-                "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"], "count": tr.count, "status": status,
+                "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
                 "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "pred": pred_src, "pred_p": pred_p, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est,
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],

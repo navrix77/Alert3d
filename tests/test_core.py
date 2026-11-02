@@ -398,7 +398,7 @@ def test_journal_2026_11_02_words_and_headers():
     # відмінки, які жорсткіший нечіткий пошук не має губити
     assert names("Ударний БПЛА маневрує біля Дергачів⚠️❗️", "M") == ["Дергачі"]
     assert names("🔴Шахед на Центр Чернівців!", "MU") == ["Чернівці"]
-    assert names("2 шахеда між Полтавою та Новими Санжарами курсом на Решетилівку.", "PL") == ["Нові Санжари", "Решетилівка"]
+    assert names("2 шахеда між Полтавою та Новими Санжарами курсом на Решетилівку.", "PL") == ["Полтава", "Нові Санжари", "Решетилівка"]  # орудний «Полтавою» тепер розпізнається
 
 
 def test_journal_2026_11_02_sumline_notes_and_cities():
@@ -579,3 +579,12 @@ def test_daleko_not_village_and_avia_short_life():
     tr = Tracker(config.SOURCES, learn=False)
     tr.ingest(p.parse("Активність тактичної авіації на північно-східному напрямку"), "x", time.time() - 13 * 60)
     assert not tr.snapshot()["avia"]  # літак не «висить» на рубежі пусків пів години
+
+
+def test_likely_recon():
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("Над Сумами кружляє безпілотник", "x")
+    assert o.type == "recon" and o.likely
+    assert p.parse("Ударний БпЛА кружляє над Харковом", "x").type == "shahed"
+    assert [r.place.name for r in p.parse("Висить БпЛА над Шосткою", "x").places] == ["Шостка"]

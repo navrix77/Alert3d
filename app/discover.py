@@ -78,7 +78,7 @@ class Discover:
     def evaluate(self, user: str, page: str) -> dict:
         msgs = parse_page(page)
         now = time.time()
-        hits, obl, samples = 0, collections.Counter(), []
+        hits, recon, obl, samples = 0, 0, collections.Counter(), []
         from .geo import oblasts
         O = oblasts()
         for _mid, ts, text in msgs:
@@ -86,6 +86,7 @@ class Discover:
                 o = self.parser.parse(seg, None)
                 if o.kind in ("track", "zone") and o.places:
                     hits += 1
+                    recon += o.type == "recon"
                     p = o.places[0].place
                     obl[O.of(p.lon, p.lat) or "?"] += 1
                     if len(samples) < 3:
@@ -93,11 +94,12 @@ class Discover:
                     break
         last = max((ts for _m, ts, _t in msgs), default=0)
         ratio = hits / max(1, len(msgs))
-        ok = bool(msgs) and now - last < 12 * 3600 and hits >= 5 and ratio >= 0.25
+        # або загальний монітор (≥5 цілей, ≥25%), або прикордонний канал, що регулярно пише про розвідників (≥2)
+        ok = bool(msgs) and now - last < 12 * 3600 and ((hits >= 5 and ratio >= 0.25) or recon >= 2)
         top = obl.most_common(1)
         region = top[0][0] if top and top[0][0] != "?" and top[0][1] >= 0.6 * hits else None
         return {"user": user, "ok": ok, "posts": len(msgs), "hits": hits, "ratio": round(ratio, 2),
-                "fresh_h": round((now - last) / 3600, 1) if last else None, "region": region, "samples": samples}
+                "fresh_h": round((now - last) / 3600, 1) if last else None, "recon": recon, "region": region, "samples": samples}
 
     async def run_once(self) -> dict:
         have = {u.lower() for _k, u, *_ in config.CHANNELS}
