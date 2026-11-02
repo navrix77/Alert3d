@@ -37,8 +37,10 @@ def lan_ips() -> list[str]:
 
 
 def ensure_cert() -> tuple[Path, Path] | None:
-    crt, key = DIR / "tryvoga.crt", DIR / "tryvoga.key"
-    if crt.exists() and key.exists():
+    crt, key, ipsf = DIR / "tryvoga.crt", DIR / "tryvoga.key", DIR / "ips.txt"
+    now_ips = ",".join(lan_ips())
+    # адреса ПК у мережі змінилась (інший роутер / DHCP) — старий сертифікат на нову IP не діє, перевипускаємо
+    if crt.exists() and key.exists() and ipsf.exists() and ipsf.read_text() == now_ips:
         return crt, key
     try:
         from cryptography import x509
@@ -59,6 +61,8 @@ def ensure_cert() -> tuple[Path, Path] | None:
             .sign(k, hashes.SHA256()))
     key.write_bytes(k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     crt.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    ipsf.write_text(now_ips)
+    log.info("https-сертифікат для локальної мережі: %s", now_ips)
     return crt, key
 
 
@@ -97,5 +101,12 @@ async def run(target_port: int = 8090) -> None:
         log.warning("https-порт %s зайнятий: %s", PORT, e)
         return
     log.info("https для телефона: %s", ", ".join(f"https://{i}:{PORT}" for i in lan_ips()))
+    ips0 = lan_ips()
     async with srv:
-        await srv.serve_forever()
+        while True:  # ПК перейшов в іншу мережу — перевипускаємо сертифікат і перезапускаємо https без перезапуску сервера
+            await asyncio.sleep(120)
+            if lan_ips() != ips0:
+                log.info("змінилась адреса в мережі: %s → %s", ips0, lan_ips())
+                srv.close()
+                await srv.wait_closed()
+                return await run(target_port)
