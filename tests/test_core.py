@@ -842,3 +842,22 @@ def test_state_smoke():
     s = M.state()
     assert s["tracks"] and "items" not in s["tracks"][0]["ev"]
     assert M.tracker.track_evidence(s["tracks"][0]["id"])["items"]
+
+
+def test_history_lite_and_frame():
+    """Машина часу: легкі кадри без публікацій, повний кадр — окремо і лише «не пізніше» запитаного моменту."""
+    import json as _j
+    from app import main as M
+    M.HIST[:] = [{"t": 1000, "levels": {}, "raions": {}, "tracks": [{"id": "Ш-1", "ev": {"pubs": 1, "prim": ["M"], "items": [{"t": 990, "src": "M"}]}}]},
+                 {"t": 1060, "levels": {}, "raions": {}, "tracks": [{"id": "Ш-1", "ev": {"pubs": 2, "prim": ["M", "K"], "items": [{"t": 1050, "src": "K"}]}}]}]
+    import time as _t
+    old = _t.time
+    _t.time = lambda: 1100
+    try:
+        lite = _j.loads(M.api_history().body)["frames"]
+    finally:
+        _t.time = old
+    assert len(lite) == 2 and "items" not in lite[0]["tracks"][0]["ev"] and lite[0]["tracks"][0]["ev"]["prim"] == ["M"]
+    fr = _j.loads(M.api_history_frame(1010).body)
+    assert fr["t"] == 1000 and fr["tracks"][0]["ev"]["items"][0]["src"] == "M"  # пізніше повідомлення K ще не видно
+    M.HIST.clear()

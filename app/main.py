@@ -511,9 +511,47 @@ def api_area(lat: float, lon: float, r: float = 25, days: int = 14):
     return JSONResponse(area_stats(round(lat, 2), round(lon, 2), max(5.0, min(r, 60.0)), max(1, min(days, 60))))
 
 
+def _lite_frame(f: dict) -> dict:
+    """Кадр без списку публікацій (≈75% обсягу): для програвання вистачає позицій і рівнів."""
+    return {**f, "tracks": [{**t, "ev": {k: v for k, v in (t.get("ev") or {}).items() if k != "items"}} for t in f["tracks"]]}
+
+
 @app.get("/api/history")
-def api_history():
-    return JSONResponse({"frames": HIST})
+def api_history(full: int = 0, hours: float = 12):
+    """Машина часу. За замовчуванням — легкі кадри (≈1.8 МБ замість 7.5 МБ JSON); докази кадру — /api/history/frame."""
+    since = time.time() - max(0.5, min(hours, 12)) * 3600
+    fr = [f for f in HIST if f["t"] >= since]
+    return JSONResponse({"frames": fr if full else [_lite_frame(f) for f in fr]})
+
+
+@app.get("/api/near")
+def api_near(lon: float, lat: float, r: float = 60):
+    """Коли востаннє позначка цілі була в межах r км від точки — за кадрами машини часу (до 12 год) і поточним станом."""
+    from .geo import dist_km, to_xy
+    H = to_xy(lat, lon)
+    last, hours = None, 0.0
+    if HIST:
+        hours = round((time.time() - HIST[0]["t"]) / 3600, 1)
+    for f in reversed(HIST):
+        if any(dist_km(H, to_xy(t["lat"], t["lon"])) <= r for t in f["tracks"]):
+            last = f["t"]
+            break
+    for t in tracker.snapshot()["tracks"]:
+        if t["status"] != "closed" and dist_km(H, to_xy(t["lat"], t["lon"])) <= r:
+            last = max(last or 0, t["last"])
+    return {"last": last, "hours": hours, "r": r}
+
+
+@app.get("/api/history/frame")
+def api_history_frame(t: float):
+    """Повний кадр (з доказами «що було відомо тоді») — найближчий до t не пізніше нього."""
+    best = None
+    for f in HIST:
+        if f["t"] <= t + 30:
+            best = f
+        else:
+            break
+    return JSONResponse(best or {})
 
 
 @app.get("/api/lan")

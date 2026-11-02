@@ -555,8 +555,12 @@ function renderMe(threats){
   const offL=ob?'<div class="me-off '+(lvl?'on':'')+'"><b>'+esc(ob)+' обл.</b> · '+esc(OF.t)+'</div>':'';
   // що відомо моніторам: давність останнього повідомлення поруч (≤60 км), непідтверджені цілі теж рахуємо
   const H=xy(home);let lastNear=0,weak=0;for(const t of SNAP.tracks){if(t.status==='closed')continue;const d=dist(H,xy([t.lon,t.lat]));if(d<=60){lastNear=Math.max(lastNear,t.last||0);if(t.status==='active'&&t.conf<0.5)weak++;}}
+  // давність — із сервера (кадри за ~12 год), а не лише з цілей у поточному знімку (~40 хв)
+  const hk=home.join();if(!REPLAY&&(renderMe.nk!==hk||Date.now()-(renderMe.nt||0)>60000)){renderMe.nk=hk;renderMe.nt=Date.now();
+    fetch('/api/near?lon='+home[0].toFixed(2)+'&lat='+home[1].toFixed(2)+'&r=60').then(r=>r.json()).then(j=>{renderMe.near=j;}).catch(()=>{});}
+  const NJ=renderMe.nk===hk?renderMe.near:null;if(NJ&&NJ.last)lastNear=Math.max(lastNear,NJ.last);
   const srvT=Date.now()/1000+offset;const ago=lastNear?Math.round((srvT-lastNear)/60):null;
-  const ageL=ago==null?'Поруч (60 км) повідомлень моніторів сьогодні не було.':'Останнє повідомлення моніторів у межах 60 км — '+(ago<1?'щойно':ago+' хв тому')+'.';
+  const ageL=ago!=null?'Остання позначка цілі в межах 60 км — '+(ago<1?'щойно':ago<90?ago+' хв тому':'о '+fmt(lastNear))+'.':(NJ?'За останні '+Math.max(1,Math.round(NJ.hours))+' год позначок цілей у межах 60 км не було.':'');
   const tg=!SNAP.health||SNAP.health.telegram||SNAP.health.replay;
   let cls=lvl?'me watch':'me',word=lvl?'Повітряна тривога':'Тривоги немає',sub=offL+'У повідомленнях моніторів немає цілі з курсом на вас. '+ageL+(weak?' Ще '+weak+' непідтвердж. поруч.':'');
   if(!tg){cls='me watch';sub=offL+'Канали моніторів зараз не надходять — оцінка неповна. Це <b>не відбій</b>.';}
@@ -627,7 +631,7 @@ function fillSheet(first){
     const why=tr.pred==='learned'?' <small>· вивчено з історії'+(tr.pred_p?' ('+Math.round(tr.pred_p*100)+'%)':'')+'</small>':tr.pred==='channels'?' <small>· за каналами</small>':'';
     $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо — позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'')+lpHtml(tr);}else $('#sh-route').innerHTML=lpHtml(tr);
   // «Чому я це показую»: першоджерело, копії, суперечності, давність, що змінило відображення
-  {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=(tr.ev&&tr.ev.items)?tr.ev.items:evItems(tr.id,()=>{if(sel===tr.id)fillSheet();});// машина часу: лише те, що було відомо на той моментE.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
+  {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=(tr.ev&&tr.ev.items)?tr.ev.items:(REPLAY?null:evItems(tr.id,()=>{if(sel===tr.id)fillSheet();}));// машина часу: лише те, що було відомо на той моментE.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
    const head=E.pubs+' '+(E.pubs===1?'публікація':E.pubs<5?'публікації':'публікацій')+' · '+ind+' '+(ind===1?'першоджерело':ind<5?'першоджерела':'першоджерел')+' · '+(ind>=2?'<b class=ok>незалежне підтвердження є</b>':'<b class=warn>незалежного підтвердження немає</b>');
    const age=E.age;const ageTxt=age<120?'щойно':age<3600?Math.round(age/60)+' хв тому':'понад годину тому';
    let h='<h4>Чому я це показую</h4><p class=ev-head>'+head+'</p><p class=ev-age>Остання фіксація місця: '+ageTxt+(age>300?' — позиція далі лише оцінка, зона невизначеності росте':'')+'</p>';
@@ -703,6 +707,8 @@ function showFrame(i){const f=HISTF[i];if(!f)return;$('#tb-range').value=i;$('#t
   REPLAY=f;SNAP=Object.assign({},LIVE||{},{now:f.t,levels:f.levels,official:Object.assign({},(LIVE&&LIVE.official)||{},{raion_levels:f.raions,points:[]}),
     tracks:f.tracks.map(t=>Object.assign({status:'active',speed:0,route:[],trail:[],route_names:[],srcs:(t.ev&&t.ev.prim)||[],links:[],first:f.t,last:f.t,ts:f.t,entry:[t.lon,t.lat,'',f.t],ev:{pubs:0,prim:[],items:[],contra:[],age:0}},t)),launches:[],zones:[],ru:[]});
   $('#tb-time').title='Що було відомо на цей момент';if(XRAY)syncXray();
+  // докази кадру (хто й що писав ДО цього моменту) — догружаємо лише для кадру, на якому зупинились
+  clearTimeout(showFrame.ft);if(!f.full)showFrame.ft=setTimeout(()=>{if(REPLAY!==f)return;fetch('/api/history/frame?t='+f.t).then(r=>r.json()).then(g=>{if(!g||!g.tracks)return;g.full=1;HISTF[i]=g;if(REPLAY===f)showFrame(i);if(sel)fillSheet();}).catch(()=>{});},tbTimer?1500:250);
   offset=f.t-Date.now()/1000;recvAt=Date.now();DISP.clear();renderCounters();syncLevels();syncRaions();}
 function play(on){clearInterval(tbTimer);$('#tb-play').textContent=on?'❚❚':'▶';if(!on)return;tbTimer=setInterval(()=>{const r=$('#tb-range');const i=+r.value+1;if(i>=HISTF.length){play(false);return;}showFrame(i);},140);}
 $('#tb-play').onclick=()=>play(!tbTimer||$('#tb-play').textContent==='▶');
@@ -735,7 +741,7 @@ function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;const F=[],nm=k
   // лише обрана ціль, або до 6 найсвіжіших цілей у кадрі — інакше «павутиння» на пів країни
   const bb=map.getBounds();const pool=SNAP.tracks.filter(t=>t.status==='active'&&t.ev&&(sel?t.id===sel:bb.contains([t.lon,t.lat]))).sort((a,b)=>b.last-a.last).slice(0,sel?1:6);
   for(const tr of pool){
-    const d=DISP.get(tr.id);const items=((tr.ev&&tr.ev.items)||evItems(tr.id,syncXray)||[]).filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
+    const d=DISP.get(tr.id);const items=((tr.ev&&tr.ev.items)||(REPLAY?null:evItems(tr.id,syncXray))||[]).filter(i=>i.p);let lastReal=null,prevPrim=null;const primAt={};
     items.forEach((it,ix)=>{let p=it.p;if(it.copy&&primAt[it.copy]){const a=ix*1.3;p=[primAt[it.copy][0]+Math.cos(a)*0.035,primAt[it.copy][1]+Math.sin(a)*0.024];
         F.push({type:'Feature',properties:{k:'copy'},geometry:{type:'LineString',coordinates:[primAt[it.copy],p]}});}
       const k=it.copy?'copy':(it.pt==='dest'?'dest':(it.pt==='est'?'est':'prim'));
