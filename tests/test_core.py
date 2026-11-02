@@ -437,3 +437,11 @@ def test_journal_2026_11_02_no_jet_teleport():
             d = dist_km((a.x, a.y), (b.x, b.y))
             v = d / max(30.0, b.t - a.t) * 3600
             assert not (d > 25 and v > 450 * 3), (track.id, a.label, b.label, round(d), round(v))
+def test_lozova_vs_lozove():
+    from app.parser import Parser
+    p = Parser()
+    # R/TLK: «на Лозовую» — місто Лозова (Лозове було б «Лозовое»)
+    for t, ch in [("Два Реактивных Шахеда на Лозовую⚠️🛸", "R"), ("Ещё 2 Р. Шаболды на Лозовую⚠️", "TLK"), ("Шахед на Лозову", "M")]:
+        assert [r.place.name for r in p.parse(t, ch).places] == ["Лозова"]
+    assert [r.place.name for r in p.parse("Шахед на Лозове").places] == ["Лозове"]
+    assert [r.place.name for r in p.parse("Шахеды на Белую Церковь").places] == ["Біла Церква"]
