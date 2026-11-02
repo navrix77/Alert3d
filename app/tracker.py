@@ -363,6 +363,20 @@ class Tracker:
                 route = [self._alias.get(p.name, p) for p in route]
                 course_to = route[-1].name if route else None
         if tr:
+            # «Хибна свіжість»: інший канал переслав той самий текст пізніше. Журнал 26.10–02.11: 24.5% надходжень —
+            # копії, 639 із них старші за 5 хв (до 94 хв). Копія не є новим спостереженням: не скидає годинник цілі
+            # (інакше позначка «замерзає» або повертається на стару точку) і не рахується незалежним підтвердженням.
+            raw_ = (getattr(obs, "raw", "") or "").strip()
+            key_ = _norm_key(raw_)
+            orig = next((e for e in tr.evidence if len(key_) >= 25 and e.get("key") == key_ and e["src"] != src), None) if key_ else None
+            if orig is not None and t - orig["t"] > 60:
+                tr.evidence.append({"t": t, "src": src, "link": link, "text": raw_[:220], "why": "перепост", "key": key_,
+                                    "dest": None, "dxy": None, "pos": None, "est": False})
+                tr.evidence = tr.evidence[-40:]
+                tr.srcs.add(src)
+                rec["track"] = tr.id
+                rec["copy_of"] = orig["src"]
+                return rec
             if pt is not None:
                 d = dist_km((tr.last.x, tr.last.y), pt)
                 dt = t - tr.last.t

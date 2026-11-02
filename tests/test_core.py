@@ -930,3 +930,20 @@ def test_course_only_target_has_no_position():
     a = Push.assess(dict(s, route=[[36.23, 49.99]]), to_xy(50.0, 36.25))
     assert a and a["stage"] == "threat" and a["d"] is None and a["eta"] is None
     assert Push.assess(dict(s, route=[[30.5, 50.45]]), to_xy(50.0, 36.25)) is None  # курс на Київ — не загроза Харкову
+
+
+def test_repost_does_not_refresh_track():
+    """Перепост того самого тексту іншим каналом через 10 хв не скидає годинник цілі (хибна свіжість)."""
+    from app.parser import Parser
+    from app.tracker import Tracker
+    from app.config import SOURCES
+    P, trk = Parser(), Tracker(SOURCES)
+    txt = "Шахед у районі Чугуєва, рухається курсом на Харків"
+    o = P.parse(txt, "K"); o.raw = txt
+    trk.ingest(o, "K", 1000.0, None)
+    tr = trk.tracks[0]
+    o2 = P.parse(txt, "D"); o2.raw = txt
+    rec = trk.ingest(o2, "D", 1600.0, None)
+    assert rec.get("copy_of") == "K"
+    assert tr.last.t == 1000.0
+    assert tr.evidence[-1]["why"] == "перепост"
