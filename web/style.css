@@ -556,3 +556,10 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
   .timebar .round{width:40px;height:40px;min-width:40px;font-size:15px}
   .timebar input{min-width:60px}
 }
+/* підписи під іконками нижньої панелі: без них незрозуміло, що за кожною кнопкою */
+.dock button[data-l]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;height:56px!important}
+.dock button[data-l]::after{content:attr(data-l);font:600 10.5px/1 var(--f);letter-spacing:.01em;opacity:.85;white-space:nowrap}
+.dock button[data-l] svg{width:21px;height:21px}
+/* панель стала вищою через підписи — піднімаємо те, що стоїть над нею */
+@media (max-width:640px){.me{bottom:calc(94px + env(safe-area-inset-bottom))!important}.timebar{bottom:calc(138px + env(safe-area-inset-bottom))!important}}
+#xr-panel{bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}
