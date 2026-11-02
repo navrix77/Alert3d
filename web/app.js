@@ -15,6 +15,7 @@ const FROM=['з півночі','з північного сходу','зі сх�
 const toast=m=>{const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,2600);};
 
 let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=false,tilt=localStorage.getItem('t3d')!=='0',base=localStorage.getItem('base2')||'night';
+window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m)};
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
 const PREFL=()=>{try{return Object.assign({launch:true},JSON.parse(localStorage.getItem('pref')||'{}'));}catch(e){return {launch:true};}};
