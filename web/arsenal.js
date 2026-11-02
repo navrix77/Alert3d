@@ -52,7 +52,7 @@ function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=
 function build(){const el=document.getElementById('arsenal');if(el.dataset.ok)return;el.dataset.ok=1;
   const box=el.querySelector('.ars-list');
   A.forEach(a=>{const c=document.createElement('article');c.className='ars-card';c.style.setProperty('--tc',(window.TYPE_COLOR||{})[a.t]||'#fff');
-    c.innerHTML='<div class="ars-img"><img loading="lazy" alt="" src="sprites/ref/'+a.t+'.png?v=ref1" onerror="this.src=\'sprites/t-'+a.t+'.png\'"></div><div class="ars-b"><small>'+esc(a.k)+'</small><h4>'+esc(a.n)+'</h4><dl>'+a.s.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><p>'+esc(a.d)+'</p><button class="ars-map">Показати на мапі</button></div>';
+    c.innerHTML='<div class="ars-img"><img loading="lazy" alt="" src="sprites/ref/'+a.t+'.png?v=ref1" onerror="this.src=\'sprites/t-'+a.t+'.png\'"></div><div class="ars-b"><small>'+esc(a.k)+'</small><h4>'+esc(a.n)+'</h4><dl>'+a.s.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><p>'+esc(a.d)+'</p><button class="ars-map" data-t="'+a.t+'" hidden></button></div>';
     c.querySelector('.ars-map').onclick=()=>{const n=((typeof SNAP!=='undefined'&&SNAP)?SNAP.tracks:[]).filter(x=>x.status==='active'&&x.type===a.t).length;if(!n&&a.t!=='kab'){if(typeof toast==='function')toast('Зараз у повітрі не видно: '+a.n);return;}el.hidden=true;if(a.t==='kab'){const z=((typeof SNAP!=='undefined'&&SNAP)?SNAP.zones:[])[0];if(z&&window.tryvogaMap)tryvogaMap.flyTo({center:z.places[0],zoom:8});else if(typeof toast==='function')toast('Зараз загроз КАБ немає');return;}if(typeof focusType==='function')focusType(a.t);};
     box.appendChild(c);});
   const lg=el.querySelector('.ars-leg');
@@ -60,6 +60,10 @@ function build(){const el=document.getElementById('arsenal');if(el.dataset.ok)re
   const sp=document.createElement('div');sp.className='ars-lr';const cv=document.createElement('canvas');cv.width=cv.height=72;sp.appendChild(cv);
   const g=cv.getContext('2d');let i=0;const ks=Object.keys(window.TYPE_COLOR||{}).filter(k=>k!=='kab');setInterval(()=>{if(el.hidden)return;const im=new Image();im.src='sprites/t-'+ks[i++%ks.length]+'.png';im.onload=()=>{g.clearRect(0,0,72,72);g.drawImage(im,6,6,60,60);};},1200);
   sp.insertAdjacentHTML('beforeend','<div><b>Ціль у повітрі</b><span>колір = тип (див. картки вище); ×N — група; торкніться цілі, щоб побачити докази: які канали, коли й що написали</span></div>');lg.prepend(sp);}
-window.openArsenal=function(){build();document.getElementById('arsenal').hidden=false;const s=document.getElementById('settings');if(s)s.hidden=true;};
+function liveBtns(){const S=(typeof SNAP!=='undefined'&&SNAP)?SNAP:null;
+  document.querySelectorAll('#arsenal .ars-map').forEach(b=>{const t=b.dataset.t;let n=0;
+    if(S){n=t==='kab'?(S.zones||[]).length:(S.tracks||[]).filter(x=>x.status==='active'&&x.type===t).reduce((s,x)=>s+(x.count||1),0);}
+    b.hidden=!n;b.textContent=t==='kab'?'Загроз КАБ зараз: '+n+' — показати':'У повітрі зараз: '+n+' — показати';});}
+window.openArsenal=function(){build();liveBtns();document.getElementById('arsenal').hidden=false;const s=document.getElementById('settings');if(s)s.hidden=true;};
 document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('b-ars');if(b)b.onclick=window.openArsenal;const c=document.getElementById('ars-close');if(c)c.onclick=()=>document.getElementById('arsenal').hidden=true;});
 })();

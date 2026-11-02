@@ -453,3 +453,5 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
   .cine.on .cine-img img{transform:scale(1.02) translateY(-8%)}
   .cine-cap{bottom:calc(11vh + 8px)}
 }
+.ars-map[hidden]{display:none}
+.ars-map{background:color-mix(in srgb,var(--tc) 22%,transparent)}
