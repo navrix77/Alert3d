@@ -779,14 +779,14 @@ async function openWidget(){
 window.__openWidget=openWidget;
 /* ---------- «Рентген неба» ---------- */
 let XRAY=false;
-function setXray(on){XRAY=on;document.body.classList.toggle('xray',on);$('#b-xray').classList.toggle('on',on);const lg=$('#xr-legend');if(lg)lg.hidden=true;
+function setXray(on){XRAY=on;document.body.classList.toggle('xray',on);if($('#b-xray'))$('#b-xray').classList.toggle('on',on);const lg=$('#xr-legend');if(lg)lg.hidden=true;
   for(const id of ['xr-dim','xr-edge','xr-edge2','xr-node','xr-t'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none');
   for(const id of ['holo','holo-top','ra-glow'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');
   const pn=xrPanel();pn.hidden=!on;if(on&&!sel)pn.innerHTML='<div class="xp-h"><b>Звідки SKY знає про ціль</b><button class="xp-x">Готово</button></div><p class="xp-n">Торкніться будь-яку ціль на мапі — покажу по кроках, хто й коли про неї написав і що з цього SKY вирахував сам.</p>';
   if(on&&!sel)pn.querySelector('.xp-x').onclick=()=>setXray(false);
   syncXray();}
 function xrPanel(){let p=$('#xr-panel');if(!p){p=document.createElement('div');p.id='xr-panel';p.hidden=true;document.body.appendChild(p);}return p;}
-$('#b-xray').onclick=()=>setXray(!XRAY);
+// окремої кнопки «Рентген» більше немає: пояснення відкривається лише з картки цілі («Чому SKY показує її тут?»)
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&XRAY)setXray(false);});
 map.on('styledata',()=>{if(XRAY&&map.getLayer('xr-dim')&&map.getLayoutProperty('xr-dim','visibility')!=='visible')setXray(true);});
 function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;
