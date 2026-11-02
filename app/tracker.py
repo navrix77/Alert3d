@@ -358,6 +358,10 @@ class Tracker:
                     if dist_km((prev.x, prev.y), X.xy) > 3:
                         tr.heading = bearing((prev.x, prev.y), X.xy)
                     route = route[1:]
+                    if not route:
+                        # ціль уже в X (оцінка) і нового пункту не названо: «→ X» більше не показуємо,
+                        # а куди вона далі — невідомо (02.11: «→ Циркуни» на шахеді, що «полетів» до Богодухова)
+                        course_to, tr.course_to, tr.course_xy = None, None, None
             if route:
                 # пункт, до якого понад годину польоту, — це тезка з іншого кінця країни, не маршрут цієї цілі
                 here = tr.est(t)

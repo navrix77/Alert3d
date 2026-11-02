@@ -283,6 +283,8 @@ function syncHromadas(H){
 /* ---------- позиція цілі в момент часу ---------- */
 function posAt(tr,serverT){
   if(tr.status!=='active')return {p:[tr.lon,tr.lat],hd:tr.hd};
+  // місце лише оцінене («курсом на X» — і вже в X), а нового пункту немає: далі не «ведемо» ціль навмання
+  if(tr.pos_est&&!tr.route.length&&!tr.next)return {p:[tr.lon,tr.lat],hd:tr.hd};
   let km=tr.speed*Math.max(0,serverT-tr.ts)/3600;
   const SHOW={shahed:25,molniya:20,jet:6,cruise:2,ballistic:1}[tr.type]??25;// хв: ціль рухається курсом, доки не прийде нове повідомлення (зона «де може бути» росте)
   const cap=Math.max(0,tr.speed*SHOW/60-tr.speed*Math.max(0,tr.ts-tr.last)/3600);

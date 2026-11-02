@@ -629,3 +629,17 @@ def test_zatoka_namesakes_2026_11_02():
     assert len(act) == 1  # одна ціль, а не друга біля Чугуєва
     lat = __import__("app.geo", fromlist=["from_xy"]).from_xy(*act[0].est(t0 + 240))[0]
     assert lat < 47.5, "бандероль має лишатися на півдні, а не біля Чугуєва"
+
+
+def test_tsyrkuny_stale_course_2026_11_02():
+    """02.11 15:42–15:48: «→ Циркуни» на шахеді, що «летів» на Богодухів (скрін користувача)."""
+    # новина про удар — не нова ціль
+    assert P.parse("⚡️У Черкаській Лозовій дрон атакував спецтехніку, є загиблі.", "CX").kind == "filtered"
+    tr = Tracker(SOURCES, learn=False)
+    t0 = 1_793_626_968.0
+    tr.ingest(P.parse("Ударний БПЛА на Дергачі", "M"), "M", t0)
+    tr.ingest(P.parse("Ударний БПЛА на Циркуни⚠️", "M"), "M", t0 + 600)
+    snap = [x for x in tr.snapshot(t0 + 700)["tracks"] if x["type"] == "shahed"]
+    assert len(snap) == 1
+    s = snap[0]
+    assert s["next"] != "Циркуни", "ціль уже в Циркунах — «→ Циркуни» не показуємо"
