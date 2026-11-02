@@ -563,3 +563,6 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 /* панель стала вищою через підписи — піднімаємо те, що стоїть над нею */
 @media (max-width:640px){.me{bottom:calc(94px + env(safe-area-inset-bottom))!important}.timebar{bottom:calc(138px + env(safe-area-inset-bottom))!important}}
 #xr-panel{bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}
+/* картка цілі: виділені назви всередині речення — в рядок, а не окремим блоком («Михальче\n, останнє…») */
+#sh-now b,#sh-from b,#sh-conf b{display:inline;font-size:inherit;margin:0}
+#sh-now>b:first-child,#sh-from b{font-weight:800}

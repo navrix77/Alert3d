@@ -627,7 +627,7 @@ function fillSheet(first){
   $('#sh-course').innerHTML=tr.status!=='active'?(tr.status==='lost'?'Втрачено':'Більше не фіксується'):(tr.next?'Курс → <b>'+esc(tr.next)+'</b>':'Курс уточнюється');
   const d=DISP.get(tr.id);const r=d&&homeRel(tr,d.p);const nowT=Date.now()/1000+offset;const mago=t=>Math.max(0,Math.round((nowT-t)/60));
   // 1) для вас: відстань і що ціль робить відносно дому, одним рядком
-  $('#sh-dist').textContent=r?Math.round(r.d)+' км на '+r.side:'';
+  $('#sh-dist').textContent=r?Math.round(r.d)+' км '+r.side:'';
   $('#sh-eta').textContent=!r?'':r.eta!=null?'· ≈ '+Math.max(1,Math.round(r.eta))+' хв до вас':r.away?'· віддаляється':tr.hd==null?'· курс невідомий':'· летить повз';
   $('#sh-dist').closest('div').hidden=!r;
   // 2) де зараз: останній пункт від каналів і як давно; далі лише оцінка
