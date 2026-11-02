@@ -393,6 +393,12 @@ class Tracker:
         if obs.count:
             tr.count = max(tr.count or 0, obs.count) if t - tr.obs[0].t < 900 else obs.count
         rec["track"] = tr.id
+        try:
+            from .audit import AUDIT
+            from .config import CHANNEL_REGION
+            AUDIT.check(tr, obs, src, CHANNEL_REGION.get(src), oblasts().of, TYPES[tr.type]["speed"], self.brain, self.learn)
+        except Exception:
+            pass
         # «Чому я це показую»: що саме змінило відображення цієї цілі
         moved = bool(tr.obs and tr.obs[-1].t == t and tr.obs[-1].src == src)
         if moved and len(tr.obs) > 1 and dist_km((tr.obs[-1].x, tr.obs[-1].y), (tr.obs[-2].x, tr.obs[-2].y)) < 1.5 and tr.evidence:

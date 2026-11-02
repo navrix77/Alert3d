@@ -282,6 +282,15 @@ from fastapi.middleware.gzip import GZipMiddleware  # noqa: E402
 app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)  # geojson і скрипти стискаються в 3-5 разів
 
 
+@app.get("/api/audit")
+def api_audit():
+    """Самоаналіз: аномалії розбору й треків + точність навченого прогнозу."""
+    from .audit import AUDIT
+    st = AUDIT.state()
+    st["pred_acc"] = brain.pred_acc() if hasattr(brain, "pred_acc") else None
+    return st
+
+
 @app.get("/api/state")
 def api_state():
     return JSONResponse(state())
