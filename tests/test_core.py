@@ -445,3 +445,11 @@ def test_lozova_vs_lozove():
         assert [r.place.name for r in p.parse(t, ch).places] == ["Лозова"]
     assert [r.place.name for r in p.parse("Шахед на Лозове").places] == ["Лозове"]
     assert [r.place.name for r in p.parse("Шахеды на Белую Церковь").places] == ["Біла Церква"]
+
+
+def test_city_over_village_namesake_in_region():
+    from app.parser import Parser
+    p = Parser()
+    # TLK/CX (Харківщина) з контекстом біля Куп'янська: «на Лозовую» — місто Лозова, не село Лозова (50.18, 37.29)
+    o = p.parse("2 Р. Шаболды на Лозовую⚠️", "TLK", (49.9, 37.5))
+    assert o.places and abs(o.places[0].place.lat - 48.89) < 0.05

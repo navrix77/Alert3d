@@ -538,6 +538,11 @@ class Parser:
                     if cities:
                         cand = cities
             import math
+            # тезки «місто ≥20 тис. vs село»: без прямої вказівки (район/громада) — це місто.
+            # «на Лозову» = місто Лозова, а не село Лозова на Куп'янщині
+            big = [i for i in cand if P[i].pop >= 20000 and bbox and bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3]]
+            if big and len(big) < len(cand) and all(P[i].pop < 5000 for i in cand if i not in big):
+                cand = big
 
             def score(i: int) -> float:
                 p = P[i]
