@@ -502,3 +502,9 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 .follow-pill.flash{animation:fpFlash .8s ease}
 @keyframes fpFlash{0%{box-shadow:0 0 0 0 rgba(255,255,255,.6)}100%{box-shadow:0 0 0 14px rgba(255,255,255,0)}}
 :root[data-theme="day"] .follow-pill{background:#fff;color:#0A0F1A;border-color:rgba(10,20,40,.1)}:root[data-theme="day"] .follow-pill .fp-t span{color:#3E4859}:root[data-theme="day"] .follow-pill button{background:rgba(10,20,40,.07)}
+
+.snd-l{font-size:13px;color:var(--mute);margin:12px 0 6px}
+.snd-seg{display:flex;width:100%}.snd-seg button{flex:1 1 0;min-width:0;padding:10px 4px;white-space:nowrap;font-size:14px}
+.snd-vol{width:100%;accent-color:#3B82F6}
+.snd-test{margin-top:14px;width:100%}
+.snd-hint{display:block;font-size:12px;color:var(--mute);margin:8px 0 0;line-height:1.4}

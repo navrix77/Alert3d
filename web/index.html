@@ -106,10 +106,11 @@
   <section><h3>Мій дім</h3><div class="row"><button class="pill" id="st-geo">Визначити автоматично</button><button class="pill" id="st-pick">Поставити на карті</button><button class="pill ghost" id="st-clear">Прибрати</button></div>
     </section>
   <section><h3>Звукові сповіщення</h3>
-    <div class="row"><span>Режим</span><div class="seg small" id="snd-mode"><button data-v="off">Вимк</button><button data-v="tone">Сигнал</button><button data-v="voice">Голос</button><button data-v="both">Сигнал + голос</button></div></div>
-    <div class="row"><span>Звук</span><div class="seg small" id="snd-tone"><button data-v="siren">Сирена</button><button data-v="beep">Біп</button><button data-v="chime">Дзвін</button><button data-v="soft">Мʼякий</button></div></div>
-    <div class="row"><span>Гучність</span><input type="range" id="snd-vol" min="10" max="100" step="5" style="flex:1"></div>
-    <div class="row"><button class="pill" id="snd-test">▶ Перевірити</button><small id="snd-voice-hint" style="opacity:.7"></small></div>
+    <div class="snd-l">Режим</div><div class="seg snd-seg" id="snd-mode"><button data-v="off">Вимк</button><button data-v="tone">Сигнал</button><button data-v="voice">Голос</button><button data-v="both">Обидва</button></div>
+    <div class="snd-l">Звук сигналу</div><div class="seg snd-seg" id="snd-tone"><button data-v="siren">Сирена</button><button data-v="beep">Біп</button><button data-v="chime">Дзвін</button><button data-v="soft">Мʼякий</button></div>
+    <div class="snd-l">Гучність</div><input type="range" id="snd-vol" min="10" max="100" step="5" class="snd-vol">
+    <button class="pill snd-test" id="snd-test">▶ Перевірити звук</button><small id="snd-voice-hint" class="snd-hint"></small>
+    <p class="snd-hint">На iPhone вимкніть беззвучний режим (перемикач збоку) — інакше браузер не відтворює звук.</p>
     <p style="font-size:12.5px;opacity:.7;margin:6px 0 0">Голос озвучує текст сповіщення: що летить, звідки, скільки хвилин до вас. Спрацьовує для ваших громад і загроз вашому місцю.</p>
     <label class="sw"><input type="checkbox" id="st-sys"><span>Сповіщення Windows / телефона, коли NAVRYX SKY згорнутий</span></label></section>
   <section><h3>Сповіщення: мої громади й області</h3>

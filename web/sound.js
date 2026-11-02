@@ -3,7 +3,12 @@
   const DEF={mode:'off',tone:'siren',vol:0.7,rate:1.05};
   let S=Object.assign({},DEF);try{const o=JSON.parse(localStorage.getItem('snd')||'null');if(o)S=Object.assign(S,o);else if(JSON.parse(localStorage.getItem('pref')||'{}').sound)S.mode='tone';}catch(e){}
   const save=()=>{try{localStorage.setItem('snd',JSON.stringify(S));}catch(e){}};
-  let ac=null;const ctx=()=>{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();return ac;};
+  let ac=null;const ctx=()=>{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state!=='running')ac.resume();return ac;};
+  // iOS: Web Audio мовчить при беззвучному режимі, доки сторінка не відтворить звичайний <audio> — «розблоковуємо» тишею
+  const SILENT='data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAACAgICA';
+  let unlocked=false;function unlock(){if(unlocked)return;unlocked=true;try{const a=new Audio(SILENT);a.setAttribute('playsinline','');a.loop=true;a.volume=0.01;a.play().catch(()=>{unlocked=false;});}catch(e){unlocked=false;}
+    try{ctx();}catch(e){}try{if('speechSynthesis' in window){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}}catch(e){}}
+  ['touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true}));
   function env(g,t,a,d,v){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(0.001,v),t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d);}
   function osc(type,f,t,dur,v,f2){const a=ctx(),o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.linearRampToValueAtTime(f2,t+dur);o.connect(g);g.connect(a.destination);env(g,t,0.02,dur,v);o.start(t);o.stop(t+dur+0.05);}
   const TONES={
@@ -22,6 +27,9 @@
   let lastT=0;const said=new Map();
   window.NXSound={get:()=>Object.assign({},S),set(k,v){S[k]=v;save();},hasUkVoice:()=>voices.some(x=>/^uk/i.test(x.lang)),
     alert(text){const now=Date.now();if(now-lastT<8000)return;if(text&&said.has(text)&&now-said.get(text)<120000)return;lastT=now;if(text)said.set(text,now);play(text);},
-    test(){const prev=S.mode;play('Тест. Шахед, двадцять кілометрів з півдня, приблизно вісім хвилин до вас.',true);if(prev==='voice'||prev==='both'){}},
+    test(){unlock();const txt='Тест. Шахед, двадцять кілометрів з півдня, приблизно вісім хвилин до вас.';const m=S.mode;
+      if(m==='voice'||m==='both')speak(txt);            // голос — одразу в межах натискання (вимога iOS)
+      if(m!=='voice')try{TONES[S.tone](S.vol);}catch(e){}  // сигнал (у режимі «Вимк» — теж, щоб почути звук)
+    },
     speakOnly:speak};
 })();
