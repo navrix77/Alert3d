@@ -38,7 +38,7 @@ def lan_ips() -> list[str]:
 
 def ensure_cert() -> tuple[Path, Path] | None:
     crt, key, ipsf = DIR / "tryvoga.crt", DIR / "tryvoga.key", DIR / "ips.txt"
-    now_ips = ",".join(lan_ips())
+    now_ips = ",".join(i for i in lan_ips() if i.startswith(("192.168.", "10.")))
     # адреса ПК у мережі змінилась (інший роутер / DHCP) — старий сертифікат на нову IP не діє, перевипускаємо
     if crt.exists() and key.exists() and ipsf.exists() and ipsf.read_text() == now_ips:
         return crt, key
@@ -105,7 +105,8 @@ async def run(target_port: int = 8090) -> None:
     async with srv:
         while True:  # ПК перейшов в іншу мережу — перевипускаємо сертифікат і перезапускаємо https без перезапуску сервера
             await asyncio.sleep(120)
-            if lan_ips() != ips0:
+            real = lambda L: [i for i in L if i.startswith(("192.168.", "10."))]  # віртуальні адаптери (WSL 172.x) не рахуємо
+            if real(lan_ips()) != real(ips0):
                 log.info("змінилась адреса в мережі: %s → %s", ips0, lan_ips())
                 srv.close()
                 await srv.wait_closed()
