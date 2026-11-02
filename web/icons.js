@@ -1,5 +1,5 @@
 // Силуети цілей зверху (ніс угору = північ). Малюються на canvas, щоб бути чіткими на будь-якому екрані.
-window.TYPE_COLOR={shahed:'#FF9F2E',jet:'#FF5FA2',molniya:'#6CFF7A',cruise:'#FF4B3E',ballistic:'#C77DFF',kab:'#FF7A2E'};
+window.TYPE_COLOR={shahed:'#FFA31A',jet:'#FF2BD6',molniya:'#7CFF2A',cruise:'#9D3CFF',ballistic:'#FF2E2E',kab:'#22E1FF'};
 window.TYPE_NAME={shahed:'Шахед',jet:'Реактивний БпЛА',molniya:'«Молнія»',cruise:'Крилата ракета',ballistic:'Балістика',kab:'КАБ'};
 window.drawTarget=function(type,px,opts){
   opts=opts||{};const s=px*2,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');

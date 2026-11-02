@@ -91,8 +91,8 @@
         float o = 0.0;
         for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236;
           o = max(o, texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.03).a); }
-        float rim = clamp(o - t.a, 0.0, 1.0) * 0.85;
-        vec3 body = t.rgb * (0.38 + 0.82 * dif) + vec3(spec * 0.75);
+        float rim = clamp(o - t.a, 0.0, 1.0) * 0.55;
+        vec3 body = t.rgb * (0.82 + 0.3 * dif) + vec3(spec * 0.25);   // текстура вже з реалістичним світлом — лише легке підсилення
         float a = max(t.a, rim);
         gl_FragColor = vec4(body * t.a + v_col.rgb * rim, a) * v_col.a;
       }

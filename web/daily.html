@@ -57,7 +57,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
 <script>
 'use strict';
-const T={shahed:['Шахеди / Герані','#FFB020'],jet:['Реактивні БпЛА','#2EE6E6'],molniya:['«Молнії»','#6CFF7A'],cruise:['Крилаті ракети','#B07CFF'],ballistic:['Балістичні ракети','#FF5A3C'],kab:['КАБи','#FF8A3D']};
+const T={shahed:['Шахеди / Герані','#FFA31A'],jet:['Реактивні БпЛА','#FF2BD6'],molniya:['«Молнії»','#7CFF2A'],cruise:['Крилаті ракети','#9D3CFF'],ballistic:['Балістичні ракети','#FF2E2E'],kab:['КАБи','#22E1FF']};
 const $=s=>document.querySelector(s);
 const q=new URLSearchParams(location.search);let DAY=q.get('d')||null,D=null,CUR=1,playing=false;
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';

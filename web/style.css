@@ -389,3 +389,6 @@ body.holo-on #map{filter:saturate(1.08) contrast(1.04)}
 .tools svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}.tools b{font-size:16px;line-height:22px}
 @media (max-width:640px){.dock button{width:56px!important}.dock{gap:6px!important}}
 .maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib.maplibregl-compact{margin-bottom:calc(84px + env(safe-area-inset-bottom))}
+
+/* підпис джерел карти не перекриває інтерфейс — він у налаштуваннях («Про дані») */
+.maplibregl-ctrl-attrib,.maplibregl-ctrl-bottom-right .maplibregl-ctrl{display:none!important}
