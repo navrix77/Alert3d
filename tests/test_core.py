@@ -314,3 +314,57 @@ def test_tts_stress_fix():
     from app import tts
     ph = "".join(p for s in tts.phonemize_text("Шахед летить, вісім хвилин") for p in s)
     assert "ʃaxˈɛd" in ph and "lɛt̪ˈɪt" in ph and "ɣβɪlˈɪn" in ph  # шахе́д, лети́ть, хвили́н — не ша́хед/ле́тить/хви́лин
+
+
+def test_audit_2026_11_02_raions_hromadas(monkeypatch):
+    """Аудит 02.11.2026: на ПК без shapely «Полтавський район» ставав селом Полтавське (Харківщина),
+    список районів — селом Кременчуки (Хмельниччина), «Покровська ТГ» у каналі Нікопольщини — Покровськом на Донеччині."""
+    import sys
+    from app import parser as pm
+    from app.parser import Parser
+    monkeypatch.setitem(sys.modules, "shapely", None)
+    monkeypatch.setitem(sys.modules, "shapely.geometry", None)
+    monkeypatch.setattr(pm, "_RAIONS", None)
+    p = Parser()
+    names = lambda t, ch: [r.place.name for r in p.parse(t, ch).places]
+    assert names("Полтавський район Щас буде тривога через реактивні з дніпра", "ppopoltavanightfighters") == ["Полтавський р-н"]  # 02:39
+    assert sorted(names("Полтавський та Кременчуцький райони", "PL")) == ["Кременчуцький р-н", "Полтавський р-н"]  # 06:15
+    assert sorted(names("Кременчуцький, Полтавський райони, тривога: загроза БпЛА", "ppo_poltava")) == ["Кременчуцький р-н", "Полтавський р-н"]  # 09:07
+    o = p.parse("◼️ 02:48 Покровська ТГ", "nikalert")  # те саме о 05:11, 06:58, 07:19, 08:13 …
+    assert [r.place.name for r in o.places] == ["Покровська ТГ"] and o.places[0].place.lon < 35
+
+
+def test_audit_2026_11_02_words_not_villages():
+    """Аудит 02.11.2026: звичайні слова й назви регіонів ставали селами через нечіткий пошук."""
+    from app.parser import Parser
+    p = Parser()
+    names = lambda t, ch: [r.place.name for r in p.parse(t, ch).places]
+    # Волині → Волфине, Буковини → Буковина (eRadarrua 08:29, tgsn_ua 08:35, truexanewsua 08:35)
+    assert names("Найбільша загроза для Львівщини, Рівненщини, Івано-Франківщини, Волині, Тернопільщини та Буковини, включаючи їхні обласні центри.", "eRadarrua") == []
+    assert names("▪️Найбільша загроза — для західних областей: Львівщини, Рівненщини, Івано-Франківщини, Волині, Тернопільщини та Буковини.", "tgsn_ua") == []
+    # дронопорт під Орлом — не Цимбалове на Полтавщині (horizon_of_war_Official 09:18, RadarChernihiv 09:19)
+    assert names("⚠️ За наявною інформацією, противник доставив до Орла (Цимбулово) близько 60 реактивних БпЛА типу «Герань-4/5».", "horizon_of_war_Official") == []
+    assert names("За наявною інформацією, ворог здійснив доставку ~60 реактивних БпЛА на дронопорт «Цимбулова».", "RadarChernihiv") == []
+    # Швидкісна → Шведчина, Попередній → Поперечне, Слідчі → Сліди, Прислати → Преслав
+    assert names("Швидкісна на Одесу від Коси", "Shturval_media")[0] == "Одеса"
+    assert "Поперечне" not in names("⚠️ Попередній на Вінниччині вже пройшов Ладижин, далі курсом на Гайсин.", "UkraineRadar_24_7")
+    assert names("Слідчі Служби безпеки повідомили агенту про підозру", "temporis_odesa") == []
+    assert names("📩 Прислати фото/відео", "operatyvnyi_donbas") == []
+    # нечіткий пошук і далі знаходить відмінки й рос. написання
+    assert names("Комишувасі, Балабиному, Юрківці, Жовтій Кручі, Терсянці,", "info_zp")[0] == "Комишуваха"
+    from app.geo import Gazetteer
+    g = Gazetteer.load()
+    for w, n in [("Кременчуга", "Кременчук"), ("Одессы", "Одеса"), ("Мерефы", "Мерефа"), ("Северодонецка", "Сіверськодонецьк")]:
+        assert g.places[g.lookup(w)[0]].name == n, w
+
+
+def test_audit_2026_11_02_sumline_zaporizhzhia():
+    """kiev_nebo 08:22: «1 на Запоріжжі – Комишуваха (1)» — Запоріжжі тут область, а не село Запоріжжя на Чернігівщині."""
+    from app.parser import Parser
+    p = Parser()
+    for t, n in [("1 на Запоріжжі – Новомиколаївка (1).", "Новомиколаївка"), ("1 на Запоріжжі – Комишуваха (1).", "Комишуваха")]:
+        segs = p.segments(t)
+        assert len(segs) == 1
+        o = p.parse(segs[0], "kiev_nebo")
+        assert [r.place.name for r in o.places] == [n] and o.oblast_hint == "Запорізька"
+        assert 46.6 < o.places[0].place.lat < 48.3 and 34.2 < o.places[0].place.lon < 37.3

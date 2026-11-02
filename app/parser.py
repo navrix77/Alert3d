@@ -80,6 +80,83 @@ MORE_HINTS = [(re.compile(r"житомирщ|житомирськ\w* обл|жи
 _RAIONS = None
 
 
+class _Pt:
+    def __init__(self, x: float, y: float) -> None:
+        self.x, self.y = x, y
+
+
+def _inner_point(geom) -> "_Pt":
+    """Точка всередині полігону району. Через shapely, якщо є; інакше — центроїд найбільшого кільця
+    (на ПК без shapely «Полтавський район» інакше ставав селом Полтавське)."""
+    try:
+        from shapely.geometry import shape
+        rp = shape(geom).representative_point()
+        return _Pt(rp.x, rp.y)
+    except ImportError:
+        pass
+    polys = geom["coordinates"] if geom["type"] == "MultiPolygon" else [geom["coordinates"]]
+    best, ba = None, -1.0
+    for poly in polys:
+        ring = poly[0]
+        a = cx = cy = 0.0
+        for (x0, y0), (x1, y1) in zip(ring, ring[1:] + ring[:1]):
+            c = x0 * y1 - x1 * y0
+            a += c
+            cx += (x0 + x1) * c
+            cy += (y0 + y1) * c
+        if abs(a) > ba and a:
+            ba, best = abs(a), _Pt(cx / (3 * a), cy / (3 * a))
+    return best or _Pt(*polys[0][0][0])
+
+
+RAION_ADJ = re.compile(r"(ськ|цьк|зьк|ск|цк)(ого|ому|ий|ій|ім|им|ая|ий)$")
+
+
+def _raion_ahead(words: list[str], i: int) -> bool:
+    """«Полтавський район», «Полтавський та Кременчуцький райони», «Кременчуцький, Полтавський райони»."""
+    for x in words[i + 1:i + 5]:
+        x = norm(x)
+        if x.startswith(("район", "р-н")):
+            return True
+        if x not in ("та", "і", "й", "и") and not RAION_ADJ.search(x):
+            return False
+    return False
+
+
+_HROM = None
+
+
+def hromada_center(adj: str, oblast: str | None, bbox=None):
+    """«Покровська ТГ» у каналі Нікопольщини → громада в цій області, а не місто Покровськ на Донеччині."""
+    global _HROM
+    if _HROM is None:
+        import json
+        from pathlib import Path
+        try:
+            _HROM = {norm(k): (k, v) for k, v in json.loads((Path(__file__).resolve().parent.parent / "data" / "hromadas.json").read_text(encoding="utf-8")).items()}
+        except Exception:
+            _HROM = {}
+    hit = _HROM.get(norm(adj))
+    if not hit:
+        return None
+    name, cands = hit
+    if oblast:
+        from .geo import oblasts
+        cands = [c for c in cands if oblasts().of(c[1], c[0]) == oblast]
+    if not cands:
+        return None
+    if bbox:
+        cy, cx = (bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2
+        c0 = min(cands, key=lambda c: (c[0] - cy) ** 2 + ((c[1] - cx) * 0.66) ** 2)
+        near = [c for c in cands if abs(c[0] - c0[0]) < 0.3 and abs(c[1] - c0[1]) < 0.4]
+        cands = near
+    elif max(c[0] for c in cands) - min(c[0] for c in cands) > 0.3 or max(c[1] for c in cands) - min(c[1] for c in cands) > 0.4:
+        return None  # тезки в різних областях і область невідома — не вгадуємо
+    la =sum(c[0] for c in cands) / len(cands)
+    lo = sum(c[1] for c in cands) / len(cands)
+    return Place(f"{name} ТГ", la, lo, "H", 5000)
+
+
 def raion_center(adj: str):
     """«ізюмського», «изюмский» → Place(«Ізюмський р-н», центр полігону району)."""
     global _RAIONS
@@ -88,8 +165,7 @@ def raion_center(adj: str):
         from pathlib import Path
         try:
             fc = json.loads((Path(__file__).resolve().parent.parent / "data" / "raions.geojson").read_text(encoding="utf-8"))
-            from shapely.geometry import shape
-            _RAIONS = [(f["properties"]["n"], shape(f["geometry"]).representative_point()) for f in fc["features"]]
+            _RAIONS = [(f["properties"]["n"], _inner_point(f["geometry"])) for f in fc["features"]]
         except Exception:
             _RAIONS = []
     ru = bool(re.search(r"(ский|ского|ском|ская|цкий|цкого)$", adj))
@@ -104,7 +180,7 @@ def raion_center(adj: str):
     return None
 
 
-SUMLINE = re.compile(r"^[^\w\d]*\d+\s+на\s+([А-ЯІЇЄҐа-яіїєґ']+?)(щині|ччині)\s*[–—-]\s*(.+)$")
+SUMLINE = re.compile(r"^[^\w\d]*\d+\s+на\s+([А-ЯІЇЄҐа-яіїєґ']+?)(щині|ччині|жжі)\s*[–—-]\s*(.+)$")  # «1 на Запоріжжі – Комишуваха (1)»
 LISTITEM = re.compile(r"^[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+(?:\s+[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+)?(?:\s*\(\d+\))?$")
 POS_MARK = "⟐"  # маркер: сегмент — поточне місце цілі (з кількістю), а не пункт призначення
 SKIP = {
@@ -119,6 +195,7 @@ SKIP = {
     "перший", "другий", "третій", "первый", "второй", "один", "одна", "два", "дві", "три", "кілька", "несколько", "декілька",
     "південного", "північного", "східного", "західного", "южного", "северного", "восточного", "западного",
     "південно-східного", "південно-західного", "північно-східного", "північно-західного", "напрямку", "направления",
+    "цимбулово", "цимбулова", "цимбулове",  # дронопорт під Орлом (рф), не Цимбалове на Полтавщині
     "напрямок", "направление", "курс", "кількість", "количество", "всього", "всего", "також", "также", "повітряна", "воздушная", "тривога", "тревога",
 }
 NEW_ADJ = re.compile(r"(?i)(?<![\w'’])(нов(?:ий|а|е|і|ый|ая|ое|ые|их|ых)|ще\s+одн\w*|ещ[её]\s+одн\w*)\s+(?=(?:\w+\s+)?(?:реактив|шахед|ударн|бпла|бпла|дрон|ракет|ціл|цел|молн|груп|гербер|гер[ао]н|мопед|балаліст|баліст|крилат))")
@@ -329,13 +406,19 @@ class Parser:
             ahead = " ".join(norm(x) for x in words[i + 1:i + 4])
             adj_gen = norm(w).endswith(("ської", "цької", "зької", "ської,", "ской", "цкой")) or (
                 norm(w).endswith(("ського", "цького", "зького", "ского", "цкого")) and re.search(r"район|област|обл\b|громад", ahead))
-            raion_adj = nxt.startswith(("район", "р-н")) and re.search(r"(ськ|цьк|зьк|ск|цк)(ого|ому|ий|ій|ім|им|ая|ий)$", norm(w))
+            raion_adj = bool(RAION_ADJ.search(norm(w))) and _raion_ahead(words, i)
             if raion_adj:
                 rc = raion_center(norm(w))
                 if rc:  # «на Ізюмський район» → центр району (позначено як район, не село)
                     before = norm(words[i - 1]) if i else ""
                     role_ = "f" if before in ("з", "із", "зі", "с", "со", "от", "из") else ("p" if before in POS_PREV else "t")
                     dist_found.append((len(dist_found) + 1000, PlaceRef(role_, rc)))
+            if nxt in ("тг", "отг") and re.search(r"(ськ|цьк|зьк)а$", norm(w)):
+                hc = hromada_center(w, obs.oblast_hint, bbox)
+                if hc:  # «Покровська ТГ» → громада в області каналу
+                    dist_found.append((len(dist_found) + 1000, PlaceRef("p" if i == 0 or prev in POS_PREV else "t", hc)))
+                i += 2
+                continue
             if adj_gen or raion_adj or norm(w) in SKIP or nxt.startswith(("област", "обл", "громад")) or any(rx.search(norm(w)) for _k, rx in TYPES):
                 i += 1
                 continue
