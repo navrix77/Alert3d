@@ -332,6 +332,7 @@ function syncHromadas(H){
 /* ---------- позиція цілі в момент часу ---------- */
 function posAt(tr,serverT){
   if(tr.status!=='active')return {p:[tr.lon,tr.lat],hd:tr.hd};
+  if(!tr.speed)return {p:[tr.lon,tr.lat],hd:tr.hd};// кадр машини часу: позиція вже на той момент
   // місце лише оцінене («курсом на X» — і вже в X), а нового пункту немає: далі не «ведемо» ціль навмання
   if(tr.pos_est&&!tr.route.length&&!tr.next)return {p:[tr.lon,tr.lat],hd:tr.hd};
   // зміщення за час від останньої названої позиції — та сама модель, що на сервері (map_disp, бектест):
@@ -532,6 +533,7 @@ function renderAsOf(){
   // для людей: лише «наживо» і час; технічні деталі — у стрічці
   const el=$('#asof');const age=(Date.now()-recvAt)/1000;
   if(!SNAP){el.className='asof';el.innerHTML='<i class="live-dot wait"></i>Підключення…';return;}
+  if(REPLAY){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Машина часу · '+fmt(REPLAY.t);return;}
   if(age>30){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Немає звʼязку '+Math.round(age)+' с — це не відбій';return;}
   const h=SNAP.health,ok=h.telegram||h.replay;
   el.className='asof'+(ok?'':' stale');
@@ -719,13 +721,13 @@ function showFrame(i){const f=HISTF[i];if(!f)return;document.body.classList.add(
   $('#tb-time').title='Що було відомо на цей момент';if(XRAY)syncXray();
   // докази кадру (хто й що писав ДО цього моменту) — догружаємо лише для кадру, на якому зупинились
   clearTimeout(showFrame.ft);if(!f.full)showFrame.ft=setTimeout(()=>{if(REPLAY!==f)return;fetch('/api/history/frame?t='+f.t).then(r=>r.json()).then(g=>{if(!g||!g.tracks)return;g.full=1;HISTF[i]=g;if(REPLAY===f)showFrame(i);if(sel)fillSheet();}).catch(()=>{});},tbTimer?1500:250);
-  offset=f.t-Date.now()/1000;recvAt=Date.now();DISP.clear();renderCounters();syncLevels();syncRaions();}
+  offset=f.t-Date.now()/1000;recvAt=Date.now();DISP.clear();renderCounters();renderAsOf();syncLevels();syncRaions();}
 function play(on){clearInterval(tbTimer);tbTimer=null;$('#tb-play').textContent=on?'❚❚':'▶';if(!on)return;tbTimer=setInterval(()=>{const r=$('#tb-range');const i=+r.value+1;if(i>=HISTF.length){play(false);return;}showFrame(i);},250);}
 const tbStep=k=>{play(false);const r=$('#tb-range');const i=Math.max(0,Math.min(HISTF.length-1,+r.value+k));showFrame(i);};
 if($('#tb-back'))$('#tb-back').onclick=()=>tbStep(-5);if($('#tb-fwd'))$('#tb-fwd').onclick=()=>tbStep(5);
 $('#tb-play').onclick=()=>play(!tbTimer||$('#tb-play').textContent==='▶');
 $('#tb-range').oninput=e=>{play(false);showFrame(+e.target.value);};
-$('#tb-live').onclick=()=>{play(false);REPLAY=null;document.body.classList.remove('replay');$('#timebar').hidden=true;DISP.clear();lastLv='';lastRa='';if(LIVE)onSnap(LIVE);};
+$('#tb-live').onclick=()=>{play(false);REPLAY=null;document.body.classList.remove('replay');setTimeout(renderAsOf,50);$('#timebar').hidden=true;DISP.clear();lastLv='';lastRa='';if(LIVE)onSnap(LIVE);};
 /* ---------- «Що змінилося, поки мене не було?» ---------- */
 function seenNow(){try{localStorage.setItem('seen',String(Math.round(Date.now()/1000+offset)));}catch(e){}}
 setInterval(()=>{if(!document.hidden&&!REPLAY)seenNow();},30000);
