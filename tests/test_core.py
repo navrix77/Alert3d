@@ -368,3 +368,72 @@ def test_audit_2026_11_02_sumline_zaporizhzhia():
         o = p.parse(segs[0], "kiev_nebo")
         assert [r.place.name for r in o.places] == [n] and o.oblast_hint == "Запорізька"
         assert 46.6 < o.places[0].place.lat < 48.3 and 34.2 < o.places[0].place.lon < 37.3
+
+
+def test_journal_2026_11_02_words_and_headers():
+    """Журнал повідомлень 01–02.11.2026: підписи, рубрики й аеродроми рф не стають селами."""
+    from app.parser import Parser
+    p = Parser()
+    names = lambda t, ch: [r.place.name for r in p.parse(t, ch).places]
+    # «– Повітряні Сили» ≠ село Сила (khmlv 20:18, 05:42)
+    assert names("🛸 БпЛА з півночі Хмельниччини на Рівненщину, – Повітряні Сили", "khmlv") == []
+    assert names("🛸 Реактивний БпЛА на півночі Вінниччини, курс на Хмельниччину, – Повітряні Сили", "khmlv") == []
+    # «Вектор» ≠ Вікторія (MK 12:29, SU 14:05)
+    assert names("1 БпЛА перелітає з Хмельниччини на Буковину. Вектор на Чернівці.", "MK") == ["Чернівці"]
+    assert "Вікторія" not in names("Вектор КАБів Храпівщина-Кияниця", "SU")
+    # «Кр.Ріг:» — рубрика nikalert (21:55, 02:38), а не село Ріг
+    assert names("Ⓜ️📡 Кр.Ріг: 1 Нива Трудова", "nikalert") == ["Нива Трудова"]
+    assert names("Ⓜ️⚒️ Кр.Ріг : Це звичайний БпЛА біля Покрова", "nikalert") == ["Покров"]
+    # рос. двослівна назва (D 21:57, CX 21:56, R 21:21)
+    assert names("⚠️на Питомник, Черкасскую Лозовую, Харьков", "D")[:2] == ["Питомник", "Черкаська Лозова"]
+    assert names("🔴 Ударный в направлении Черкасской Лозовой", "CX") == ["Черкаська Лозова"]
+    assert "Черкаська Лозова" in names("Ударный на Питомник / Черкасская Лозовая ⚠️", "R")
+    # аеродроми рф (MU, UkraineRadar_24_7, krolevetsnews): не Українка на Київщині, не Олине
+    assert names("✈️Зліт двох бортів Ту-95мс з аер.Українка, ймовірно переліт на аер.Оленья.", "UkraineRadar_24_7") == []
+    assert names("Передислокація щонайменше   2 Ту-95мс з ае. «Українка» на ае. «Оленья».", "krolevetsnews") == []
+    assert names("1 реактивний курсом на Андріївка/Донець", "Karkivw")[0] == "Андріївка"  # «а/Д» — не аеродром
+    # «Більше …» ≠ Білаші (PL, ppopoltavanightfighters)
+    assert names("Більше 5 нових шахедів вздовж межі Харківщини та Дніпропетровщини курсом в район Нехворощі.", "PL") == ["Нехвороща"]
+    assert names("Більше скажу нових до нас не фіксується", "ppopoltavanightfighters") == []
+    # відмінки, які жорсткіший нечіткий пошук не має губити
+    assert names("Ударний БПЛА маневрує біля Дергачів⚠️❗️", "M") == ["Дергачі"]
+    assert names("🔴Шахед на Центр Чернівців!", "MU") == ["Чернівці"]
+    assert names("2 шахеда між Полтавою та Новими Санжарами курсом на Решетилівку.", "PL") == ["Нові Санжари", "Решетилівка"]
+
+
+def test_journal_2026_11_02_sumline_notes_and_cities():
+    from app.parser import Parser
+    p = Parser()
+    # kiev_nebo 02:37: пояснення після кількості — зведення не губиться
+    segs = p.segments("2 на Київщині – Київ (1, повз Козин), Пісківка (1, з Житомирщини)")
+    assert [[r.place.name for r in p.parse(s, "kiev_nebo").places] for s in segs] == [["Київ"], ["Пісківка"]]
+    segs = p.segments("1 на Миколаївщині – Очаків (1, з акваторії Чорного моря)")
+    assert [[r.place.name for r in p.parse(s, "kiev_nebo").places] for s in segs] == [["Очаків"]]
+    # місто за межами регіону каналу, а не село-тезка біля його кордону
+    for t, ch, lat in [("🔻 Один БпЛА повз Гощу на Рівне", "kiev_nebo", 50.6), ("БпЛА на Запоріжжя.", "kiev_nebo", 47.85),
+                       ("БпЛА курсом на Запоріжжя", "D", 47.85)]:
+        pl = [r.place for r in p.parse(t, ch).places]
+        assert pl and pl[-1].kind == "M" and abs(pl[-1].lat - lat) < 0.2, (t, pl)
+
+
+def test_journal_2026_11_02_no_jet_teleport():
+    """РБ-27, 02.11 03:35–03:36: «курсом на X» від кількох каналів щохвилини переносило ціль у X —
+    Васильків → Петропавлівська Борщагівка 26 км за ~40 с (2195 км/год). Тепер X лишається курсом."""
+    from app.parser import Parser
+    from app.geo import dist_km
+    p = Parser()
+    tr = Tracker(SOURCES)
+    t0 = 1_793_583_299  # 03:34:59 Київ
+    msgs = [(0, "KL", "Реактивний БпЛА курсом на Боярку (Київщина)"),
+            (35, "truexakyiv", "Реактивний на Васильків."),
+            (62, "UkraineRadar_24_7", "‼️ 1х реактивний на Київщині курсом на Васильків!  Далі може піти в бік Глевахи."),
+            (96, "KL", "Реактивний БпЛА курсом на Петропавлівську Борщагівку (Київщина)"),
+            (105, "rozvidkaneba", "Реактивний БпЛА курсом на Петропавлівську Борщагівку (Київщина)")]
+    for dt, src, text in msgs:
+        for s in p.segments(text):
+            tr.ingest(p.parse(s, src), src, t0 + dt)
+    for track in tr.tracks:
+        for a, b in zip(track.obs, track.obs[1:]):
+            d = dist_km((a.x, a.y), (b.x, b.y))
+            v = d / max(30.0, b.t - a.t) * 3600
+            assert not (d > 25 and v > 450 * 3), (track.id, a.label, b.label, round(d), round(v))

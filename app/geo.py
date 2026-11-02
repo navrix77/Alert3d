@@ -52,7 +52,7 @@ _ALT = {("ц", "к"), ("з", "г"), ("с", "х"), ("г", "к")}  # Терсян�
 
 def _skel_ok(word_key: str, place_key: str) -> bool:
     a, b = _skel(word_key), _skel(place_key)
-    if a == b or a == b + "м":  # «Балабиному» — закінчення орудного/місцевого
+    if a == b or (a[:-1] == b and a[-1:] in "мвх"):  # закінчення: Балабиному, Дергачів, Чернівцях
         return True
     return len(a) == len(b) > 2 and a[:-1] == b[:-1] and (a[-1], b[-1]) in _ALT
 
@@ -188,7 +188,15 @@ class Gazetteer:
             c += [b + "а", b + "я"]
         if e not in "аеиіоуюяьй'":  # родовий множини: Черкас → Черкаси, Лубен → Лубни
             c += [w + "и", w + "і", w + "а"]
-        if e2 in ("ое", "ую", "ій", "ий", "ые", "ої", "ом", "ем"):
+        if w.endswith(("ами", "ями", "ими")):  # орудний множини: «Новими Санжарами» → Нові Санжари
+            c += [w[:-3] + "и", w[:-3] + "і"]
+        if e2 == "их":  # родовий множини прикметника: «Великих Сорочинців», «Жовтих Вод»
+            c += [b2 + "і", b2 + "ий"]
+        if w.endswith("ців"):  # «Сорочинців» → Сорочинці
+            c.append(w[:-1])
+        if e2 == "ый":  # рос. «Старый Салтов»
+            c.append(b2 + "ий")
+        if e2 in ("ое", "ую", "ій", "ий", "ые", "ої", "ом", "ем", "ой", "ая"):
             c += [b2 + x for x in ("ое", "ий", "е", "а", "о", "ій", "ів", "ов", "ки", "ка")]
         if e2 in ("ом", "ем"):
             c.append(b2)
@@ -204,7 +212,7 @@ class Gazetteer:
             if w.endswith(suf):
                 c.append(w[: -len(suf)] + suf[:3])
                 c.append(w[: -len(suf)])  # «Ізюмський район» → Ізюм, «Чугуївський» → Чугуїв
-        for suf, rep in (("ова", "ів"), ("ева", "ів"), ("єва", "їв"), ("овом", "ів"), ("євом", "їв"), ("ові", "ів"), ("єві", "їв"), ("ову", "ів"), ("еву", "ів"), ("єву", "їв")):
+        for suf, rep in (("ов", "ів"), ("ова", "ів"), ("ева", "ів"), ("єва", "їв"), ("овом", "ів"), ("євом", "їв"), ("ові", "ів"), ("єві", "їв"), ("ову", "ів"), ("еву", "ів"), ("єву", "їв")):
             if w.endswith(suf):
                 c.append(w[: -len(suf)] + rep)
         seen, out = set(), []
@@ -243,9 +251,9 @@ class Gazetteer:
                 if abs(len(kk) - len(k)) > lim:
                     continue
                 d = lev(k, kk, lim)
-                if d < bd:
+                if d < bd and _skel_ok(k, kk):
                     best, bd = kk, d
-            if best and _skel_ok(k, best):
+            if best:
                 return self.kidx[best]
         if "-" in w:
             *head, last = w.split("-")
@@ -257,11 +265,28 @@ class Gazetteer:
 
     def lookup_bigram(self, a: str, b: str) -> list[int] | None:
         A, B = norm(a), norm(b)
-        for x in self.candidates(A):
-            for y in self.candidates(B):
+        ca, cb = self.candidates(A), self.candidates(B)
+        if len(B) <= 4 and B[-1:] not in "аеиіоуюяь":  # «Жовтих Вод» → Жовті Води
+            cb = cb + [B + "и", B + "і"]
+        for x in ca:
+            for y in cb:
                 k = f"{x} {y}"
                 if k in self.idx:
                     return self.idx[k]
+        # рос. написання двослівної назви: «Черкасскую Лозовую» → Черкаська Лозова
+        if len(A) < 4 or len(B) < 4:
+            return None
+        bk = self.__dict__.get("_bk")
+        if bk is None:
+            bk = self._bk = {}
+            for k, v in self.kidx.items():
+                if " " in k:
+                    bk.setdefault(re.sub(r"(.)\1+", r"\1", k), []).extend(v)
+        for x in ca:
+            for y in cb:
+                k = re.sub(r"(.)\1+", r"\1", phon(f"{x} {y}"))
+                if k in bk:
+                    return bk[k]
         return None
 
 

@@ -180,6 +180,9 @@ def raion_center(adj: str):
     return None
 
 
+KR_RIH = re.compile(r"(?<![\w])кр\.\s*р[іо]г(\s*:)?", re.I)
+AIRFIELD = re.compile(r"(?i)(?<![\w])(аеродром\w*|аэродром\w*|аер\.|ае\.)\s*[«\"„“]?\s*[А-ЯІЇЄҐA-Z][\w\-]*(?:-\d)?[»\"”]?")
+AIR_FORCE = re.compile(r"(?i)(повітрян\w*|воздушн\w*)\s+(сил\w*)")
 SUMLINE = re.compile(r"^[^\w\d]*\d+\s+на\s+([А-ЯІЇЄҐа-яіїєґ']+?)(щині|ччині|жжі)\s*[–—-]\s*(.+)$")  # «1 на Запоріжжі – Комишуваха (1)»
 LISTITEM = re.compile(r"^[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+(?:\s+[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+)?(?:\s*\(\d+\))?$")
 POS_MARK = "⟐"  # маркер: сегмент — поточне місце цілі (з кількістю), а не пункт призначення
@@ -195,6 +198,8 @@ SKIP = {
     "перший", "другий", "третій", "первый", "второй", "один", "одна", "два", "дві", "три", "кілька", "несколько", "декілька",
     "південного", "північного", "східного", "західного", "южного", "северного", "восточного", "западного",
     "південно-східного", "південно-західного", "північно-східного", "північно-західного", "напрямку", "направления",
+    "більше", "больше", "оленья", "оленьей",  # «Більше 5 нових шахедів» ≠ Білаші; аеродром «Оленья» (рф) ≠ Олине
+    "вектор", "вектором", "вектори",  # «Вектор на Чернівці», «Вектор КАБів …» — не село Вікторія
     "цимбулово", "цимбулова", "цимбулове",  # дронопорт під Орлом (рф), не Цимбалове на Полтавщині
     "напрямок", "направление", "курс", "кількість", "количество", "всього", "всего", "також", "также", "повітряна", "воздушная", "тривога", "тревога",
 }
@@ -287,7 +292,8 @@ class Parser:
                 continue
             m = SUMLINE.match(ln.strip())
             if m:
-                for name, cnt in re.findall(r"([А-ЯІЇЄҐ][\w'’ʼ\- ]{1,40}?)\s*\((\d+)\)", m.group(3)):
+                # «Київ (1, повз Козин)», «Очаків (1, з акваторії Чорного моря)» — пояснення після кількості
+                for name, cnt in re.findall(r"([А-ЯІЇЄҐ][\w'’ʼ\- ]{1,40}?)\s*\((\d+)(?:,[^)]*)?\)", m.group(3)):
                     lines.append(f"{POS_MARK}{cnt} {name.strip()} ({m.group(1)}{m.group(2)})")
             else:
                 lines.append(ln)
@@ -311,6 +317,12 @@ class Parser:
         text = NEW_ADJ.sub(" ", text)
         # «з акваторії Чорного моря» — не село Чорне під Черніговом
         text = SEA.sub(" з моря ", text)
+        # «Кр.Ріг:» — рубрика каналу (nikalert), а не село Ріг; «на Кр.Ріг» — Кривий Ріг
+        text = KR_RIH.sub(lambda m_: " " if m_.group(1) else " Кривий Ріг ", text)
+        # «– Повітряні Сили» — підпис джерела, а не село Сила
+        text = AIR_FORCE.sub(" ", text)
+        # «з аеродрому "Українка" на аеродром «Оленья»» — аеродроми рф, а не Українка на Київщині
+        text = AIRFIELD.sub(" ", text)
         t = norm(text)
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         m = COUNT.search(t)
@@ -419,6 +431,12 @@ class Parser:
                     dist_found.append((len(dist_found) + 1000, PlaceRef("p" if i == 0 or prev in POS_PREV else "t", hc)))
                 i += 2
                 continue
+            if adj_gen and not raion_adj and i + 1 < len(words) and words[i + 1][:1].isupper():
+                ids = self.gaz.lookup_bigram(w, words[i + 1])
+                if ids:  # «Черкасской Лозовой» — двослівна назва, а не прикметник області
+                    found.append(("p" if prev in POS_PREV else "t", ids))
+                    i += 2
+                    continue
             if adj_gen or raion_adj or norm(w) in SKIP or nxt.startswith(("област", "обл", "громад")) or any(rx.search(norm(w)) for _k, rx in TYPES):
                 i += 1
                 continue
@@ -495,6 +513,11 @@ class Parser:
                         dx = max(bbox[2] - q.lon, 0, q.lon - bbox[3]) * 72
                         return math.hypot(dx, dy)
                     near = [i for i in ids if off(i) <= 60]
+                    # але місто за межами регіону ймовірніше за село-тезку біля кордону:
+                    # kiev_nebo «повз Гощу на Рівне», «БпЛА на Запоріжжя.», D «БпЛА курсом на Запоріжжя»
+                    cities = [i for i in ids if P[i].kind in ("M", "K")]
+                    if cities and not any(P[i].kind in ("M", "K") for i in near):
+                        near = cities
                     if not near:
                         continue
                     inb = near  # лише тезки біля регіону каналу, а не «найбільший по країні»
@@ -507,6 +530,13 @@ class Parser:
                 inobl = [i for i in cand if _ob().of(P[i].lon, P[i].lat) == hint or P[i].pop >= 20000]
                 if inobl:
                     cand = inobl  # точно в області з повідомлення/каналу, а не лише в її прямокутнику
+            if hint and getattr(self, "_chan_bbox", False) and not any(P[i].kind in ("M", "K") for i in cand):
+                from .geo import oblasts as _ob
+                if not any(_ob().of(P[i].lon, P[i].lat) == hint for i in cand):
+                    # у регіоні каналу такого пункту немає — місто ймовірніше за село-тезку за кордоном області
+                    cities = [i for i in ids if P[i].kind in ("M", "K")]
+                    if cities:
+                        cand = cities
             import math
 
             def score(i: int) -> float:

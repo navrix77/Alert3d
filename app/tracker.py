@@ -345,7 +345,10 @@ class Tracker:
                 X = route[0]
                 e = tr.est(t)
                 reach = tr.speed * max(60.0, t - tr.last.t) / 3600 * 1.6 + 12
-                if dist_km(e, X.xy) <= reach:
+                # і не швидше за 2.5× номінальної від останньої фіксації: «курсом на X» щохвилини від кількох каналів
+                # інакше «стрибає» ціль на 25–40 км за пів хвилини (аудит: Васильків→Борщагівка 2195 км/год)
+                jump = dist_km((tr.last.x, tr.last.y), X.xy) <= TYPES[tr.type]["speed"] * 2.5 * max(30.0, t - tr.last.t) / 3600 + 5
+                if dist_km(e, X.xy) <= reach and jump:
                     prev = tr.last
                     tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
                     if dist_km((prev.x, prev.y), X.xy) > 3:
