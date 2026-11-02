@@ -304,6 +304,16 @@ async def pusher() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # журнал пусків живе в пам'яті: після перезапуску відновлюємо пуски за 6 год із журналу повідомлень на диску
+    try:
+        rows = brain.db.execute("SELECT t, src, link, type, cnt, text FROM msg WHERE kind='launch' AND t > ? ORDER BY t", (time.time() - 6 * 3600,)).fetchall()
+        for t_, src_, link_, typ_, cnt_, text_ in rows:
+            sites_, ltyp_, car_, _ = launch.detect(text_ or "", typ_)
+            if sites_:
+                tracker.launches.add(sites_, ltyp_, cnt_, car_, src_, link_, t_, False, text_)
+        log.info("відновлено пусків з журналу: %d повідомлень", len(rows))
+    except Exception as e:  # noqa: BLE001
+        log.warning("відновлення пусків: %s", e)
     tasks = [asyncio.create_task(pusher()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     tasks.append(asyncio.create_task(pushsvc.run(state)))
     tasks.append(asyncio.create_task(ru.run()))

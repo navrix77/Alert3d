@@ -46,6 +46,12 @@ CARRIER = [(re.compile(r"ту-95|ту95|ту-160|ту160"), "Ту-95МС/Ту-16
            (re.compile(r"су-34|су-35|су34"), "Су-34", "kab"), (re.compile(r"міг-31|миг-31"), "МіГ-31К", "ballistic"),
            (re.compile(r"калібр|калибр|корабл|крейсер|підводн|подводн|носі[їй] калібр"), "кораблі (Калібр)", "cruise")]
 STRAT = {"Ту-95МС/Ту-160", "Ту-22М3"}
+
+
+def car_bad(carrier, typ) -> bool:
+    """Кораблі пускають «Калібри» (крилаті); шахеди, балістика, реактивні БпЛА з кораблів не стартують
+    (03.11: «Чорне море · Шахед ×13 · кораблі (Калібр)»)."""
+    return bool(carrier and "Калібр" in carrier and typ not in (None, "cruise"))
 SUMMARY_RX = re.compile(r"в ніч на|у ніч на|в ночь на|протягом ночі|за ніч|за минулу добу|атакував[аи]?\s+\d|загалом")
 FORECAST_RX = re.compile(r"може\s+застосов|можуть\s+застосов|може\s+застосува|можуть\s+застосува|может\s+примен|могут\s+примен|маю попередж|є попередж|попереджаю|"
                          r"загроза застосуван|можливе застосуван|можливий масован|не думаю|будуть застосован|в готовності|у готовності|готуют|готують|"
@@ -170,7 +176,12 @@ class LaunchBook:
         for s in sites:
             strat_site = s.kind == "аеродром" and "cruise" in (s.types or set())
             stage = "takeoff" if (carrier in STRAT or strat_site) and not pusk else "launch"
+            if car_bad(carrier, typ):
+                carrier = None
             ex = next((L for L in self.items if L.site is s and (L.type == typ or not typ or not L.type) and abs(t - L.t) < 1200), None)
+            if ex and link and link in ex.links:
+                out.append(ex)  # той самий пост ще раз (відновлення з журналу + дочитування каналів)
+                continue
             if ex:
                 ex.srcs.add(src)
                 ex.links = (ex.links + [link])[-6:] if link else ex.links
@@ -193,6 +204,8 @@ class LaunchBook:
                 car = None
             # бандероль не з кораблів
             car = car or (None if typ in ("banderol", "ballistic") and "море" in s.name else (None if typ == "banderol" else s.carrier))
+            if car_bad(car, typ):
+                car = None
             L = Launch(f"L{self.n}", s, t, typ, count, car, {src}, [link] if link else [], stage=stage,
                        ev=[{"t": int(t), "src": src, "text": (text or "")[:220], "link": link}] if text else [])
             self.items.append(L)
