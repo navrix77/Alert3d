@@ -461,7 +461,7 @@ function renderMe(threats){
   const isStale=!SNAP||(Date.now()-recvAt)/1000>20;
   const near=SNAP.tracks.filter(t=>t.status==='active'&&t.conf>=0.5).map(t=>{const d=DISP.get(t.id);return d?{tr:t,r:homeRel(t,d.p)}:null;}).filter(x=>x&&x.r&&x.r.d<120).sort((a,b)=>(a.r.eta??999)-(b.r.eta??999)||a.r.d-b.r.d);
   const thr=near.filter(x=>x.r.rel);const first=thr[0];
-  let cls='me',word='Над вами чисто',sub='Підтверджених цілей у бік дому немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
+  let cls='me',word='Над вами чисто',sub='Підтверджених цілей у ваш бік немає. Найближча: '+(near[0]?Math.round(near[0].r.d)+' км '+near[0].r.from:'далі 120 км')+'.';
   if(isStale){cls='me watch';word='Невідомо';sub='Немає звʼязку з джерелами. Це <b>не відбій</b>.';}
   else if(first){const e=first.r.eta||0;cls=e<=5?'me danger':'me watch';word=e<=5?'Летить на вас':'У ваш бік';
     sub=esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':'');}
