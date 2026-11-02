@@ -790,15 +790,24 @@ function setXray(on){XRAY=on;document.body.classList.toggle('xray',on);if($('#b-
   for(const id of ['xr-dim','xr-edge','xr-edge2','xr-node','xr-t'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'visible':'none');
   for(const id of ['holo','holo-top','ra-glow'])if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');
   const pn=xrPanel();pn.hidden=!on;if(on&&!sel)pn.innerHTML='<div class="xp-h"><b>Звідки SKY знає про ціль</b><button class="xp-x">Готово</button></div><p class="xp-n">Торкніться будь-яку ціль на мапі — покажу по кроках, хто й коли про неї написав і що з цього SKY вирахував сам.</p>';
+  if(on&&sel)xrMsg('Завантажую повідомлення про ціль…');
   if(on&&!sel)pn.querySelector('.xp-x').onclick=()=>setXray(false);
   syncXray();}
 function xrPanel(){let p=$('#xr-panel');if(!p){p=document.createElement('div');p.id='xr-panel';p.hidden=true;document.body.appendChild(p);}return p;}
 // окремої кнопки «Рентген» більше немає: пояснення відкривається лише з картки цілі («Чому SKY показує її тут?»)
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&XRAY)setXray(false);});
 map.on('styledata',()=>{if(XRAY&&map.getLayer('xr-dim')&&map.getLayoutProperty('xr-dim','visibility')!=='visible')setXray(true);});
-function syncXray(){if(!XRAY||!SNAP||!map.getSource('xr'))return;
+// панель рентгену ніколи не лишається порожньою: заголовок, пояснення стану і «Готово»
+function xrMsg(t){const pn=xrPanel();pn.dataset.k='';pn.hidden=false;pn.innerHTML='<div class="xp-h"><b>Звідки SKY знає про ціль</b><button class="xp-x">Готово</button></div><p class="xp-n">'+t+'</p>';pn.querySelector('.xp-x').onclick=()=>setXray(false);}
+function syncXray(){if(!XRAY)return;
+  if(!SNAP||!map.getSource('xr')){xrMsg('Завантажую дані…');return;}
+  try{syncXray0();}catch(e){xrMsg('Не вдалося показати пояснення. Закрийте й торкніться ціль ще раз.');}}
+function syncXray0(){
   const tr=sel&&SNAP.tracks.find(t=>t.id===sel);const F=[];
-  if(!tr){map.getSource('xr').setData({type:'FeatureCollection',features:F});return;}
+  if(!tr){map.getSource('xr').setData({type:'FeatureCollection',features:F});
+    if(sel){if(xrPanel().dataset.k!=='gone')xrMsg('Цієї цілі вже немає в даних: канали перестали про неї писати або її обʼєднано з іншою. Торкніться іншу ціль.');xrPanel().dataset.k='gone';}
+    else if(!xrPanel().innerHTML.trim())xrMsg('Торкніться будь-яку ціль на мапі — покажу по кроках, хто й коли про неї написав.');
+    return;}
   const nm=k=>SNAP.sources[k]?.name||k;const d=DISP.get(tr.id);
   const items=((tr.ev&&tr.ev.items)||(REPLAY?null:evItems(tr.id,syncXray))||[]).slice().sort((a,b)=>a.t-b.t);
   const prim=items.filter(i=>!i.copy),copies=items.filter(i=>i.copy);
