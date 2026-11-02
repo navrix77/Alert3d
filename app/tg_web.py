@@ -99,17 +99,23 @@ class WebMonitor:
         chans = [(k, u) for k, u, *_ in config.CHANNELS]
         # Перший прохід — дочитати останні 30 хв у хронологічному порядку по всіх каналах
         async with httpx.AsyncClient(timeout=15, headers=UA, follow_redirects=True) as cli:
+            # УСІ канали, не лише головні: інакше решта дочитується порціями вже після старту, старі пости
+            # приходять не за часом і створюють зайві «нові» цілі (02.11, перезапуск під час атаки: 29 → 87 шахедів)
             buf = []
-            for key, user in [(k, u) for k, u in chans if k in config.FAST]:
-                try:
-                    r = await cli.get(f"https://t.me/s/{user}")
-                    msgs = parse_page(r.text)
-                    self.last_ok[user] = time.time()
-                    self.last_id[user] = max((m[0] for m in msgs), default=0)
-                    buf += [(ts, text, key, f"https://t.me/{user}/{mid}") for mid, ts, text in msgs if ts > time.time() - 1800]
-                except Exception as e:  # noqa: BLE001
-                    self.errors[user] = str(e)[:120]
-                await asyncio.sleep(0.25)
+            sem0 = asyncio.Semaphore(6)
+
+            async def first(key, user):
+                async with sem0:
+                    try:
+                        r = await cli.get(f"https://t.me/s/{user}")
+                        msgs = parse_page(r.text)
+                        self.last_ok[user] = time.time()
+                        self.last_id[user] = max((m[0] for m in msgs), default=0)
+                        buf.extend((ts, text, key, f"https://t.me/{user}/{mid}") for mid, ts, text in msgs if ts > time.time() - 1800)
+                    except Exception as e:  # noqa: BLE001
+                        self.errors[user] = str(e)[:120]
+                    await asyncio.sleep(0.25)
+            await asyncio.gather(*(first(k, u) for k, u in chans))
             for ts, text, key, link in sorted(buf):
                 try:
                     on_message(text, key, ts, link)
