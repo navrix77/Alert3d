@@ -19,7 +19,7 @@ if [ ! -f $H/.installed ]; then
   sudo -u navryx python3 -m venv $H/venv
   sudo -u navryx $H/venv/bin/pip install -q -r $H/app/requirements.txt pytest
   sudo -u navryx $H/venv/bin/pip install -q --no-deps ukrainian-word-stress || true
-  (cd $H/app && sudo -u navryx $H/venv/bin/python scripts/build_gazetteer.py) || true
+  (cd $H/app && timeout 420 sudo -u navryx $H/venv/bin/python scripts/build_gazetteer.py) || true
   touch $H/.env && chown navryx $H/.env && chmod 600 $H/.env
 
   cat > /etc/systemd/system/navryx.service <<UNIT
