@@ -427,8 +427,8 @@ function fillSheet(first){
   $('#sh-name').textContent=TYPE_NAME[tr.type]+(tr.count>1?' ×'+tr.count:'');
   $('#sh-course').innerHTML=tr.status!=='active'?(tr.status==='lost'?'Втрачено':'Більше не фіксується'):(tr.next?'Курс → <b>'+esc(tr.next)+'</b>':'Курс уточнюється');
   const d=DISP.get(tr.id);const r=d&&homeRel(tr,d.p);
-  $('#sh-dist').textContent=!home?'вкажіть дім':r?Math.round(r.d)+' км '+r.side:'—';
-  $('#sh-eta').textContent=!home?'—':!r?'—':r.eta!=null?'≈ '+Math.max(1,Math.round(r.eta))+' хв':r.away?'віддаляється':tr.hd==null?'курс невідомий':'летить повз';
+  $('#sh-dist').textContent=!home?'вкажіть свою точку':r?Math.round(r.d)+' км '+r.side:'—';
+  $('#sh-eta').textContent=!home?'—':!r?'—':r.eta!=null?'≈ '+Math.max(1,Math.round(r.eta))+' хв до вас':r.away?'віддаляється':tr.hd==null?'курс невідомий':'летить повз';
   const ago=Math.round((Date.now()/1000+offset-tr.first)/60);
   $('#sh-first').textContent=fmt(tr.first)+' · '+ago+' хв тому';
   $('#sh-src').textContent=tr.srcs.map(s=>SNAP.sources[s]?.name||s).join(', ')+(tr.srcs.length>1?'':'');
