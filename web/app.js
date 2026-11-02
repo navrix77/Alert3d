@@ -407,7 +407,7 @@ function frame(now){
         fx.push({id:tr.id,age:((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),spd:tr.speed,p:d.p,sa,hd:d.hd,type:tr.type,col:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],weak,thr:!!(rel&&rel.rel),sel:sel===tr.id,tail:dots});}
       const c=TYPE_COLOR[tr.type];
       // пройдений шлях, крапками за позиціями, які назвали канали; лише для вибраної цілі й тих, що летять до вас (інакше «каша»)
-      if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.trail&&tr.trail.length)trails.push({type:'Feature',properties:{c,o:0.95},geometry:{type:'LineString',coordinates:[...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
+      if(active&&tr.trail&&tr.trail.length){const hi=sel===tr.id||(rel&&rel.rel);trails.push({type:'Feature',properties:{c:hi?c:'#E8ECF4',o:hi?0.95:0.22},geometry:{type:'LineString',coordinates:[...tr.trail.map(t=>[t[0],t[1]]),d.p]}});}
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.route.length)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
       if(active&&(sel===tr.id||(rel&&rel.rel))&&tr.lpath&&tr.lpath.length&&!tr.route.length){const L=tr.lpath;lpf.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...L.map(x=>[x[0],x[1]])]}});
         L.forEach(x=>lpf.push({type:'Feature',properties:{c,l:'ймовірно '+x[2]+' · '+Math.round(x[3]*100)+'%'},geometry:{type:'Point',coordinates:[x[0],x[1]]}}));}
@@ -429,8 +429,9 @@ function frame(now){
     if(slow&&map.getSource('chains')){frame.ch=now;const ch=[],ls=new Map();
       for(const L of (SNAP.launches||[])){const w=launchWhat(L);ls.set(L.site,{type:'Feature',properties:{est:false,lid:L.id,l:(isTO(L)?'НОСІЇ В ПОВІТРІ'+(L.count?' · '+cntL(L):''):'ПУСК: '+w.short+(L.count?' ×'+L.count:''))+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
-        if(!isSel)continue;// звʼязок «пуск → ціль» лише для вибраної цілі: це оцінка, а павутина ліній на всю мапу заважає читати
-        ch.push({type:'Feature',properties:{c:L.est?'#FF8A8A':'#FF3B3B',o:isSel?0.95:(L.est?0.3:0.38),s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
+        if(L.est&&!isSel)continue;
+        // звʼязок «пуск → ціль» — оцінка: для всіх ледь помітний світлий, для вибраної цілі яскравий
+        ch.push({type:'Feature',properties:{c:isSel?(L.est?'#FF8A8A':'#FF3B3B'):'#E8ECF4',o:isSel?0.95:0.1,s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
         if(!ls.has(L.site))ls.set(L.site,{type:'Feature',properties:{est:true,l:'ймовірно · '+L.site.replace(/ \(.*\)/,'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       map.getSource('chains').setData({type:'FeatureCollection',features:ch});map.getSource('lsites').setData({type:'FeatureCollection',features:[...ls.values()]});}
     T3D.heads=feats.map(f=>({id:f.properties.id,type:f.properties.type,hd:f.properties.hd,active:f.properties.active,weak:f.properties.weak,p:f.geometry.coordinates}));
