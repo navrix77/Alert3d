@@ -835,7 +835,7 @@ function syncXray0(){
   map.getSource('xr').setData({type:'FeatureCollection',features:F});
   const pn=xrPanel();const key=tr.id+'|'+items.length+'|'+Math.floor(Date.now()/60000);if(pn.dataset.k===key&&!pn.hidden)return;pn.dataset.k=key;pn.hidden=false;
   pn.innerHTML='<div class="xp-h"><b>'+esc(TYPE_NAME[tr.type]||'Ціль')+': звідки SKY знає, де вона</b><button class="xp-x">Готово</button></div>'+
-    '<p class="xp-n">'+(E.pubs||items.length)+' повідомл. · '+ind+' '+(ind===1?'незалежне джерело':'незалежних джерела')+(ind<2?' — <b>ще не підтверджено другим джерелом</b>':'')+'</p>'+contra+
+    '<p class="xp-n">'+(E.pubs||items.length)+' повідомл. · '+ind+' '+(ind===1?'незалежне джерело':'незалежних джерела')+(ind<2?' — <b>ще не підтверджено другим джерелом</b>':'')+(ind?': '+(E.prim||[]).map(x=>esc(nm(x))).join(', '):'')+'</p>'+contra+
     (items.length?'<ol class="xp-l">'+rows.join('')+nowRow+'</ol>':'<p class="xp-n">Завантажую повідомлення…</p>');
   pn.querySelector('.xp-x').onclick=()=>{const id=sel;setXray(false);if(id){sel=id;$('#sheet').hidden=false;fillSheet(true);}};}
 setInterval(syncXray,1000);
