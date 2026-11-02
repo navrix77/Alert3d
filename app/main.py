@@ -228,7 +228,8 @@ def state() -> dict:
                           "route": t["route"][:3],
                           # що було ВІДОМО в цей момент: докази на ту хвилину
                           "ev": {"pubs": t["ev"]["pubs"], "prim": t["ev"]["prim"], "indep": t["ev"]["indep"], "age": t["ev"]["age"], "contra": t["ev"]["contra"],
-                                 "items": [{k: i[k] for k in ("t", "src", "p", "pt", "copy", "dest", "why")} for i in t["ev"]["items"][-8:]]}}
+                                 "items": [{k: i[k] for k in ("t", "src", "p", "pt", "copy", "dest", "why")}
+                                           for i in ((tracker.track_evidence(t["id"], snap["now"]) or {}).get("items") or [])[-8:]]}}
                          for t in snap["tracks"] if t["status"] == "active"]}
         HIST.append(fr)
         brain.hist_add(fr)

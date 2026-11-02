@@ -828,3 +828,14 @@ def test_launch_forecast_and_ship_carrier_2026_11_02():
     assert [s.name for s in sites] == ["Курськ (Халіно)"]
     L = LaunchBook().add(sites, "ballistic", None, car, "x", None, 1_793_646_000.0, summ)[0]
     assert not L.carrier or "Калібр" not in L.carrier
+
+
+def test_state_smoke():
+    """state() — те, що отримують усі клієнти; падіння тут = мапа без даних (02.11 21:38: 500 після винесення доказів)."""
+    import os
+    os.environ.setdefault("REPLAY", "1")
+    from app import main as M
+    M.tracker.ingest(P.parse("Ударний БПЛА на Дергачі", "M"), "M")
+    s = M.state()
+    assert s["tracks"] and "items" not in s["tracks"][0]["ev"]
+    assert M.tracker.track_evidence(s["tracks"][0]["id"])["items"]
