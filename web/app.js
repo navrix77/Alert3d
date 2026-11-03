@@ -73,7 +73,8 @@ async function styleFor(kind){
     return L;});
   const out={version:8,glyphs:vec.glyphs,sources:{...vec.sources,esri:{type:'raster',tiles:[ESRI],tileSize:256,maxzoom:19,attribution:'© Esri, Maxar, Earthstar Geographics'}},
     layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}},
-      {id:'esri',type:'raster',source:'esri',paint:NIGHT?{'raster-saturation':-0.15,'raster-brightness-max':['interpolate',['linear'],['zoom'],4,0.62,7,0.6,10,0.62,13,0.7],'raster-brightness-min':0.02,'raster-contrast':0.08,'raster-opacity':1}:{'raster-saturation':-0.1,'raster-brightness-max':0.9}},
+      // підкладка приглушена, майже монохромна: цілі й заливка тривог читаються на ній, а не змагаються з коричнево-зеленим супутником (03.11, ревізія візуалу)
+      {id:'esri',type:'raster',source:'esri',paint:NIGHT?{'raster-saturation':-0.5,'raster-brightness-max':['interpolate',['linear'],['zoom'],4,0.5,7,0.5,10,0.55,13,0.66],'raster-brightness-min':0.02,'raster-contrast':0.04,'raster-opacity':1}:{'raster-saturation':-0.35,'raster-brightness-max':0.84}},
       ...(NIGHT?[{id:'lights',type:'raster',source:'lights',maxzoom:10,paint:{'raster-opacity':['interpolate',['linear'],['zoom'],4,0.22,7,0.15,9,0],'raster-saturation':-0.1,'raster-contrast':0.25,'raster-resampling':'linear'}}]:[]),...keep]};
   if(NIGHT){out.sources.lights={type:'raster',tiles:['https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png'],tileSize:256,maxzoom:8,attribution:'NASA Black Marble'};}
   out.sky={'sky-color':'#04060C','horizon-color':'#1B2A4A','fog-color':'#04060C','sky-horizon-blend':0.7,'horizon-fog-blend':0.85,'fog-ground-blend':0.35,'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,0.75,8,0.2]};
@@ -131,7 +132,6 @@ function addOverlays(){
   map.addSource('obl',{type:'geojson',data:'/data/oblasts.geojson',promoteId:'n'});
   map.addSource('ra',{type:'geojson',data:'/data/raions.geojson',generateId:true});
   map.addSource('occ',{type:'geojson',data:'/data/occupied.geojson'});
-  if(!map.hasImage('hatch')){const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');x.strokeStyle='rgba(20,0,6,.55)';x.lineWidth=3;x.beginPath();x.moveTo(-4,20);x.lineTo(20,-4);x.moveTo(-4,4);x.lineTo(4,-4);x.moveTo(12,20);x.lineTo(20,12);x.stroke();map.addImage('hatch',x.getImageData(0,0,16,16),{pixelRatio:2});}
   map.addSource('sel',{type:'geojson',data:EMPTY});map.addSource('mepos',{type:'geojson',data:EMPTY});map.addSource('lpred',{type:'geojson',data:EMPTY});map.addSource('myplaces',{type:'geojson',data:EMPTY});
   map.addSource('ticks',{type:'geojson',data:EMPTY});
   map.addSource('holo',{type:'geojson',data:EMPTY});map.addSource('hrom',{type:'geojson',data:EMPTY});map.addSource('comets',{type:'geojson',data:EMPTY,lineMetrics:true});
@@ -140,19 +140,13 @@ function addOverlays(){
   map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.16,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':['match',LV,2,'#FF6B7D',1,'#FFC940','#fff'],'line-opacity':['match',LV,0,['interpolate',['linear'],['zoom'],5.5,0.2,9,0.5],0.9],'line-width':['match',LV,0,['interpolate',['linear'],['zoom'],6,0.5,10,1.2],['interpolate',['linear'],['zoom'],6,1.2,10,2.2]]}});
   map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.5,0.3]}});
-  map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.45}});
-  map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#B24A5C','line-width':['interpolate',['linear'],['zoom'],5,1,9,2],'line-opacity':0.7}});
+  // окуповані території: рівна напівпрозора заливка без штриховки (штрихи додавали шуму під цілями)
+  map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#B24A5C','line-width':['interpolate',['linear'],['zoom'],5,0.8,9,1.4],'line-opacity':0.6}});
   map.addSource('outside',{type:'geojson',data:'/data/outside.geojson',tolerance:0.2,buffer:256});
-  // напис навскіс, напівпрозоро, над територією РФ (у площині карти)
-  map.addSource('rf-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[39.2,53.6],[44.5,50.4],[36.2,56.9],[46.5,55.4]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.55,8,0.6]}});
-  map.addLayer({id:'rf-mark',type:'symbol',source:'rf-mark',maxzoom:7.5,layout:{'text-field':'ДЕРЖАВА-ТЕРОРИСТ','text-font':['Noto Sans Bold'],
-    'text-size':['interpolate',['exponential',1.6],['zoom'],3,13,5,26,7,46],'text-letter-spacing':0.18,'text-max-width':40,'text-rotate':-22,'text-rotation-alignment':'map','text-pitch-alignment':'map',
-    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,90,90,0.22)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});
-  map.addSource('by-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[27.6,53.4],[29.4,52.2]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});
-  map.addLayer({id:'by-mark',type:'symbol',source:'by-mark',maxzoom:7.5,layout:{'text-field':'ПОСІПАКИ ТЕРОРИСТІВ','text-font':['Noto Sans Bold'],
-    'text-size':['interpolate',['exponential',1.6],['zoom'],3,9,5,18,7,32],'text-letter-spacing':0.16,'text-max-width':40,'text-rotate':-18,'text-rotation-alignment':'map','text-pitch-alignment':'map',
-    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,150,90,0.2)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});syncOutside();
-  map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
+  // за межами України: темніше; без написів-водяних знаків над РФ і Білоруссю (03.11: на мапі з цілями це лише шум, що з'їдає контраст)
+  map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.55,8,0.6]}});syncOutside();
+  // межі областей: тонкі, сірі; товсті білі лінії були яскравіші за самі цілі
+  map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#DDE3EE','line-width':['interpolate',['linear'],['zoom'],4,0.6,9,1.2],'line-opacity':0.4}});
   // «пам'ятні місця»: крейсер «Москва» на дні та Кримський міст
   if(!map.hasImage('moskva')){const c=document.createElement('canvas');c.width=120;c.height=60;const x=c.getContext('2d');
     x.translate(60,34);x.rotate(-0.38);x.fillStyle='rgba(150,170,190,.85)';x.strokeStyle='rgba(255,255,255,.7)';x.lineWidth=1.5;
@@ -259,7 +253,7 @@ function addOverlays(){
   const TGS=['interpolate',['linear'],['zoom'],4,0.55,7,0.85,9,1.15,12,1.55];
   // голограма тривоги: об'єми над районами (червоні вищі), «дихають»
   const firstLbl=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
-  map.addLayer({id:'holo',type:'fill-extrusion',source:'holo',maxzoom:8.5,paint:{'fill-extrusion-color':['match',['get','l'],2,'#FF2D3D','#FFB020'],'fill-extrusion-height':['interpolate',['linear'],['zoom'],5,['match',['get','l'],2,12000,4500],7.5,['match',['get','l'],2,1500,600],8.5,0],'fill-extrusion-base':0,'fill-extrusion-opacity':0.26,'fill-extrusion-vertical-gradient':true}},firstLbl);
+  map.addLayer({id:'holo',type:'fill-extrusion',source:'holo',maxzoom:8.5,paint:{'fill-extrusion-color':['match',['get','l'],2,'#FF2D3D','#FFB020'],'fill-extrusion-height':['interpolate',['linear'],['zoom'],5,['match',['get','l'],2,12000,4500],7.5,['match',['get','l'],2,1500,600],8.5,0],'fill-extrusion-base':0,'fill-extrusion-opacity':0.17,'fill-extrusion-vertical-gradient':true}},firstLbl);
   // громади з тривогою, справжні межі громади (КАТОТТГ + OSM), а не коло
   if(!map.getSource('hp'))map.addSource('hp',{type:'geojson',data:HPDATA||EMPTY,attribution:'Межі громад: КАТОТТГ, © OpenStreetMap (ODbL)'});HPPREV={};lastRa='';
   map.addLayer({id:'hp-f',type:'fill',source:'hp',paint:{'fill-color':['match',['coalesce',['feature-state','l'],0],2,'#FF2D3D','#FFB020'],'fill-opacity':['match',['coalesce',['feature-state','l'],0],0,0,0.34]}},firstLbl);
@@ -318,7 +312,7 @@ function armHome(){setHomeMode=true;$('#b-home').classList.add('on');toast('То
 function disarmHome(){setHomeMode=false;clearTimeout(homeArmT);$('#b-home').classList.remove('on');}
 map.on('click',e=>{if(!setHomeMode)return;
   // дотик по цілі, пуску, пам'ятному знаку тощо, це перегляд, а не вибір дому (02.11: дім «з'їхав» у море на крейсер «Москва»)
-  const OBJ=new Set(['targets','zones','lsites','hits','memo','ru','rf-mark','by-mark','chains','preds','trails','myplaces','comets','sel','home','lpred','mepos']);
+  const OBJ=new Set(['targets','zones','lsites','hits','memo','ru','chains','preds','trails','myplaces','comets','sel','home','lpred','mepos']);
   if(map.queryRenderedFeatures([[e.point.x-12,e.point.y-12],[e.point.x+12,e.point.y+12]]).some(f=>OBJ.has(f.source)))return;
   if(!map.queryRenderedFeatures(e.point,{layers:['obl-fill']}).length){toast('Дім можна позначити лише на території України');return;}
   try{if(home)localStorage.setItem('home_prev',JSON.stringify(home));}catch(x){}
