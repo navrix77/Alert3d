@@ -24,6 +24,7 @@ TYPES = [
     ("shahed", re.compile(r"шахед|мопед|бпла|беспилот|безпілот|герань|гербер|дрон|(^|[^а-яіїє])шах(и|ів)?\b|шаболд|(^|[^а-яіїє])ударн(ий|ик|і|их|ого)\b|(^|[^а-яіїє])ударн(ый|ые|ых)\b")),
 ]
 RECON_RX = dict(TYPES)["recon"]
+TYPE_ANY = re.compile("|".join(f"(?:{rx.pattern})" for _n, rx in TYPES))
 LANCET_THREAT = re.compile(r"(?:угроз\w*|загроз\w*|можлив\w*|ймовірн\w*|возможн\w*|вероятн\w*)\s+(?:удар\w*\s+)?ланцет\w*"
                            r"|ланцет\w*\s+(?:не\s+)?(?:виключ\w*|исключ\w*)|(?:в\s+)?пар\w*\s+[зс]\s+ланцет\w*")
 # статус офіційної тривоги («Сумський район — повітряна тривога / відбій») — не ціль: тривоги беремо з офіційного API
@@ -78,6 +79,7 @@ AFTER_STRIKE = re.compile(r"так виглядає|так выглядит|на
                        r"зруйнован|пошкоджен|загибл|поранен|рятувальник|ліквідують|розбирають завал|"
                        r"(?:в|у) ніч на \d|знищили:|знешкодили:|збито(?:/| або )подавлено|збито/подавлено")  # нічні підсумки; «станом на 00:43: • Р-Шахед на …» (shovnebi) — живе зведення, не чіпаємо
 AVIATION = re.compile(r"су-34|су-35|ту-95|ту-160|ту-22|миг-31|міг-31")
+COUNT_PAREN = re.compile(r"\((\d{1,2})\s*[хx]\)")  # «→Суми/р-н (4х)» (Куди летить): кількість у дужках після пункту
 COUNT = re.compile(r"(\d+)\s*[хx]?\s*(?:реактив|шахед|бпла|ракет|бомб|каб|мопед|ціл|цел|молн|баліст|баллист|дрон|ударн)")
 DIRS = {"північно-захід": 315, "північно-схід": 45, "південно-захід": 225, "південно-схід": 135, "северо-запад": 315, "северо-восток": 45, "юго-запад": 225, "юго-восток": 135,
         "північ": 0, "південь": 180, "півден": 180, "схід": 90, "сход": 90, "захід": 270, "заход": 270, "север": 0, "юг": 180, "восток": 90, "запад": 270}
@@ -90,7 +92,7 @@ DIR_WORDS = {"схід", "сході", "сходу", "захід", "заході
 CITY_WORDS = re.compile(r"над містом|по місту|над городом|по городу|для міста|для города|в місті|в городе")
 # Канали, для яких «місто» означає Харків
 CHANNEL_CITY = {"M": "Харків", "R": "Харків", "TLK": "Харків", "KHN": "Харків", "KHL": "Харків", "KM": "Харків", "D": "Харків", "CX": "Харків", "SU": "Суми", "PL": "Полтава", "DN": "Дніпро", "KR": "Краматорськ"}
-HEADER = re.compile(r"^\s*([А-ЯІЇЄҐ][а-яіїєґ'’]+(?:щина|ччина|еччина|ччини|щини))\s*:", re.M)
+HEADER = re.compile(r"^\s*(?:[^\w\s]{1,4}\s*)?([А-ЯІЇЄҐ][а-яіїєґ'’]+(?:щина|ччина|еччина|ччини|щини))\s*:", re.M)  # «✈️Сумщина:» теж
 LOC_OBL = re.compile(r"(?i)(?<![\w])на\s+([А-ЯІЇЄҐ][а-яіїєґ']+(?:щині|ччині)|Запоріжжі)(?![\w])")
 REGION_ANY = re.compile(r"(?i)[а-яіїєґ']+(?:щин|ччин)[аиіуою]|запоріжж|област")
 SEG_SPLIT = re.compile(r"\n+|(?<=[.!])\s+(?=⚠️)|(?=🛵)|(?=🚀)|(?=💥)|(?=🟠)|(?=🟡)|(?=🔴)|(?=🟢)|;\s*|\s+-\s+")
@@ -421,16 +423,30 @@ class Parser:
         if len(lines) != len(text.split("\n")) or any(x.startswith(POS_MARK) for x in lines):
             return [x for x in lines if x.startswith(POS_MARK)] + [s_ for s_ in self.segments("\n".join(x for x in lines if not x.startswith(POS_MARK))) if s_.strip()] if any(not x.startswith(POS_MARK) and x.strip() for x in lines) else [x for x in lines if x.startswith(POS_MARK)]
         loc = None
-        for raw in SEG_SPLIT.split(text):
-            seg = (raw or "").strip(" \t-•–—")
+        plane_hdr = False
+        parts = [(r or "").strip(" \t-•–—") for r in SEG_SPLIT.split(text)]
+        # «Кропивницький - групи БпЛА (Герань-2/Гербера-2) на місто.» (war_monitor 04.11): назва міста, тире, опис з малої —
+        # одне повідомлення, а не «місто без цілі» + «ціль без місця»
+        merged = []
+        for seg in parts:
+            if merged and seg and seg[:1].islower() and merged[-1] and len(merged[-1].split()) <= 3 \
+                    and not re.search(r"\d", merged[-1]) and not HEADER.match(merged[-1]):
+                merged[-1] = merged[-1] + ": " + seg
+            else:
+                merged.append(seg)
+        for seg in merged:
             if not seg:
                 continue
             m = HEADER.match(seg)
             if m:
                 header = m.group(1)
+                # «✈️Сумщина:» (Куди летить, 04.11): значок літака в заголовку — це ударні БпЛА (шахеди), не «Бандеролі»
+                plane_hdr = "✈" in seg[:m.start(1)]
                 seg = seg[m.end():].strip()
                 if not seg:
                     continue
+            if plane_hdr and not TYPE_ANY.search(norm(seg)):
+                seg = "БпЛА " + seg
             # «⚠️ На Дніпропетровщині реактивний… ⚠️ 4х БпЛА курсом на Покровське» — область з попереднього пункту
             # зведення діє й на наступні, доки не названо іншу (UkraineRadar_24_7 та подібні)
             lm = LOC_OBL.search(seg)
@@ -474,7 +490,7 @@ class Parser:
             t, pair = LANCET_THREAT.sub(" ", t), "lancet"
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         self._typ = typ
-        m = COUNT.search(t)
+        m = COUNT.search(t) or COUNT_PAREN.search(t)
         alert_status = bool(ALERT_STATUS.search(t)) or bool(ALERT_LINE.search(text))
         nonstrat = bool(NONSTRAT.search(t)) or bool(EXPECT.search(t)) or bool(AFTERMATH.search(t)) or bool(NEWS.search(t))
         if nonstrat:
@@ -756,7 +772,8 @@ class Parser:
             import math
             # тезки «місто ≥20 тис. vs село»: без прямої вказівки (район/громада) — це місто.
             # «на Лозову» = місто Лозова, а не село Лозова на Куп'янщині
-            big = [i for i in cand if P[i].pop >= 20000 and bbox and bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3]]
+            # без області в тексті й каналі (bbox немає) — теж: «Суми, Терни, Гадяч, …» (monikppy) — місто Гадяч, а не однойменне село
+            big = [i for i in cand if P[i].pop >= 20000 and (not bbox or bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3])]
             if big and len(big) < len(cand) and all(P[i].pop < 5000 for i in cand if i not in big):
                 cand = big
 

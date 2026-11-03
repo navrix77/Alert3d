@@ -1657,3 +1657,36 @@ def test_quality_split_identity_vs_position():
     tr.ingest(p.parse("Шахед курсом на Полтаву", "ND"), "ND", t0)
     c = [x for x in tr.snapshot(t0 + 60)["tracks"] if x.get("next") == "Полтава"]
     assert c and c[0]["pos_lvl"] == "невідоме" and c[0]["pos_km"] is None
+
+
+def test_plane_header_and_geran2_and_ai_exotic_guard():
+    from app.parser import Parser
+    p = Parser()
+    segs = p.segments("✈️Сумщина:\n→Суми/р-н (4х);\n→Лебедин/Полтавщина.")
+    obs = [p.parse(s_, "KL") for s_ in segs]
+    assert all(o.type == "shahed" for o in obs) and obs[0].count == 4
+    seg = p.segments("❗️✈️ Кропивницький - групи БпЛА (Герань-2/Гербера-2) на місто.")
+    assert len(seg) == 1 and p.parse(seg[0], "war_monitor").type == "shahed"
+    from app.ai_glue import AI
+
+    class T:
+        got = []
+        def ingest(self, o, *a):
+            self.got.append(o)
+    ai = AI.__new__(AI)
+    ai.p, ai.trk = Parser(), T()
+    item = {"src": "war_monitor", "t": 0, "text": "Кропивницький - групи БпЛА (Герань-2/Гербера-2) на місто.", "rules": [],
+            "llm": {"kind": "target", "type": "geran5", "now": ["Кропивницький"], "to": [], "from": []}, "votes": {}}
+    ai.ai_ingest(item)
+    assert ai.trk.got and ai.trk.got[0].type == "shahed"  # не «Герань-5»
+
+
+def test_geo_holdout_error_rate():
+    """Відкладена вибірка (tests/geo_holdout.json): не для підлаштування, а як запобіжник від погіршення."""
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("geo_eval", Path(__file__).resolve().parent.parent / "scripts" / "geo_eval.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    r = m.run()
+    assert r["wrong_rate"] <= 0.03 and r["missed_rate"] <= 0.05, r

@@ -20,6 +20,12 @@ WORD = {"shahed": "Шахед", "jet": "Реактивний БпЛА", "geran5"
         "banderol": "Бандероль", "ballistic": "Балістика", "kab": "КАБ"}
 
 
+EXOTIC = {"geran5": r"гер[ао]н\w*\W{0,3}5(?!\d)|гербер\w*\W{0,3}5(?!\d)", "banderol": r"бандерол", "lancet": r"ланцет|lancet",
+          "molniya": r"молни|молні", "ballistic": r"баліст|баллист|іскандер|искандер|кинджал|кинжал|кн-23|kn-23",
+          "cruise": r"ракет|крилат|крылат|калібр|калибр|х-\d", "kab": r"(^|\W)каб|бомб", "fpv": r"fpv|фпв", "fpvf": r"оптоволок",
+          "recon": r"розвід|развед|орлан|zala|зала|суперкам|supercam|мерлін", "jet": r"реактив|турбо|р\.\s*шах|р\.\s*шабол"}
+
+
 class AI:
     def __init__(self, llm, parser, tracker, state_fn) -> None:
         self.llm, self.p, self.trk, self.state = llm, parser, tracker, state_fn
@@ -37,6 +43,16 @@ class AI:
         rules = item.get("rules") or []
         if m.get("kind") != "target" or m.get("type") not in WORD:
             return False
+        # 04.11: моделі назвали «Герань-2» Геранню-5, а значок ✈️ — «Бандероллю». Рідкісний тип приймаємо лише тоді,
+        # коли його прямо названо в тексті; інакше звичайний ударний БпЛА (якщо текст про БпЛА) або нічого
+        import re as _re
+        low = (item.get("text") or "").lower()
+        need = EXOTIC.get(m["type"])
+        if need and not _re.search(need, low):
+            if _re.search(r"бпла|безпілот|беспилот|шахед|герань|гербер|мопед|дрон", low):
+                m = dict(m, type="shahed")
+            else:
+                return False
         votes = item.get("votes") or {}
         if len(votes) >= 2 and (item.get("agree", 0) < 0.6 or sum(1 for v in votes.values() if v.get("type") == m["type"]) < 2):
             return False  # кілька моделей і немає згоди хоча б двох — лише в журнал
