@@ -317,7 +317,7 @@ map.on('click',e=>{if(!setHomeMode)return;
   if(map.queryRenderedFeatures([[e.point.x-12,e.point.y-12],[e.point.x+12,e.point.y+12]]).some(f=>OBJ.has(f.source)))return;
   if(!map.queryRenderedFeatures(e.point,{layers:['obl-fill']}).length){toast('Дім можна позначити лише на території України');return;}
   try{if(home)localStorage.setItem('home_prev',JSON.stringify(home));}catch(x){}
-  home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));disarmHome();syncHome();toast('Дім збережено');});
+  home=[e.lngLat.lng,e.lngLat.lat];localStorage.setItem('home',JSON.stringify(home));disarmHome();syncHome();try{homeRow();}catch(x){}toast('Дім збережено');});
 // перевірка збереженого дому: поза Україною (у морі), повертаємо попередній або просимо позначити знову
 fetch('/data/raions.geojson').then(r=>r.json()).then(g=>{window.__RAGJ=g;homeObl.k=null;}).catch(()=>{});
 fetch('/data/oblasts.geojson').then(r=>r.json()).then(g=>{window.__OBLGJ=g;homeObl.k=null;if(!home)return;
@@ -750,7 +750,17 @@ function renderFeed(){
 }
 
 /* ---------- кнопки ---------- */
-$('#b-home').onclick=()=>{if(setHomeMode){disarmHome();toast('Скасовано');return;}if(home){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Змінити дім, у Налаштуваннях');return;}armHome();};
+// дім: змінити або видалити (з Налаштувань і дотиком до значка на мапі)
+function delHome(){if(!home)return;try{localStorage.setItem('home_prev',JSON.stringify(home));}catch(x){}home=null;try{localStorage.removeItem('home');localStorage.removeItem('wp_home');}catch(x){}
+  syncHome();homeRow();try{renderMe([]);}catch(x){}toast('Дім видалено. Сповіщення про загрози для дому вимкнено');}
+function homeRow(){const l=$('#st-home-l');if(!l)return;l.textContent=home?'Дім: '+(homeObl()?homeObl()+' обл. · ':'')+home[1].toFixed(3)+', '+home[0].toFixed(3):'Дім не позначено';
+  $('#st-home-set').textContent=home?'Змінити':'Позначити';$('#st-home-del').hidden=!home;}
+if($('#st-home-set')){$('#st-home-set').onclick=()=>{if(!$('#settings').hidden)$('#st-close').click();armHome();};$('#st-home-del').onclick=()=>{if(confirmDel())delHome();};setTimeout(homeRow,1500);}
+function confirmDel(){const b=$('#st-home-del');if(b.dataset.ask){delete b.dataset.ask;b.textContent='Видалити';return true;}b.dataset.ask='1';b.textContent='Точно видалити?';setTimeout(()=>{delete b.dataset.ask;b.textContent='Видалити';},4000);return false;}
+map.on('click','home',e=>{if(!home)return;const pp=new maplibregl.Popup({closeButton:false,offset:22,className:'home-pop'}).setLngLat(home)
+  .setHTML('<div style="display:flex;gap:6px"><button class="pill" id="hp-move">Перемістити</button><button class="pill" id="hp-del">Видалити</button></div>').addTo(map);
+  setTimeout(()=>{const m=document.getElementById('hp-move'),d=document.getElementById('hp-del');if(m)m.onclick=()=>{pp.remove();armHome();};if(d)d.onclick=()=>{pp.remove();delHome();};},0);});
+$('#b-home').onclick=()=>{if(setHomeMode){disarmHome();toast('Скасовано');return;}if(home){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Торкніться значка «Дім», щоб перемістити або видалити');return;}armHome();};
 // довге натискання на «Дім» прибрано: на телефоні воно спрацьовувало випадково й наступний дотик переносив дім
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
 $('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
