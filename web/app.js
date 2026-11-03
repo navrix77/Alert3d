@@ -971,7 +971,7 @@ async function webPushSync(loud){
       wpStatus(null,!home?'не позначено дім':Notification.permission==='denied'?'телефон заборонив: Налаштування iPhone → Сповіщення → NAVRYX SKY':!PREF.sys?'вимкнено':'немає дозволу');return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
     // обрані області й громади (явно, не автоматична «область дому») — сервер шле по них зведення навіть із закритим застосунком
-    const MZ=myZones(),zones=(MZ.obl&&MZ.obl.length)||(MZ.hrom&&MZ.hrom.length)?{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)}:null;// без явного вибору — область дому
+    const MZ=myZones(),zones=!MZ.auto&&((MZ.obl&&MZ.obl.length)||(MZ.hrom&&MZ.hrom.length))?{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)}:null;// область дому «автоматично» не шлемо: зведення по всій області засмічує// без явного вибору — область дому
     const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false)+'|'+JSON.stringify(zones);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
     if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false,zones})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}

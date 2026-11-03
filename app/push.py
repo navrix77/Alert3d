@@ -148,6 +148,10 @@ HD_Q = {"channels": [0, 0, 0, 0, 0, 5, 7, 10, 14, 19, 22, 28, 32, 42, 50, 56, 63
         "movement": [4, 6, 7, 7, 10, 13, 13, 23, 26, 26, 34, 36, 76, 94, 97, 97, 97, 156, 158, 164],
         "all": [0, 0, 0, 0, 0, 4, 7, 12, 14, 18, 22, 26, 32, 42, 49, 56, 71, 88, 97, 150]}
 NEAR_KM = 15
+# Push лише при реальній загрозі (калібрування 03.11, 9 ночей): «курс на вас» з 80–150 км справджувався в 1,4%,
+# з 15–30 км у 21%. Правило «лише в межах 40 км»: сповіщень у 3 рази менше, точність 3,6% → 8,9%, охоплення 62% → 49%.
+# Ранні 🟡 «можлива загроза» не надсилаємо: вони зливаються з 🟠 у межах 40 км, далі це шум.
+HOME_KM = 40
 P_PRE, P_THREAT = 0.15, 0.4  # як в Ізраїлі: широке попередження («можливо, будьте поруч з укриттям») і вузька загроза
 
 
@@ -345,7 +349,7 @@ class Push:
         subs = self.db.execute("SELECT token, lon, lat FROM subs").fetchall()
         webs = {r[0]: r[1] for r in self.db.execute("SELECT endpoint, sub FROM websubs").fetchall()}
         no_pre = {r[0] for r in self.db.execute("SELECT endpoint FROM websubs WHERE pre=0").fetchall()}
-        zmap = {r[0]: _json.loads(r[1]) for r in self.db.execute("SELECT endpoint, zones FROM websubs WHERE zones IS NOT NULL").fetchall()}
+        zmap = {r[0]: _json.loads(r[1]) for r in self.db.execute("SELECT endpoint, zones FROM websubs WHERE zones IS NOT NULL").fetchall()}  # лише явно обрані зони
         subs += self.db.execute("SELECT endpoint, lon, lat FROM websubs").fetchall()
         if not subs:
             return
@@ -360,6 +364,9 @@ class Push:
                 a = self.assess(tr, H)
                 if not a or not a["stage"]:
                     continue
+                if a.get("d") is not None and a["d"] > HOME_KM:
+                    continue  # далеко: на мапі видно, телефон не турбуємо
+                a = dict(a, stage="threat")
                 key = (token, tr["id"], a["stage"])
                 last = self.fired.get(key)
                 self.fired[key] = now

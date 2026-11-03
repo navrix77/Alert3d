@@ -1163,3 +1163,28 @@ def test_sw_shell_no_duplicates():
     shell = re.findall(r"'(/[^']*)'", re.search(r"SHELL=\[(.*?)\]", s).group(1))
     assert len(shell) == len(set(shell))
     assert "addAll(SHELL)" not in s
+
+
+def test_push_only_real_threat_within_40km():
+    """03.11 калібрування: «курс на вас» з 80–150 км справджувався в 1,4%. Телефон турбуємо лише в межах 40 км."""
+    import asyncio
+    from pathlib import Path as P_
+    from app.push import Push
+    sent = []
+
+    class Cli:
+        async def post(self, url, json=None, headers=None):
+            sent.extend(json)
+
+            class R:
+                def json(self_):
+                    return {"data": []}
+            return R()
+    far = {"id": "Ш-far", "type": "shahed", "lat": 50.80, "lon": 36.23, "speed": 170, "hd": 180.0, "hd_src": "channels", "route": [], "count": 1, "status": "active", "conf": 0.9}
+    near = dict(far, id="Ш-near", lat=50.30)
+    pu = Push(P_(":memory:"))
+    pu.db.execute("INSERT INTO subs VALUES('ExponentPushToken[abcdefghijkl]', 36.23, 50.0, 0)")
+    asyncio.run(pu.tick(Cli(), {"tracks": [far]}))
+    assert sent == []  # ~89 км: лише на мапі
+    asyncio.run(pu.tick(Cli(), {"tracks": [near]}))
+    assert len(sent) == 1 and sent[0]["title"].startswith(("🟠", "🔴"))
