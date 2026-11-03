@@ -1299,3 +1299,15 @@ def test_no_has_filters_in_map_layers():
     import pathlib, re
     s = pathlib.Path(__file__).resolve().parent.parent.joinpath("web", "app.js").read_text(encoding="utf-8")
     assert not re.search(r"\[\s*'has'\s*,", s)
+
+
+def test_oblast_adjective_list_is_not_a_route():
+    """03.11, sectorv666: перелік областей прикметниками («Дніпропетровська» ≠ Дніпро, «Запорізька» ≠ село Запорізьке).
+    Балістика з Таганрога не має «летіти» з Дніпра на Донецьк."""
+    t = ("🚀 [03.11.2026 20:46] Загроза балістики з Таганрог: загроза для Донецька, Луганська, Запорізька, "
+         "Дніпропетровська, Харківська, Полтавська, Херсонська, Миколаївська.")
+    o = P.parse(t, "X")
+    assert o.type == "ballistic" and o.places == [] and o.threat
+    # родовий міст лишається містами
+    o = P.parse("Шахед з Донецька на Луганськ", "X")
+    assert [r.place.name for r in o.places] == ["Донецьк", "Луганськ"]

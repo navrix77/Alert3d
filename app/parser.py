@@ -342,6 +342,25 @@ class Observation:
         return "info"
 
 
+# «загроза для Донецька, Луганська, Запорізька, Дніпропетровська…» (sectorv666, 03.11): перелік ОБЛАСТЕЙ у формі
+# прикметника без слова «область». Без цього «Дніпропетровська» ставала Дніпром, «Запорізька» селом Запорізьке,
+# і балістика з Таганрога «летіла» з Дніпра на Донецьк. «Донецька», «Луганська» бувають і родовим міста,
+# тому перелік визнаємо лише з 2+ назв, серед яких є однозначно обласна.
+_OBL_ADJ = ("Вінницьк|Волинськ|Дніпропетровськ|Донецьк|Житомирськ|Закарпатськ|Запорізьк|Івано-Франківськ|Київськ|"
+            "Кіровоградськ|Луганськ|Львівськ|Миколаївськ|Одеськ|Полтавськ|Рівненськ|Сумськ|Тернопільськ|Харківськ|"
+            "Херсонськ|Хмельницьк|Черкаськ|Чернівецьк|Чернігівськ")
+_OBL_ONE = rf"(?:{_OBL_ADJ})(?:а|ої|ій)(?![\w'’-])"
+OBL_LIST = re.compile(rf"(?<![\w'’-]){_OBL_ONE}(?:\s*(?:,|та|і|й)\s*{_OBL_ONE})+")
+_OBL_AMBIG = re.compile(r"^(Донецьк|Луганськ)")
+
+
+def _obl_list(m: "re.Match") -> str:
+    names = re.findall(rf"(?<![\w'’-]){_OBL_ONE}", m.group(0))
+    if all(_OBL_AMBIG.match(n) for n in names):
+        return m.group(0)
+    return ", ".join(re.sub(r"(ої|ій)$", "а", n) + " область" for n in names)
+
+
 class Parser:
     def __init__(self, gaz: Gazetteer | None = None) -> None:
         self.gaz = gaz or Gazetteer.load()
@@ -411,6 +430,7 @@ class Parser:
         # вулиці й назви організацій: «вул. Світла», «Нова пошта», «Сили добра»
         text = NOT_PLACE.sub(" ", text)
         text = KH_DISTRICT.sub(" Харків ", text)
+        text = OBL_LIST.sub(_obl_list, text)
         t = norm(text)
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         self._typ = typ
