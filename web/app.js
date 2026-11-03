@@ -59,8 +59,11 @@ const REDUCE=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').mat
 const LASTCAM=null; // 03.11: старт завжди однаковий (2D по центру → 3D), без «там, де закрили»
 let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:LASTCAM?LASTCAM.c:[31.2,48.4],zoom:LASTCAM?LASTCAM.z:(innerWidth<640?3.9:5.2),pitch:LASTCAM?LASTCAM.p:0,bearing:0,attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
 // центр країни між верхніми плашками й нижньою панеллю; цю ж камеру тримає й перехід у 3D (03.11: «не по центру» — камера їхала на дім, Харків біля краю)
-let START_CAM=null;
-if(!LASTCAM){try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.13),bottom:Math.round(innerHeight*0.13),left:12,right:12}});if(c){START_CAM={center:c.center,zoom:c.zoom};map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}}catch(e){}}
+let START_CAM=null,introDone=false;
+// Україна у верхній половині екрана (відступ знизу більший: там панель дому й док); перераховуємо після load/resize,
+// бо на телефоні розмір вікна в момент створення мапи ще не остаточний (03.11: мапа сиділа внизу)
+function fitStart(){if(introDone)return;try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.09),bottom:Math.round(innerHeight*0.33),left:10,right:10}});if(c){START_CAM={center:c.center,zoom:c.zoom};map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}}catch(e){}}
+fitStart();map.once('load',fitStart);window.addEventListener('resize',fitStart);
 map.on('moveend',()=>{try{const c=map.getCenter();localStorage.setItem('cam_last',JSON.stringify({c:[c.lng,c.lat],z:map.getZoom(),p:map.getPitch(),t:Date.now()}));}catch(e){}});
 // спливаючі вікна на мапі завжди цілком на екрані: після відкриття зсуваємо мапу, якщо вікно вилазить за край (03.11: «обрізає вікно»)
 try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo=function(m){const r=_add.call(this,m);const pp=this;
@@ -301,7 +304,7 @@ function addOverlays(){
 }
 map.on('style.load',addOverlays);
 // кінематографічне інтро: з космосу, на Україну вночі, поки збираються дані
-let introDone=false,introT0=Date.now();if(INTRO)document.body.classList.add('intro');
+let introT0=Date.now();if(INTRO)document.body.classList.add('intro');
 function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
   const mob=innerWidth<640;
   // кінцевий стан: 3D (pitch 45–55°), північ угорі, zoom +0.7 від стартового (край країни ще в кадрі), центр — дім, якщо він є
@@ -323,6 +326,8 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   // без дому: за час паузи питаємо геопозицію (тихо, 4 с), щоб було куди наближатися
   if(!home&&navigator.geolocation){try{navigator.geolocation.getCurrentPosition(p=>{window.__GEOPOS=[p.coords.longitude,p.coords.latitude];},()=>{},{enableHighAccuracy:false,timeout:4000,maximumAge:600000});}catch(e){}}
   setTimeout(()=>{el&&el.classList.add('out');setTimeout(()=>el&&el.remove(),1400);document.body.classList.remove('intro');
+    // поки мапа стоїть у 2D, усі цілі пульсують кільцями кольору свого типу: за 5 с видно, що де летить
+    window.FXHLALL={t0:performance.now(),until:performance.now()+5000};map.triggerRepaint();
     // 2D по центру стоїть 5 с, потім плавний переліт у 3D з наближенням (2.4 с)
     setTimeout(()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
       map.flyTo({...camFor(),duration:2400,curve:1.25,essential:true});window.__introAt=Date.now();tilt=true;setTimeout(finish,2500);},5000);},wait);}
