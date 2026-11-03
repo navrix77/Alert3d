@@ -641,7 +641,7 @@ function fillSheet(first){
    $('#sh-now').innerHTML=h;}
   // 2б) куди летить: напрямок, звідки SKY його знає і наскільки такий напрямок справджувався (жива самоперевірка)
   {const PA=SNAP.pred_acc||{};const HA=PA['hd:'+tr.type],LA=PA[tr.type];let h='';
-   const SRC={channels:'канали назвали пункт',course:'канал назвав напрямок',learned:'навчені маршрути попередніх перельотів',movement:'рух між названими позиціями'}[tr.hd_src]||'';
+   const SRC={fused:'злиття кількох джерел з вагами за їхньою точністю',channels:'канали назвали пункт',course:'канал назвав напрямок',learned:'навчені маршрути попередніх перельотів',movement:'рух між названими позиціями'}[tr.hd_src]||'';
    if(tr.status!=='active')h='Не відстежується: '+(tr.status==='lost'?'нових повідомлень немає':'канали написали «збито / не фіксується»');
    else if(tr.hd==null&&!tr.next)h='<b class=warn>Напрямок невідомий</b><br><small>Канали не назвали пункт, а навчених маршрутів звідси замало. Стрілку не домальовуємо</small>';
    else{h='<div class="dir-h">'+(tr.hd!=null?'<span class="dir-arrow" style="transform:rotate('+Math.round(tr.hd)+'deg)">↑</span><span><b>'+SIDE[Math.round(tr.hd/45)%8]+'</b>':'<span>')+(tr.next?(tr.hd!=null?' · ':'')+'на <b>'+esc(tr.next)+'</b>':'')+'</span></div>';
@@ -649,7 +649,7 @@ function fillSheet(first){
      if(HA)h+='<br><small>Наскільки справджується: напрямок цього типу цілей збігався з наступною позицією (±45°) у '+Math.round(HA.acc*100)+'% з '+HA.n+' перевірок</small>';
      const L=tr.lpath||[];if(!(tr.route_names&&tr.route_names.length)&&L.length)h+='<br><small>Ймовірно далі: '+L.slice(0,3).map(x=>esc(x[2])+' '+Math.round(x[3]*100)+'%').join(', ')+(LA?' · такий прогноз справджувався у '+Math.round(LA.acc*100)+'% з '+LA.n+(LA.naive!=null?' (просто «тим самим курсом»: '+Math.round(LA.naive*100)+'%)':''):'')+'</small>';
      h+='<br><small>Ціль може змінити курс будь-якої миті</small>';}
-   $('#sh-dir').innerHTML=h;}
+   const dz=$('#sh-dir');if(dz)dz.innerHTML=h;}// старий index.html з кешу може не мати цього блоку: решта картки все одно заповнюється
   // 3) звідки: перша фіксація, потім імовірне місце пуску
   {const L=tr.launch,en=tr.entry;let h='';
    if(en&&en[2])h='Вперше: <b>'+esc(en[2])+'</b> о '+fmt(en[3])+' ('+mago(en[3])+' хв тому)';

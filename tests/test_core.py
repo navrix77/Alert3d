@@ -1070,3 +1070,18 @@ def test_forecast_journal_logs_candidates_and_truth():
         o = P.parse(txt, "K"); o.raw = txt; trk.ingest(o, "K", t, None)
     rows = b.db.execute("SELECT type, cand, truth FROM fcast").fetchall()
     assert rows and rows[0][0] == "shahed" and '"mv"' in rows[0][1]
+
+
+def test_fusion_stays_off_without_data_and_turns_on_with_proven_gain():
+    import json, random, sqlite3, time
+    from app import fusion
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE fcast(t REAL, type TEXT, src TEXT, cand TEXT, truth REAL, dt REAL, d REAL)")
+    assert fusion.evaluate(db)["on"] is False
+    random.seed(1); now = time.time()
+    for i in range(2000):  # «показаний» курс шумний (±60°), навчений маршрут точний (±10°)
+        tr = random.uniform(0, 360)
+        c = {"cur": (tr + random.gauss(0, 60)) % 360, "ln": (tr + random.gauss(0, 10)) % 360, "mv": (tr + random.gauss(0, 40)) % 360}
+        db.execute("INSERT INTO fcast VALUES(?,?,?,?,?,?,?)", (now - (i % 8) * 86400 - 3600, "shahed", "K", json.dumps(c), tr, 600, 20))
+    rep = fusion.evaluate(db, now)
+    assert rep["on"] is True and rep["by_type"]["shahed"]["fused"]["med"] < rep["by_type"]["shahed"]["current"]["med"]

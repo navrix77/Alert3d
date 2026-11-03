@@ -627,6 +627,13 @@ class Tracker:
             c["cur"] = round(tr.heading, 1)
         if c:
             tr.fc = (t, P[0], P[1], src, c)
+        # злиття джерел напрямку — лише коли журнал прогнозів довів виграш (app/fusion.py, рішення раз на добу)
+        fz = getattr(self, "fusion", None)
+        if fz and fz.get("on") and sum(k in c for k in ("ch", "ln", "mv")) >= 2:
+            from .fusion import fuse
+            f = fuse(c, fz.get("kappa") or {}, tr.type)
+            if f is not None:
+                tr.heading, tr.hd_src = f, "fused"
 
     def _score_heading(self, tr: Track, pt, t: float) -> None:
         """Жива самоперевірка напрямку: курс, який показувала мапа після останньої НАЗВАНОЇ позиції, проти того,

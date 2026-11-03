@@ -151,6 +151,7 @@ def raion_centroid(n: str):
 
 
 STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "tracker_state.pkl"
+FUSION_FILE = Path(__file__).resolve().parent.parent / "data" / "fusion.json"
 RESTORED: dict[str, float] = {}  # посилання на пости, вже враховані у відновленому стані трекера
 
 
@@ -344,7 +345,27 @@ async def lifespan(app: FastAPI):
                 await asyncio.to_thread(tmp.replace, STATE_FILE)
             except Exception as e:  # noqa: BLE001
                 log.warning("збереження стану трекера: %s", e)
-    tasks = [asyncio.create_task(pusher()), asyncio.create_task(_save_state()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
+    # злиття напрямку: останнє рішення з диска, далі щодня о ~05:30 перевірка на журналі прогнозів
+    from . import fusion as _fusion
+    try:
+        if FUSION_FILE.exists():
+            tracker.fusion = json.loads(FUSION_FILE.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        log.warning("fusion.json: %s", e)
+
+    async def _fusion_daily():
+        while True:
+            lt = time.localtime()
+            wait = ((5 - lt.tm_hour) * 3600 + (30 - lt.tm_min) * 60 - lt.tm_sec) % 86400 or 86400
+            await asyncio.sleep(wait)
+            try:
+                rep = await asyncio.to_thread(_fusion.evaluate, brain.db)
+                tracker.fusion = rep
+                FUSION_FILE.write_text(json.dumps(rep, ensure_ascii=False), encoding="utf-8")
+                log.info("злиття напрямку: %s (%s)", "увімкнено" if rep["on"] else "вимкнено", rep["why"])
+            except Exception as e:  # noqa: BLE001
+                log.warning("перевірка злиття: %s", e)
+    tasks = [asyncio.create_task(pusher()), asyncio.create_task(_save_state()), asyncio.create_task(_fusion_daily()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     tasks.append(asyncio.create_task(pushsvc.run(state)))
     tasks.append(asyncio.create_task(ru.run()))
     tasks.append(asyncio.create_task(occupied.run()))
@@ -568,6 +589,15 @@ def api_history(full: int = 0, hours: float = 12):
     since = time.time() - max(0.5, min(hours, 12)) * 3600
     fr = [f for f in HIST if f["t"] >= since]
     return JSONResponse({"frames": fr if full else [_lite_frame(f) for f in fr]})
+
+
+@app.get("/api/fusion")
+def api_fusion(fresh: int = 0):
+    """Звіт самоперевірки злиття напрямку: скільки пар у журналі прогнозів, точність на днях, яких модель не бачила, рішення."""
+    from . import fusion as _fusion
+    if fresh:
+        return _fusion.evaluate(brain.db)
+    return getattr(tracker, "fusion", None) or {"on": False, "why": "перевірки ще не було", "total": brain.db.execute("SELECT count(*) FROM sqlite_master WHERE name='fcast'").fetchone()[0] and brain.db.execute("SELECT count(*) FROM fcast").fetchone()[0]}
 
 
 @app.get("/api/changes")
