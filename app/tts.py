@@ -67,7 +67,9 @@ async def _ensure_model(key: str) -> Path | None:
     if have and (have[0].with_suffix(".onnx.json")).exists():
         return have[0]
     d.mkdir(parents=True, exist_ok=True)
-    async with httpx.AsyncClient(timeout=120, follow_redirects=True) as cli:
+    # токен Hugging Face (якщо є в .env) — вищий ліміт завантажень, голоси качаються без відмов 429
+    hf = (os.getenv("HUGGINGFACE_TOKEN") or os.getenv("HF_TOKEN") or "").strip()
+    async with httpx.AsyncClient(timeout=120, follow_redirects=True, headers={"Authorization": f"Bearer {hf}"} if hf else None) as cli:
         lst = (await cli.get(f"https://huggingface.co/api/models/rhasspy/piper-voices/tree/main/uk/uk_UA/{folder}")).json()
         quals = [x["path"].rsplit("/", 1)[-1] for x in lst if x.get("type") == "directory"]
         q = next((x for x in ("medium", "high", "low", "x_low") if x in quals), None)

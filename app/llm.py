@@ -9,6 +9,12 @@
   shadow  — за замовчуванням: модель відповідає, відповідь лише пишеться в data/llm.jsonl поруч із розбором правил.
             Мапу не змінює. Так ми міряємо, чи модель справді краща, перш ніж їй довіряти.
 Ключ додає власник у .env на сервері; код його ніде не логує й не віддає назовні.
+
+Резерв і друга думка: якщо Anthropic недоступний, запит іде наступному провайдеру з ключем у .env
+(OpenRouter, Groq, OpenAI, Gemini, Mistral, SambaNova, Moonshot — усі через OpenAI-сумісний API).
+LLM_SECOND_SHARE (0..1, за замовчуванням 0.2): частка повідомлень, які паралельно розбирає друга модель —
+так нічний розбір бачить, де моделі згодні, а де ні (згода двох незалежних моделей = вища довіра).
+Назви моделей можна змінити в .env (LLM_<ПРОВАЙДЕР>_MODEL), бо провайдери їх оновлюють.
 """
 from __future__ import annotations
 
@@ -16,6 +22,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import time
 from pathlib import Path
@@ -59,6 +66,27 @@ TOOL = {
     },
 }
 
+# OpenAI-сумісні провайдери: (назва, змінні з ключем, базова адреса, модель за замовчуванням)
+PROVIDERS = [
+    ("openrouter", ("OPENROUTER_API_KEY",), "https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
+    ("groq", ("GROQ_API_KEY", "groq"), "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    ("openai", ("OPENAI_API_KEY",), "https://api.openai.com/v1", "gpt-4o-mini"),
+    ("gemini", ("GEMINI_API_KEY",), "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.0-flash"),
+    ("mistral", ("MISTRAL_API_KEY",), "https://api.mistral.ai/v1", "mistral-small-latest"),
+    ("sambanova", ("SAMBANOVA_API_KEY",), "https://api.sambanova.ai/v1", "Meta-Llama-3.3-70B-Instruct"),
+    ("moonshot", ("MOONSHOT_API_KEY",), "https://api.moonshot.ai/v1", "moonshot-v1-8k"),
+]
+
+
+def _others() -> list[tuple[str, str, str, str]]:
+    out = []
+    for name, envs, base, model in PROVIDERS:
+        key = next((os.getenv(e, "").strip() for e in envs if os.getenv(e, "").strip()), "")
+        if key:
+            out.append((name, key, base, os.getenv(f"LLM_{name.upper()}_MODEL", model).strip()))
+    return out
+
+
 MOVE = re.compile(r"(?i)курс|на\s|над\s|в\s+район|біля|около|повз|мимо|от\s|від\s|через|вектор|напрям|направлен")
 WORD_AFTER = re.compile(r"(?:на|над|курс(?:ом)?(?:\s+на)?|в\s+район[еі]|біля|около|от|від|через|повз|мимо|/)\s*([А-ЯІЇЄҐ][\w'’\-]+)")
 
@@ -72,13 +100,23 @@ class LLM:
         self.q: asyncio.Queue | None = None
         self.day, self.used, self.errors, self.seen = "", 0, 0, {}
         self.last_error = ""
+        self.others = _others()
+        self.second_share = float(os.getenv("LLM_SECOND_SHARE", "0.2"))
+        self._secrets = [self.key] + [o[1] for o in self.others]
 
     @property
     def on(self) -> bool:
-        return bool(self.key) and self.mode != "off"
+        return bool(self.key or self.others) and self.mode != "off"
+
+    def _clean(self, msg: str) -> str:
+        for k in self._secrets:
+            if k:
+                msg = msg.replace(k, "***")
+        return msg
 
     def stats(self) -> dict:
-        return {"enabled": self.on, "mode": self.mode if self.on else "off", "model": self.model, "today": self.used,
+        return {"enabled": self.on, "mode": self.mode if self.on else "off", "model": self.model if self.key else None,
+                "fallback": [o[0] + ":" + o[3] for o in self.others], "second_share": self.second_share, "today": self.used,
                 "daily_max": self.daily_max, "errors": self.errors, "last_error": self.last_error[:160]}
 
     # ---------- чи варто питати модель
@@ -139,12 +177,32 @@ class LLM:
         except asyncio.QueueFull:
             pass
 
-    async def ask(self, cli: httpx.AsyncClient, text: str, src: str) -> dict:
+    @staticmethod
+    def _user(text: str, src: str) -> str:
         from .config import CHANNEL_REGION
-        reg = CHANNEL_REGION.get(src) or "загальнонаціональний"
+        return f"Канал: {src} (регіон каналу: {CHANNEL_REGION.get(src) or 'загальнонаціональний'}).\nПовідомлення:\n{text}"
+
+    async def ask_compat(self, cli: httpx.AsyncClient, prov: tuple, text: str, src: str) -> dict:
+        """OpenAI-сумісний виклик з tool calling (та сама схема відповіді)."""
+        name, key, base, model = prov
+        body = {"model": model, "max_tokens": 600, "temperature": 0,
+                "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": self._user(text, src)}],
+                "tools": [{"type": "function", "function": {"name": TOOL["name"], "description": TOOL["description"], "parameters": TOOL["input_schema"]}}],
+                "tool_choice": {"type": "function", "function": {"name": TOOL["name"]}}}
+        r = await cli.post(base + "/chat/completions", json=body, headers={"Authorization": f"Bearer {key}", "content-type": "application/json"}, timeout=30)
+        r.raise_for_status()
+        msg = (r.json().get("choices") or [{}])[0].get("message") or {}
+        for tc in msg.get("tool_calls") or []:
+            try:
+                return json.loads(tc["function"]["arguments"])
+            except (KeyError, ValueError):
+                continue
+        return {}
+
+    async def ask(self, cli: httpx.AsyncClient, text: str, src: str) -> dict:
         body = {"model": self.model, "max_tokens": 600, "system": SYSTEM, "tools": [TOOL],
                 "tool_choice": {"type": "tool", "name": "report"},
-                "messages": [{"role": "user", "content": f"Канал: {src} (регіон каналу: {reg}).\nПовідомлення:\n{text}"}]}
+                "messages": [{"role": "user", "content": self._user(text, src)}]}
         r = await cli.post(API, json=body, headers={"x-api-key": self.key, "anthropic-version": "2023-06-01",
                                                    "content-type": "application/json"}, timeout=30)
         r.raise_for_status()
@@ -169,14 +227,30 @@ class LLM:
                     continue
                 self.used += 1
                 t0 = time.time()
-                try:
-                    item["llm"] = await self.ask(cli, item["text"], item["src"])
-                except Exception as e:  # noqa: BLE001
-                    self.errors += 1
-                    self.last_error = f"{type(e).__name__}: {e}".replace(self.key, "***") if self.key else str(e)
+                chain = ([("anthropic", self.key, "", self.model)] if self.key else []) + self.others
+                for prov in chain:
+                    try:
+                        item["llm"] = await (self.ask(cli, item["text"], item["src"]) if prov[0] == "anthropic"
+                                             else self.ask_compat(cli, prov, item["text"], item["src"]))
+                        item["by"] = prov[0] + ":" + prov[3]
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        self.errors += 1
+                        self.last_error = self._clean(f"{prov[0]}: {type(e).__name__}: {e}")
+                if "llm" not in item:
                     await asyncio.sleep(5)
                     continue
                 item["ms"] = int((time.time() - t0) * 1000)
+                # друга думка іншої моделі для частини повідомлень: міра згоди для нічного розбору
+                rest = [p_ for p_ in chain if p_[0] + ":" + p_[3] != item["by"]]
+                if rest and random.random() < self.second_share:
+                    p2 = rest[0]
+                    try:
+                        item["llm2"] = await (self.ask(cli, item["text"], item["src"]) if p2[0] == "anthropic"
+                                              else self.ask_compat(cli, p2, item["text"], item["src"]))
+                        item["by2"] = p2[0] + ":" + p2[3]
+                    except Exception as e:  # noqa: BLE001
+                        self.last_error = self._clean(f"{p2[0]}: {type(e).__name__}: {e}")
                 try:
                     OUT.parent.mkdir(parents=True, exist_ok=True)
                     with OUT.open("a", encoding="utf-8") as f:
