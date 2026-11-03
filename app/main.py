@@ -642,6 +642,24 @@ async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: 
     return await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc, sid[:40])
 
 
+@app.get("/api/health")
+async def api_health() -> dict:
+    """Коротка перевірка для зовнішнього нагляду: сервер живий і дані справді надходять (не лише відкривається сторінка)."""
+    now = time.time()
+    ws = webmon.state()
+    off = alerts.state()
+    a_age = int(now - (off.get("updated") or 0)) if off.get("updated") else None
+    live_share = round(ws.get("live", 0) / max(1, ws.get("channels", 1)), 2)
+    problems = []
+    if os.getenv("REPLAY") != "1":
+        if not off.get("ok") or a_age is None or a_age > 300:
+            problems.append("official_alerts_stale")
+        if live_share < 0.3 and not config.TG_SESSION:
+            problems.append("channels_stale")
+    return {"ok": not problems, "problems": problems, "now": int(now), "alerts_age": a_age, "channels_live": live_share,
+            "msg_age": int(now - FRESH["any"]) if FRESH["any"] else None, "uptime": int(now - started), "version": "2026-11-04.1"}
+
+
 @app.post("/api/brief")
 async def api_brief(req: Request) -> dict:
     """Створити картку-зведення по області для поширення (без дому користувача)."""

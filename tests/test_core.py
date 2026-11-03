@@ -1707,3 +1707,10 @@ def test_brief_card_snapshot_and_age():
     assert c.get("/b/nope").status_code == 404
     st = c.get("/api/state").json()
     assert "fresh" in st and "alerts_ok" in st["fresh"]
+
+
+def test_health_endpoint():
+    from fastapi.testclient import TestClient
+    from app import main as M
+    h = TestClient(M.app).get("/api/health").json()
+    assert {"ok", "problems", "alerts_age", "channels_live", "version"} <= set(h)
