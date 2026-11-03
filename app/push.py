@@ -28,6 +28,69 @@ NAME = {"shahed": "Шахед", "jet": "Реактивний БпЛА", "molniya
 COMPASS = ["на північ", "на північний схід", "на схід", "на південний схід", "на південь", "на південний захід", "на захід", "на північний захід"]
 
 
+ZONE_GAP = 300  # не частіше одного зонального зведення на пристрій за 5 хв (масована атака — не спам)
+ZONE_AHEAD = (5, 10, 15)  # хв: ціль, що за цей час увійде в зону, теж «у зоні»
+_HROM = None
+
+
+def _hromadas():
+    """Межі громад (індекс = номер у hromadas.geojson, як на сайті): [(назва, полігони, bbox)]."""
+    global _HROM
+    if _HROM is None:
+        fc = _json.loads((Path(__file__).resolve().parent.parent / "data" / "hromadas.geojson").read_text(encoding="utf-8"))
+        out = []
+        for f in fc["features"]:
+            g = f["geometry"]
+            polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+            xs = [p[0] for pl in polys for p in pl[0]]
+            ys = [p[1] for pl in polys for p in pl[0]]
+            out.append((f["properties"].get("n", ""), polys, (min(xs), min(ys), max(xs), max(ys))))
+        _HROM = out
+    return _HROM
+
+
+def _in_ring(r, x, y) -> bool:
+    c = False
+    j = len(r) - 1
+    for i in range(len(r)):
+        a, b = r[i], r[j]
+        if (a[1] > y) != (b[1] > y) and x < (b[0] - a[0]) * (y - a[1]) / ((b[1] - a[1]) or 1e-12) + a[0]:
+            c = not c
+        j = i
+    return c
+
+
+def zone_of(lon: float, lat: float, zones: dict) -> str | None:
+    if zones.get("obl"):
+        from .geo import oblasts
+        o = oblasts().of(lon, lat)
+        if o and o in zones["obl"]:
+            return f"{o} обл."
+    for h in zones.get("hrom") or []:
+        H = _hromadas()
+        if 0 <= h < len(H):
+            n, polys, bb = H[h]
+            if bb[0] <= lon <= bb[2] and bb[1] <= lat <= bb[3] and any(_in_ring(pl[0], lon, lat) for pl in polys):
+                return f"{n} громада"
+    return None
+
+
+def _ahead(tr: dict, minutes: float) -> tuple[float, float]:
+    """Де буде ціль через N хв: уздовж названого маршруту, інакше курсом; швидкість як на мапі (≈0.7 паспортної)."""
+    from .geo import bearing, from_xy, move
+    P = to_xy(tr["lat"], tr["lon"])
+    km = (tr.get("speed") or 170) * 0.7 * minutes / 60
+    if tr.get("route"):
+        Q = to_xy(tr["route"][0][1], tr["route"][0][0])
+        hd = bearing(P, Q)
+    elif tr.get("hd") is not None:
+        hd = tr["hd"]
+    else:
+        return tr["lon"], tr["lat"]
+    la, lo = from_xy(*move(P, hd, km))
+    return lo, la
+
+
 def _hm(t) -> str:
     return time.strftime("%H:%M", time.localtime(t)) if t else "?"
 
@@ -94,11 +157,17 @@ class Push:
             self.db.execute("ALTER TABLE websubs ADD COLUMN pre INTEGER DEFAULT 1")
         except sqlite3.OperationalError:
             pass
+        try:  # обрані області й громади ({"obl": [назви], "hrom": [індекси громад у hromadas.geojson]})
+            self.db.execute("ALTER TABLE websubs ADD COLUMN zones TEXT")
+        except sqlite3.OperationalError:
+            pass
         self.db.commit()
         self._vapid = None
         self.web_sender = None  # для тестів: підміна відправлення
         self.fired: dict[tuple, float] = {}
         self.armed: dict[str, dict[str, float]] = {}  # телефон → цілі, про які вже була «загроза» (для явного відбою)
+        self.zseen: dict[tuple, float] = {}  # (пристрій, ціль) → коли сповістили про ціль у його зоні
+        self.zlast: dict[str, float] = {}  # пристрій → коли надіслали останнє зональне зведення
         self.sent = 0
 
     def register(self, token: str, lon: float, lat: float) -> bool:
@@ -129,15 +198,20 @@ class Push:
         raw = self.vapid().public_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
         return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
-    def web_register(self, sub: dict, lon: float, lat: float, pre: bool = True) -> bool:
+    def web_register(self, sub: dict, lon: float, lat: float, pre: bool = True, zones: dict | None = None) -> bool:
         ep = str((sub or {}).get("endpoint", ""))
         keys = (sub or {}).get("keys") or {}
         if not ep.startswith("https://") or len(ep) > 1000 or not keys.get("p256dh") or not keys.get("auth"):
             return False
         if not (20 < lon < 42 and 43 < lat < 53):
             return False
-        self.db.execute("INSERT INTO websubs(endpoint, sub, lon, lat, t, pre) VALUES(?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET sub=excluded.sub, lon=excluded.lon, lat=excluded.lat, t=excluded.t, pre=excluded.pre",
-                        (ep, _json.dumps({"endpoint": ep, "keys": {"p256dh": keys["p256dh"], "auth": keys["auth"]}}), round(lon, 2), round(lat, 2), time.time(), 1 if pre else 0))
+        z = None
+        if isinstance(zones, dict):
+            obl = [str(o)[:40] for o in (zones.get("obl") or [])][:25]
+            hrom = [int(h) for h in (zones.get("hrom") or []) if str(h).isdigit()][:40]
+            z = _json.dumps({"obl": obl, "hrom": hrom}, ensure_ascii=False) if (obl or hrom) else None
+        self.db.execute("INSERT INTO websubs(endpoint, sub, lon, lat, t, pre, zones) VALUES(?,?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET sub=excluded.sub, lon=excluded.lon, lat=excluded.lat, t=excluded.t, pre=excluded.pre, zones=excluded.zones",
+                        (ep, _json.dumps({"endpoint": ep, "keys": {"p256dh": keys["p256dh"], "auth": keys["auth"]}}), round(lon, 2), round(lat, 2), time.time(), 1 if pre else 0, z))
         self.db.commit()
         return True
 
@@ -255,6 +329,7 @@ class Push:
         subs = self.db.execute("SELECT token, lon, lat FROM subs").fetchall()
         webs = {r[0]: r[1] for r in self.db.execute("SELECT endpoint, sub FROM websubs").fetchall()}
         no_pre = {r[0] for r in self.db.execute("SELECT endpoint FROM websubs WHERE pre=0").fetchall()}
+        zmap = {r[0]: _json.loads(r[1]) for r in self.db.execute("SELECT endpoint, zones FROM websubs WHERE zones IS NOT NULL").fetchall()}
         subs += self.db.execute("SELECT endpoint, lon, lat FROM websubs").fetchall()
         if not subs:
             return
@@ -283,6 +358,31 @@ class Push:
             if msg:
                 out.append({"to": token, "title": msg[0], "body": msg[1], "sound": "default", "priority": "high",
                             "channelId": "threats", "data": {"track": msg[2]}})
+            # обрані області й громади: нові цілі в зоні (або що увійдуть за ≤15 хв), одним зведенням не частіше разу на 5 хв
+            zones = zmap.get(token)
+            if zones and not msg:
+                homed = {t["id"] for t, _ in new_thr + new_pre}
+                cand = []
+                for tr in live:
+                    if tr.get("nopos") or tr["id"] in homed or (token, tr["id"]) in self.zseen:
+                        continue
+                    z = zone_of(tr["lon"], tr["lat"], zones)
+                    eta = 0
+                    if not z:
+                        for m in ZONE_AHEAD:
+                            z = zone_of(*_ahead(tr, m), zones)
+                            if z:
+                                eta = m
+                                break
+                    if z:
+                        cand.append((tr, z, eta))
+                if cand and now - self.zlast.get(token, 0) >= ZONE_GAP:
+                    zm = self._compose_zone(cand)
+                    out.append({"to": token, "title": zm[0], "body": zm[1], "sound": "default", "priority": "high",
+                                "channelId": "zones", "data": {"track": zm[2]}})
+                    self.zlast[token] = now
+                    for tr, _z, _e in cand:
+                        self.zseen[(token, tr["id"])] = now
             # відбій для вас: усі цілі, що загрожували, зникли або віддаляються
             arm = self.armed.get(token) or {}
             if arm and not new_thr:
@@ -309,6 +409,7 @@ class Push:
                                         "Це ще не відбій: офіційний відбій лише за сиреною та «Повітряною тривогою».",
                                 "sound": "default", "channelId": "threats", "data": {}})
         self.fired = {k: v for k, v in self.fired.items() if now - v < 3 * REARM}
+        self.zseen = {k: v for k, v in self.zseen.items() if now - v < 3600}
         web_out = [dict(m, sub=webs[m["to"]]) for m in out if m["to"] in webs]
         out = [m for m in out if m["to"] not in webs]
         if web_out:
@@ -323,6 +424,27 @@ class Push:
                         self.unregister(msg["to"])
             except Exception:  # noqa: BLE001
                 pass
+
+    @staticmethod
+    def _compose_zone(cand: list) -> tuple[str, str, str]:
+        """Зведення для обраних областей і громад: уже в зоні — першими, далі ті, що найшвидше увійдуть."""
+        cand.sort(key=lambda x: (x[2], -(x[0].get("count") or 1)))
+        tr, z, eta = cand[0]
+        n = sum(t.get("count") or 1 for t, _z, _e in cand)
+        zones = sorted({c[1] for c in cand})
+        where = zones[0] if len(zones) == 1 else f"{zones[0]} і ще {len(zones) - 1}"
+        nm = NAME.get(tr["type"], "Ціль") + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
+        if n == 1:
+            title = f"🟠 {nm} · " + (f"~{eta} хв до «{z}»" if eta else f"у межах «{z}»")
+        else:
+            title = f"🟠 {where}: {n} {'нова ціль' if n % 10 == 1 and n % 100 != 11 else 'нові цілі' if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else 'нових цілей'}"
+        at = tr.get("at")
+        lines = [(f"{nm}: " if n > 1 else "") + (f"останнє місце {at[0]}" if at else "місце за оцінкою SKY") + (f" · ~{eta} хв до «{z}»" if eta and n > 1 else ""),
+                 _move(tr), _who(tr)]
+        if len(cand) > 1:
+            lines.append("Ще: " + "; ".join(f"{NAME.get(t['type'], 'ціль')}" + (f" → {t['next']}" if t.get("next") else "") for t, _z, _e in cand[1:4])
+                         + (f" і ще {len(cand) - 4}" if len(cand) > 4 else ""))
+        return title, "\n".join(lines), tr["id"]
 
     @staticmethod
     def _compose(thr: list, pre: list) -> tuple[str, str, str] | None:

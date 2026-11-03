@@ -945,8 +945,10 @@ async function webPushSync(loud){
       if(sub){fetch('/api/webpush/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});await sub.unsubscribe();try{localStorage.removeItem('wp_home');}catch(e){}}
       if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');wpStatus(null);return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
-    const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
-    if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false})});
+    // обрані області й громади (явно, не автоматична «область дому») — сервер шле по них зведення навіть із закритим застосунком
+    const MZ=myZones(),zones=MZ.auto?null:{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)};
+    const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false)+'|'+JSON.stringify(zones);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
+    if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false,zones})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
     wpStatus(sub);
   }catch(e){if(loud)toast('Не вдалося увімкнути сповіщення: '+(e&&e.message||e));}}
@@ -1008,7 +1010,7 @@ function geomIn(g,x,y){const P=g.type==='Polygon'?[g.coordinates]:g.coordinates;
 function zoneOf(p){const Z=myZones();if(Z.obl.length&&window.OBLPOLY){const o=window.OBLPOLY(p[0],p[1]);if(o&&Z.obl.includes(o))return o+' обл.';}
   if(Z.hrom.length&&HPDATA){for(const h of Z.hrom){const f=HPDATA.features[h.id];if(f&&geomIn(f.geometry,p[0],p[1]))return h.n;}}return null;}
 function loadHP(){if(HPDATA||HPLOADING)return Promise.resolve(HPDATA);HPLOADING=true;return fetch('/data/hromadas.geojson').then(r=>r.json()).then(d=>{HPDATA=d;if(map.getSource('hp'))map.getSource('hp').setData(d);HPPREV={};return d;}).catch(()=>{HPLOADING=false;});}
-function renderZones(){const ul=$('#st-zones-list');if(!ul)return;const Z=myZones();ul.innerHTML='';
+function renderZones(){clearTimeout(renderZones.t);renderZones.t=setTimeout(()=>window.webPushSync&&webPushSync(false),1200);const ul=$('#st-zones-list');if(!ul)return;const Z=myZones();ul.innerHTML='';
   if(Z.auto)ul.innerHTML='<li><span style="opacity:.75;font-weight:500">Зараз: '+esc(Z.obl[0])+' обл. (за домом). Додайте свої громади або області:</span></li>';
   else if(!Z.obl.length&&!Z.hrom.length)ul.innerHTML='<li><span style="opacity:.75;font-weight:500">Не обрано, сповіщення лише про пуски й про загрози біля дому/моїх місць</span></li>';
   if(!Z.auto){Z.obl.forEach(o=>{const li=document.createElement('li');li.innerHTML='<span>🗺 '+esc(o)+' обл.</span><button>✕</button>';li.querySelector('button').onclick=()=>{Z.obl=Z.obl.filter(x=>x!==o);PREF.nz=Z;savePref();renderZones();};ul.appendChild(li);});

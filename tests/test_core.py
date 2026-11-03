@@ -1092,3 +1092,31 @@ def test_webpush_test_endpoint_rejects_unknown_device():
     from app.main import app
     r = TestClient(app).post("/api/webpush/test", json={"endpoint": "https://unknown.example/x"})
     assert r.status_code == 404
+
+
+def test_zone_push_aggregated_and_rate_limited(tmp_path, monkeypatch):
+    """Push для обраних областей: одне зведення на кілька цілей, не частіше разу на 5 хв, без повторів про ту саму ціль."""
+    import asyncio
+    import app.push as pushmod
+    from app.push import Push
+    monkeypatch.setattr(pushmod, "VAPID_KEY", tmp_path / "vapid.pem")
+    pu = Push(tmp_path / "push.sqlite")
+    sub = {"endpoint": "https://fcm.googleapis.com/fcm/send/z1", "keys": {"p256dh": "BPk", "auth": "x1"}}
+    assert pu.web_register(sub, 36.23, 50.0, True, {"obl": ["Полтавська"], "hrom": []})  # дім у Харкові, зона — Полтавщина
+    got = []
+
+    async def fake(s, payload):
+        got.append(payload)
+        return 201
+    pu.web_sender = fake
+
+    def tr(i, lat, lon):
+        return {"id": f"Ш-{i}", "type": "shahed", "lat": lat, "lon": lon, "speed": 170, "hd": None, "hd_src": None,
+                "route": [], "count": 1, "status": "active", "conf": 0.9, "ev": {"prim": ["K"]}}
+    class Cli:
+        async def post(self, *a, **k):
+            raise AssertionError
+    asyncio.run(pu.tick(Cli(), {"tracks": [tr(1, 49.59, 34.55), tr(2, 49.07, 33.42)]}))  # Полтава, Кременчук
+    assert len(got) == 1 and "Полтавська обл." in got[0]["title"] and "2" in got[0]["title"]
+    asyncio.run(pu.tick(Cli(), {"tracks": [tr(1, 49.59, 34.55), tr(2, 49.07, 33.42), tr(3, 50.0, 33.0)]}))
+    assert len(got) == 1  # нова ціль за хвилину — чекає 5 хв, а ті самі не повторюються
