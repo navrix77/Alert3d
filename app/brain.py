@@ -245,6 +245,10 @@ class Brain:
             b = self.pacc.get(k + ":naive")
             if b and b[1] >= 5:
                 out[t]["naive"] = round(b[0] / b[1], 2)
+        # жива самоперевірка напрямку (Tracker._score_heading): показаний курс проти наступної названої позиції, влучання ≤45°
+        for k, (h, n) in self.pacc.items():
+            if k.endswith("@hd") and n >= 10:
+                out["hd:" + k[:-3]] = {"acc": round(h / n, 2), "n": int(n)}
         return out
 
     def prev_place(self, typ: str, name: str) -> tuple[str, float, float, float] | None:

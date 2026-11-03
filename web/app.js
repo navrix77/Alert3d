@@ -18,7 +18,7 @@ let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=fals
 function applySaver(){const on=window.NXPERF&&NXPERF.saver;['hillshade','bld3d'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');});const c=$('#st-saver');if(c){c.checked=!!(window.NXPERF&&localStorage.getItem('saver')==='1');c.onchange=e=>NXPERF.setSaver(e.target.checked);}}
 document.addEventListener('nxsaver',()=>{try{applySaver();}catch(e){}});
 function syncReal3d(){applySaver();const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
-window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m)};
+window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m),open:id=>openSheet(id)};
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
 const PREFL=()=>{try{return Object.assign({launch:true},JSON.parse(localStorage.getItem('pref')||'{}'));}catch(e){return {launch:true};}};
@@ -624,7 +624,7 @@ function fillSheet(first){
   const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr){$('#sheet').hidden=true;sel=null;return;}
   if(first||!fillSheet.icon||fillSheet.icon!==tr.type){const c=drawTarget(tr.type,40);$('#sh-icon').innerHTML='';$('#sh-icon').appendChild(c);fillSheet.icon=tr.type;}
   $('#sh-name').textContent=TYPE_NAME[tr.type]+(tr.count>1?' ×'+tr.count:'');
-  $('#sh-course').innerHTML=tr.status!=='active'?(tr.status==='lost'?'Втрачено':'Більше не фіксується'):(tr.next?'Курс → <b>'+esc(tr.next)+'</b>':'Курс уточнюється');
+  $('#sh-course').innerHTML=tr.status!=='active'?(tr.status==='lost'?'Втрачено':'Більше не фіксується'):(tr.next?'Курс → <b>'+esc(tr.next)+'</b>':tr.hd!=null?'Ймовірно '+SIDE[Math.round(tr.hd/45)%8]+' <small>(оцінка SKY)</small>':'Курс невідомий');
   const d=DISP.get(tr.id);const r=d&&homeRel(tr,d.p);const nowT=Date.now()/1000+offset;const mago=t=>Math.max(0,Math.round((nowT-t)/60));
   // 1) для вас: відстань і що ціль робить відносно дому, одним рядком
   $('#sh-dist').textContent=r?Math.round(r.d)+' км '+r.side:'';
@@ -639,6 +639,17 @@ function fillSheet(first){
    const END={shahed:'≈5 год 30 хв – 14 год (розрахунок за дальністю)',jet:'не встановлено: модель не названа',geran5:'до 2 год',banderol:'≈1 год на 500 км (розрахунок)',recon:'від 2 год до 16 год, залежно від моделі',molniya:'не встановлено',lancet:'до 30 хв («Ланцет-1») або до 40 хв («Ланцет-3»); версію канали зазвичай не називають'}[tr.type];
    if(END)h+='<br><small>Модель може бути в повітрі: '+END+'. Це не відлік і не відбій</small>';
    $('#sh-now').innerHTML=h;}
+  // 2б) куди летить: напрямок, звідки SKY його знає і наскільки такий напрямок справджувався (жива самоперевірка)
+  {const PA=SNAP.pred_acc||{};const HA=PA['hd:'+tr.type],LA=PA[tr.type];let h='';
+   const SRC={channels:'канали назвали пункт',course:'канал назвав напрямок',learned:'навчені маршрути попередніх перельотів',movement:'рух між названими позиціями'}[tr.hd_src]||'';
+   if(tr.status!=='active')h='Не відстежується: '+(tr.status==='lost'?'нових повідомлень немає':'канали написали «збито / не фіксується»');
+   else if(tr.hd==null&&!tr.next)h='<b class=warn>Напрямок невідомий</b><br><small>Канали не назвали пункт, а навчених маршрутів звідси замало. Стрілку не домальовуємо</small>';
+   else{h='<div class="dir-h">'+(tr.hd!=null?'<span class="dir-arrow" style="transform:rotate('+Math.round(tr.hd)+'deg)">↑</span><span><b>'+SIDE[Math.round(tr.hd/45)%8]+'</b>':'<span>')+(tr.next?(tr.hd!=null?' · ':'')+'на <b>'+esc(tr.next)+'</b>':'')+'</span></div>';
+     if(SRC)h+='<small>Звідки відомо: '+SRC+'</small>';
+     if(HA)h+='<br><small>Наскільки справджується: напрямок цього типу цілей збігався з наступною позицією (±45°) у '+Math.round(HA.acc*100)+'% з '+HA.n+' перевірок</small>';
+     const L=tr.lpath||[];if(!(tr.route_names&&tr.route_names.length)&&L.length)h+='<br><small>Ймовірно далі: '+L.slice(0,3).map(x=>esc(x[2])+' '+Math.round(x[3]*100)+'%').join(', ')+(LA?' · такий прогноз справджувався у '+Math.round(LA.acc*100)+'% з '+LA.n+(LA.naive!=null?' (просто «тим самим курсом»: '+Math.round(LA.naive*100)+'%)':''):'')+'</small>';
+     h+='<br><small>Ціль може змінити курс будь-якої миті</small>';}
+   $('#sh-dir').innerHTML=h;}
   // 3) звідки: перша фіксація, потім імовірне місце пуску
   {const L=tr.launch,en=tr.entry;let h='';
    if(en&&en[2])h='Вперше: <b>'+esc(en[2])+'</b> о '+fmt(en[3])+' ('+mago(en[3])+' хв тому)';
@@ -654,7 +665,7 @@ function fillSheet(first){
   if(tr.route_names&&tr.route_names.length&&tr.route&&tr.route.length&&pos){let acc=0,prev=xy(pos.p);const items=tr.route.slice(0,tr.route_names.length).map((p,i)=>{const q=xy(p);acc+=dist(prev,q);prev=q;return '<li><b>~'+Math.max(1,Math.round(acc/tr.speed*60))+' хв</b> '+esc(tr.route_names[i])+'</li>';});
     if(home&&r&&r.eta!=null)items.push('<li class="home"><b>~'+Math.max(1,Math.round(r.eta))+' хв</b> ваш дім</li>');
     const why=tr.pred==='learned'?' <small>· вивчено з історії'+(tr.pred_p?' ('+Math.round(tr.pred_p*100)+'%)':'')+'</small>':tr.pred==='channels'?' <small>· за каналами</small>':'';
-    $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо, позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'')+lpHtml(tr);}else $('#sh-route').innerHTML=lpHtml(tr);
+    $('#sh-route').innerHTML='<h4>Прогноз маршруту'+why+'</h4><ol>'+items.join('')+'</ol>'+(tr.pos_est?'<p class="est">Точне місце не названо, позицію оцінено'+(tr.pred==='learned-origin'?' за типовими маршрутами':' по пункту призначення')+'</p>':'');}else $('#sh-route').innerHTML='';
   // «Чому я це показую»: першоджерело, копії, суперечності, давність, що змінило відображення
   {const E=Object.assign({items:[],prim:[],pubs:0,contra:[],age:0},tr.ev||{});const got=(tr.ev&&tr.ev.items)?tr.ev.items:(REPLAY?null:evItems(tr.id,()=>{if(sel===tr.id)fillSheet();}));// машина часу: лише те, що було відомо на той момент
    E.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;

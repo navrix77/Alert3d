@@ -566,3 +566,7 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 /* картка цілі: виділені назви всередині речення — в рядок, а не окремим блоком («Михальче\n, останнє…») */
 #sh-now b,#sh-from b,#sh-conf b{display:inline;font-size:inherit;margin:0}
 #sh-now>b:first-child,#sh-from b{font-weight:800}
+.dir-arrow{display:inline-block;font-weight:900;font-size:20px;line-height:1;color:var(--fg,#fff);transform-origin:50% 55%}
+#sh-dir b{display:inline;font-size:inherit;margin:0;font-weight:800}
+#sh-dir .dir-h{display:flex;align-items:center;gap:8px;font-size:18px}
+#sh-dir .dir-arrow{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);font-size:17px}
