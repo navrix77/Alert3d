@@ -127,6 +127,7 @@ class Track:
     pred_naive_hit: bool = False
     closed: float | None = None
     likely: bool = False  # тип — непряма ознака («ймовірно розвідник»)
+    pair: str | None = None  # канал попередив про можливу пару: «Зала (угроза ланцет)» → розвідник, pair="lancet"
     merged: str | None = None  # дублікат іншого треку (той самий об'єкт, різні канали/назви)
 
     @property
@@ -235,6 +236,10 @@ _BAL_STEMS = [("дніпропетров", "Дніпропетровська"), 
               ("тернопіл", "Тернопільська"), ("харків", "Харківська"), ("херсон", "Херсонська"), ("хмельниц", "Хмельницька"),
               ("хмельниччин", "Хмельницька"), ("черкас", "Черкаська"), ("черкащин", "Черкаська"), ("чернівец", "Чернівецька"),
               ("буковин", "Чернівецька"), ("чернігів", "Чернігівська")]
+BAL_MACRO = [(r"східн\w*\s+(?:та\s+\w+\s+)?(?:регіон|област)|східн\w*\s+та\s+центральн|(?<![а-яіїє])на\s+сході", ["Харківська", "Донецька", "Луганська", "Дніпропетровська", "Запорізька", "Сумська"]),
+             (r"центральн\w*\s+(?:та\s+\w+\s+)?(?:регіон|област)|та\s+центральн", ["Полтавська", "Черкаська", "Кіровоградська", "Київська", "Київ", "Вінницька"]),
+             (r"північн\w*\s+(?:та\s+\w+\s+)?(?:регіон|област)", ["Чернігівська", "Сумська", "Київська", "Київ", "Житомирська"]),
+             (r"південн\w*\s+(?:та\s+\w+\s+)?(?:регіон|област)", ["Одеська", "Миколаївська", "Херсонська", "Запорізька"])]
 _BAL_OBL_RX = _re.compile(r"(?i)(?<![\w'’-])([а-яіїєґ'’-]+?(?:щин|ччин)\w*|[а-яіїєґ'’-]+?(?:ськ|цьк|зьк)(?:а|ої|ій|у)\s+обл\w*)")
 
 
@@ -242,6 +247,12 @@ def bal_oblasts(text: str) -> list[str]:
     from .parser import OBL_LIST, _obl_list
     text = OBL_LIST.sub(_obl_list, text or "")  # «загроза для Донецька, Запорізька, …» → області
     out = []
+    # «загроза балістики для низки східних та центральних регіонів» (kpszsu 03.11): області не названо, лише макрорегіони.
+    # Склад за поділом, яким користуються Повітряні сили у зведеннях: схід, центр, північ, південь
+    low = text.lower()
+    for rx, obls in BAL_MACRO:
+        if _re.search(rx, low):
+            out += [o for o in obls if o not in out]
     for m in _BAL_OBL_RX.finditer(text or ""):
         w = m.group(1).lower()
         for stem, o in _BAL_STEMS:
@@ -613,6 +624,8 @@ class Tracker:
             d_c = dist_km(pt, tr.course_xy)
             if d_c < 8 or (tr.heading is not None and abs((bearing(pt, tr.course_xy) - tr.heading + 540) % 360 - 180) > 100):
                 tr.course_to, tr.course_xy = None, None
+        if getattr(obs, "pair", None):
+            tr.pair = obs.pair
         if obs.count:
             tr.count = max(tr.count or 0, obs.count) if t - tr.obs[0].t < 900 else obs.count
         rec["track"] = tr.id
@@ -1016,7 +1029,7 @@ class Tracker:
                         la, lo = from_xy(*p)
                         up(obl.of(lo, la), 1)
             out.append({
-                "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "count": tr.count, "status": status,
+                "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "pair": tr.pair, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
                 "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "nopos": all(o.est for o in tr.obs),
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],

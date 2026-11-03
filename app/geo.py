@@ -176,6 +176,11 @@ class Gazetteer:
             if key in g.idx and any(abs(g.places[i].lat - lat) < 0.02 and abs(g.places[i].lon - lon) < 0.03 for i in g.idx[key]):
                 continue
             g.add([name], Place(name, lat, lon, cat, cls.KIND_POP.get(cat, 500)))
+        # населені пункти, яких немає в КАТОТТГ-вибірці, але монітори їх пишуть (перевірено за журналом)
+        # 03.11: «Ракета Золочев/Ольшаны», «Вектор Ольшаны/Солоницевка/Люботин» (TLK) — селище Ольшани під Харковом
+        for names, pl in [(["Ольшани", "Ольшаны"], Place("Ольшани", 50.0514, 35.8756, "X", 4_000))]:
+            if not any(abs(g.places[i].lat - pl.lat) < 0.05 and abs(g.places[i].lon - pl.lon) < 0.05 for i in g.idx.get(norm(pl.name), [])):
+                g.add(names, pl)
         return g
 
     # --- відмінки: спроба звести словоформу до називного

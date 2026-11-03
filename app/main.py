@@ -85,7 +85,7 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
             obs.type = last[1]
         # «Заїченці курс Вʼязівок» без типу: канал щойно (≤20 хв) писав про цілі певного типу — це продовження
         # (ppopoltavanightfighters пише тип лише в першому пості хвилі)
-        if obs.type is None and obs.places and not obs.close and not obs.no_target and last and ts - last[0] < 1200 and re.search(r"курс|→", seg.lower()):
+        if obs.type is None and obs.places and not obs.close and not obs.no_target and last and ts - last[0] < 1200 and re.search(r"курс|→|вектор", seg.lower()):
             obs.type = last[1]
         # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
         sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type)

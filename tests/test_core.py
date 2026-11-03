@@ -1349,3 +1349,23 @@ def test_ballistic_threat_mode_events():
     b = tr.snapshot(now + 5)["bal"]
     assert [e["obl"] for e in b] == [["Харківська", "Сумська"], ["Харківська"], []]
     assert [e["close"] for e in b] == [False, False, True]
+
+
+def test_recon_with_lancet_threat_is_recon():
+    """03.11: «Зала (угроза ланцет)»: ZALA розвідник, що може наводити Ланцет; Ланцет поруч не підтверджено."""
+    o = P.parse("Зала (угроза ланцет) от Староверовки на Шевченково", "X")
+    assert o.type == "recon" and o.pair == "lancet"
+    assert [r.place.name for r in o.places] == ["Старовірівка", "Шевченкове"]
+    assert P.parse("Ланцет на Шевченково", "X").type == "lancet"
+
+
+def test_olshany_kharkiv_and_launchers_activity():
+    """03.11 TLK: «Ракета Золочев/Ольшаны» (селище під Харковом не було в газетирі; 37 повідомлень у журналі),
+    «Активність пускових» (Харків life, TLK) — попередження про балістику для області каналу."""
+    o = P.parse("Ракета Золочев/Ольшаны⚠️", "TLK")
+    assert [r.place.name for r in o.places] == ["Золочів", "Ольшани"]
+    assert abs(o.places[1].place.lat - 50.05) < 0.1
+    assert P.parse("Активність пускових", "X").type == "ballistic"
+    assert P.parse("Активность пусковых⚠️", "TLK").type == "ballistic"
+    from app.tracker import bal_oblasts
+    assert "Харківська" in bal_oblasts("❗ Загроза балістики для низки східних та центральних регіонів")
