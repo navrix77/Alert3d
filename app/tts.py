@@ -10,7 +10,9 @@ import hashlib
 import io
 import logging
 import os
+import re
 import subprocess
+import time
 import sys
 import threading
 import wave
@@ -262,7 +264,7 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
-LAST = {"openai": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
+LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
 OAI_VOICES = {"lada": "nova", "tetiana": "shimmer", "mykyta": "onyx", "oleksa": "echo"}
 OAI_STYLE = ("Говори українською літературною мовою, як спокійний диктор новин: чітко, рівно, з правильними наголосами "
              "в українських назвах міст і сіл (Харків, Чугуїв, Балаклія, Ізюм, Лозова), без драматизму.")
@@ -283,26 +285,93 @@ async def _openai(text: str, key: str, rate: float) -> bytes | None:
                 return r.content
             LAST["openai"] = f"{model}: HTTP {r.status_code} {r.text[:160]}"
             log.warning("openai tts %s: %s", model, r.status_code)
+            if r.status_code in (401, 429) and any(w in r.text for w in ("credit", "quota", "billing")):
+                _off["openai"] = time.time() + 1800  # немає кредитів — не гаємо час щоразу
+                return None
     return None
+
+
+# Gemini TTS (ключ GEMINI_API_KEY): нейромережевий голос, добре читає українські назви. 03.11: OpenAI без кредитів (429).
+GEM_VOICES = {"lada": "Kore", "tetiana": "Aoede", "mykyta": "Charon", "oleksa": "Orus"}
+GEM_STYLE = "Прочитай українською спокійно й чітко, як диктор новин, з правильними наголосами в назвах міст і сіл: "
+_off: dict = {}  # провайдер → до якого часу не пробувати (немає кредитів / ліміт)
+
+
+def _gkey() -> str:
+    return (os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI") or os.getenv("GOOGLE_API_KEY") or "").strip()
+
+
+def _wav(pcm: bytes, sr: int = 24000) -> bytes:
+    import struct
+    return (b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16)
+            + b"data" + struct.pack("<I", len(pcm)) + pcm)
+
+
+async def _gemini(text: str, key: str, rate: float) -> bytes | None:
+    import base64
+    k = _gkey()
+    if not k:
+        return None
+    voice = os.getenv("TTS_GEMINI_VOICE") or GEM_VOICES.get(key, "Kore")
+    pre = GEM_STYLE + ("трохи швидше: " if rate > 1.1 else "")
+    async with httpx.AsyncClient(timeout=40) as cli:
+        for model in [m for m in (os.getenv("TTS_GEMINI_MODEL"), "gemini-2.5-flash-preview-tts", "gemini-2.5-flash-tts",
+                                  "gemini-2.5-pro-preview-tts") if m]:
+            r = await cli.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                               headers={"x-goog-api-key": k},
+                               json={"contents": [{"parts": [{"text": pre + text}]}],
+                                     "generationConfig": {"responseModalities": ["AUDIO"],
+                                                          "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}}})
+            if r.status_code == 200:
+                try:
+                    part = r.json()["candidates"][0]["content"]["parts"][0]["inlineData"]
+                except (KeyError, IndexError, ValueError):
+                    LAST["gemini"] = f"{model}: порожня відповідь"
+                    continue
+                m = re.search(r"rate=(\d+)", part.get("mimeType", ""))
+                return _wav(base64.b64decode(part["data"]), int(m.group(1)) if m else 24000)
+            LAST["gemini"] = f"{model}: HTTP {r.status_code} {r.text[:160]}"
+            log.warning("gemini tts %s: %s", model, r.status_code)
+            if r.status_code == 429:
+                _off["gemini"] = time.time() + 600
+                return None
+    return None
+
+
+async def _cached(prov: str, ext: str, fn, text: str, key: str, rate: float):
+    c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
+    if c.exists():
+        return c.read_bytes(), f"{prov}-cache"
+    if _off.get(prov, 0) > time.time():
+        return None, ""
+    try:
+        data = await fn(text, key, rate)
+    except Exception as e:  # noqa: BLE001
+        LAST[prov] = f"{type(e).__name__}: {str(e)[:160]}"
+        log.warning("%s tts: %s", prov, e)
+        return None, ""
+    if data:
+        c.parent.mkdir(parents=True, exist_ok=True)
+        c.write_bytes(data)
+        return data, prov
+    return None, ""
 
 
 async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes | None, str]:
     text = " ".join((text or "").split())[:300]
     if not text:
         return None, "empty"
-    if os.getenv("OPENAI_API_KEY") and os.getenv("TTS_PROVIDER", "openai") != "piper":
-        ocache = BASE / "cache" / f"o-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
-        if ocache.exists():
-            return ocache.read_bytes(), "openai-cache"
-        try:
-            data = await _openai(text, key, rate)
-            if data:
-                ocache.parent.mkdir(parents=True, exist_ok=True)
-                ocache.write_bytes(data)
-                return data, "openai"
-        except Exception as e:  # noqa: BLE001 — недоступний OpenAI → Google/Piper
-            LAST["openai"] = f"{type(e).__name__}: {str(e)[:160]}"
-            log.warning("openai tts: %s", e)
+    order = (os.getenv("TTS_ORDER") or "openai,gemini").split(",")
+    for prov in order:
+        prov = prov.strip()
+        if prov == "openai" and os.getenv("OPENAI_API_KEY"):
+            data, by = await _cached("openai", "mp3", _openai, text, key, rate)
+        elif prov == "gemini" and _gkey():
+            data, by = await _cached("gemini", "wav", _gemini, text, key, rate)
+        else:
+            continue
+        if data:
+            return data, by
     if GKEY:
         gcache = BASE / "cache" / f"g-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
         if gcache.exists():
@@ -335,5 +404,5 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes 
 
 
 def status() -> dict:
-    return {"openai": bool(os.getenv("OPENAI_API_KEY")), "openai_error": LAST["openai"], "google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
+    return {"openai": bool(os.getenv("OPENAI_API_KEY")), "openai_error": LAST["openai"], "gemini": bool(_gkey()), "gemini_error": LAST["gemini"], "google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
             "ready": bool(list((BASE / VOICES[k][0]).glob('*.onnx')))} for k in VOICES]}

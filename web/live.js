@@ -17,9 +17,25 @@
 
   // ---------- інтерфейс
   const css = `
-  #live-btn{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);z-index:40;border-radius:999px;padding:9px 13px;
-    background:rgba(18,20,30,.86);border:1px solid rgba(255,255,255,.22);color:#fff;font:700 13px system-ui,sans-serif;backdrop-filter:blur(10px)}
-  #live-btn i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#FF4D5E;margin-right:6px;vertical-align:1px}
+  #live-btn{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);z-index:40;border-radius:16px;padding:8px 14px 8px 12px;
+    background:rgba(18,20,30,.9);border:1px solid rgba(255,120,130,.55);color:#fff;font:800 14px/1.15 system-ui,sans-serif;backdrop-filter:blur(10px);
+    display:flex;align-items:center;gap:8px;text-align:left;box-shadow:0 4px 18px rgba(0,0,0,.45)}
+  #live-btn i{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF4D5E;flex:none;animation:lvp 1.6s infinite}
+  #live-btn small{display:block;font:600 11px system-ui,sans-serif;opacity:.7}
+  @keyframes lvp{0%,100%{opacity:1}50%{opacity:.35}}
+  #radio-btn{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:41;border-radius:999px;padding:8px 13px;
+    background:rgba(18,20,30,.9);border:1px solid rgba(255,255,255,.25);color:#fff;font:800 13.5px system-ui,sans-serif;backdrop-filter:blur(10px);
+    display:flex;align-items:center;gap:7px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
+  #radio-btn.on{background:rgba(160,30,45,.92);border-color:rgba(255,140,150,.8)}
+  #radio-btn.on b{display:inline-block;width:8px;height:8px;border-radius:50%;background:#fff;animation:lvp 1.2s infinite}
+  #radio-card{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 54px);z-index:41;max-width:min(300px,calc(100vw - 150px));
+    background:rgba(12,14,22,.93);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:8px 10px;color:#fff;
+    font:13px/1.4 system-ui,sans-serif;backdrop-filter:blur(10px);box-shadow:0 8px 26px rgba(0,0,0,.5)}
+  #radio-card small{display:block;opacity:.6;font-size:11px;margin-top:3px}
+  #live .lv-ctl{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  #live .lv-help{font-size:12px;opacity:.7;margin-top:2px}
+  #live .lv-chips{display:flex;gap:6px;overflow-x:auto;margin-top:8px;padding-bottom:2px;scrollbar-width:none}
+  #live .lv-chips button{white-space:nowrap;flex:none;background:rgba(120,160,255,.14);border-color:rgba(150,180,255,.35)}
   #live{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);z-index:60;max-width:560px;margin:0 auto;
     background:rgba(12,14,22,.94);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:12px 12px 10px;color:#fff;
     font:14px/1.45 system-ui,sans-serif;box-shadow:0 12px 40px rgba(0,0,0,.5);backdrop-filter:blur(12px)}
@@ -41,12 +57,15 @@
     color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:10px 12px;font:14px system-ui,sans-serif;display:flex;gap:8px;align-items:center;max-width:92vw}
   #live-tip button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:5px 10px;font:600 13px system-ui,sans-serif}`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
-  const btn = document.createElement('button'); btn.id = 'live-btn'; btn.innerHTML = '<i></i>Ефір'; btn.title = 'Живий ефір: що змінилося і питання до мапи';
+  const btn = document.createElement('button'); btn.id = 'live-btn'; btn.innerHTML = '<i></i><span>Ефір<small>що змінилось</small></span>'; btn.title = 'Живий ефір: мапа розповість, що змінилось, і відповість на питання';
   document.body.appendChild(btn);
   const box = document.createElement('div'); box.id = 'live'; box.hidden = true;
-  box.innerHTML = `<div class="lv-h"><i></i><span>ЖИВИЙ ЕФІР</span><span class="sp"></span>
-      <button id="lv-audio" title="Озвучувати">🔊</button><button id="lv-radio" title="Радіо SKY: голосові зведення про ваш регіон, сусідів і всю Україну">📻 Радіо</button><button id="lv-shelter" title="Короткі голосові оновлення, поки ви в укритті">Я в укритті</button>
-      <button id="lv-pause">❚❚</button><button id="lv-close">✕</button></div>
+  box.innerHTML = `<div class="lv-h"><i></i><span>ЖИВИЙ ЕФІР</span><span class="sp"></span><button id="lv-close" title="Закрити">✕</button></div>
+    <div class="lv-ctl"><button id="lv-audio" title="Озвучувати">🔊 Голос</button><button id="lv-shelter" title="Короткі голосові оновлення, поки ви в укритті">🛡 Я в укритті</button>
+      <button id="lv-pause" title="Пауза">⏸ Пауза</button></div>
+    <div class="lv-help">Мапа сама покаже, що змінилось біля вас, поки вас не було. Можна спитати текстом або голосом.</div>
+    <div class="lv-chips"><button data-q="Що нового біля мене?">Що нового біля мене?</button><button data-q="Що летить на мою область?">Що летить на мою область?</button>
+      <button data-q="Що зараз по всій Україні?">Що по Україні?</button><button data-q="Звідки це відомо?">Звідки відомо?</button></div>
     <div class="lv-say" id="lv-say"></div><div class="lv-x" id="lv-x"></div>
     <div class="lv-q"><input id="lv-in" placeholder="Спитайте: чому стало 6? що нового? звідки відомо?" enterkeyhint="send">
       <button id="lv-mic" title="Сказати голосом">🎤</button><button id="lv-lasso" title="Обвести ділянку на мапі">✎</button><button id="lv-go">➤</button></div>
@@ -99,7 +118,7 @@
     }
   }
   async function run(steps) {
-    playing = true; stop = false; box.hidden = false; $('#lv-pause').textContent = '❚❚';
+    playing = true; stop = false; box.hidden = false; $('#lv-pause').textContent = '⏸ Пауза';
     for (const s of steps) {
       if (stop) break;
       say.textContent = s.say || ''; act(s);
@@ -127,11 +146,12 @@
   }
   function start(manual) { stop = true; if (abortAudio) abortAudio(); setTimeout(() => live(null, null, manual ? seen : seen), 50); }
   btn.onclick = () => { $('#live-tip') && $('#live-tip').remove(); start(true); };
-  $('#lv-close').onclick = () => { if (radioOn) $('#lv-radio').click(); if (shelter) $('#lv-shelter').click(); stop = true; paused = false; if (abortAudio) abortAudio(); box.hidden = true; hl([], false); window.FXLIVE = null; markSeen(); };
-  $('#lv-pause').onclick = () => { paused = !paused; $('#lv-pause').textContent = paused ? '▶' : '❚❚'; if (paused && abortAudio) abortAudio(); };
+  $('#lv-close').onclick = () => { if (shelter) $('#lv-shelter').click(); stop = true; paused = false; if (abortAudio) abortAudio(); box.hidden = true; hl([], false); window.FXLIVE = null; markSeen(); };
+  $('#lv-pause').onclick = () => { paused = !paused; $('#lv-pause').textContent = paused ? '▶ Далі' : '⏸ Пауза'; if (paused && abortAudio) abortAudio(); };
   $('#lv-audio').onclick = () => { audioOn = !audioOn; LS.set('live_audio', audioOn ? '1' : '0'); $('#lv-audio').classList.toggle('on', audioOn); if (!audioOn && abortAudio) abortAudio(); };
   const ask = q => { if (!q) return; stop = true; paused = false; if (abortAudio) abortAudio(); $('#lv-in').value = ''; setTimeout(() => live(q, lassoBox), 60); lassoBox = null; };
   $('#lv-go').onclick = () => ask($('#lv-in').value.trim());
+  box.querySelectorAll('.lv-chips button').forEach(b => b.onclick = () => ask(b.dataset.q));
   $('#lv-in').onkeydown = e => { if (e.key === 'Enter') ask($('#lv-in').value.trim()); };
 
   // ---------- голосове питання (де браузер уміє розпізнавати мову)
@@ -232,18 +252,23 @@
       // свій регіон без змін — не повторюємо щоразу «змін немає», лише раз на ~6 хв
       if (scope === 'region' && /суттєвих змін|змін немає|без змін/i.test(r.text || '') && ++radioQuiet % 3 !== 1) return;
       if (scope === 'region') radioSeen = NX().now();
-      say.textContent = (scope === 'country' ? '🇺🇦 Україна: ' : scope === 'neighbors' ? 'Сусіди: ' : '📍 ') + (r.text || '');
-      xtra.innerHTML = '<small>' + new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) + ' · ' + (r.by && r.by !== 'rules' ? 'ШІ за даними SKY' : 'дані SKY') + '</small>';
+      rsay((scope === 'country' ? '🇺🇦 Україна: ' : scope === 'neighbors' ? 'Сусіди: ' : '📍 Ваш регіон: ') + (r.text || ''),
+        new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) + ' · ' + (r.by && r.by !== 'rules' ? 'ШІ за даними SKY' : 'дані SKY'));
       chime(); await wait(450); await speak(r.text || '');
     } catch (e) {}
   }
-  $('#lv-radio').onclick = async () => {
-    radioOn = !radioOn; $('#lv-radio').classList.toggle('on', radioOn);
-    if (!radioOn) { clearInterval(radioT); radioT = null; say.textContent = 'Радіо вимкнено'; return; }
-    audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on'); stop = true; if (abortAudio) abortAudio();
+  const rbtn = document.createElement('button'); rbtn.id = 'radio-btn'; rbtn.title = 'Радіо SKY: голосові зведення кожні 2 хв про ваш регіон, періодично про сусідів і всю Україну';
+  const rcard = document.createElement('div'); rcard.id = 'radio-card'; rcard.hidden = true;
+  const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.innerHTML = radioOn ? '<b></b>📻 Радіо в ефірі ✕' : '📻 Радіо'; };
+  rshow(); document.body.appendChild(rbtn); document.body.appendChild(rcard);
+  const rsay = (txt, sub) => { rcard.hidden = false; rcard.innerHTML = esc(txt) + (sub ? '<small>' + esc(sub) + '</small>' : ''); };
+  rbtn.onclick = async () => {
+    radioOn = !radioOn; rshow();
+    if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); rcard.hidden = true; return; }
+    audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on');
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
     radioN = 0; radioQuiet = 0; radioSeen = seen || (NX().now() - 1800);
-    say.textContent = 'Радіо SKY: кожні 2 хвилини про ваш регіон, періодично про сусідів і всю Україну.';
+    rsay('Радіо SKY увімкнено: кожні 2 хвилини про ваш регіон, періодично про сусідні області й усю Україну.', 'Вимкнути: натисніть кнопку ще раз');
     await speak('Радіо SKY. Кожні дві хвилини про ваш регіон, періодично про сусідні області і всю Україну.');
     radioN = 4; await radioIssue();  // перший випуск — загальна картина країни, далі свій регіон
     radioT = setInterval(radioIssue, 120000);

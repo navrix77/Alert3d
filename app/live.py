@@ -241,7 +241,8 @@ def radio_context(state: dict, hist: list, tracker, since: float, home, obl: str
            + "\n".join(f"- {k}: {v}" for k, v in types.most_common(6)) +
            f"\nНайбільше цілей: " + ", ".join(f"{o} ({n})" for o, n in by_obl.most_common(4)) +
            (f"\nПовідомлень про балістику/МіГ-31К за 30 хв: {len(bal)}" if bal else ""))
-    fb = (f"По Україні тривога в {len(alerts)} областях. " + (f"У повітрі приблизно {sum(types.values())} цілей, найбільше: " +
+    n = len(alerts)
+    fb = ((f"По Україні тривога в {n} " + ("області" if n % 10 == 1 and n % 100 != 11 else "областях") + ". " if n else "Офіційних тривог в областях зараз немає. ") + (f"У повітрі приблизно {sum(types.values())} цілей, найбільше: " +
           ", ".join(o for o, _n in by_obl.most_common(3)) + "." if types else "Цілей у повітрі не фіксують."))
     return ctx, fb
 

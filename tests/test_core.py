@@ -1532,3 +1532,19 @@ def test_ukrainealarm_failover_parse():
     assert "Чугуївський" in a.raion_levels
     assert any(p[2] == "м. Харків" for p in a.points)
     assert a.source.startswith("ukrainealarm")
+
+
+def test_llm_breaker_and_tts_wav():
+    import httpx
+    from app.llm import LLM
+    from app import tts
+    l = LLM()
+    req = httpx.Request("POST", "https://x")
+    e = httpx.HTTPStatusError("x", request=req, response=httpx.Response(402, request=req, text="Payment Required"))
+    l._fail("openrouter", e)
+    assert not l._live("openrouter") and "402" in l.err_by["openrouter"]
+    e2 = httpx.HTTPStatusError("x", request=req, response=httpx.Response(429, request=req, text="slow down"))
+    l._fail("groq", e2)
+    assert not l._live("groq") and l.off["groq"] - __import__("time").time() < 400
+    w = tts._wav(b"\x00\x00" * 100, 24000)
+    assert w[:4] == b"RIFF" and len(w) == 244

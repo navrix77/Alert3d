@@ -76,7 +76,7 @@ PROVIDERS = [
     ("groq", ("GROQ_API_KEY", "groq", "GROQ", "GROK", "grok"), "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
     ("xai", ("XAI_API_KEY", "GROK", "grok", "GROQ", "groq"), "https://api.x.ai/v1", "grok-3-mini"),
     ("openai", ("OPENAI_API_KEY",), "https://api.openai.com/v1", "gpt-4o-mini"),
-    ("gemini", ("GEMINI_API_KEY",), "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.0-flash"),
+    ("gemini", ("GEMINI_API_KEY",), "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash"),
     ("mistral", ("MISTRAL_API_KEY",), "https://api.mistral.ai/v1", "mistral-small-latest"),
     ("sambanova", ("SAMBANOVA_API_KEY",), "https://api.sambanova.ai/v1", "Meta-Llama-3.3-70B-Instruct"),
     ("moonshot", ("MOONSHOT_API_KEY",), "https://api.moonshot.ai/v1", "moonshot-v1-8k"),
@@ -118,6 +118,9 @@ class LLM:
         # вимкнути без зміни коду: LLM_ASSIST=0 (тоді лише журнал)
         self.assist = self.mode != "off" and (self.mode == "assist" or os.getenv("LLM_ASSIST", "1").strip() != "0")
         self.used_p: dict[str, int] = {}
+        self.err_by: dict[str, str] = {}   # остання помилка кожного провайдера (без ключів)
+        self.ok_by: dict[str, int] = {}    # скільки вдалих відповідей сьогодні
+        self.off: dict[str, float] = {}    # провайдер → до якого часу не питати (немає кредитів, неправильний ключ/модель, ліміт)
         self._secrets = [self.key] + [o[1] for o in self.others]
         self.cli = None
         self.on_ai = None      # assist: як додати ціль, розпізнану моделлю (задає main)
@@ -137,7 +140,34 @@ class LLM:
         return {"enabled": self.on, "mode": self.mode if self.on else "off", "assist": self.assist and self.on, "model": self.model if self.key else None,
                 "ensemble": self.ensemble, "models": [o[0] + ":" + o[3] for o in self._chain()] if self.on else [],
                 "today": self.used, "today_by": self.used_p,
-                "daily_max": self.daily_max, "errors": self.errors, "last_error": self.last_error[:160]}
+                "daily_max": self.daily_max, "errors": self.errors, "last_error": self.last_error[:160],
+                "providers": {o[0]: {"ok": self.ok_by.get(o[0], 0), "error": self.err_by.get(o[0], "")[:200],
+                                     "paused_min": max(0, round((self.off.get(o[0], 0) - time.time()) / 60))} for o in self._chain()}}
+
+    def _fail(self, prov: str, e: Exception) -> None:
+        """Облік помилки й «запобіжник»: без кредитів / з неправильним ключем чи моделлю провайдер не смикаємо щоразу."""
+        import httpx as _h
+        self.errors += 1
+        msg = f"{type(e).__name__}: {e}"
+        if isinstance(e, _h.HTTPStatusError):
+            st, body = e.response.status_code, (e.response.text or "")[:300]
+            msg = f"HTTP {st}: {body}"
+            low = body.lower()
+            if st in (401, 402, 403) or (st == 429 and any(w in low for w in ("credit", "quota", "billing", "balance", "exceeded your"))):
+                self.off[prov] = time.time() + 6 * 3600
+            elif st in (400, 404) and "model" in low:
+                self.off[prov] = time.time() + 6 * 3600
+            elif st == 429:
+                self.off[prov] = time.time() + 300
+        self.err_by[prov] = self._clean(msg)
+        self.last_error = self._clean(f"{prov}: {msg}")
+
+    def _live(self, prov: str) -> bool:
+        return self.off.get(prov, 0) <= time.time()
+
+    def _ok(self, prov: str) -> None:
+        self.ok_by[prov] = self.ok_by.get(prov, 0) + 1
+        self.err_by.pop(prov, None)
 
     # ---------- чи варто питати модель
     @staticmethod
@@ -252,13 +282,16 @@ class LLM:
             return None, None
         for prov in self._chain():
             tag = prov[0] + ":" + prov[3]
-            if tag == skip or (vision and prov[0] not in VISION):
+            if tag == skip or (vision and prov[0] not in VISION) or not self._live(prov[0]):
                 continue
             try:
-                return await self._one(self.cli, prov, system, user, tool, image, max_tokens), tag
+                res = await self._one(self.cli, prov, system, user, tool, image, max_tokens)
             except Exception as e:  # noqa: BLE001
-                self.errors += 1
-                self.last_error = self._clean(f"{prov[0]}: {type(e).__name__}: {e}")
+                self._fail(prov[0], e)
+                continue
+            if res:
+                self._ok(prov[0])
+                return res, tag
         return None, None
 
     async def vote(self, system: str, user: str, tool: dict, image: str | None = None, max_tokens: int = 600) -> dict:
@@ -266,17 +299,18 @@ class LLM:
         провайдерам з ключами (для картинок — тим, що бачать зображення). Повертає {хто: відповідь}."""
         if self.cli is None:
             return {}
-        chain = [p_ for p_ in self._chain() if not image or p_[0] in VISION]
+        chain = [p_ for p_ in self._chain() if (not image or p_[0] in VISION) and self._live(p_[0])]
         if not self.ensemble:
             chain = chain[:1]
         async def one(prov):
             if not self._budget_p(prov[0]):
                 return None
             try:
-                return prov[0] + ":" + prov[3], await self._one(self.cli, prov, system, user, tool, image, max_tokens)
+                out = prov[0] + ":" + prov[3], await self._one(self.cli, prov, system, user, tool, image, max_tokens)
+                self._ok(prov[0])
+                return out
             except Exception as e:  # noqa: BLE001
-                self.errors += 1
-                self.last_error = self._clean(f"{prov[0]}: {type(e).__name__}: {e}")
+                self._fail(prov[0], e)
                 return None
         res = await asyncio.gather(*(one(p_) for p_ in chain))
         return {k: v for k, v in (r for r in res if r) if v}

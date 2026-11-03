@@ -133,8 +133,13 @@ class AI:
                (f"\nПовідомлень про балістику/МіГ-31К за 30 хв: {len(bal)}" if bal else "") +
                (f"\nЗон загрози КАБ: {len(kab)}" if kab else ""))
         txt, by = await self.llm.call(EXPLAIN_SYSTEM, ctx, None, max_tokens=350)
-        out = {"ok": bool(txt), "text": (txt or "Не вдалося отримати пояснення.").strip(), "by": by, "t": int(time.time()),
-               "n": len(tr), "note": "Оцінка ШІ за даними SKY; не замінює офіційних повідомлень"}
+        if not txt:  # усі моделі недоступні — чесне зведення з даних SKY, без вигадок
+            txt = (f"Офіційна тривога в області: {'є' if alert else 'немає'}. "
+                   + (f"За повідомленнями каналів цілей в області: {len(tr)}. " + "; ".join(lines[:5]) + "." if tr else "Цілей в області за повідомленнями каналів зараз немає.")
+                   + (f" Повідомлень про балістику за 30 хв: {len(bal)}." if bal else "") + (f" Зон загрози КАБ: {len(kab)}." if kab else ""))
+            by = "rules"
+        out = {"ok": True, "text": txt.strip(), "by": by, "t": int(time.time()), "n": len(tr),
+               "note": ("Оцінка ШІ за даними SKY" if by != "rules" else "Зведення з даних SKY (ШІ зараз недоступний)") + "; не замінює офіційних повідомлень"}
         self.cache[obl] = (time.time(), out)
         return out
 

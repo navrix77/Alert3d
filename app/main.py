@@ -573,6 +573,33 @@ async def api_llm() -> dict:
     return LLMX.stats()
 
 
+_llm_check: dict = {}
+
+
+@app.get("/api/llm/check")
+async def api_llm_check() -> dict:
+    """Пробний мінімальний запит до кожної моделі: хто живий, у кого немає кредитів, неправильний ключ чи модель. Не частіше разу на 2 хв."""
+    if _llm_check.get("t", 0) > time.time() - 120:
+        return _llm_check
+    import httpx as _h
+    out = {}
+    async with _h.AsyncClient() as cli:
+        async def one(prov):
+            t0 = time.time()
+            try:
+                r = await LLMX._one(cli, prov, "Відповідай одним словом.", "Скажи: так", None, None, 5)
+                LLMX.off.pop(prov[0], None)
+                LLMX._ok(prov[0])
+                out[prov[0]] = {"ok": True, "model": prov[3], "ms": int((time.time() - t0) * 1000), "reply": str(r)[:20]}
+            except Exception as e:  # noqa: BLE001
+                LLMX._fail(prov[0], e)
+                out[prov[0]] = {"ok": False, "model": prov[3], "error": LLMX.err_by.get(prov[0], "")[:200]}
+        await asyncio.gather(*(one(p_) for p_ in LLMX._chain()))
+    _llm_check.clear()
+    _llm_check.update({"t": int(time.time()), "providers": out})
+    return _llm_check
+
+
 @app.get("/api/visits")
 def api_visits(days: int = 30):
     st = VISITS.stats(max(1, min(days, 365)))
