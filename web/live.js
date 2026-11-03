@@ -255,7 +255,7 @@
   }
   const rbtn = document.createElement('button'); rbtn.id = 'radio-btn'; rbtn.title = 'Радіо SKY: голосові зведення кожні 2 хв про ваш регіон, періодично про сусідів і всю Україну';
   // лише кнопка-значок без тексту на мапі (власник 03.11: «текст не потрібен»)
-  const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.textContent = '📻'; rbtn.setAttribute('aria-label', radioOn ? 'Радіо в ефірі, вимкнути' : 'Увімкнути радіо'); };
+  const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.innerHTML = '<span class=ri>📻</span><span class=rl>Sky Radio</span>'; rbtn.setAttribute('aria-label', radioOn ? 'Sky Radio в ефірі, вимкнути' : 'Увімкнути Sky Radio'); };
   rshow(); document.body.appendChild(rbtn);
   // під рядком лічильників цілей (він може перенестись у два рядки), щоб нічого не перекривати
   // варіант А (власник 03.11): Ефір і Радіо в одному ряду з «Що зараз?» у картці «Мій дім»; без картки — зліва вгорі
@@ -266,6 +266,11 @@
       const y = b && b.height ? Math.round(b.bottom + 8) : 60; rbtn.style.top = y + 'px'; btn.style.top = (y + 48) + 'px'; };
     addEventListener('resize', place); setInterval(place, 3000); place();
   }
+  // Ефір: сірий і без світла, поки не активний; відкрито — червона точка світиться (власник 04.11)
+  const syncOn = () => btn.classList.toggle('on', !box.hidden);
+  try { new MutationObserver(syncOn).observe(box, { attributes: true, attributeFilter: ['hidden'] }); } catch (e) {}
+  syncOn();
+
   const rsay = () => {};
   rbtn.onclick = async () => {
     radioOn = !radioOn; rshow();
