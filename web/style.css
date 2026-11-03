@@ -525,7 +525,6 @@ a.pill{display:inline-block;text-decoration:none}
 .sh-why{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}.sh-why .pill{font-size:12.5px;padding:7px 10px}
 
 .me-off{display:flex;align-items:center;gap:6px;font-size:13px;opacity:.9;margin:0 0 2px}
-.me-src{font-size:12px;opacity:.65;margin:2px 0 0;font-variant-numeric:tabular-nums}
 .me-off i{width:8px;height:8px;border-radius:50%;background:#3ddc84;flex:none}
 .me-off.on i{background:#ff4d4d;box-shadow:0 0 8px #ff4d4d}.me-off.part i{background:#ffb020}
 body.replay #me,body.replay #banner{display:none!important}
