@@ -231,6 +231,11 @@ class Push:
     async def _web_send(self, msgs: list[dict]) -> None:
         for m in msgs:
             payload = {"title": m["title"], "body": m["body"], "tag": (m.get("data") or {}).get("track") or "navryx", "url": "/"}
+            # картинка для Android/Windows (iPhone її не показує): ціль на тлі кольору рівня
+            lv = {"🔴": "red", "🟠": "orange", "🟡": "yellow", "🟢": "green"}.get(m["title"][:1])
+            ty = (m.get("data") or {}).get("type")
+            if lv and ty in NAME:
+                payload["image"] = f"/notif/{lv}-{ty}.jpg"
             sub = _json.loads(m["sub"])
             code = await (self.web_sender(sub, payload) if self.web_sender else asyncio.to_thread(self._web_send_sync, sub, payload))
             self.sent += 1
@@ -357,7 +362,7 @@ class Push:
             msg = self._compose(new_thr, [] if token in no_pre else new_pre)
             if msg:
                 out.append({"to": token, "title": msg[0], "body": msg[1], "sound": "default", "priority": "high",
-                            "channelId": "threats", "data": {"track": msg[2]}})
+                            "channelId": "threats", "data": {"track": msg[2], "type": (tracks.get(msg[2]) or {}).get("type")}})
             # обрані області й громади: нові цілі в зоні (або що увійдуть за ≤15 хв), одним зведенням не частіше разу на 5 хв
             zones = zmap.get(token)
             if zones and not msg:
@@ -379,7 +384,7 @@ class Push:
                 if cand and now - self.zlast.get(token, 0) >= ZONE_GAP:
                     zm = self._compose_zone(cand)
                     out.append({"to": token, "title": zm[0], "body": zm[1], "sound": "default", "priority": "high",
-                                "channelId": "zones", "data": {"track": zm[2]}})
+                                "channelId": "zones", "data": {"track": zm[2], "type": (tracks.get(zm[2]) or {}).get("type")}})
                     self.zlast[token] = now
                     for tr, _z, _e in cand:
                         self.zseen[(token, tr["id"])] = now

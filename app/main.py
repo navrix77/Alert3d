@@ -571,7 +571,7 @@ async def webpush_test(body: dict):
     await pushsvc._web_send([{"to": ep, "sub": row[0], "title": "🟠 Тест · так виглядатиме загроза",
                               "body": "12 км на захід від вас · останнє місце: Люботин\nКурс → Пересічне · на північний схід\n"
                                       "2 незалежні джерела · місце о " + time.strftime("%H:%M") + "\nЦе перевірка: сповіщення доходять.",
-                              "data": {"track": "test"}}])
+                              "data": {"track": "test", "type": "shahed"}}])
     return {"ok": True}
 
 

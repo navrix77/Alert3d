@@ -574,3 +574,15 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
   background:rgba(12,17,28,.97);border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55);color:#E8ECF4;display:flex;flex-direction:column;gap:6px}
 .push-card b{font-size:16px}.push-card span{font-size:14px;line-height:1.4;color:#C9D2E3}.push-card div{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
 .push-card .primary{background:#2B6BFF;color:#fff;border-color:#2B6BFF}
+/* сповіщення в застосунку: скло, кольорове світіння рівня, силует цілі, деталі чіпами */
+.note-c{background:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,.02)),rgba(10,14,22,.92)!important;border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 14px 40px rgba(0,0,0,.5),0 0 0 1px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:12px 40px 12px 14px!important;animation:noteIn .45s cubic-bezier(.2,1.2,.3,1) both}
+.note-c::after{content:"";position:absolute;inset:0;border-radius:16px;pointer-events:none;background:radial-gradient(120% 140% at 0% 0%,color-mix(in srgb,var(--nc) 22%,transparent),transparent 55%)}
+.note-c .ni{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none;margin-left:6px;
+  background:color-mix(in srgb,var(--nc) 18%,rgba(255,255,255,.04));box-shadow:0 0 0 1px color-mix(in srgb,var(--nc) 45%,transparent),0 0 18px color-mix(in srgb,var(--nc) 35%,transparent)}
+.note-c .nb{min-width:0;flex:1}
+.note-c .nb b{font-size:15px;font-weight:800;letter-spacing:-.01em;padding-right:34px}
+.note-c .nch{display:flex;flex-wrap:wrap;gap:4px 5px;margin-top:6px}
+.note-c .nch span{font-size:12px;line-height:1.2;padding:3px 7px;border-radius:8px;background:rgba(255,255,255,.07);color:#C9D2E3;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.note-c .nch span.lead{background:color-mix(in srgb,var(--nc) 22%,transparent);color:#fff}
+@keyframes noteIn{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}

@@ -18,7 +18,7 @@ let SNAP=null,recvAt=0,offset=0,sel=null,follow=false,home=null,setHomeMode=fals
 function applySaver(){const on=window.NXPERF&&NXPERF.saver;['hillshade','bld3d'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility',on?'none':'visible');});const c=$('#st-saver');if(c){c.checked=!!(window.NXPERF&&localStorage.getItem('saver')==='1');c.onchange=e=>NXPERF.setSaver(e.target.checked);}}
 document.addEventListener('nxsaver',()=>{try{applySaver();}catch(e){}});
 function syncReal3d(){applySaver();const r=$('#st-real3d-row');if(r)r.hidden=!(CFG&&CFG.gtilesKey);const c=$('#st-real3d');if(c){c.checked=!!(window.Real3D&&Real3D.active());c.onchange=async e=>{if(e.target.checked){const ok=await Real3D.on();if(!ok){e.target.checked=false;toast('3D-моделі зараз недоступні');}}else Real3D.off();};}}
-window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m),open:id=>openSheet(id)};
+window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m),open:id=>openSheet(id),note:n=>note(n)};
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
 const PREFL=()=>{try{return Object.assign({launch:true},JSON.parse(localStorage.getItem('pref')||'{}'));}catch(e){return {launch:true};}};
@@ -1033,7 +1033,11 @@ function note(n){
   const box=$('#notes');if(!box)return;
   const el=document.createElement('div');el.className='note-c';el.style.setProperty('--nc',NOTE_CLR[n.lvl]||NOTE_CLR.orange);
   const tm=new Date((n.t||Date.now()/1000)*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
-  el.innerHTML='<span class="ni">'+(n.ic||'🔔')+'</span><div><b>'+esc(String(n.title).replace(/^(🔴|🟠|🟡|🟢)\s*/u,''))+'</b>'+(n.sub?'<small>'+esc(n.sub)+'</small>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
+  // картка: силует цілі в кольоровому колі рівня, заголовок, деталі «чіпами» (місце · напрямок · джерела)
+  const parts=String(n.sub||'').split(' · ').filter(Boolean);
+  el.innerHTML='<span class="ni'+(n.type?' ni-t':'')+'">'+(n.type?'':(n.ic||'🔔'))+'</span><div class="nb"><b>'+esc(String(n.title).replace(/^(🔴|🟠|🟡|🟢)\s*/u,''))+'</b>'+
+    (parts.length?'<div class="nch">'+parts.map((x,i)=>'<span'+(i===0?' class="lead"':'')+'>'+esc(x)+'</span>').join('')+'</div>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
+  if(n.type){const im=new Image();im.alt='';im.width=im.height=32;im.style.objectFit='contain';im.onerror=()=>{try{im.replaceWith(drawTarget(n.type,22));}catch(e){}};im.src='sprites/t-'+n.type+'.png?v=ref2';el.querySelector('.ni').appendChild(im);}
   const close=()=>{el.classList.add('out');setTimeout(()=>{el.remove();notesAll();},300);};
   el.querySelector('.nx').onclick=e=>{e.stopPropagation();close();};
   el.onclick=()=>{if(n.go)n.go();};
@@ -1089,7 +1093,7 @@ function notesCheck(s){
     let z=null;const p0=(DISP.get(t.id)||{p:[t.lon,t.lat]}).p;z=zoneOf(p0);let eta=0;
     if(!z){for(let m=5;m<=30;m+=5){const q=posAt(t,serverT+m*60).p;z=zoneOf(q);if(z){eta=m;break;}}}
     if(!z&&!(PREF.nAll&&fast))continue;   // не моя зона, мовчимо
-    note({k,lvl:z?'red':(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
+    note({k,type:t.type,lvl:z?(eta?'orange':'red'):(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
       title:(z?(eta?'🟠 ':'🔴 '):'')+(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(z?(eta?' · ~'+eta+' хв до «'+z+'»':' · у межах «'+z+'»'):'')+(t.next?' → '+t.next:''),
       sub:[t.at?'останнє місце: '+t.at[0]+' о '+fmt(t.at[1]):(t.nopos?'місце невідоме, канали назвали курс':''),
            t.hd!=null?(t.next?'':'ймовірно ')+SIDE[Math.round(t.hd/45)%8]:'',
