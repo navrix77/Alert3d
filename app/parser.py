@@ -773,7 +773,7 @@ class Parser:
             # тезки «місто ≥20 тис. vs село»: без прямої вказівки (район/громада) — це місто.
             # «на Лозову» = місто Лозова, а не село Лозова на Куп'янщині
             # без області в тексті й каналі (bbox немає) — теж: «Суми, Терни, Гадяч, …» (monikppy) — місто Гадяч, а не однойменне село
-            big = [i for i in cand if P[i].pop >= 20000 and (not bbox or bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3])]
+            big = [i for i in cand if P[i].pop >= 20000 and ((not bbox and getattr(self, "_typ", None) not in FRONTLINE) or bbox and bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3])]
             if big and len(big) < len(cand) and all(P[i].pop < 5000 for i in cand if i not in big):
                 cand = big
 
