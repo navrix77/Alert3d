@@ -323,6 +323,7 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
         ck = hashlib.sha1(ctx.encode()).hexdigest()
         hit = RADIO_CACHE.get(ck)
         if hit and time.time() - hit[0] < 120:
+            llm.count("saved:radio") if hasattr(llm, "count") else None
             res, by = hit[1], hit[2]  # той самий стан і та сама пам'ять — відповідь для іншого слухача без нового запиту
         else:
             res, by = await llm.call(RADIO_SYSTEM, ctx, RADIO_TOOL, max_tokens=500)

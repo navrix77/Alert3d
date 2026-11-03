@@ -72,6 +72,7 @@ TOOL = {
 }
 
 # Відносна ціна запиту: 0 — безкоштовний ліміт, далі дорожчі. Змінюється LLM_COST_<NAME>.
+USAGE = Path(__file__).resolve().parent.parent / "data" / "llm_usage.json"
 COST = {"groq": 0, "mistral": 0, "sambanova": 0, "gemini": 1, "openrouter": 2, "openai": 2, "moonshot": 2, "xai": 2, "anthropic": 3}
 COST.update({k: int(os.getenv(f"LLM_COST_{k.upper()}", v)) for k, v in COST.items()})
 
@@ -125,6 +126,8 @@ class LLM:
         self.used_p: dict[str, int] = {}
         self.err_by: dict[str, str] = {}   # остання помилка кожного провайдера (без ключів)
         self.ok_by: dict[str, int] = {}
+        self._usage: dict | None = None
+        self._usage_t = 0.0
         self._vcache: dict = {}            # хеш запиту → (час, голоси): ретрансляції того самого тексту    # скільки вдалих відповідей сьогодні
         self.off: dict[str, float] = {}    # провайдер → до якого часу не питати (немає кредитів, неправильний ключ/модель, ліміт)
         self._secrets = [self.key] + [o[1] for o in self.others]
@@ -151,6 +154,7 @@ class LLM:
                                      "paused_min": max(0, round((self.off.get(o[0], 0) - time.time()) / 60))} for o in self._chain()}}
 
     def _fail(self, prov: str, e: Exception) -> None:
+        self.count("err:" + prov)
         """Облік помилки й «запобіжник»: без кредитів / з неправильним ключем чи моделлю провайдер не смикаємо щоразу."""
         import httpx as _h
         self.errors += 1
@@ -171,7 +175,32 @@ class LLM:
     def _live(self, prov: str) -> bool:
         return self.off.get(prov, 0) <= time.time()
 
+    def count(self, key: str, n: int = 1) -> None:
+        """Облік на диску по днях (Київ), щоб перезапуски сервера не обнуляли: виклики кожної моделі, кеш, зекономлені запити."""
+        from zoneinfo import ZoneInfo
+        import datetime as _dt
+        d = _dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d")
+        u = self._usage
+        if u is None:
+            try:
+                u = json.loads(USAGE.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                u = {}
+            self._usage = u
+        day = u.setdefault(d, {})
+        day[key] = day.get(key, 0) + n
+        if time.time() - self._usage_t > 30:
+            self._usage_t = time.time()
+            for k in sorted(u)[:-14]:
+                u.pop(k, None)
+            try:
+                USAGE.parent.mkdir(parents=True, exist_ok=True)
+                USAGE.write_text(json.dumps(u, ensure_ascii=False), encoding="utf-8")
+            except OSError:
+                pass
+
     def _ok(self, prov: str) -> None:
+        self.count("ok:" + prov)
         self.ok_by[prov] = self.ok_by.get(prov, 0) + 1
         self.err_by.pop(prov, None)
 
@@ -322,6 +351,7 @@ class LLM:
         ck = hashlib.sha1((system[:60] + "|" + user + "|" + (image or "")).encode()).hexdigest()
         hit = self._vcache.get(ck)
         if hit and time.time() - hit[0] < 1800:
+            self.count("saved:cache")
             return hit[1]  # те саме повідомлення з іншого каналу-ретранслятора — не платимо вдруге
         async def one(prov):
             if not self._budget_p(prov[0]):
@@ -337,6 +367,8 @@ class LLM:
         first = await asyncio.gather(*(one(p_) for p_ in chain[:2]))
         out = {k: v for k, v in (r for r in first if r) if v}
         vals = list(out.values())
+        if len(chain) > 2 and len(vals) == 2 and _agree(vals[0], vals[1]):
+            self.count("saved:agree", len(chain) - 2)  # стільки дорожчих моделей не питали
         if len(chain) > 2 and not (len(vals) == 2 and _agree(vals[0], vals[1])):
             more = await asyncio.gather(*(one(p_) for p_ in chain[2:]))
             out |= {k: v for k, v in (r for r in more if r) if v}

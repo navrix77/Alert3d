@@ -573,6 +573,25 @@ async def api_llm() -> dict:
     return LLMX.stats()
 
 
+@app.get("/api/llm/usage")
+async def api_llm_usage() -> dict:
+    """Скільки запитів пішло на безкоштовні й платні моделі по днях, скільки зекономлено кешем і згодою дешевих моделей."""
+    from .llm import COST, USAGE
+    u = LLMX._usage
+    if u is None:
+        try:
+            u = json.loads(USAGE.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            u = {}
+    out = {}
+    for d, row in sorted(u.items()):
+        free = sum(v for k, v in row.items() if k.startswith("ok:") and COST.get(k[3:], 2) == 0)
+        paid = sum(v for k, v in row.items() if k.startswith("ok:") and COST.get(k[3:], 2) > 0)
+        out[d] = {"free_ok": free, "paid_ok": paid, "saved_cache": row.get("saved:cache", 0), "saved_agree": row.get("saved:agree", 0),
+                  "saved_radio": row.get("saved:radio", 0), "raw": row}
+    return {"cost": COST, "days": out}
+
+
 _llm_check: dict = {}
 
 
@@ -627,6 +646,9 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
     from fastapi import Response
     from . import tts
     data, why = await tts.speak(text, voice, rate)
+    LLMX.count("tts:" + (why or "none").split(":")[0])
+    if data and why in ("openai", "gemini"):
+        LLMX.count("tts_chars:" + why, len(text))
     if not data:
         return JSONResponse({"ok": False, "why": why, **tts.status()}, status_code=503)
     mt = "audio/mpeg" if why.startswith(("google", "openai")) else "audio/wav"
