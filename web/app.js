@@ -1035,6 +1035,9 @@ async function pushEnable(){
       if(sub)fetch('/api/webpush/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});}catch(e){}
     toast('Готово. Зараз прийде тестове сповіщення');};}
 setTimeout(pushCard,6000);
+// облік встановлень: запуск з іконки (встановлений застосунок) і подія встановлення; без cookies, сервер не зберігає IP
+try{if(matchMedia('(display-mode: standalone)').matches||navigator.standalone)fetch('/api/visits/app?k=app',{method:'POST'}).catch(()=>{});
+  addEventListener('appinstalled',()=>fetch('/api/visits/app?k=install',{method:'POST'}).catch(()=>{}));}catch(e){}
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
 $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};

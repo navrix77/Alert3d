@@ -10,7 +10,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -465,7 +465,21 @@ async def count_visits(request, call_next):
 def api_visits(days: int = 30):
     st = VISITS.stats(max(1, min(days, 365)))
     st["online"] = len(clients)
+    try:  # пристрої з увімкненими сповіщеннями: найточніша оцінка «встановили й користуються» (на iPhone push можливий лише зі встановленого)
+        st["push_devices"] = pushsvc.db.execute("SELECT COUNT(*) FROM websubs").fetchone()[0] + pushsvc.db.execute("SELECT COUNT(*) FROM subs").fetchone()[0]
+    except Exception:  # noqa: BLE001
+        st["push_devices"] = None
     return JSONResponse(st)
+
+
+@app.post("/api/visits/app")
+def api_visits_app(request: Request, k: str = "app"):
+    """Запуск із встановленого застосунку або подія встановлення (без cookies і IP, див. app/visits.py)."""
+    try:
+        VISITS.app_hit(_client_ip(request.client, request.headers), request.headers.get("user-agent"), k)
+    except Exception:  # noqa: BLE001
+        pass
+    return JSONResponse({"ok": True})
 
 
 @app.get("/api/tts")

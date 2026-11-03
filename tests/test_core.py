@@ -1198,3 +1198,11 @@ def test_aftermath_is_not_target():
         assert o.no_target and o.type is None, t
     assert P.parse("Шахед на Харків, після удару ще один курсом на Чугуїв", "M").type == "shahed"
     assert P.parse("Ракета на Харків!", "M").type == "cruise"
+
+
+def test_app_installs_counted(tmp_path):
+    from app.visits import Visits
+    v = Visits(tmp_path / "v.sqlite")
+    v.app_hit("1.1.1.1", "Mozilla", "app"); v.app_hit("1.1.1.1", "Mozilla", "app"); v.app_hit("2.2.2.2", "Mozilla", "install")
+    d = v.stats(1)["days"][-1]
+    assert d["app_users"] == 1 and d["installs"] == 1 and d["visitors"] == 0

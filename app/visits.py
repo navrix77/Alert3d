@@ -37,7 +37,25 @@ class Visits:
             CREATE TABLE IF NOT EXISTS seen(d TEXT, h TEXT, PRIMARY KEY(d, h));
             CREATE TABLE IF NOT EXISTS salt(d TEXT PRIMARY KEY, s TEXT);
         """)
+        for col in ("app_uniq", "installs"):  # запуски встановленого застосунку (з іконки) і нові встановлення
+            try:
+                self.db.execute(f"ALTER TABLE day ADD COLUMN {col} INT DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
         self.db.commit()
+
+    def app_hit(self, ip: str | None, ua: str | None, kind: str, ts: float | None = None) -> None:
+        """kind='app': запуск з іконки на екрані (унікальний пристрій за добу); 'install': браузер повідомив про встановлення."""
+        if not ip or kind not in ("app", "install") or any(b in (ua or "").lower() for b in BOTS):
+            return
+        d = _day(ts)
+        with self.lock:
+            h = "a" + hashlib.sha256((self._salt(d) + kind + "|" + ip + "|" + (ua or "")).encode()).hexdigest()[:19]
+            self.db.execute("INSERT OR IGNORE INTO day(d) VALUES(?)", (d,))
+            new = self.db.execute("INSERT OR IGNORE INTO seen VALUES(?,?)", (d, h)).rowcount
+            if new:
+                self.db.execute(f"UPDATE day SET {'app_uniq' if kind == 'app' else 'installs'}={'app_uniq' if kind == 'app' else 'installs'}+1 WHERE d=?", (d,))
+            self.db.commit()
 
     def _salt(self, d: str) -> str:
         r = self.db.execute("SELECT s FROM salt WHERE d=?", (d,)).fetchone()
@@ -70,8 +88,9 @@ class Visits:
 
     def stats(self, days: int = 30) -> dict:
         with self.lock:
-            rows = self.db.execute("SELECT d, uniq, views, ws, peak_online FROM day ORDER BY d DESC LIMIT ?", (days,)).fetchall()
+            rows = self.db.execute("SELECT d, uniq, views, ws, peak_online, COALESCE(app_uniq,0), COALESCE(installs,0) FROM day ORDER BY d DESC LIMIT ?", (days,)).fetchall()
         rows = rows[::-1]
-        return {"days": [{"day": d, "visitors": u, "views": v, "map_sessions": w, "peak_online": p} for d, u, v, w, p in rows],
+        return {"days": [{"day": d, "visitors": u, "views": v, "map_sessions": w, "peak_online": p, "app_users": a, "installs": i} for d, u, v, w, p, a, i in rows],
+                "total_installs": sum(r[6] for r in rows),
                 "today": rows[-1][1] if rows and rows[-1][0] == _day() else 0,
                 "total_visitor_days": sum(r[1] for r in rows), "total_views": sum(r[2] for r in rows)}
