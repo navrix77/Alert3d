@@ -1050,6 +1050,9 @@ function note(n){
   if(PREF.sys&&document.hidden&&'Notification' in window&&Notification.permission==='granted'){
     try{const sn=new Notification(n.title,{body:n.sub||'',tag:n.k,icon:'brand/icon-192.png',renotify:false});sn.onclick=()=>{window.focus();n.go&&n.go();sn.close();};}catch(e){}}
 }
+// картки сповіщень завжди нижче верхньої панелі з лічильниками (вона може переноситися у два рядки)
+function notesPos(){const tp=document.querySelector('header.top'),nb=$('#notes');if(!tp||!nb)return;const b=tp.getBoundingClientRect().bottom;if(b>0)nb.style.top=(b+8)+'px';}
+addEventListener('resize',notesPos);setInterval(notesPos,2000);
 function notesAll(){const box=$('#notes');let a=box.querySelector('.all');const n=box.querySelectorAll('.note-c').length;
   if(n>=2&&!a){a=document.createElement('button');a.className='all';a.textContent='Закрити всі';a.onclick=()=>{box.innerHTML='';};box.prepend(a);}
   if(n<2&&a)a.remove();}
@@ -1094,11 +1097,11 @@ function notesCheck(s){
     let z=null;const p0=(DISP.get(t.id)||{p:[t.lon,t.lat]}).p;z=zoneOf(p0);let eta=0;
     if(!z){for(let m=5;m<=30;m+=5){const q=posAt(t,serverT+m*60).p;z=zoneOf(q);if(z){eta=m;break;}}}
     if(!z&&!(PREF.nAll&&fast))continue;   // не моя зона, мовчимо
+    if(window.__wpOK){NSEEN.add(k);continue;}// push увімкнено: про цілі попереджає телефон (екран блокування), у застосунку не дублюємо
     note({k,type:t.type,lvl:z?(eta?'orange':'red'):(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
       title:(z?(eta?'🟠 ':'🔴 '):'')+(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(z?(eta?' · ~'+eta+' хв до «'+z+'»':' · у межах «'+z+'»'):'')+(t.next?' → '+t.next:''),
-      sub:[t.at?'останнє місце: '+t.at[0]+' о '+fmt(t.at[1]):(t.nopos?'місце невідоме, канали назвали курс':''),
+      sub:[t.at?'останнє місце: '+t.at[0]+' о '+fmt(t.at[1]):'',
            t.hd!=null?(t.next?'':'ймовірно ')+SIDE[Math.round(t.hd/45)%8]:'',
-           ((t.ev&&t.ev.prim)||[]).length>1?((t.ev.prim.length)+' незалежні джерела'):'одне джерело',
            !z&&t.launch&&t.launch.site&&!t.launch.est?'запуск: '+t.launch.site:''].filter(Boolean).join(' · '),go:()=>openSheet(t.id)});}
   // 3) тривога / відбій у моїх областях і громадах
   const Z=myZones();

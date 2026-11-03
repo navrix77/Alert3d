@@ -586,3 +586,6 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .note-c .nch span{font-size:12px;line-height:1.2;padding:3px 7px;border-radius:8px;background:rgba(255,255,255,.07);color:#C9D2E3;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .note-c .nch span.lead{background:color-mix(in srgb,var(--nc) 22%,transparent);color:#fff}
 @keyframes noteIn{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
+
+/* «Закрити всі» під картками, щоб не перекривати лічильники цілей */
+.notes .all{order:99;align-self:flex-end}

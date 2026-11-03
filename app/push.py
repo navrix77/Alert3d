@@ -112,7 +112,7 @@ def _rel(a: dict) -> str:
 
 def _where(tr: dict, a: dict) -> str:
     if a.get("d") is None:
-        return "Місце невідоме: канали назвали лише курс" + (f" на {tr['next']}" if tr.get("next") else "")
+        return ""  # без службових пояснень: лише те, що допомагає вирішити
     at = tr.get("at")
     return _rel(a) + (f" · останнє місце: {at[0]}" if at else "")
 
@@ -124,7 +124,7 @@ def _move(tr: dict) -> str:
         parts.append(f"Курс → {tr['next']}")
     if hd is not None:
         parts.append(("ймовірно " if not tr.get("next") else "") + COMPASS[round(hd / 45) % 8])
-    return " · ".join(parts) if parts else "Курс невідомий"
+    return " · ".join(parts)
 
 VAPID_KEY = DB.parent / "vapid_private.pem"  # ключ сервера для Web Push (браузер/PWA/iPhone з початкового екрана)
 REARM = 600  # повтор по тій самій цілі — не раніше ніж за 10 хв після зникнення загрози
@@ -444,12 +444,12 @@ class Push:
         else:
             title = f"🟠 {where}: {n} {'нова ціль' if n % 10 == 1 and n % 100 != 11 else 'нові цілі' if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else 'нових цілей'}"
         at = tr.get("at")
-        lines = [(f"{nm}: " if n > 1 else "") + (f"останнє місце {at[0]}" if at else "місце за оцінкою SKY") + (f" · ~{eta} хв до «{z}»" if eta and n > 1 else ""),
-                 _move(tr), _who(tr)]
+        lines = [(f"{nm}: " if n > 1 else "") + (f"останнє місце {at[0]}" if at else "") + (f" · ~{eta} хв до «{z}»" if eta and n > 1 else ""),
+                 _move(tr)]
         if len(cand) > 1:
             lines.append("Ще: " + "; ".join(f"{NAME.get(t['type'], 'ціль')}" + (f" → {t['next']}" if t.get("next") else "") for t, _z, _e in cand[1:4])
                          + (f" і ще {len(cand) - 4}" if len(cand) > 4 else ""))
-        return title, "\n".join(lines), tr["id"]
+        return title, "\n".join(x.strip(" ·:") for x in lines if x.strip(" ·:")), tr["id"]
 
     @staticmethod
     def _compose(thr: list, pre: list) -> tuple[str, str, str] | None:
@@ -475,17 +475,16 @@ class Push:
                 title = f"{lvl} {nm} · ~{max(1, round(a['eta']))} хв до вас"
             else:
                 title = f"{lvl} {nm} · курс на ваш район"
-            lines = [_where(tr, a), _move(tr) + (f" · шанс пройти поруч {round(a['p'] * 100)}%" if a["p"] < 1 else ""), _who(tr)]
+            lines = [_where(tr, a), _move(tr) + (f" · шанс пройти поруч {round(a['p'] * 100)}%" if a["p"] < 1 else "")]
             if len(thr) > 1:
                 rest = [f"{NAME.get(t['type'], 'ціль')} " + (_rel(x).replace(" від вас", "") if x.get("d") is not None else "місце невідоме") for t, x in thr[1:3]]
                 lines.append("Ще: " + "; ".join(rest) + (f" і ще {len(thr) - 3}" if len(thr) > 3 else ""))
             lines.append("Перейдіть в укриття." if lvl == "🔴" else "Будьте поруч з укриттям.")
-            return title, "\n".join(lines), tr["id"]
+            return title, "\n".join(x.strip(" ·") for x in lines if x.strip(" ·")), tr["id"]
         if pre:
             pre.sort(key=lambda x: -x[1]["p"])
             tr, a = pre[0]
             title = f"🟡 Можлива загроза · {NAME.get(tr['type'], 'Ціль')} {round(a['d'])} км"
-            lines = [_where(tr, a), _move(tr) + f" · шанс пройти поруч ~{round(a['p'] * 100)}%", _who(tr)
-                     + (f" · ще {len(pre) - 1} поруч" if len(pre) > 1 else ""), "Це ще не тривога. Будьте поруч з укриттям."]
-            return title, "\n".join(lines), tr["id"]
+            lines = [_where(tr, a), _move(tr) + f" · шанс пройти поруч ~{round(a['p'] * 100)}%", f"Ще {len(pre) - 1} поруч" if len(pre) > 1 else "", "Це ще не тривога. Будьте поруч з укриттям."]
+            return title, "\n".join(x.strip(" ·") for x in lines if x.strip(" ·")), tr["id"]
         return None
