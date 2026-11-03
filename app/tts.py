@@ -265,7 +265,7 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
 LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
-VOICE_V = "r4"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
+VOICE_V = "r5"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
 OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
 OAI_STYLE = ("Ти ведучий сучасного українського інформаційного радіо. Говори рідною українською без акценту: чітко, енергійно, "
@@ -279,7 +279,7 @@ OAI_STYLE = ("Ти ведучий сучасного українського і
 # SKY Radio (04.11, концепція власника): один основний чоловічий голос, теплий середньо-низький баритон, радійна подача
 RADIO_STYLE = ("Озвучуй українською як сучасний професійний радіоведучий SKY Radio. Голос чоловічий, вікове враження 35–45 років, "
                "теплий середньо-низький баритон із легкою природною шорсткістю. Близьке чисте студійне звучання. Природна розмовна "
-               "інтонація, виразна дикція, спокійна впевненість, живий розмовний темп без поспіху. Звертайся до одного слухача. "
+               "інтонація, виразна дикція, спокійна впевненість, живий бадьорий темп сучасного радіо. Звертайся до одного слухача. "
                "У вступі допустима легка привітність; у повідомленнях про загрозу, наслідки і виправлення будь нейтральним і зібраним. "
                "Назви регіонів, населених пунктів, числа та слова невизначеності вимовляй особливо чітко й трохи повільніше; після "
                "назви регіону на початку коротка пауза; інших зайвих пауз немає. Завершуй речення природною низхідною інтонацією. "
@@ -296,7 +296,7 @@ async def _openai(text: str, key: str, rate: float) -> bytes | None:
     voice = (os.getenv("TTS_RADIO_VOICE") if key == "radio" else None) or os.getenv("TTS_OPENAI_VOICE") or OAI_VOICES.get(key, "nova")
     async with httpx.AsyncClient(timeout=30) as cli:
         for model in (os.getenv("TTS_OPENAI_MODEL") or "gpt-4o-mini-tts", "tts-1-hd"):
-            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.3, rate * (1.0 if key == "radio" else 1.05)))}
+            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.4, rate * (1.25 if key == "radio" else 1.05)))}
             if model.startswith("gpt-"):
                 body["instructions"] = RADIO_STYLE if key == "radio" else OAI_STYLE
             r = await cli.post("https://api.openai.com/v1/audio/speech", json=body, headers={"Authorization": f"Bearer {k}"})

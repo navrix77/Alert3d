@@ -288,7 +288,9 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
         if t.get("status") != "active" or not home:
             continue
         km = _km((t["lon"], t["lat"]), home)
-        if km > radius:
+        at_ll = t.get("at_ll")
+        named_km = round(_km(tuple(at_ll), home)) if at_ll else None
+        if km > radius and (named_km is None or named_km > radius):
             continue
         side = SIDES[int(((_brg(home, (t["lon"], t["lat"])) + 22.5) % 360) // 45)]
         appr = None
@@ -307,65 +309,162 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
         fix = t.get("fix_age")
         near.append({"id": t["id"], "type": t["type"], "word": (f"{n} " + w[1]) if n > 1 else w[0], "km": round(km), "side": side,
                      "appr": appr, "eta": eta, "next": t.get("next"), "pos": t.get("pos_lvl"), "new": (t.get("first") or 0) > since,
-                     "src": src_txt, "fix_min": round(fix / 60) if fix is not None else None, "at": (t.get("at") or [None])[0]})
+                     "src": src_txt, "fix_min": round(fix / 60) if fix is not None else None, "at": (t.get("at") or [None])[0],
+                     "named_km": named_km})
     near.sort(key=lambda x: (not x["appr"], x["km"]))
     bal = [e for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") and (obl in e.get("obl", []) or "*" in e.get("obl", []))]
     urgent = bool(bal) or any(x["appr"] and x["km"] <= 30 for x in near)
-    fp = tuple(sorted((x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "") for x in near[:6])) + (alert, bool(bal))
-    return {"alert": alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:], "urgent": urgent, "fp": fp}
+    home_raion = None
+    raion_alert = False
+    if home:
+        from .geo import raions
+        home_raion = raions().of(home[0], home[1])
+        raion_alert = bool(home_raion) and home_raion in (off.get("raion_levels") or {})
+    fp = tuple(sorted((x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "") for x in near[:6])) + (alert, raion_alert, bool(bal))
+    return {"alert": alert, "raion": home_raion, "raion_alert": raion_alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:],
+            "urgent": urgent, "fp": fp, "radius": radius}
 
 
 def region_text(f: dict, obl: str) -> tuple[str, str]:
     """(контекст для редактора, запасний текст без моделі) — про свій район."""
-    lines = [f"Область слухача: {obl or 'невідома'}. Офіційна тривога в області: {'так' if f['alert'] else 'ні'}."]
+    lines = [f"РЕЖИМ: «Поруч зі мною» (радіус {f.get('radius', 120):.0f} км від геомітки слухача; адресу не називати). "
+             f"Область: {obl or 'невідома'}. Офіційна тривога в області: {'так' if f['alert'] else 'ні'}." +
+             (f" Район геомітки: {f['raion']}, тривога в районі: {'так' if f.get('raion_alert') else 'ні'}." if f.get("raion") else "")]
     if f["bal"]:
         b = f["bal"][0]
         lines.append(f"Повідомлення про загрозу балістики для області о {time.strftime('%H:%M', time.localtime(b['t']))}.")
     if f["near"]:
-        lines.append(f"Цілей у радіусі 120 км від слухача: {f['n_near']}. Найважливіші:")
+        lines.append(f"Цілей у радіусі {f.get('radius', 120):.0f} км: {f['n_near']}. Найважливіші:")
         for x in f["near"]:
-            lines.append(f"- {x['word']}" + (f" біля {x['at']}" if x.get("at") else "") + f": {x['km']} км {x['side']} від слухача; джерело: {x['src']}; " +
+            lines.append(f"- {x['word']}" + (f" біля {x['at']} (до цього місця {x['named_km']} км від слухача)" if x.get("at") and x.get("named_km") is not None else "") +
+                         f": оцінка положення {x['km']} км {x['side']}; джерело: {x['src']}; " +
                          (f"місце назване {x['fix_min']} хв тому; " if x.get("fix_min") is not None else "місце не назване, це оцінка SKY; ") +
                          ("наближається" + (f", орієнтовно {x['eta']} хв" if x["eta"] is not None else "") if x["appr"] else
                           "рухається не в бік слухача" if x["appr"] is False else "напрямок невідомий") +
                          (f"; курс на {x['next']}" if x["next"] else "") + (f"; місце {x['pos']}" if x["pos"] else "") + ("; НОВА" if x["new"] else ""))
     else:
-        lines.append("У радіусі 120 км від слухача цілей немає.")
+        lines.append(f"У радіусі {f.get('radius', 120):.0f} км повідомлень про цілі немає (це не означає, що загрози немає).")
     # запасний текст
     fb = []
     if f["bal"]:
         fb.append("Для вашої області повідомляють про загрозу балістики. Будьте в укритті.")
     if f["near"]:
         x = f["near"][0]
-        fb.append(f"{x['word'][:1].upper() + x['word'][1:]} {x['side']}, приблизно {x['km']} кілометрів від вас" +
+        W = x['word'][:1].upper() + x['word'][1:]
+        fb.append("Оновлення для вашої місцевості. " + (f"{W} біля {x['at']}, це приблизно {x['named_km']} кілометрів від вас" if x.get("at") and x.get("named_km") is not None
+                  else f"{W} {x['side']} від вас, точне місце не вказане") +
                   (", наближається" if x["appr"] else "") + (f", курсом на {x['next']}" if x["next"] else "") + ".")
         if f["n_near"] > 1:
-            fb.append(f"Усього поруч {f['n_near']} цілей.")
+            fb.append(f"Поруч ще повідомлення: усього {f['n_near']}.")
     else:
-        fb.append("Поруч з вами цілей немає." + (" Тривога в області триває." if f["alert"] else ""))
+        fb.append(("У вашому районі триває повітряна тривога. " if f.get("raion_alert") else "Тривога в області триває. " if f["alert"] else "") +
+                  "Повідомлень про цілі поруч немає.")
     return "\n".join(lines), " ".join(fb)
 
 
-def country_text(state: dict) -> tuple[str, str]:
+def _src_phrase(state: dict, t: dict) -> str:
+    srcs = (t.get("ev") or {}).get("prim") or []
+    S = state.get("sources") or {}
+    if any((S.get(k) or {}).get("official") for k in srcs):
+        return "Повітряні сили" if "AIU" in srcs else "офіційне джерело"
+    if len(srcs) == 1:
+        return f"моніторинговий канал {(S.get(srcs[0]) or {}).get('name', srcs[0])}"
+    return f"кілька незалежних моніторингових джерел" if srcs else "джерело невідоме"
+
+
+def oblast_facts(state: dict, obl: str) -> dict:
+    """«Моя область»: статус тривоги по районах (без узагальнення на всю область), цілі по районах, сусіди — лише якщо джерело
+    прямо назвало пункт у цій області."""
+    from .geo import oblasts, raions
+    O, R = oblasts(), raions()
+    off = state.get("official") or {}
+    rl = off.get("raion_levels") or {}
+    whole = obl in (state.get("levels") or {}) and (state.get("levels") or {}).get(obl, 0) >= 2
+    groups: dict = {}
+    for t in state.get("tracks", []):
+        if t.get("status") != "active":
+            continue
+        ll = t.get("at_ll") or [t["lon"], t["lat"]]
+        if O.of(ll[0], ll[1]) == obl:
+            r = R.of(ll[0], ll[1]) or "район не визначено"
+            n = t.get("count") or 1
+            w = TWORD.get(t["type"], (t.get("name") or "ціль",) * 2)
+            groups.setdefault(r, []).append({"id": t["id"], "txt": ((f"{n} " + w[1]) if n > 1 else w[0]) +
+                                             (f" біля {t['at'][0]}" if t.get("at") else " (місце не назване, оцінка Скай)") +
+                                             (f", курс на {t['next']}" if t.get("next") else "") + f"; джерело: {_src_phrase(state, t)}"})
+        elif t.get("pred") == "channels" and t.get("route") and O.of(t["route"][0][0], t["route"][0][1]) == obl:
+            groups.setdefault("з сусідніх областей", []).append({"id": t["id"], "txt": f"{TWORD.get(t['type'], ('ціль',))[0]} прямує в область, "
+                                                                f"курс на {t.get('next')}; джерело: {_src_phrase(state, t)}"})
+    al_raions = sorted(r for r in rl if O.of(*_rc(R, r)) == obl)
+    fp = (whole, tuple(al_raions), tuple(sorted((k, tuple(sorted(x["id"] for x in v))) for k, v in groups.items())))
+    return {"obl": obl, "whole": whole, "al_raions": al_raions, "groups": groups, "fp": fp}
+
+
+_RC: dict = {}
+
+
+def _rc(R, name):
+    """Центр району (для визначення його області)."""
+    if name not in _RC:
+        for n, polys, bb in R.items:
+            if n == name:
+                _RC[name] = ((bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2)
+                break
+        else:
+            _RC[name] = (0, 0)
+    return _RC[name]
+
+
+def oblast_text(f: dict) -> tuple[str, str]:
+    lines = [f"РЕЖИМ: «Моя область» ({f['obl']}). Спершу статус тривоги, потім зміни, згруповані за районами."]
+    if f["whole"]:
+        lines.append("Офіційна тривога: на всю область.")
+    elif f["al_raions"]:
+        lines.append("Офіційна тривога в районах: " + ", ".join(f["al_raions"]) + " (не на всю область).")
+    else:
+        lines.append("Офіційної тривоги в області немає.")
+    for r, items in f["groups"].items():
+        lines.append(f"{r}:" if r.startswith("з ") else f"{r} район:")
+        lines += [f"- {x['txt']}" for x in items[:4]]
+    if not f["groups"]:
+        lines.append("Повідомлень про цілі в області немає (це не означає, що загрози немає).")
+    st = "На всю область оголошено повітряну тривогу." if f["whole"] else ("Повітряна тривога в районах: " + ", ".join(f["al_raions"]) + ".") if f["al_raions"] else "Офіційної тривоги в області немає."
+    blocks = [f"{r} район: " + "; ".join(x["txt"].split("; джерело")[0] for x in items[:2]) for r, items in f["groups"].items() if not r.startswith("з ")]
+    fb = f"{f['obl'].replace('ська', 'щина').replace('цька', 'ччина')}. {st} " + (" ".join(b + "." for b in blocks[:3]) if blocks else "Повідомлень про цілі в області немає.")
+    return "\n".join(lines), fb
+
+
+def country_facts(state: dict) -> dict:
     from collections import Counter
     from .geo import oblasts
     O = oblasts()
-    act = [t for t in state.get("tracks", []) if t.get("status") == "active"]
-    by_obl = Counter()
-    for t in act:
+    by = {}
+    for t in state.get("tracks", []):
+        if t.get("status") != "active":
+            continue
         o = O.of(t["lon"], t["lat"])
         if o:
-            by_obl[o] += t.get("count") or 1
+            by.setdefault(o, Counter())[t["type"]] += 1
     levels = state.get("levels") or {}
     off = state.get("official") or {}
-    n = len(set(levels) | set(off.get("alert_obl") or []))
+    al = sorted(set(levels) | set(off.get("alert_obl") or []))
     now = time.time()
-    bal_obl = sorted({o for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") for o in e.get("obl", []) if o != "*"})
-    top = [o for o, _c in by_obl.most_common(3)]
-    ctx = (f"ВИПУСК: уся Україна. Областей з офіційною тривогою: {n}. Найбільше цілей: {', '.join(top) or 'немає'}." +
-           (f" Загроза балістики: {', '.join(bal_obl)}." if bal_obl else ""))
-    fb = ((f"По Україні тривога в {n} " + ("області" if n % 10 == 1 and n % 100 != 11 else "областях") + ". ") if n else "Офіційних тривог зараз немає. ") + \
-         (f"Найбільше цілей: {', '.join(top)}." if top else "")
+    bal = sorted({o for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") for o in e.get("obl", []) if o != "*"})
+    top = sorted(by, key=lambda o: -sum(by[o].values()))[:4]
+    fp = (tuple(al), tuple(bal), tuple(top))
+    return {"al": al, "bal": bal, "top": [(o, by[o].most_common(2)) for o in top], "fp": fp}
+
+
+def country_text(state: dict, f: dict | None = None) -> tuple[str, str]:
+    f = f or country_facts(state)
+    ctx = (f"РЕЖИМ: «Вся Україна». Зараз {_kyiv_hm()}. Областей з офіційною тривогою: {len(f['al'])}." +
+           (f" Загроза балістики: {', '.join(f['bal'])}." if f["bal"] else "") +
+           "\nРегіони з найбільшою активністю за повідомленнями моніторингу (кількість не є встановленим фактом, не називай її):\n" +
+           "\n".join(f"- {o}: " + ", ".join(TWORD.get(k, (k, k))[1] for k, _n in ty) for o, ty in f["top"]))
+    n = len(f["al"])
+    fb = (f"Скай. Огляд по Україні станом на {_kyiv_hm()}. " +
+          ((f"Повітряна тривога в {n} " + ("області" if n % 10 == 1 and n % 100 != 11 else "областях") + ". ") if n else "Офіційних тривог зараз немає. ") +
+          (f"Найбільше повідомлень про цілі: {', '.join(o for o, _t in f['top'][:3])}." if f["top"] else ""))
     return ctx, fb
 
 
@@ -385,23 +484,38 @@ RADIO_SYSTEM = RADIO_SYSTEM + """
 Краще дві зрозумілі події, ніж десять назв. «Щойно», «зараз» — лише для свіжих даних; час публікації не видавай за час події.
 Новому слухачеві: «Ви слухаєте Скай. Коротко про [регіон]. Станом на [час], [статус тривоги]…» (20–40 с). Оновлення — 8–20 с.
 Ніколи: «увага, увага», «можна видихнути», «все чисто», «ціль знищена» через зникнення повідомлень.
+РЕЖИМИ: працюй у переданому режимі («Поруч зі мною», «Моя область», «Вся Україна») і лише з переданим сервером переліком подій.
+«Поруч зі мною»: почни «Оновлення для вашої місцевості»; офіційні попередження для території — першими; відстань називай лише
+до місця, названого в повідомленні («біля X, це приблизно N км від вас»), а не до цілі; адресу слухача не називай; якщо місце
+не назване — так і скажи. «Моя область»: почни з назви області; статус тривоги по районах, не узагальнюй на всю область;
+групуй зміни за районами; сусідні області — лише те, що передано. «Вся Україна»: «Скай. Огляд по Україні станом на [час].»,
+короткі регіональні блоки, без перелічування кожного пункту й без загальної кількості цілей як факту.
+Зберігай різницю між точно названим місцем і приблизною територією. Відсутність повідомлень не означає безпеки.
 РАДІО ДЛЯ ОДНІЄЇ ЛЮДИНИ: говори так, ніби звертаєшся до слухача: «біля вас», «на південь від вас». Головне — що поруч і чи
 наближається. Не перелічуй статистику повідомлень. Для всієї України — щонайбільше два речення."""
 
 
-async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "") -> dict:
+async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25) -> dict:
     """Ефір для одного слухача. Регіон: говоримо, коли щось змінилось (нова ціль, наближення, тривога, балістика);
     без змін — мовчимо, а раз на 8 хв коротко нагадуємо обстановку без запиту до моделі. Україна — коротко."""
     key = (sid or "-", scope, obl)
     mem = RADIO_STATE.setdefault(key, {"fp": None, "t": 0.0, "said": []})
     now = time.time()
     out_ = _outage(state)
-    if scope == "country":
-        ctx, fb = country_text(state)
+    fh = near_facts(state, home, obl, since, radius) if home else None
+    if fh and fh["urgent"] and scope != "near":
+        scope = "near"  # важливе для «Дому» — першим, незалежно від обраного режиму
+        key = (sid or "-", "near", obl)
+        mem = RADIO_STATE.setdefault(key, {"fp": None, "t": 0.0, "said": []})
+    if scope in ("country", "oblast"):
+        cf = country_facts(state) if scope == "country" else oblast_facts(state, obl)
+        ctx, fb = country_text(state, cf) if scope == "country" else oblast_text(cf)
         level = "info"
-        fp = None
+        fp = cf["fp"]
+        if mem["said"] and fp == mem["fp"] and not out_:
+            return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
     else:
-        f = near_facts(state, home, obl, since)
+        f = fh or near_facts(state, home, obl, since, radius)
         ctx, fb = region_text(f, obl)
         level = "urgent" if f["urgent"] else "update"
         fp = f["fp"]
@@ -444,7 +558,7 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
     else:
         disp = speech = fb
         kind, by = ("outage" if out_ else "summary" if not said else "update"), "rules"
-    if not said and scope != "country" and not speech.lower().startswith("ви слухаєте"):
+    if not said and scope == "near" and not speech.lower().startswith("ви слухаєте"):
         speech = "Ви слухаєте Скай. " + speech  # перше звучання для нового слухача
     mem.update(fp=fp, t=now, said=(said + [disp])[-5:])
     if len(RADIO_STATE) > 3000:

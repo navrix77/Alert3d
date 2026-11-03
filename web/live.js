@@ -73,7 +73,7 @@
   async function speak(text, voice) {
     if (!audioOn || !text) return;
     try {
-      const url = '/api/tts?v=4&text=' + encodeURIComponent(text.slice(0, 600)) + '&voice=' + (voice || LS.get('voice') || 'lada');
+      const url = '/api/tts?v=4&text=' + encodeURIComponent(text.slice(0, 600)) + '&voice=' + (voice || 'radio');
       if (window.SKYVOICE) { abortAudio = () => window.SKYVOICE.stop(); await window.SKYVOICE.play(url, 1); return; }
       const a = new Audio(url);
       await new Promise(res => { abortAudio = () => { try { a.pause(); } catch (e) {} res(); }; a.onended = res; a.onerror = res; a.play().catch(res); setTimeout(res, 20000); });
@@ -290,19 +290,27 @@
     const sync = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === mode()));
     seg.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_mode', b.dataset.v); sync(); if (radioOn) { if (b.dataset.v === 'atmo') bedStart(); else bedStop(); } });
     if (vol) { vol.value = Math.round((+(LS.get('radio_atmo_vol') || 0.04)) * 100); vol.oninput = () => { LS.set('radio_atmo_vol', String(vol.value / 100)); duck(false); }; }
-    sync(); })();
+    sync();
+    // охоплення: «Поруч зі мною» (радіус) / «Моя область» / «Вся Україна»; перемикання — нове зведення в новому режимі
+    const sc = document.getElementById('rad-scope'), rr = document.getElementById('rad-radius');
+    const syncS = () => { sc && sc.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === (LS.get('radio_scope') || 'near')));
+      rr && rr.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === String(LS.get('radio_radius') || 25))); };
+    sc && sc.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_scope', b.dataset.v); syncS(); if (radioOn) { window.SKYVOICE && window.SKYVOICE.stop(); radioIssue(); } });
+    rr && rr.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_radius', b.dataset.v); syncS(); });
+    syncS(); })();
   async function radioIssue(force) {
     if (!radioOn || playing || radioBusy) return;
     const w = where();
     const now = NX().now();
-    const scope = force === 'country' || now - lastCountry > 900 ? 'country' : 'region';
+    const mode = LS.get('radio_scope') || 'near';
+    const scope = force === 'country' ? 'country' : mode;
     radioBusy = true;
     try {
-      const r = await (await fetch('/api/radio?scope=' + scope + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (now - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
+      const r = await (await fetch('/api/radio?scope=' + scope + '&radius=' + (LS.get('radio_radius') || 25) + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (now - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
         (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : ''))).json();
       if (scope === 'country') lastCountry = now;
       if (!radioOn || !r.text) return;  // нового немає: мовчимо
-      if (scope === 'region') radioSeen = NX().now();
+      if (scope === 'near') radioSeen = NX().now();
       const hard = r.level === 'urgent' || r.level === 'outage' || r.kind === 'correction';
       if (hard) bedStop(); else bedStart();  // важливе, виправлення, збій — без фону
       if (r.level === 'urgent' && window.SKYVOICE) window.SKYVOICE.stop();  // важливе перериває поточне
@@ -338,8 +346,7 @@
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
     radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0;
     bedStart(); await SND.ident();
-    await radioIssue('region');          // спершу свій район
-    await radioIssue('country');         // далі коротко по Україні
+    await radioIssue();                  // зведення в обраному режимі охоплення
     radioT = setInterval(radioIssue, 40000);
   };
 

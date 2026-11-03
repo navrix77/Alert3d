@@ -413,3 +413,22 @@ class Oblasts:
 @lru_cache(maxsize=1)
 def oblasts() -> Oblasts:
     return Oblasts()
+
+
+class Raions(Oblasts):
+    """Межі районів (data/raions.geojson) — для радіо «Моя область» і «Поруч зі мною»."""
+
+    def __init__(self) -> None:  # noqa: D107
+        fc = json.loads((DATA / "raions.geojson").read_text(encoding="utf-8"))
+        self.items = []
+        for f in fc["features"]:
+            g = f["geometry"]
+            polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+            xs = [x for pl in polys for x, _ in pl[0]]
+            ys = [y for pl in polys for _, y in pl[0]]
+            self.items.append((f["properties"]["n"], polys, (min(xs), min(ys), max(xs), max(ys))))
+
+
+@lru_cache(maxsize=1)
+def raions() -> Raions:
+    return Raions()

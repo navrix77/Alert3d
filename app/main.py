@@ -634,12 +634,13 @@ async def api_stt(req: Request):
 
 
 @app.get("/api/radio")
-async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: float | None = None, scope: str = "region", sid: str = ""):
+async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: float | None = None, scope: str = "near", sid: str = "", radius: float = 25):
     """«Радіо SKY»: один голосовий випуск — свій регіон / сусідні області / уся Україна."""
     from . import live
     since, home, ob = _live_args(t, obl, lat, lon)
-    sc = scope if scope in ("region", "neighbors", "country") else "region"
-    return await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc, sid[:40])
+    sc = {"region": "near", "neighbors": "oblast"}.get(scope, scope)
+    sc = sc if sc in ("near", "oblast", "country") else "near"
+    return await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc, sid[:40], max(5.0, min(100.0, radius)))
 
 
 @app.get("/api/health")

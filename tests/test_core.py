@@ -1714,3 +1714,23 @@ def test_health_endpoint():
     from app import main as M
     h = TestClient(M.app).get("/api/health").json()
     assert {"ok", "problems", "alerts_age", "channels_live", "version"} <= set(h)
+
+
+def test_radio_modes(monkeypatch):
+    import asyncio
+    import time as _t
+    from app import live
+    monkeypatch.setattr(live, "RADIO_STATE", {})
+    home = (36.23, 49.99)
+    st = {"now": _t.time(), "levels": {}, "official": {"raion_levels": {"Чугуївський": 1}},
+          "tracks": [{"id": "Ш-1", "type": "shahed", "status": "active", "lon": 36.80, "lat": 49.70, "hd": 270, "speed": 170, "count": 1,
+                      "first": _t.time(), "at": ["Чугуїв", 0], "at_ll": [36.69, 49.84]},
+                     {"id": "Ш-2", "type": "shahed", "status": "active", "lon": 30.5, "lat": 50.45, "count": 2, "first": _t.time()}]}
+    ob = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "oblast", "m1"))
+    assert "Чугуївський район" in ob["text"] and "всю область" not in ob["text"]  # тривога по району, не на всю область
+    ct = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "country", "m1"))
+    assert ct["text"].startswith("Скай. Огляд по Україні")
+    nr = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "m2", 50))
+    assert "Чугуїв" in nr["speech"] and "Ви слухаєте Скай" in nr["speech"]
+    nr10 = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "m3", 10))
+    assert "немає" in nr10["text"]

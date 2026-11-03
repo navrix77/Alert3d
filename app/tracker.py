@@ -1155,6 +1155,7 @@ class Tracker:
                 "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4), tr.obs[0].label, int(tr.obs[0].t)],
                 # останній пункт, який назвали самі канали (не оцінка SKY): «де ціль зараз» у картці
                 "at": next(([o.label, int(o.t)] for o in reversed(tr.obs) if not o.est and o.label), None),
+                "at_ll": next(([round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4)] for o in reversed(tr.obs) if not o.est), None),
                 "launch": self.launches.link(tr, now, hd) if status != "closed" or age < 1800 else None,
             })
         zones = []
