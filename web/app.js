@@ -151,6 +151,9 @@ function addOverlays(){
   map.addLayer({id:'obl-fill',type:'fill',source:'obl',paint:{'fill-color':['match',LV,2,'#C8102E',1,'#E8B300','#000'],'fill-opacity':['match',LV,2,0.1,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-fill',type:'fill',source:'ra',paint:{'fill-color':['match',LV,2,'#B3122E',1,'#E0A800','#000'],'fill-opacity':['match',LV,2,0.16,1,0.1,0],'fill-opacity-transition':{duration:500}}});
   map.addLayer({id:'ra-line',type:'line',source:'ra',minzoom:5.5,paint:{'line-color':['match',LV,2,'#FF6B7D',1,'#FFC940','#fff'],'line-opacity':['interpolate',['linear'],['zoom'],5.5,['match',LV,0,0.2,0.9],9,['match',LV,0,0.5,0.9]],'line-width':['interpolate',['linear'],['zoom'],6,['match',LV,0,0.5,1.2],10,['match',LV,0,1.2,2.2]]}});
+  // режим балістичної загрози: решта мапи спокійніша, названі області чіткі (без миготіння)
+  map.addLayer({id:'bal-dim',type:'fill',source:'obl',layout:{visibility:'none'},paint:{'fill-color':'#000','fill-opacity':0.38}});
+  map.addLayer({id:'bal-hl',type:'line',source:'obl',layout:{visibility:'none','line-join':'round'},paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1.6,8,3],'line-opacity':0.95}});syncBalLayers.k=null;
   map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.5,0.3]}});
   map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.45}});
   map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#B24A5C','line-width':['interpolate',['linear'],['zoom'],5,1,9,2],'line-opacity':0.7}});
@@ -647,6 +650,28 @@ function homeOfficial(ob){const O=SNAP.official||{};const ra=homeObl.r;
   if(!HPDATA&&Object.keys(H).length)loadHP();
   if((O.alert_obl||[]).includes(ob))return {on:2,t:'тривога в частині області'+st};
   return {on:0,t:'тривоги немає'+st};}
+/* ---------- Режим балістичної загрози (03.11) ----------
+   Вмикається повідомленням про балістику, де названо область дому (або регіональним каналом цієї області).
+   Не стверджує, де ракета: показує територію, яку назвали, вік повідомлення й першоджерело.
+   Вимикається відбоєм балістики від каналів або офіційним відбоєм для дому; мовчання джерел режим не вимикає
+   (страховка: 40 хв без жодного нового повідомлення про балістику для області). */
+const OBL_GEN={'Вінницька':'Вінниччина','Волинська':'Волинь','Дніпропетровська':'Дніпропетровщина','Донецька':'Донеччина','Житомирська':'Житомирщина','Закарпатська':'Закарпаття','Запорізька':'Запоріжжя','Івано-Франківська':'Прикарпаття','Київська':'Київщина','Київ':'Київ','Кіровоградська':'Кіровоградщина','Луганська':'Луганщина','Львівська':'Львівщина','Миколаївська':'Миколаївщина','Одеська':'Одещина','Полтавська':'Полтавщина','Рівненська':'Рівненщина','Сумська':'Сумщина','Тернопільська':'Тернопільщина','Харківська':'Харківщина','Херсонська':'Херсонщина','Хмельницька':'Хмельниччина','Черкаська':'Черкащина','Чернівецька':'Буковина','Чернігівська':'Чернігівщина'};
+let BALM=null;
+function balMode(ob,OF){if(!ob||!SNAP||!SNAP.bal)return null;const now=Date.now()/1000+offset;const cov=e=>e.obl.includes(ob)||(ob==='Київ'&&e.obl.includes('Київська'));
+  const ev=SNAP.bal.slice().sort((a,b)=>a.t-b.t);let start=null,last=null,items=[];
+  for(const e of ev){if(e.close){if(!e.obl.length||cov(e)){start=null;items=[];}continue;}
+    if(cov(e)){if(!start)start=e;last=e;items.push(e);}}
+  if(!start)return null;
+  if(now-last.t>40*60)return null;
+  // офіційний відбій для дому після початку режиму (повідомлення старше 90 с)
+  if(OF&&OF.on===0&&SNAP.official&&SNAP.official.ok&&now-last.t>90)return null;
+  return {start,last,items:items.slice(-4).reverse(),obl:ob,names:last.obl};}
+function showBalRegion(){if(!BALM||!window.__OBLGJ)return;const fs=window.__OBLGJ.features.filter(f=>BALM.names.includes(f.properties.n)||f.properties.n===BALM.obl);if(!fs.length)return;
+  let b=[180,90,-180,-90];const walk=c=>{if(typeof c[0]==='number'){b=[Math.min(b[0],c[0]),Math.min(b[1],c[1]),Math.max(b[2],c[0]),Math.max(b[3],c[1])];}else c.forEach(walk);};fs.forEach(f=>walk(f.geometry.coordinates));
+  map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:{top:120,bottom:260,left:30,right:30},duration:800});}
+function syncBalLayers(){if(!map.getLayer('bal-dim'))return;const on=!!BALM;const names=on?Array.from(new Set([BALM.obl,...BALM.names])):[];
+  map.setLayoutProperty('bal-dim','visibility',on?'visible':'none');map.setLayoutProperty('bal-hl','visibility',on?'visible':'none');
+  if(on){const key=names.join('|');if(syncBalLayers.k!==key){syncBalLayers.k=key;map.setFilter('bal-dim',['!',['in',['get','n'],['literal',names]]]);map.setFilter('bal-hl',['in',['get','n'],['literal',names]]);}}}
 function renderMe(threats){
   const box=$('#me');if(!home){box.className='me'+(box.classList.contains('open')?' open':'');$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>(document.hidden?75:30);
@@ -670,12 +695,20 @@ function renderMe(threats){
   else if(first){const e=first.r.eta||0,byRoute=first.r.rel==='route';
     cls=e<=5&&byRoute?'me danger':'me watch';word=byRoute?(e<=5?'Летить на вас':'Маршрут поруч'):'Можливо у ваш бік';
     sub=offL+esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(byRoute?(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':''):' · напрямок за оцінкою, може наблизитися');}
+  BALM=(!isStale)?balMode(ob,OF):null;syncBalLayers();
+  if(BALM){const now=Date.now()/1000+offset,L=BALM.last,ag=Math.max(0,Math.round(now-L.t));const nm=k=>esc(SNAP.sources[k]?.name||k);
+    cls='me danger bal';word='Балістична загроза · '+(OBL_GEN[BALM.obl]||BALM.obl);
+    sub=offL+'<div class="bal-age">Повідомлення отримано '+(ag<60?ag+' с':Math.round(ag/60)+' хв')+' тому · '+nm(L.src)+(SNAP.sources[L.src]?.official?' (офіційне)':'')+'</div>'+
+      '<div class="bal-go">Перейдіть в укриття</div>'+
+      '<ol class="bal-log">'+BALM.items.map(e=>'<li><span>'+fmt(e.t)+'</span><b>'+nm(e.src)+'</b> '+esc(e.pl.length?e.pl.join(', '):e.obl.map(o=>OBL_GEN[o]||o).slice(0,4).join(', ')+(e.obl.length>4?' +'+(e.obl.length-4):''))+(e.link?' <a href="'+esc(e.link)+'" target=_blank rel=noopener>↗</a>':'')+'</li>').join('')+'</ol>'+
+      '<small class="bal-note">Це вік повідомлення, а не час до удару. Де ракета, канали не знають</small>'+
+      '<button class="bal-btn" id="bal-show">Показати регіон загрози</button>';}
   box.className=cls+(box.classList.contains('open')?' open':'');$('#me-word').textContent=word;
   // великі хвилини, лише коли маршрут названо каналами (обґрунтована оцінка), а не з напрямку
-  if(first&&!isStale&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
+  if(first&&!isStale&&!BALM&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
     sub=offL+'<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
       '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> · ~'+eta+' хв до вас<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+' · за повідомленнями каналів</span></div>';}
-  $('#me-sub').innerHTML=sub;
+  $('#me-sub').innerHTML=sub;{const bs=$('#bal-show');if(bs)bs.onclick=e=>{e.stopPropagation();showBalRegion();};}
   $('#me-list').innerHTML='';
   const nearIds=new Set(near.map(x=>x.tr.id));const closeAsNear=close.filter(x=>!nearIds.has(x.tr.id)).map(x=>({tr:x.tr,r:{d:x.d,from:x.side,eta:null,rel:null,away:false,maybe:false,p:0,near:true}}));
   (thr.length?thr:closeAsNear.concat(near)).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');

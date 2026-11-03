@@ -603,3 +603,13 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 
 /* спливаючі вікна мапи не ширші за екран */
 .maplibregl-popup{max-width:calc(100vw - 20px)!important}.maplibregl-popup-content{max-width:calc(100vw - 20px);box-sizing:border-box;overflow-wrap:anywhere}
+/* режим балістичної загрози (03.11): без миготіння, коротко й чітко */
+.me.bal .me-dot{animation:none}
+.me .bal-age{font-weight:700;margin-top:4px}
+.me .bal-go{margin-top:6px;font-weight:800;font-size:15px;color:#fff;background:rgba(229,72,77,.28);border:1px solid rgba(229,72,77,.6);border-radius:10px;padding:6px 10px;display:inline-block}
+.me .bal-log{list-style:none;margin:8px 0 0;padding:0;font-size:12.5px;line-height:1.45}
+.me .bal-log li{display:flex;gap:6px;align-items:baseline;opacity:.92}
+.me .bal-log li span{opacity:.7;font-variant-numeric:tabular-nums}
+.me .bal-log a{color:inherit;opacity:.7;text-decoration:none}
+.me .bal-note{display:block;opacity:.65;font-size:11.5px;margin-top:6px}
+.me .bal-btn{margin-top:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:6px 12px;font:600 13px inherit;font-family:inherit}

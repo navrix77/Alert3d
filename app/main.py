@@ -108,7 +108,9 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
                 brain.log_msg(ts, key, link, obs.kind, obs.type, obs.count, rec.get("places"), rec.get("track"), seg)
     trk.exclude = set()
     if not useful:
-        trk.ingest(parser.parse(text, key), key, ts, link)
+        o_ = parser.parse(text, key)
+        o_.raw = text
+        trk.ingest(o_, key, ts, link)
 
 
 def on_threat(ev: dict) -> None:

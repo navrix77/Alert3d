@@ -225,6 +225,32 @@ def _obl_name(reg) -> str | None:
     return None
 
 
+# «Режим балістичної загрози» (03.11): які області названо в повідомленні про балістику.
+# Не положення ракети, а територія загрози, як її назвали канали; клієнт показує це для області дому.
+_BAL_STEMS = [("дніпропетров", "Дніпропетровська"), ("вінниц", "Вінницька"), ("вінниччин", "Вінницька"), ("волин", "Волинська"),
+              ("донец", "Донецька"), ("донеччин", "Донецька"), ("житомир", "Житомирська"), ("закарпат", "Закарпатська"),
+              ("запоріз", "Запорізька"), ("франків", "Івано-Франківська"), ("київщин", "Київська"), ("київськ", "Київська"),
+              ("кіровоград", "Кіровоградська"), ("луган", "Луганська"), ("львів", "Львівська"), ("миколаїв", "Миколаївська"),
+              ("одес", "Одеська"), ("полтав", "Полтавська"), ("рівнен", "Рівненська"), ("сумщин", "Сумська"), ("сумськ", "Сумська"),
+              ("тернопіл", "Тернопільська"), ("харків", "Харківська"), ("херсон", "Херсонська"), ("хмельниц", "Хмельницька"),
+              ("хмельниччин", "Хмельницька"), ("черкас", "Черкаська"), ("черкащин", "Черкаська"), ("чернівец", "Чернівецька"),
+              ("буковин", "Чернівецька"), ("чернігів", "Чернігівська")]
+_BAL_OBL_RX = _re.compile(r"(?i)(?<![\w'’-])([а-яіїєґ'’-]+?(?:щин|ччин)\w*|[а-яіїєґ'’-]+?(?:ськ|цьк|зьк)(?:а|ої|ій|у)\s+обл\w*)")
+
+
+def bal_oblasts(text: str) -> list[str]:
+    from .parser import OBL_LIST, _obl_list
+    text = OBL_LIST.sub(_obl_list, text or "")  # «загроза для Донецька, Запорізька, …» → області
+    out = []
+    for m in _BAL_OBL_RX.finditer(text or ""):
+        w = m.group(1).lower()
+        for stem, o in _BAL_STEMS:
+            if w.startswith(stem) and o not in out:
+                out.append(o)
+                break
+    return out
+
+
 @dataclass
 class Zone:
     places: list[Place]
@@ -249,6 +275,7 @@ class Tracker:
         self.avia: dict[str, dict] = {}  # область -> {"t", "first", "n", "platform"}
         self.counters: dict[str, int] = {}
         self.log: list[dict] = []
+        self.bal: list[dict] = []  # повідомлення про балістику: які області названо (режим балістичної загрози)
         self.last_update = 0.0
         self.launches = LaunchBook(brain)
         self.exclude: set[str] = set()
@@ -281,6 +308,23 @@ class Tracker:
         self.restored_at = d["saved"]
         return True
 
+    def _bal_event(self, obs: Observation, src: str, t: float, link: str | None) -> None:
+        from .config import CHANNEL_REGION
+        raw = getattr(obs, "raw", None) or ""
+        obl = bal_oblasts(raw)
+        for r in obs.places:
+            if r.role in ("t", "p"):
+                o = obl_of(r.place)
+                if o and o not in obl:
+                    obl.append(o)
+        if not obl:  # «Балістика!» у регіональному каналі стосується його області
+            o = _obl_name(CHANNEL_REGION.get(src))
+            if o:
+                obl.append(o)
+        self.bal.append({"t": int(t), "src": src, "link": link, "obl": obl, "close": obs.kind == "close",
+                         "pl": [r.place.name for r in obs.places if r.role in ("t", "p")][:4], "txt": raw.strip()[:160]})
+        self.bal = [e for e in self.bal if t - e["t"] < 3600][-60:]
+
     # ---------------- прийом повідомлення
     def ingest(self, obs: Observation, src: str, t: float | None = None, link: str | None = None) -> dict:
         t = t or time.time()
@@ -289,6 +333,11 @@ class Tracker:
                "places": [{"r": r.role, "n": r.place.name} for r in obs.places] if not obs.safety else []}
         self.log.append(rec)
         self.log = self.log[-400:]
+        if obs.type == "ballistic" and obs.kind in ("track", "info", "close", "zone"):
+            try:
+                self._bal_event(obs, src, t, link)
+            except Exception:
+                pass
         places = obs.places
         if obs.kind == "filtered":
             # «збито / вибухи / приліт» не публікуємо (безпека), але ціль після цього прибираємо з карти
@@ -1015,4 +1064,4 @@ class Tracker:
                          "act": int(a["act"]) if a.get("act") else None, "until": int(a["t"] + AVIA_LIFE),
                          "targets": [z.places[0].name for z in kz][:6]})
         return {"now": now, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
-                "log": self.log[-60:]}
+                "log": self.log[-60:], "bal": [e for e in self.bal if now - e["t"] < 3600]}
