@@ -52,14 +52,7 @@ function liteMode(fallback){
   const poll=()=>fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(draw).catch(()=>{el.innerHTML='<h1>NAVRYX SKY</h1><div class=n>Немає звʼязку з сервером. Це не відбій.</div>';});
   try{const ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws');ws.onmessage=m=>{try{draw(JSON.parse(m.data));}catch(x){}};}catch(x){}
   poll();setInterval(()=>{if(Date.now()-last>25000)poll();},15000);}
-// старт (03.11, ревізія візуалу): кадр 0 — 2D, північ угорі, вся Україна по центру екрана; перехід у 3D — коли прийдуть цілі (introFly).
-// повторний запуск протягом 5 хв — камера там, де її закрили, без прольоту
-const UA_BOUNDS=[[22.1,44.2],[40.3,52.45]];
-const REDUCE=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){return false;}})();
-const LASTCAM=(()=>{try{const c=JSON.parse(localStorage.getItem('cam_last')||'null');return c&&Date.now()-c.t<5*60*1000?c:null;}catch(e){return null;}})();
-let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:LASTCAM?LASTCAM.c:[31.2,48.4],zoom:LASTCAM?LASTCAM.z:(innerWidth<640?3.9:5.2),pitch:LASTCAM?LASTCAM.p:0,bearing:0,attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
-if(!LASTCAM){try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.14),bottom:Math.round(innerHeight*0.22),left:16,right:16}});if(c)map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}catch(e){}}
-map.on('moveend',()=>{try{const c=map.getCenter();localStorage.setItem('cam_last',JSON.stringify({c:[c.lng,c.lat],z:map.getZoom(),p:map.getPitch(),t:Date.now()}));}catch(e){}});
+let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:INTRO?[31.4,48.6]:[32.2,48.4],zoom:INTRO?(innerWidth<640?3.2:4.1):5.6,pitch:INTRO?0:(tilt?50:0),bearing:INTRO?0:(tilt?-14:0),attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
 // спливаючі вікна на мапі завжди цілком на екрані: після відкриття зсуваємо мапу, якщо вікно вилазить за край (03.11: «обрізає вікно»)
 try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo=function(m){const r=_add.call(this,m);const pp=this;
   setTimeout(()=>{try{const el=pp.getElement();if(!el)return;const b=el.getBoundingClientRect(),pad=10,top=(document.querySelector('header.top')||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom+6;
@@ -299,28 +292,22 @@ map.on('style.load',addOverlays);
 let introDone=false,introT0=Date.now();if(INTRO)document.body.classList.add('intro');
 function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
   const mob=innerWidth<640;
-  // кінцевий стан: 3D (pitch 45–55°), північ угорі, zoom +0.7 від стартового (край країни ще в кадрі), центр — дім, якщо він є
-  const cam={center:home||map.getCenter(),zoom:Math.min(map.getZoom()+0.7,home?(mob?6.4:6.8):5.6),pitch:mob?45:52,bearing:0};
+  const cam={center:home||[31.4,48.6],zoom:home?(mob?7:7.6):(mob?4.75:5.6),pitch:mob?42:52,bearing:-14};
   const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
-  // повторний запуск протягом 5 хв: камера вже там, де її закрили; без прольоту
-  if(LASTCAM){if(el)el.remove();tilt=map.getPitch()>20;finish();return;}
-  // є ціль у бік дому вже на старті: одразу кінцевий стан і картка цілі, без анімації
-  let thr=null;try{if(home&&SNAP)thr=SNAP.tracks.find(t=>t.status==='active'&&t.conf>=0.5&&(homeRel(t,[t.lon,t.lat])||{}).rel);}catch(e){}
-  if(skip||!INTRO||thr||REDUCE){if(el)el.remove();if(INTRO)map.jumpTo(cam);tilt=true;window.__introAt=Date.now();finish();if(thr)setTimeout(()=>{try{openSheet(thr.id);}catch(e){}},300);return;}
-  // поки летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
+  if(skip||!INTRO){if(el)el.remove();if(INTRO)map.jumpTo(cam);finish();return;}
+  // поки летимо, без підписів пусків і цілей (каша), вони з'являються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
   const wait=Math.max(0,2300-(Date.now()-introT0));   // логотип встигає зіграти
-  setTimeout(()=>{el&&el.classList.add('out');map.easeTo({...cam,duration:1400,easing:t=>1-Math.pow(1-t,3),essential:true});window.__introAt=Date.now();tilt=true;
-    setTimeout(finish,1500);setTimeout(()=>el&&el.remove(),1400);},wait);}
+  setTimeout(()=>{el&&el.classList.add('out');map.flyTo({...cam,duration:4200,curve:1.4,essential:true});window.__introAt=Date.now();tilt=true;
+    setTimeout(finish,2600);setTimeout(()=>el&&el.remove(),1800);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').reduce((a,t)=>a+(t.count||1),0);// так само, як лічильники вгорі: з урахуванням ×N у групах
     st.textContent=(c.channels?c.live+' з '+c.channels+' джерел наживо · ':'')+(act?act+' цілей у небі':'небо поки чисте');}else st.textContent=['Підключаюсь до джерел…','Читаю монітори…','Збираю картину неба…'][n%3];},450);}
-// перехід запускається, коли прийшли дані (перший знімок) і карта готова, а не за таймером; 7 с — запобіжник, якщо дані не йдуть
-map.once('idle',()=>{if(SNAP)introFly(false);});
+map.once('idle',()=>introFly(false));
 setTimeout(()=>introFly(false),7000);
-{const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}if(LASTCAM)introFly(true);}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
+{const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
 /* ---------- дім: змінюється лише свідомо (Налаштування → «Змінити дім»), лише на суші України ---------- */
 let homeArmT=null;
 function armHome(){setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім (30 с)');clearTimeout(homeArmT);
@@ -660,7 +647,7 @@ function renderBanner(threats){
   if(!renderBanner.seen.has(t.tr.id)){renderBanner.seen.add(t.tr.id);
     note({k:'home:'+t.tr.id,lvl:'red',ic:'⚠️',title:TYPE_NAME[t.tr.type]+(t.tr.count>1?' ×'+t.tr.count:'')+', '+(t.rel.rel==='route'?'маршрут біля вашого дому':'курс на ваш район'),sub:Math.round(t.rel.d)+' км '+t.rel.from+(t.rel.eta!=null?' · ~'+Math.max(1,Math.round(t.rel.eta))+' хв':''),go:()=>openSheet(t.tr.id)});const d=DISP.get(t.tr.id);
     if(d&&home&&introDone&&Date.now()-(window.__introAt||0)>9000&&Date.now()-(window.__touch||0)>20000){const b2=new maplibregl.LngLatBounds(home,home).extend(d.p);
-      const cam=map.cameraForBounds(b2,{padding:{top:140,bottom:160,left:80,right:380}});if(cam)map.flyTo({...cam,zoom:Math.min(cam.zoom,10),pitch:tilt?55:20,bearing:0,curve:1.5,speed:0.7,essential:true});}}
+      const cam=map.cameraForBounds(b2,{padding:{top:140,bottom:160,left:80,right:380}});if(cam)map.flyTo({...cam,zoom:Math.min(cam.zoom,10),pitch:tilt?55:20,bearing:tilt?-18:0,curve:1.5,speed:0.7,essential:true});}}
 }
 ['mousedown','touchstart','wheel'].forEach(ev=>document.getElementById('map').addEventListener(ev,()=>window.__touch=Date.now(),{passive:true}));
 
@@ -791,7 +778,7 @@ $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолок
 $('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D), без перспективних спотворень; у 3D лише коротша тінь
   if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
-function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:0,duration:anim?700:0});}
+function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:on?-14:0,duration:anim?700:0});}
 $('#b-3d').onclick=()=>set3d(!tilt,true);
 document.querySelectorAll('.tools [data-b]').forEach(b=>b.onclick=()=>{const t=document.getElementById(b.dataset.b);if(!t)return;const keep=b.dataset.b==='b-3d'||b.dataset.b==='b-layers';if(!keep)$('#settings').hidden=true;t.click();});
 $('#b-daily').onclick=()=>{location.href='/daily.html';};
@@ -800,7 +787,7 @@ $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 
 /* ---------- живий потік ---------- */
-function onSnap(s){window.__snapOK=true;LIVE=s;if(REPLAY)return;SNAP=s;if(!introDone&&map.isStyleLoaded&&map.isStyleLoaded())setTimeout(()=>introFly(false),0);try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
+function onSnap(s){window.__snapOK=true;LIVE=s;if(REPLAY)return;SNAP=s;try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
 let LIVE=null,REPLAY=null;
 // «зараз» за сервером, не залежить від того, на який кадр машини часу перемкнуто offset
 const liveNow=()=>LIVE&&LIVE.now?LIVE.now+(REPLAY?0:Math.max(0,(Date.now()-recvAt)/1000)):Date.now()/1000;
