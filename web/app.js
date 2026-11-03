@@ -984,18 +984,19 @@ window.webPushSync=webPushSync;setTimeout(()=>webPushSync(false),4000);
 function pushCard(){if(document.getElementById('push-card'))return;
   const ios=/iPhone|iPad/.test(navigator.userAgent),standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
   const can='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
-  let dismissed=0;try{dismissed=+localStorage.getItem('push_card_x')||0;}catch(e){}
-  if(Date.now()-dismissed<3*864e5)return;
+  // картка показується ОДИН раз (перший запуск після встановлення); далі лише з налаштувань: «Сповіщення → Увімкнути»
+  let shown=null;try{shown=localStorage.getItem('push_card_once')||localStorage.getItem('push_card_x');}catch(e){shown='1';}
+  if(shown)return;
   let txt,btn;
-  if(can&&Notification.permission==='granted'&&PREF.sys&&window.__wpOK)return;
+  if(can&&Notification.permission==='granted')return;
   if(can&&Notification.permission==='denied')return;
   if(!can&&ios&&!standalone){txt='Щоб SKY попереджав навіть із закритим телефоном: «Поділитися» → «На початковий екран», і відкрийте SKY звідти.';btn=null;}
   else if(can){txt=home?'Попереджати про загрози для вашого дому й області навіть із закритим застосунком?':'Позначте свій дім, і SKY попереджатиме про загрози для нього навіть із закритим застосунком.';btn=home?'Увімкнути сповіщення':'Позначити дім';}
   else return;
   const el=document.createElement('div');el.id='push-card';el.className='push-card';
   el.innerHTML='<b>🔔 Сповіщення</b><span>'+esc(txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>';
-  document.body.appendChild(el);
-  $('#pc-x').onclick=()=>{try{localStorage.setItem('push_card_x',Date.now());}catch(e){}el.remove();};
+  document.body.appendChild(el);try{localStorage.setItem('push_card_once',Date.now());}catch(e){}
+  $('#pc-x').onclick=()=>{el.remove();toast('Увімкнути можна будь-коли: Налаштування → Сповіщення');};
   const on=$('#pc-on');if(on)on.onclick=async()=>{el.remove();if(!home){armHome();return;}await pushEnable();};}
 async function pushEnable(){
   {
