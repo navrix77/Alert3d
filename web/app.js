@@ -956,11 +956,12 @@ $('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&N
 /* ---------- Web Push: сповіщення від сервера навіть із закритим сайтом ---------- */
 function b64u(s){const p='='.repeat((4-s.length%4)%4);const b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0));}
 async function webPushSync(loud){
-  if(!('serviceWorker' in navigator)||!('PushManager' in window)){if(loud&&PREF.sys)toast(/iPhone|iPad/.test(navigator.userAgent)?'На iPhone: «Поділитися → На початковий екран», потім відкрийте звідти':'Цей браузер не підтримує сповіщення із закритим сайтом');return;}
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){wpStatus(null,/iPhone|iPad/.test(navigator.userAgent)?'відкрийте SKY з іконки на початковому екрані («Поділитися» → «На початковий екран»)':'цей браузер не підтримує');if(loud&&PREF.sys)toast(/iPhone|iPad/.test(navigator.userAgent)?'На iPhone: «Поділитися → На початковий екран», потім відкрийте звідти':'Цей браузер не підтримує сповіщення із закритим сайтом');return;}
   try{const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
     if(!PREF.sys||!home||Notification.permission!=='granted'){
       if(sub){fetch('/api/webpush/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});await sub.unsubscribe();try{localStorage.removeItem('wp_home');}catch(e){}}
-      if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');wpStatus(null);return;}
+      if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');
+      wpStatus(null,!home?'не позначено дім':Notification.permission==='denied'?'телефон заборонив: Налаштування iPhone → Сповіщення → NAVRYX SKY':!PREF.sys?'вимкнено':'немає дозволу');return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
     // обрані області й громади (явно, не автоматична «область дому») — сервер шле по них зведення навіть із закритим застосунком
     const MZ=myZones(),zones=(MZ.obl&&MZ.obl.length)||(MZ.hrom&&MZ.hrom.length)?{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)}:null;// без явного вибору — область дому
@@ -968,10 +969,13 @@ async function webPushSync(loud){
     if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false,zones})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
     wpStatus(sub);
-  }catch(e){if(loud)toast('Не вдалося увімкнути сповіщення: '+(e&&e.message||e));}}
+  }catch(e){wpStatus(null,'помилка: '+(e&&e.message||e));if(loud)toast('Не вдалося увімкнути сповіщення: '+(e&&e.message||e));}}
 // стан підписки й кнопка «Надіслати тестове»: щоб перевірити, що сповіщення справді доходять на цей телефон
-function wpStatus(sub){const row=$('#st-wp-row');if(!row)return;row.hidden=!sub;if(!sub)return;
-  $('#st-wp-st').textContent='✓ Цей пристрій отримує сповіщення про загрози для вашого дому';
+function wpStatus(sub,why){const row=$('#st-wp-row');if(!row)return;row.hidden=false;const st=$('#st-wp-st'),bt=$('#st-wp-test');
+  window.__wpOK=!!sub;
+  if(!sub){st.textContent='✗ Сповіщення на цей пристрій не надходять: '+(why||'не увімкнено');bt.textContent='Увімкнути';bt.onclick=()=>pushEnable();return;}
+  bt.textContent='Надіслати тестове';
+  st.textContent='✓ Цей пристрій отримує сповіщення про загрози для вашого дому';
   $('#st-wp-test').onclick=async()=>{const r=await fetch('/api/webpush/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>null);
     const j=r?await r.json().catch(()=>({})):{};toast(r&&r.ok?'Надіслано. Заблокуйте екран: сповіщення має прийти за кілька секунд':'Не вдалося: '+(j.why||'немає звʼязку'));};}
 if($('#st-pre')){$('#st-pre').checked=PREF.pre!==false;$('#st-pre').onchange=e=>{PREF.pre=e.target.checked;savePref();webPushSync(false);};}
@@ -983,7 +987,7 @@ function pushCard(){if(document.getElementById('push-card'))return;
   let dismissed=0;try{dismissed=+localStorage.getItem('push_card_x')||0;}catch(e){}
   if(Date.now()-dismissed<3*864e5)return;
   let txt,btn;
-  if(can&&Notification.permission==='granted'&&PREF.sys)return;
+  if(can&&Notification.permission==='granted'&&PREF.sys&&window.__wpOK)return;
   if(can&&Notification.permission==='denied')return;
   if(!can&&ios&&!standalone){txt='Щоб SKY попереджав навіть із закритим телефоном: «Поділитися» → «На початковий екран», і відкрийте SKY звідти.';btn=null;}
   else if(can){txt=home?'Попереджати про загрози для вашого дому й області навіть із закритим застосунком?':'Позначте свій дім, і SKY попереджатиме про загрози для нього навіть із закритим застосунком.';btn=home?'Увімкнути сповіщення':'Позначити дім';}
@@ -992,10 +996,12 @@ function pushCard(){if(document.getElementById('push-card'))return;
   el.innerHTML='<b>🔔 Сповіщення</b><span>'+esc(txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>';
   document.body.appendChild(el);
   $('#pc-x').onclick=()=>{try{localStorage.setItem('push_card_x',Date.now());}catch(e){}el.remove();};
-  const on=$('#pc-on');if(on)on.onclick=async()=>{
-    if(!home){el.remove();armHome();return;}
-    const r=await Notification.requestPermission();if(r!=='granted'){toast('Телефон не дозволив сповіщення. Увімкніть їх у налаштуваннях телефону для SKY');el.remove();return;}
-    PREF.sys=true;savePref();if($('#st-sys'))$('#st-sys').checked=true;await webPushSync(true);el.remove();
+  const on=$('#pc-on');if(on)on.onclick=async()=>{el.remove();if(!home){armHome();return;}await pushEnable();};}
+async function pushEnable(){
+  {
+    if(!home){toast('Спершу позначте свій дім');armHome();return;}
+    const r=await Notification.requestPermission();if(r!=='granted'){toast('Телефон не дозволив сповіщення. Увімкніть їх у налаштуваннях телефону для SKY');return;}
+    PREF.sys=true;savePref();if($('#st-sys'))$('#st-sys').checked=true;await webPushSync(true);
     // одразу перевіряємо доставку: тестове сповіщення
     try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
       if(sub)fetch('/api/webpush/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});}catch(e){}
