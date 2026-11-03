@@ -307,30 +307,24 @@ map.on('style.load',addOverlays);
 let introT0=Date.now();if(INTRO)document.body.classList.add('intro');
 function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
   const mob=innerWidth<640;
-  // кінцевий стан: 3D (pitch 45–55°), північ угорі, zoom +0.7 від стартового (край країни ще в кадрі), центр — дім, якщо він є
-  // кінцевий стан: той самий центр країни, лише нахил і трохи ближче (+0.3), північ угорі; на дім камера НЕ їде, Україна лишається по центру
-  // кінцевий стан (03.11): 3D з наближенням до дому; якщо дому немає — до геопозиції (GEOPOS, визначається під час паузи); інакше центр країни
+  // кінцевий стан: 3D з наближенням до дому; без дому — до геопозиції (визначається під час паузи); без обох — центр країни з нахилом
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
   const camFor=()=>{const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
-  const cam=camFor();
   const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
-  // повторний запуск протягом 5 хв: камера вже там, де її закрили; без прольоту
-  if(LASTCAM){if(el)el.remove();tilt=map.getPitch()>20;finish();return;}
-  // 03.11: виняток «ціль у бік дому → одразу картка» прибрано: на старті відкривалася картка непідтвердженого шахеда за 84 км.
-  // Про загрозу дому й так каже панель унизу; старт завжди однаковий
-  if(skip||!INTRO||REDUCE){if(el)el.remove();if(INTRO)map.jumpTo(cam);tilt=true;window.__introAt=Date.now();finish();return;}
-  // поки летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
+  // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
+  const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
+    const c=camFor();if(REDUCE)map.jumpTo(c);else map.flyTo({...c,duration:2400,curve:1.25,essential:true});window.__introAt=Date.now();tilt=true;setTimeout(finish,REDUCE?50:2500);};
+  if(skip){if(el)el.remove();document.body.classList.remove('intro');go();return;}
+  // поки стоїмо й летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
-  const wait=Math.max(0,2300-(Date.now()-introT0));   // логотип встигає зіграти
+  const wait=(el&&INTRO)?Math.max(0,2300-(Date.now()-introT0)):0;   // логотип встигає зіграти (лише при першому запуску в сесії)
   // без дому: за час паузи питаємо геопозицію (тихо, 4 с), щоб було куди наближатися
   if(!home&&navigator.geolocation){try{navigator.geolocation.getCurrentPosition(p=>{window.__GEOPOS=[p.coords.longitude,p.coords.latitude];},()=>{},{enableHighAccuracy:false,timeout:4000,maximumAge:600000});}catch(e){}}
-  setTimeout(()=>{el&&el.classList.add('out');setTimeout(()=>el&&el.remove(),1400);document.body.classList.remove('intro');
+  setTimeout(()=>{if(el){el.classList.add('out');setTimeout(()=>el.remove(),1400);}document.body.classList.remove('intro');
     // поки мапа стоїть у 2D, усі цілі пульсують кільцями кольору свого типу: за 5 с видно, що де летить
     window.FXHLALL={t0:performance.now(),until:performance.now()+5000};map.triggerRepaint();
-    // 2D по центру стоїть 5 с, потім плавний переліт у 3D з наближенням (2.4 с)
-    setTimeout(()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
-      map.flyTo({...camFor(),duration:2400,curve:1.25,essential:true});window.__introAt=Date.now();tilt=true;setTimeout(finish,2500);},5000);},wait);}
+    setTimeout(go,5000);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').reduce((a,t)=>a+(t.count||1),0);// так само, як лічильники вгорі: з урахуванням ×N у групах
@@ -338,7 +332,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
 // перехід запускається, коли прийшли дані (перший знімок) і карта готова, а не за таймером; 7 с — запобіжник, якщо дані не йдуть
 map.once('idle',()=>{if(SNAP)introFly(false);});
 setTimeout(()=>introFly(false),7000);
-{const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}if(LASTCAM)introFly(true);}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
+{const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
 /* ---------- дім: змінюється лише свідомо (Налаштування → «Змінити дім»), лише на суші України ---------- */
 let homeArmT=null;
 function armHome(){setHomeMode=true;$('#b-home').classList.add('on');toast('Торкніться карти, щоб позначити дім (30 с)');clearTimeout(homeArmT);
