@@ -8,10 +8,10 @@ name: Сервер ← main (Cloud Run)
 # Потім GitHub → Settings → Secrets and variables → Actions → New repository secret:
 #   GCP_PROJECT = <id проєкту>      GCP_SA_KEY = увесь вміст sky-deploy.json (після цього файл видалити)
 # Далі кожен push у main (крім mobile/, widget/, capacitor/) сам потрапляє на сервер за 5–10 хв.
+# 04.11: sky.navryx.com.ua зараз працює на ВМ, яка сама оновлюється з main кожні 5 хв (deploy/vm-setup.sh → update.sh,
+# лише після тестів). Тому автозапуск на кожен push вимкнено: без секретів він щоразу падав, а Cloud Run для сайту не потрібен.
+# Запуск лише вручну, якщо колись повернемося на Cloud Run.
 on:
-  push:
-    branches: [main]
-    paths-ignore: ['mobile/**', 'widget/**', 'capacitor/**', '.github/workflows/android.yml', '.github/workflows/ios.yml', '.github/workflows/widget.yml', '**.md']
   workflow_dispatch:
 permissions:
   contents: read
