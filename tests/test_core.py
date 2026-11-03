@@ -745,7 +745,7 @@ def test_push_stages_like_israel():
     pu.db.execute("INSERT INTO subs VALUES('ExponentPushToken[abcdefghijkl]', 36.23, 50.0, 0)")
     many = [dict(straight, id=f"Ш-{i}") for i in range(10, 30)]
     asyncio.run(pu.tick(Cli(), {"tracks": many}))
-    assert len(sent) == 1 and sent[0]["title"].startswith("20 цілей")  # одне зведене, а не 20 сповіщень
+    assert len(sent) == 1 and "20 цілей до вас" in sent[0]["title"]  # одне зведене, а не 20 сповіщень
     sent.clear()
     import time as _t
     for k in pu.armed["ExponentPushToken[abcdefghijkl]"]:
@@ -815,7 +815,7 @@ def test_webpush_subscribe_and_stage_send(tmp_path, monkeypatch):
         async def post(self, *a, **k):
             raise AssertionError("Expo не має викликатися для веб-підписок")
     asyncio.run(pu.tick(Cli(), {"tracks": [tr]}))
-    assert len(got) == 1 and "курс на ваш район" in got[0][1]["title"]
+    assert len(got) == 1 and got[0][1]["title"][:1] in "🔴🟠" and "Шахед" in got[0][1]["title"]
     assert pu.count() == 0  # 410 Gone — браузер скасував підписку
 
 

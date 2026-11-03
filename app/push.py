@@ -22,7 +22,47 @@ log = logging.getLogger("push")
 DB = Path(__file__).resolve().parent.parent / "data" / "push.sqlite"
 TOKEN_RX = re.compile(r"^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_\-]{10,}\]$")
 FROM = ["півночі", "північного сходу", "сходу", "південного сходу", "півдня", "південного заходу", "заходу", "північного заходу"]
-NAME = {"shahed": "Шахед", "jet": "Реактивний БпЛА", "molniya": "«Молнія»", "cruise": "Крилата ракета", "ballistic": "Балістика"}
+NAME = {"shahed": "Шахед", "jet": "Реактивний БпЛА", "molniya": "«Молнія»", "cruise": "Крилата ракета", "ballistic": "Балістика",
+        "geran5": "«Герань-5»", "banderol": "«Бандероль»", "rszv": "РСЗВ", "fpv": "FPV-дрон", "fpvf": "FPV на оптоволокні",
+        "recon": "Дрон-розвідник", "lancet": "«Ланцет»"}
+COMPASS = ["на північ", "на північний схід", "на схід", "на південний схід", "на південь", "на південний захід", "на захід", "на північний захід"]
+
+
+def _hm(t) -> str:
+    return time.strftime("%H:%M", time.localtime(t)) if t else "?"
+
+
+def _who(tr: dict) -> str:
+    """Доказовість одним рядком: скільки незалежних джерел і коли останнє місце від каналів."""
+    ev = tr.get("ev") or {}
+    n = len(ev.get("prim") or []) or len(tr.get("srcs") or []) or 1
+    at = tr.get("at")
+    return (f"{n} незалежн{'е джерело' if n == 1 else 'і джерела' if n < 5 else 'их джерел'}"
+            + (f" · місце о {_hm(at[1])}" if at else f" · оновлено о {_hm(tr.get('last'))}"))
+
+
+def _rel(a: dict) -> str:
+    """«12 км на захід від вас» (assess дає сторону в родовому: «заходу»)."""
+    side = COMPASS[FROM.index(a["side"])] if a.get("side") in FROM else ""
+    return f"{max(1, round(a['d']))} км {side} від вас".replace("  ", " ")
+
+
+def _where(tr: dict, a: dict) -> str:
+    if a.get("d") is None:
+        return "Місце невідоме: канали назвали лише курс" + (f" на {tr['next']}" if tr.get("next") else "")
+    at = tr.get("at")
+    return _rel(a) + (f" · останнє місце: {at[0]}" if at else "")
+
+
+def _move(tr: dict) -> str:
+    hd = tr.get("hd")
+    parts = []
+    if tr.get("next"):
+        parts.append(f"Курс → {tr['next']}")
+    if hd is not None:
+        parts.append(("ймовірно " if not tr.get("next") else "") + COMPASS[round(hd / 45) % 8])
+    return " · ".join(parts) if parts else "Курс невідомий"
+
 VAPID_KEY = DB.parent / "vapid_private.pem"  # ключ сервера для Web Push (браузер/PWA/iPhone з початкового екрана)
 REARM = 600  # повтор по тій самій цілі — не раніше ніж за 10 хв після зникнення загрози
 
@@ -264,9 +304,9 @@ class Push:
                     self.armed.pop(token, None)  # пів години без новин — тихо забуваємо, але «відбою» не обіцяємо
                 elif gone and len(gone) == len(arm) and now - max(arm.values()) > 120:
                     self.armed.pop(token, None)
-                    out.append({"to": token, "title": "Цілі, що йшли до вас, віддалились",
-                                "body": "За повідомленнями каналів цілі, що летіли у ваш бік, віддаляються або більше не фіксуються. "
-                                        "Офіційний відбій, лише за сиреною та «Повітряною тривогою».",
+                    out.append({"to": token, "title": "🟢 Цілі, що йшли до вас, віддалились",
+                                "body": "За повідомленнями каналів вони віддаляються або більше не фіксуються.\n"
+                                        "Це ще не відбій: офіційний відбій лише за сиреною та «Повітряною тривогою».",
                                 "sound": "default", "channelId": "threats", "data": {}})
         self.fired = {k: v for k, v in self.fired.items() if now - v < 3 * REARM}
         web_out = [dict(m, sub=webs[m["to"]]) for m in out if m["to"] in webs]
@@ -286,21 +326,39 @@ class Push:
 
     @staticmethod
     def _compose(thr: list, pre: list) -> tuple[str, str, str] | None:
-        """Одне повідомлення на телефон за тік, навіть коли цілей багато."""
+        """Одне повідомлення на телефон за тік, навіть коли цілей багато. Структура однакова для всіх рівнів:
+        заголовок — рівень (колір), що і коли; тіло — де зараз, куди летить, на чому ґрунтується, що робити."""
         if thr:
-            thr.sort(key=lambda x: x[1]["eta"] if x[1]["eta"] is not None else 999)
+            # першою — найнебезпечніша: уже поруч, далі найменший час підльоту, далі найближча
+            thr.sort(key=lambda x: (0 if x[1].get("d") is not None and x[1]["d"] <= NEAR_KM else 1,
+                                    x[1]["eta"] if x[1]["eta"] is not None else 999, x[1]["d"] if x[1]["d"] is not None else 999))
             tr, a = thr[0]
+            nm = NAME.get(tr["type"], "Ціль") + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
+            near = a.get("d") is not None and a["d"] <= NEAR_KM
+            soon = a["eta"] is not None and a["eta"] <= 10
+            lvl = "🔴" if near or soon else "🟠"
             n = sum(t.get("count") or 1 for t, _ in thr)
-            title = (f"{NAME.get(tr['type'], 'Ціль')}" + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
-                     + ", курс на ваш район") if len(thr) == 1 else f"{n} цілей, курс на ваш район"
-            body = (f"{round(a['d'])} км з {a['side']}" if a.get("d") is not None else "місце невідоме, канали назвали курс") + (f" · ~{max(1, round(a['eta']))} хв" if a["eta"] is not None else "") + \
-                (f" · → {tr['next']}" if tr.get("next") else "") + (f" · ймовірність {round(a['p'] * 100)}%" if a["p"] < 1 else "")
-            return title, body, tr["id"]
+            if len(thr) > 1:
+                title = f"{lvl} {n} {'ціль' if n % 10 == 1 and n % 100 != 11 else 'цілі' if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else 'цілей'} до вас · найближча " + (f"~{max(1, round(a['eta']))} хв" if a["eta"] is not None else f"{round(a['d'])} км" if a.get("d") is not None else "місце невідоме")
+            elif a["eta"] is not None and soon:
+                title = f"{lvl} {nm} · ~{max(1, round(a['eta']))} хв до вас"
+            elif near:
+                title = f"{lvl} {nm} поруч · {max(1, round(a['d']))} км"
+            elif a["eta"] is not None:
+                title = f"{lvl} {nm} · ~{max(1, round(a['eta']))} хв до вас"
+            else:
+                title = f"{lvl} {nm} · курс на ваш район"
+            lines = [_where(tr, a), _move(tr) + (f" · шанс пройти поруч {round(a['p'] * 100)}%" if a["p"] < 1 else ""), _who(tr)]
+            if len(thr) > 1:
+                rest = [f"{NAME.get(t['type'], 'ціль')} " + (_rel(x).replace(" від вас", "") if x.get("d") is not None else "місце невідоме") for t, x in thr[1:3]]
+                lines.append("Ще: " + "; ".join(rest) + (f" і ще {len(thr) - 3}" if len(thr) > 3 else ""))
+            lines.append("Перейдіть в укриття." if lvl == "🔴" else "Будьте поруч з укриттям.")
+            return title, "\n".join(lines), tr["id"]
         if pre:
             pre.sort(key=lambda x: -x[1]["p"])
             tr, a = pre[0]
-            title = "Можлива загроза: будьте поруч з укриттям"
-            body = (f"{NAME.get(tr['type'], 'Ціль')} за {round(a['d'])} км з {a['side']}, ймовірність пройти поруч ~{round(a['p'] * 100)}%"
-                    + (f"; ще {len(pre) - 1}" if len(pre) > 1 else "") + ". Це ще не тривога, може й не дійти.")
-            return title, body, tr["id"]
+            title = f"🟡 Можлива загроза · {NAME.get(tr['type'], 'Ціль')} {round(a['d'])} км"
+            lines = [_where(tr, a), _move(tr) + f" · шанс пройти поруч ~{round(a['p'] * 100)}%", _who(tr)
+                     + (f" · ще {len(pre) - 1} поруч" if len(pre) > 1 else ""), "Це ще не тривога. Будьте поруч з укриттям."]
+            return title, "\n".join(lines), tr["id"]
         return None

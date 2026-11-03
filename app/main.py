@@ -370,9 +370,14 @@ async def lifespan(app: FastAPI):
         """Щоденний самоаналіз на самому сервері (тут журнал): о ~05:40 → data/selfcheck.json, читає рутина через /api/selfcheck."""
         import sys as _sys
         root = Path(__file__).resolve().parent.parent
+        first = not SELFCHECK_FILE.exists() or time.time() - SELFCHECK_FILE.stat().st_mtime > 20 * 3600
         while True:
-            lt = time.localtime()
-            await asyncio.sleep(((5 - lt.tm_hour) * 3600 + (40 - lt.tm_min) * 60 - lt.tm_sec) % 86400 or 86400)
+            if first:  # звіту немає або він старий (перший запуск, простій) — робимо одразу, а не чекаємо 05:40
+                first = False
+                await asyncio.sleep(90)
+            else:
+                lt = time.localtime()
+                await asyncio.sleep(((5 - lt.tm_hour) * 3600 + (40 - lt.tm_min) * 60 - lt.tm_sec) % 86400 or 86400)
             try:
                 pr = await asyncio.create_subprocess_exec("nice", "-n", "15", _sys.executable, str(root / "scripts" / "selfcheck.py"),
                                                           str(root / "data" / "brain.sqlite"), "--days", "3", "--out", str(SELFCHECK_FILE),

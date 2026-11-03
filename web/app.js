@@ -977,7 +977,7 @@ function note(n){
   const box=$('#notes');if(!box)return;
   const el=document.createElement('div');el.className='note-c';el.style.setProperty('--nc',NOTE_CLR[n.lvl]||NOTE_CLR.orange);
   const tm=new Date((n.t||Date.now()/1000)*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
-  el.innerHTML='<span class="ni">'+(n.ic||'🔔')+'</span><div><b>'+esc(n.title)+'</b>'+(n.sub?'<small>'+esc(n.sub)+'</small>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
+  el.innerHTML='<span class="ni">'+(n.ic||'🔔')+'</span><div><b>'+esc(String(n.title).replace(/^(🔴|🟠|🟡|🟢)\s*/u,''))+'</b>'+(n.sub?'<small>'+esc(n.sub)+'</small>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
   const close=()=>{el.classList.add('out');setTimeout(()=>{el.remove();notesAll();},300);};
   el.querySelector('.nx').onclick=e=>{e.stopPropagation();close();};
   el.onclick=()=>{if(n.go)n.go();};
@@ -1034,8 +1034,11 @@ function notesCheck(s){
     if(!z){for(let m=5;m<=30;m+=5){const q=posAt(t,serverT+m*60).p;z=zoneOf(q);if(z){eta=m;break;}}}
     if(!z&&!(PREF.nAll&&fast))continue;   // не моя зона, мовчимо
     note({k,lvl:z?'red':(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
-      title:(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(t.next?' → '+t.next:''),
-      sub:z?(eta?'за ~'+eta+' хв буде в зоні «'+z+'»':'у зоні «'+z+'»'):'Нова ціль'+(t.launch&&t.launch.site&&!t.launch.est?' · запуск: '+t.launch.site:''),go:()=>openSheet(t.id)});}
+      title:(z?(eta?'🟠 ':'🔴 '):'')+(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(z?(eta?' · ~'+eta+' хв до «'+z+'»':' · у межах «'+z+'»'):'')+(t.next?' → '+t.next:''),
+      sub:[t.at?'останнє місце: '+t.at[0]+' о '+fmt(t.at[1]):(t.nopos?'місце невідоме, канали назвали курс':''),
+           t.hd!=null?(t.next?'':'ймовірно ')+SIDE[Math.round(t.hd/45)%8]:'',
+           ((t.ev&&t.ev.prim)||[]).length>1?((t.ev.prim.length)+' незалежні джерела'):'одне джерело',
+           !z&&t.launch&&t.launch.site&&!t.launch.est?'запуск: '+t.launch.site:''].filter(Boolean).join(' · '),go:()=>openSheet(t.id)});}
   // 3) тривога / відбій у моїх областях і громадах
   const Z=myZones();
   for(const o of Z.obl){const lv=(s.levels||{})[o]||0,pv=NZLV.get('o:'+o);
