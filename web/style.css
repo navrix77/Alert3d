@@ -589,3 +589,6 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 
 /* «Закрити всі» під картками, щоб не перекривати лічильники цілей */
 .notes .all{order:-1;align-self:flex-start}
+
+/* плавне зникнення картки сповіщення */
+.note-c.out{animation:none!important;transition:opacity .6s ease,transform .6s ease;opacity:0;transform:translateY(-8px) scale(.98)}

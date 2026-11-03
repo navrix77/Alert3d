@@ -1040,7 +1040,9 @@ function note(n){
   el.innerHTML='<span class="ni'+(n.type?' ni-t':'')+'">'+(n.type?'':(n.ic||'🔔'))+'</span><div class="nb"><b>'+esc(String(n.title).replace(/^(🔴|🟠|🟡|🟢)\s*/u,''))+'</b>'+
     (parts.length?'<div class="nch">'+parts.map((x,i)=>'<span'+(i===0?' class="lead"':'')+'>'+esc(x)+'</span>').join('')+'</div>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
   if(n.type){const im=new Image();im.alt='';im.width=im.height=32;im.style.objectFit='contain';im.onerror=()=>{try{im.replaceWith(drawTarget(n.type,22));}catch(e){}};im.src='sprites/t-'+n.type+'.png?v=ref2';el.querySelector('.ni').appendChild(im);}
-  const close=()=>{el.classList.add('out');setTimeout(()=>{el.remove();notesAll();},300);};
+  const close=()=>{if(el.classList.contains('out'))return;el.classList.add('out');setTimeout(()=>{el.remove();notesAll();},600);};
+  // зникає сама за 3 с плавно; якщо застосунок у фоні, відлік починається, коли користувач його відкрив
+  const arm=()=>{if(document.hidden){document.addEventListener('visibilitychange',function v(){if(!document.hidden){document.removeEventListener('visibilitychange',v);setTimeout(close,3000);}});}else setTimeout(close,3000);};arm();
   el.querySelector('.nx').onclick=e=>{e.stopPropagation();close();};
   el.onclick=()=>{if(n.go)n.go();};
   box.insertBefore(el,box.querySelector('.note-c'));
