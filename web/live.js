@@ -130,7 +130,17 @@
       while (paused && !stop) await wait(200);
     }
     playing = false;
+    if (!stop) autoClose();
   }
+  // 04.11 власник: немає новин і змін — ефір сам вимикається (як радіо мовчить); є зміни — панель зникає за 30 с,
+  // якщо людина не відкрила питання (⋯) і не взаємодіє з нею
+  let acT = null;
+  function autoClose() {
+    clearTimeout(acT);
+    const c = curDiff && curDiff.counts, quiet = !c || (!c.new && !c.changed && !c.gone && !(curDiff.bal || []).length);
+    acT = setTimeout(() => { if (!playing && !box.hidden && !box.classList.contains('full') && !shelter) $('#lv-close').click(); }, quiet ? 6000 : 30000);
+  }
+  box.addEventListener('pointerdown', () => clearTimeout(acT));
   let paused = false;
 
   // ---------- запити
