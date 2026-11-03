@@ -337,7 +337,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
     setTimeout(go,5000);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
-  if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').reduce((a,t)=>a+(t.count||1),0);// так само, як лічильники вгорі: з урахуванням ×N у групах
+  if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;// так само, як лічильники вгорі: треки, без ×N
     st.textContent=(c.channels?c.live+' з '+c.channels+' джерел наживо · ':'')+(act?'цілей у повітрі: '+act:'небо поки чисте');}else st.textContent=['Підключаюсь до джерел…','Читаю монітори…','Збираю картину неба…'][n%3];},450);}
 // перехід запускається, коли прийшли дані (перший знімок) і карта готова, а не за таймером; 7 с — запобіжник, якщо дані не йдуть
 map.once('idle',()=>{if(SNAP)introFly(false);});
@@ -615,7 +615,10 @@ function focusType(t){const ps=SNAP.tracks.filter(x=>x.status==='active'&&x.type
   document.querySelectorAll('#counters .cnt').forEach(c=>c.classList.toggle('hl-off',c.title!==TYPE_NAME[t]));clearTimeout(focusType.t);
   focusType.t=setTimeout(()=>{document.querySelectorAll('#counters .cnt').forEach(c=>c.classList.remove('hl-off'));map.triggerRepaint();},3500);}
 function renderCounters(){
-  const act=SNAP.tracks.filter(t=>t.status==='active');const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+(t.count||1));
+  // 04.11: лічильник рахує ТРЕКИ, а не суму ×N (85 «одиниць» при 48 треках збивало з пантелику); ×N лишається на значках.
+  // Цілі, про які не писали 10+ хв, у лічильник не входять (на мапі вони напівпрозорі)
+  const nowS=Date.now()/1000+offset;const fresh=t=>(((t.ev&&t.ev.age)||0)+Math.max(0,nowS-SNAP.now))<600;
+  const act=SNAP.tracks.filter(t=>t.status==='active'&&fresh(t));const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+1);
   const order=['shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','lancet','fpv','fpvf'];
   $('#counters').innerHTML='';
   order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];const c=(CNTI[t]&&CNTI[t]._sprite?CNTI[t]:(CNTI[t]=drawTarget(t,28)));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);const w=document.createElement('div');w.className='cw';const b=document.createElement('b');b.textContent=by[t];if(renderCounters.prev&&renderCounters.prev[t]!==by[t])b.className='pop';
