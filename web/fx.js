@@ -156,7 +156,7 @@
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
-      const spr = Math.max(21, Math.min(38, 9 + z * 2.6));  // 03.11: «цілі губляться» — крупніше на всіх масштабах  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
+      const spr = z < 6 ? Math.max(8, z * 2.2 - 0.5) : Math.min(38, 9 + z * 2.6);  // країна: компактно (z4 ≈ 23 px), область і місто: крупно (z7 ≈ 54 px)  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
       const glow = [], top = [];
       const day = !!window.FXDAY;
       if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
@@ -229,7 +229,7 @@
         const q = [[f._m[0], f._m[1], sz * 0.97, r, [1, 1, 1, a], 4, 0, 0, sh * 0.7, sh],
                    [f._m[0], f._m[1], sz, r, rc, 3 + (bank + 1) / 2 * 0.4]];
         this.draw(gl, this.quads(q), 2);
-        if (f.type === 'jet' && !(HL && HL.type !== 'jet')) { // язик полум'я позаду сопла (сопло ≈ 0.88 напіврозміру від центру)
+        if (f.type === 'jet' && z >= 6 && !(HL && HL.type !== 'jet')) {  // на масштабі країни полум'я лише заважає // язик полум'я позаду сопла (сопло ≈ 0.88 напіврозміру від центру)
           const fs = sz * 0.85, back = sz * 0.86 + fs * 0.95, seed = ((f.p[0] * 97 + f.p[1] * 31) % 1 + 1) % 1;
           const nb = sz * 0.9, flick = 0.55 + 0.25 * Math.sin(tt * 29 + seed * 40) * Math.sin(tt * 13 + seed * 9);
           fl.push([f._m[0], f._m[1], sz * 0.55, r, [1, 0.45, 0.12, 0.55 * flick], 0, 0, 0, -Math.sin(r) * nb, Math.cos(r) * nb]); // відсвіт від сопла
