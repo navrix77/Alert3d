@@ -1323,10 +1323,13 @@ setInterval(()=>{
   if(PREF.follow)followOn();}
 /* ---------- ШІ: «Що зараз відбувається?» для області дому (03.11) ---------- */
 fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const box=$('#ai-box');if(!box)return;box.hidden=false;
-  $('#ai-ask').onclick=async e=>{e.stopPropagation();const ob=homeObl();const a=$('#ai-ans');a.hidden=false;
+  const aiHide=()=>{const a=$('#ai-ans');a.hidden=true;a.innerHTML='';clearTimeout(aiHide.t);};
+  $('#ai-ans').onclick=e=>{e.stopPropagation();if(e.target.closest('.ai-x'))aiHide();};
+  $('#ai-ask').onclick=async e=>{e.stopPropagation();const a=$('#ai-ans');if(!a.hidden){aiHide();return;}// друге торкання — сховати
+    const ob=homeObl();a.hidden=false;clearTimeout(aiHide.t);aiHide.t=setTimeout(aiHide,90000);// саме зникає за 1,5 хв
     if(!ob){a.innerHTML='Спершу позначте дім кнопкою ⌂';return;}
     a.innerHTML='<small>Аналізую дані SKY…</small>';
     try{const r=await (await fetch('/api/ask?obl='+encodeURIComponent(ob))).json();
-      a.innerHTML=esc(r.text||'Немає відповіді')+'<small class=ai-note>'+esc(r.note||'Оцінка ШІ за даними SKY')+(r.t?' · '+fmt(r.t):'')+'</small>';}
+      a.innerHTML='<button class=ai-x aria-label="Закрити">✕</button>'+esc(r.text||'Немає відповіді')+'<small class=ai-note>'+esc(r.note||'Оцінка ШІ за даними SKY')+(r.t?' · '+fmt(r.t):'')+'</small>';}
     catch(x){a.innerHTML='Не вдалося отримати відповідь';}};}).catch(()=>{});
 })();
