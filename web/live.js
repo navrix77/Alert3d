@@ -249,6 +249,7 @@
       const r = await (await fetch('/api/radio?scope=' + scope + '&t=' + Math.round(radioSeen || (NX().now() - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
         (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : ''))).json();
       if (!radioOn) return;
+      if (!r.text) { if (scope === 'region') radioSeen = NX().now(); return; }  // нового немає: мовчимо, не повторюємо
       // свій регіон без змін — не повторюємо щоразу «змін немає», лише раз на ~6 хв
       if (scope === 'region' && /суттєвих змін|змін немає|без змін/i.test(r.text || '') && ++radioQuiet % 3 !== 1) return;
       if (scope === 'region') radioSeen = NX().now();

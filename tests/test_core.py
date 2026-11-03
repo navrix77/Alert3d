@@ -1548,3 +1548,21 @@ def test_llm_breaker_and_tts_wav():
     assert not l._live("groq") and l.off["groq"] - __import__("time").time() < 400
     w = tts._wav(b"\x00\x00" * 100, 24000)
     assert w[:4] == b"RIFF" and len(w) == 244
+
+
+def test_say_form_and_radio_memory(monkeypatch):
+    import asyncio
+    from app.tts import say_form
+    from app import live
+    t = say_form("МіГ-31К зліт, Х-101 ×3, БпЛА")
+    assert "міг тридцять один ка" in t and "ха сто один" in t and "безпілотник" in t and "×" not in t
+
+    class L:
+        on = True
+        async def call(self, *a, **k):
+            return "На Харківщині без змін.", "x:y"
+    monkeypatch.setattr(live, "radio_context", lambda *a: ("ctx", "fb"))
+    monkeypatch.setattr(live, "RADIO_MEM", {})
+    r1 = asyncio.run(live.radio(L(), None, None, None, 0, None, "Харківська", "region"))
+    r2 = asyncio.run(live.radio(L(), None, None, None, 0, None, "Харківська", "region"))
+    assert r1["text"] and r2["text"] == "" and r2.get("quiet")
