@@ -95,8 +95,9 @@
         float outl = clamp(o1 - t.a, 0.0, 1.0);
         float halo = 0.0 * o2;
         vec3 body = t.rgb * (0.86 + 0.22 * dif) + vec3(spec * 0.12);   // текстура вже з реалістичним світлом: без «пластику»
-        float a = max(t.a, outl * 0.55);
-        gl_FragColor = vec4(clamp(body, 0.0, 1.0) * t.a + vec3(0.0) * outl, a) * v_col.a;
+        // тонкий світлий край: на темному супутнику вночі силует не зникає; тінь під ціллю тримає контраст на світлих полях
+        float a = max(t.a, outl * 0.6);
+        gl_FragColor = vec4(clamp(body, 0.0, 1.0) * t.a + vec3(0.78, 0.82, 0.88) * outl * 0.6, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -155,7 +156,7 @@
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
-      const spr = Math.max(15, Math.min(34, 7 + z * 2.4));  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
+      const spr = Math.max(21, Math.min(38, 9 + z * 2.6));  // 03.11: «цілі губляться» — крупніше на всіх масштабах  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
       const glow = [], top = [];
       const day = !!window.FXDAY;
       if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
@@ -204,7 +205,7 @@
           // місце лише оцінене (канали не назвали, де ціль зараз): без суцільної «шайби», лише тонке біле кільце,
           // сам силует напівпрозорий. 03.11: шахед «у місті», хоча про місто ніхто не писав
           if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.2, 0, [1, 1, 1, 0.3], 2, 0, 0]); continue; }
-          pk.push([f._m[0], f._m[1], spr * 1.25, 0, [0.0, 0.0, 0.0, 0.42 * a], 0]); }
+          pk.push([f._m[0], f._m[1], spr * 1.45, 0, [0.0, 0.0, 0.0, 0.62 * a], 0]); }
         if (pk.length) this.draw(gl, this.quads(pk), pk.length); }
       const HL = window.FXHL && performance.now() < window.FXHL.until ? window.FXHL : null;
       if (HL) { const ph = (performance.now() - HL.t0) / 1000, fade = Math.min(1, (HL.until - performance.now()) / 600);

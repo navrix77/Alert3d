@@ -1206,3 +1206,12 @@ def test_app_installs_counted(tmp_path):
     v.app_hit("1.1.1.1", "Mozilla", "app"); v.app_hit("1.1.1.1", "Mozilla", "app"); v.app_hit("2.2.2.2", "Mozilla", "install")
     d = v.stats(1)["days"][-1]
     assert d["app_users"] == 1 and d["installs"] == 1 and d["visitors"] == 0
+
+
+def test_kab_namesakes_near_front():
+    """03.11: «КАБ на Запоріжжя» ставило загрозу в село Запоріжжя під Дніпром; «СУшки» ставали селом, «кабельна лінія» КАБом."""
+    o = P.parse("💣 КАБи на Запоріжжя.", "K")
+    assert o.type == "kab" and abs(o.places[0].place.lat - 47.85) < 0.1
+    assert not P.parse("СУшки в бнр, угроза КАБ⚠️", "R").places
+    assert P.parse("Через аварію на кабельній лінії знеструмлено абонентів у Чернігові.", "horizon_of_war_Official").type is None
+    assert not P.parse("Південний схід області: тактична тактика на КАБи", "DN").places
