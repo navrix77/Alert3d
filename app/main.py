@@ -555,6 +555,26 @@ async def webpush_subscribe(body: dict):
     return JSONResponse({"ok": ok}, status_code=200 if ok else 400)
 
 
+_WP_TEST: dict[str, float] = {}
+
+
+@app.post("/api/webpush/test")
+async def webpush_test(body: dict):
+    """Тестове сповіщення на цей пристрій (перевірити, що доходить на заблокований екран). Не частіше разу на хвилину."""
+    ep = str(body.get("endpoint", ""))
+    row = pushsvc.db.execute("SELECT sub FROM websubs WHERE endpoint=?", (ep,)).fetchone()
+    if not row:
+        return JSONResponse({"ok": False, "why": "цей пристрій не підписаний"}, status_code=404)
+    if time.time() - _WP_TEST.get(ep, 0) < 60:
+        return JSONResponse({"ok": False, "why": "не частіше разу на хвилину"}, status_code=429)
+    _WP_TEST[ep] = time.time()
+    await pushsvc._web_send([{"to": ep, "sub": row[0], "title": "🟠 Тест · так виглядатиме загроза",
+                              "body": "12 км на захід від вас · останнє місце: Люботин\nКурс → Пересічне · на північний схід\n"
+                                      "2 незалежні джерела · місце о " + time.strftime("%H:%M") + "\nЦе перевірка: сповіщення доходять.",
+                              "data": {"track": "test"}}])
+    return {"ok": True}
+
+
 @app.post("/api/webpush/unsubscribe")
 async def webpush_unsubscribe(body: dict):
     pushsvc.web_unregister(str(body.get("endpoint", "")))

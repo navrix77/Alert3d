@@ -1085,3 +1085,10 @@ def test_fusion_stays_off_without_data_and_turns_on_with_proven_gain():
         db.execute("INSERT INTO fcast VALUES(?,?,?,?,?,?,?)", (now - (i % 8) * 86400 - 3600, "shahed", "K", json.dumps(c), tr, 600, 20))
     rep = fusion.evaluate(db, now)
     assert rep["on"] is True and rep["by_type"]["shahed"]["fused"]["med"] < rep["by_type"]["shahed"]["current"]["med"]
+
+
+def test_webpush_test_endpoint_rejects_unknown_device():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    r = TestClient(app).post("/api/webpush/test", json={"endpoint": "https://unknown.example/x"})
+    assert r.status_code == 404

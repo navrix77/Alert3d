@@ -943,12 +943,18 @@ async function webPushSync(loud){
   try{const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
     if(!PREF.sys||!home||Notification.permission!=='granted'){
       if(sub){fetch('/api/webpush/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});await sub.unsubscribe();try{localStorage.removeItem('wp_home');}catch(e){}}
-      if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');return;}
+      if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');wpStatus(null);return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
     const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
     if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
+    wpStatus(sub);
   }catch(e){if(loud)toast('Не вдалося увімкнути сповіщення: '+(e&&e.message||e));}}
+// стан підписки й кнопка «Надіслати тестове»: щоб перевірити, що сповіщення справді доходять на цей телефон
+function wpStatus(sub){const row=$('#st-wp-row');if(!row)return;row.hidden=!sub;if(!sub)return;
+  $('#st-wp-st').textContent='✓ Цей пристрій отримує сповіщення про загрози для вашого дому';
+  $('#st-wp-test').onclick=async()=>{const r=await fetch('/api/webpush/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>null);
+    const j=r?await r.json().catch(()=>({})):{};toast(r&&r.ok?'Надіслано. Заблокуйте екран: сповіщення має прийти за кілька секунд':'Не вдалося: '+(j.why||'немає звʼязку'));};}
 if($('#st-pre')){$('#st-pre').checked=PREF.pre!==false;$('#st-pre').onchange=e=>{PREF.pre=e.target.checked;savePref();webPushSync(false);};}
 window.webPushSync=webPushSync;setTimeout(()=>webPushSync(false),4000);
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
