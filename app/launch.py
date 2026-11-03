@@ -313,6 +313,65 @@ class LaunchBook:
         return {"site": site.name, "lat": site.lat, "lon": site.lon, "kind": site.kind, "t": int(t) if t else None, "est": est,
                 "carrier": carrier, "srcs": srcs, "link": link, "p": p, "id": lid, "count": count}
 
+    def site_vector(self, site, typ: str | None) -> dict | None:
+        """Ймовірний напрямок цілей з цього місця пуску за історією: звідки ціль уперше з'являлася в Україні.
+        Перевірка leave-one-out на журналі 26.10–03.11 (1391 перші фіксації, 14 пар тип/місце):
+        середній напрямок влучав у ±45° у 84,5% (наївне «на Київ» 76,7%), у ±30° 60,8% проти 60,4%.
+        Тому показуємо сектор, а не лінію: ширина сектора = 70% історичних відхилень."""
+        if not self.brain:
+            return None
+        import time as _t
+        key = (site.name, typ)
+        cache = getattr(self, "_vcache", None)
+        if cache is None or _t.time() - cache[0] > 600:
+            cache = self._vcache = (_t.time(), {})
+        if key in cache[1]:
+            return cache[1][key]
+        from .geo import Gazetteer
+        g = Gazetteer.load()
+
+        def pts(types, sites):
+            out = []
+            for ty in types:
+                for entry, row in (self.brain.sites.get(ty) or {}).items():
+                    if not entry:
+                        continue
+                    for sn, n in row.items():
+                        s_ = BY_NAME.get(sn)
+                        if not s_ or sn not in sites:
+                            continue
+                        ids = g.lookup(entry) or []
+                        if not ids:
+                            continue
+                        p = min((g.places[i] for i in ids), key=lambda q: dist_km(q.xy, s_.xy))
+                        if dist_km(p.xy, s_.xy) < 900:
+                            out.append((bearing(site.xy, p.xy), n))
+            return out
+        near = {s_.name for s_ in SITE_LIST if dist_km(s_.xy, site.xy) <= 200}
+        alltypes = list(self.brain.sites.keys())
+        how, v = "type", pts([typ] if typ else alltypes, {site.name})
+        if sum(n for _, n in v) < 8:
+            how, v = "site", pts(alltypes, {site.name})
+        if sum(n for _, n in v) < 8:
+            how, v = "near", pts([typ] if typ else alltypes, near)
+        N = sum(n for _, n in v)
+        res = None
+        if N >= 8:
+            x = sum(n * math.sin(math.radians(b)) for b, n in v)
+            y = sum(n * math.cos(math.radians(b)) for b, n in v)
+            m, R = math.degrees(math.atan2(x, y)) % 360, math.hypot(x, y) / N
+            devs = sorted((min(abs(b - m) % 360, 360 - abs(b - m) % 360), n) for b, n in v)
+            acc, w70 = 0.0, 180.0
+            for d, n in devs:
+                acc += n
+                if acc >= 0.7 * N:
+                    w70 = d
+                    break
+            if R >= 0.5:
+                res = {"bearing": round(m), "spread": round(max(12.0, min(60.0, w70))), "n": int(N), "how": how}
+        cache[1][key] = res
+        return res
+
     def snapshot(self, now: float, every: bool = False) -> list[dict]:
         """Актуальні пуски. Позначка живе, доки її зброя фізично може бути в повітрі над Україною: політ від місця пуску
         до найдальшої точки України зі швидкістю типу (×1.25 + 15 хв), не довше за MAXAGE (03.11: «ПУСК: крилаті ракети
@@ -320,4 +379,4 @@ class LaunchBook:
         self.prune(now)
         return [{"id": L.id, "site": L.site.name, "lat": L.site.lat, "lon": L.site.lon, "kind": L.site.kind, "t": int(L.t), "until": int(L.t + ttl(L)),
                  "type": L.type, "count": L.count, "carrier": L.carrier, "srcs": sorted(L.srcs), "links": L.links[-3:],
-                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind, "stage": L.stage} for L in self.items if now - L.t < 6 * 3600 and (every or now < L.t + ttl(L))]
+                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind, "stage": L.stage, "vec": self.site_vector(L.site, L.type) if L.stage != "takeoff" else None} for L in self.items if now - L.t < 6 * 3600 and (every or now < L.t + ttl(L))]

@@ -1386,3 +1386,14 @@ def test_alert_level_line_is_not_target_position():
     """03.11 CXID: «🟡 Харків та передмістя» — рівень тривоги, а шахед «перестрибнув» у центр Харкова."""
     o = P.parse("🟡 Харків та передмістя", "CX")
     assert o.no_target and o.type is None
+
+
+def test_kharkiv_compound_names_and_city_context():
+    """03.11: «Велику Данилівку» ≠ Велике (Житомирщина) + Данилівка (Крим); «над Харковом на П'ятихатки» —
+    місто як контекст, не точка в центрі; «🟡 21:33, Харківський район» — рівень тривоги."""
+    assert [r.place.name for r in P.parse("1 БпЛа невизначеного типу курсом на Велику Данилівку ⚠️", "M").places] == ["Велика Данилівка (Харків)"]
+    assert [r.place.name for r in P.parse("Р. Шахед курсом на Малую Даниловку", "CX").places] == ["Мала Данилівка"]
+    o = P.parse("⚠️ над Харковом на Пятихатки, Сокольники", "ND")
+    assert "Харків" not in [r.place.name for r in o.places]
+    assert P.parse("🟡 21:33, Харківський район", "CX").no_target
+    assert [r.place.name for r in P.parse("Шахед на Нову Водолагу", "X").places] == ["Нова Водолага"]

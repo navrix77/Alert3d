@@ -178,9 +178,17 @@ class Gazetteer:
             g.add([name], Place(name, lat, lon, cat, cls.KIND_POP.get(cat, 500)))
         # населені пункти, яких немає в КАТОТТГ-вибірці, але монітори їх пишуть (перевірено за журналом)
         # 03.11: «Ракета Золочев/Ольшаны», «Вектор Ольшаны/Солоницевка/Люботин» (TLK) — селище Ольшани під Харковом
-        for names, pl in [(["Ольшани", "Ольшаны"], Place("Ольшани", 50.0514, 35.8756, "X", 4_000))]:
-            if not any(abs(g.places[i].lat - pl.lat) < 0.05 and abs(g.places[i].lon - pl.lon) < 0.05 for i in g.idx.get(norm(pl.name), [])):
+        for names, pl in [(["Ольшани", "Ольшаны"], Place("Ольшани", 50.0514, 35.8756, "X", 4_000)),
+                          # «на Малую Даниловку» (R, D, CX, KM): селище під північно-західною межею Харкова
+                          (["Мала Данилівка", "Малая Даниловка", "Мала Даниловка"], Place("Мала Данилівка", 50.063, 36.165, "X", 4_000))]:
+            near = [i for i in g.idx.get(norm(pl.name), []) if abs(g.places[i].lat - pl.lat) < 0.05 and abs(g.places[i].lon - pl.lon) < 0.05]
+            if not near:
                 g.add(names, pl)
+            else:  # уже є в КАТОТТГ: лише додаємо російську форму назви
+                for n in names:
+                    g.idx.setdefault(norm(n), [])
+                    if near[0] not in g.idx[norm(n)]:
+                        g.idx[norm(n)].append(near[0])
         return g
 
     # --- відмінки: спроба звести словоформу до називного

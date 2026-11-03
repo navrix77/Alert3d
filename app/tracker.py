@@ -899,7 +899,9 @@ class Tracker:
                     lim = 8
                 else:
                     continue
-                if d > lim or not same_way(a, b):
+                # той самий пункт призначення («на П'ятихатки» від двох каналів) — курс із «центру міста» міг бути хибним (03.11)
+                dest = lambda tr: ({p.name for p in tr.route} | ({tr.course_to} if tr.course_to else set()))
+                if d > lim or not (same_way(a, b) or (a.type != b.type and dest(a) & dest(b))):
                     continue
                 # той самий канал майже одночасно написав про дві цілі («шахед на Чугуїв» + «ще шахед на Чугуїв») — це різні
                 if a.srcs & b.srcs and abs(a.obs[0].t - b.obs[0].t) < 120:
