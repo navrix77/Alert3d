@@ -473,6 +473,45 @@ def _client_ip(scope_client, headers) -> str | None:
     return xff.split(",")[0].strip() if xff else (scope_client[0] if scope_client else None)
 
 
+# ---------- захист (04.11, незалежна оцінка): ліміти на платні ендпоінти, службове лише для власника, заголовки безпеки
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
+RATE = {"/api/tts": (30, 60), "/api/stt": (6, 60), "/api/live": (8, 60), "/api/ask": (8, 60), "/api/radio": (8, 60),
+        "/api/tts/check": (3, 60), "/api/llm/check": (3, 60), "/api/llm/report": (6, 60)}
+_hits: dict = {}
+
+
+def _is_admin(request) -> bool:
+    import hmac
+    tok = request.headers.get("x-admin-token") or request.query_params.get("admin") or ""
+    return bool(ADMIN_TOKEN) and hmac.compare_digest(tok, ADMIN_TOKEN)
+
+
+@app.middleware("http")
+async def guard(request, call_next):
+    path = request.url.path
+    lim = RATE.get(path)
+    if lim and not _is_admin(request):
+        ip = request.headers.get("cf-connecting-ip") or _client_ip(request.client, request.headers) or "?"
+        now = time.time()
+        q = [x for x in _hits.get((ip, path), []) if now - x < lim[1]]
+        if len(q) >= lim[0]:
+            return JSONResponse({"ok": False, "why": "rate_limited"}, status_code=429, headers={"Retry-After": str(lim[1])})
+        q.append(now)
+        _hits[(ip, path)] = q
+        if len(_hits) > 20000:
+            _hits.clear()
+    resp = await call_next(request)
+    h = resp.headers
+    h.setdefault("Strict-Transport-Security", "max-age=31536000")
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "SAMEORIGIN")
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    h.setdefault("Permissions-Policy", "microphone=(self), geolocation=(self), camera=(self)")
+    if path.startswith("/api/") and "cache-control" not in h:
+        h["Cache-Control"] = "no-store"
+    return resp
+
+
 @app.middleware("http")
 async def count_visits(request, call_next):
     """Відвідування сторінок (без cookies і без збереження IP, див. app/visits.py)."""
@@ -502,8 +541,10 @@ async def api_ask(obl: str = "") -> dict:
 
 
 @app.get("/api/llm/report")
-async def api_llm_report() -> dict:
-    """Самонавчання: згода моделі з правилами за добу, пропозиції словника, підсумок ночі (без ключів)."""
+async def api_llm_report(request: Request) -> dict:
+    """Самонавчання: згода моделі з правилами за добу, пропозиції словника, підсумок ночі (без ключів). Лише власнику."""
+    if not _is_admin(request):
+        return JSONResponse({"ok": False, "why": "admin_only"}, status_code=403)
     import subprocess as _sp
     import sys as _sys
     root = Path(__file__).resolve().parent.parent
@@ -568,13 +609,16 @@ async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: 
 
 
 @app.get("/api/llm")
-async def api_llm() -> dict:
-    """Стан «другого парсера» (без ключа й без текстів повідомлень)."""
-    return LLMX.stats()
+async def api_llm(request: Request) -> dict:
+    """Публічно — лише чи ввімкнено ШІ; провайдери, лічильники й помилки — тільки власнику (ADMIN_TOKEN)."""
+    st = LLMX.stats()
+    if _is_admin(request):
+        return st
+    return {"enabled": st["enabled"], "assist": st["assist"]}
 
 
 @app.get("/api/llm/usage")
-async def api_llm_usage() -> dict:
+async def api_llm_usage(request: Request) -> dict:
     """Скільки запитів пішло на безкоштовні й платні моделі по днях, скільки зекономлено кешем і згодою дешевих моделей."""
     from .llm import COST, USAGE
     u = LLMX._usage
@@ -588,16 +632,23 @@ async def api_llm_usage() -> dict:
         free = sum(v for k, v in row.items() if k.startswith("ok:") and COST.get(k[3:], 2) == 0)
         paid = sum(v for k, v in row.items() if k.startswith("ok:") and COST.get(k[3:], 2) > 0)
         out[d] = {"free_ok": free, "paid_ok": paid, "saved_cache": row.get("saved:cache", 0), "saved_agree": row.get("saved:agree", 0),
-                  "saved_radio": row.get("saved:radio", 0), "raw": row}
-    return {"cost": COST, "days": out}
+                  "saved_radio": row.get("saved:radio", 0),
+                  "tts_paid_chars": sum(v for k, v in row.items() if k.startswith("tts_chars:")),
+                  "tts_paid": sum(v for k, v in row.items() if k in ("tts:openai", "tts:gemini")),
+                  "tts_cached": sum(v for k, v in row.items() if k.endswith("-cache") and k.startswith("tts:"))}
+        if _is_admin(request):
+            out[d]["raw"] = row
+    return {"days": out} | ({"cost": COST} if _is_admin(request) else {})
 
 
 _llm_check: dict = {}
 
 
 @app.get("/api/llm/check")
-async def api_llm_check() -> dict:
+async def api_llm_check(request: Request) -> dict:
     """Пробний мінімальний запит до кожної моделі: хто живий, у кого немає кредитів, неправильний ключ чи модель. Не частіше разу на 2 хв."""
+    if not _is_admin(request):
+        return JSONResponse({"ok": False, "why": "admin_only"}, status_code=403)
     if _llm_check.get("t", 0) > time.time() - 120:
         return _llm_check
     import httpx as _h
@@ -645,7 +696,12 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
     """Українська озвучка (Piper). 503, поки ставиться рушій або голос; клієнт тоді говорить голосом пристрою."""
     from fastapi import Response
     from . import tts
-    data, why = await tts.speak(text, voice, rate)
+    cap = int(os.getenv("TTS_DAILY_CHARS", "150000"))  # ~$2–3 на добу; понад — запасний голос, щоб не спустошити рахунок
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    day = (LLMX._usage or {}).get(_dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d"), {})
+    paid_ok = sum(v for k, v in day.items() if k.startswith("tts_chars:")) < cap
+    data, why = await tts.speak(text, voice, rate, paid=paid_ok)
     LLMX.count("tts:" + (why or "none").split(":")[0])
     if data and why in ("openai", "gemini"):
         LLMX.count("tts_chars:" + why, len(text))
@@ -670,18 +726,20 @@ def api_msgs(kind: str | None = None, type: str | None = None, hours: float = 3,
 
 
 @app.get("/api/tts/check")
-async def api_tts_check(text: str = "Перевірка голосу. Харків, Чугуїв, Балаклія."):
-    """Діагностика озвучки: хто зараз говорить (openai / google / piper / нічого) і чому."""
+async def api_tts_check(request: Request):
+    """Діагностика озвучки: хто зараз говорить (openai / gemini / piper). Публічно — без тексту помилок; власнику — повністю."""
     from . import tts
     tts._off.clear()  # ручна перевірка: знову пробуємо всіх (наприклад, після поповнення рахунку)
-    data, why = await tts.speak(text + f" {int(time.time()) % 1000}", "lada", 1.0)
-    return {"ok": bool(data), "by": why, "bytes": len(data or b""), **tts.status()}
+    data, why = await tts.speak(f"Перевірка голосу. Харків, Чугуїв, Балаклія. {int(time.time()) % 1000}", "lada", 1.0)
+    out = {"ok": bool(data), "by": why}
+    return out | tts.status() if _is_admin(request) else out
 
 
 @app.get("/api/tts/status")
-def api_tts_status():
+def api_tts_status(request: Request):
     from . import tts
-    return tts.status()
+    st = tts.status()
+    return st if _is_admin(request) else {k: v for k, v in st.items() if not k.endswith("_error") and k != "google_voices"}
 
 
 @app.get("/api/sources_auto")

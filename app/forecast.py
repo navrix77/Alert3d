@@ -109,7 +109,8 @@ def forecast(snap: dict, launches: list[dict], brain=None, gaz=None) -> dict:
 
     out = {}
     for name, row in acc.items():
-        out[name] = {f"p{h}": round(1 - row[h], 2) for h in HORIZONS}
+        # стеля 0.95 (04.11, незалежна оцінка): «1.0» читається як «гарантовано», а відкаліброваної певності такої немає
+        out[name] = {f"p{h}": min(0.95, round(1 - row[h], 2)) for h in HORIZONS}
         out[name].update({f"n{h}": round(exp_n[name][h], 1) for h in HORIZONS})
     top = sorted(out.items(), key=lambda kv: -kv[1]["p60"])
     return {"oblasts": dict(top), "model": "fan-v2"}

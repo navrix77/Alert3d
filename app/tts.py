@@ -375,11 +375,16 @@ def say_form(text: str) -> str:
     return t
 
 
-async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes | None, str]:
+async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True) -> tuple[bytes | None, str]:
     text = say_form(" ".join((text or "").split())[:300])
     if not text:
         return None, "empty"
-    order = (os.getenv("TTS_ORDER") or "openai,gemini").split(",")
+    order = (os.getenv("TTS_ORDER") or "openai,gemini").split(",") if paid else []
+    if not paid:  # денний ліміт платного голосу вичерпано: уже синтезоване з кешу, нове — запасним голосом
+        for prov, ext in (("openai", "mp3"), ("gemini", "wav")):
+            c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
+            if c.exists():
+                return c.read_bytes(), f"{prov}-cache"
     for prov in order:
         prov = prov.strip()
         if prov == "openai" and os.getenv("OPENAI_API_KEY"):

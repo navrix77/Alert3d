@@ -1617,3 +1617,17 @@ def test_ecopark_lysa_hora_and_far_alternative():
     tr.ingest(p.parse("1 ударний БпЛа курсом на Лозова/Питомник", "M"), "M", t0 + 60)
     act = [x for x in tr.snapshot(t0 + 90)["tracks"] if x["status"] == "active" and x["type"] == "shahed"]
     assert act and all(x.get("next") != "Лозова" for x in act) and act[0]["lat"] > 49.9  # не «летить» через центр Харкова на Лозову
+
+
+def test_public_endpoints_hide_internals_and_rate_limit():
+    from fastapi.testclient import TestClient
+    from app import main as M
+    c = TestClient(M.app)
+    r = c.get("/api/llm").json()
+    assert set(r) <= {"enabled", "assist"}  # без провайдерів і тексту помилок
+    assert c.get("/api/llm/check").status_code == 403
+    h = c.get("/api/llm").headers
+    assert h.get("x-content-type-options") == "nosniff" and h.get("cache-control") == "no-store"
+    M._hits.clear()
+    codes = [c.get("/api/ask?obl=").status_code for _ in range(10)]
+    assert 429 in codes
