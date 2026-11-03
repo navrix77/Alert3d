@@ -210,6 +210,17 @@ class Brain:
         return out
 
     # ---------------- самоперевірка прогнозу: чи справді ціль прилетіла туди, куди передбачили
+    def log_fc(self, t, typ, src, cand: dict, truth: float, dt: float, d: float) -> None:
+        """Журнал прогнозів напрямку: що пропонувало кожне джерело в момент названої позиції і куди ціль назвали далі.
+        З нього через тиждень-два живої роботи вчаться ваги злиття джерел (бектест на 9 ночах дав лише 258 пар — замало)."""
+        import json as _j
+        with self.lock:
+            try:
+                self.db.execute("CREATE TABLE IF NOT EXISTS fcast(t REAL, type TEXT, src TEXT, cand TEXT, truth REAL, dt REAL, d REAL)")
+                self.db.execute("INSERT INTO fcast VALUES(?,?,?,?,?,?,?)", (t, typ, src, _j.dumps(cand), truth, dt, d))
+            except sqlite3.Error:
+                pass
+
     def pred_score(self, typ: str, hit: bool) -> None:
         st = self.pacc.setdefault(typ, [0.0, 0.0])
         st[0] += 1.0 if hit else 0.0

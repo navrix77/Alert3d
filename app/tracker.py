@@ -116,6 +116,7 @@ class Track:
     course_to: str | None = None
     course_xy: tuple | None = None
     credited: set[str] = field(default_factory=set)
+    fc: tuple | None = None  # прогноз напрямку з кожного джерела в момент останньої названої позиції (журнал прогнозів)
     evidence: list = field(default_factory=list)  # [{t, src, link, text, why, dest, pos, key}]
     pred_src: str | None = None
     route_src: str | None = None  # хто назвав поточний пункт призначення (для зважування суперечливих версій)
@@ -444,6 +445,7 @@ class Tracker:
                     self._score_pred(tr, pt, t)
                 if self.brain and self.learn:
                     self._score_heading(tr, pt, t)
+                    self._log_fc(tr, pt, t)
                     self._score_dir_claims(tr, pt, t)
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
                 # кінематично неможливий «перехід» (той самий пост/хвилина, сусідні села різних дронів групи,
@@ -584,7 +586,47 @@ class Tracker:
                             "dest": route[0].name if route else None, "dxy": route[0].xy if route else None,
                             "pos": (tr.obs[-1].x, tr.obs[-1].y) if moved else None, "est": bool(moved and tr.obs[-1].est)})
         tr.evidence = tr.evidence[-40:]
+        if self.brain and self.learn:
+            self._open_fc(tr, src, t)
         return rec
+
+    def _log_fc(self, tr: Track, pt, t: float) -> None:
+        """Закрити прогноз попередньої названої позиції: куди ціль назвали далі (>5 км, через 3–40 хв)."""
+        if not tr.fc or not hasattr(self.brain, "log_fc"):
+            return
+        t0, x0, y0, src0, cand = tr.fc
+        d = dist_km((x0, y0), pt)
+        if 180 <= t - t0 <= 2400 and d > 5:
+            self.brain.log_fc(t0, tr.type, src0, cand, round(bearing((x0, y0), pt), 1), round(t - t0), round(d, 1))
+            tr.fc = None
+        elif t - t0 > 2400:
+            tr.fc = None
+
+    def _open_fc(self, tr: Track, src: str, t: float) -> None:
+        """Записати, що кожне джерело пропонує як напрямок зараз (канали / навчений маршрут / рух / показаний)."""
+        o = tr.last
+        if o.est or o.t != t:
+            return
+        P, c = (o.x, o.y), {}
+        if tr.route and dist_km(P, tr.route[0].xy) > 3:
+            c["ch"] = round(bearing(P, tr.route[0].xy), 1)
+        if o.place is not None and self.brain and hasattr(self.brain, "next_path"):
+            la, lo = from_xy(*P)
+            nx = self.brain.next_path(tr.type, o.place.name, tr.heading, (la, lo), steps=1)
+            if nx:
+                q = _gxy(nx[0][2], nx[0][3])
+                if dist_km(P, q) > 3:
+                    c["ln"], c["lnp"] = round(bearing(P, q), 1), round(nx[0][1], 2)
+        real = [x for x in tr.obs[:-1] if not x.est]
+        if real:
+            pv = real[-1]
+            d, dt = dist_km((pv.x, pv.y), P), t - pv.t
+            if d > 3 and dt >= 90 and d / dt * 3600 <= TYPES[tr.type]["speed"] * 1.8:
+                c["mv"] = round(bearing((pv.x, pv.y), P), 1)
+        if tr.heading is not None:
+            c["cur"] = round(tr.heading, 1)
+        if c:
+            tr.fc = (t, P[0], P[1], src, c)
 
     def _score_heading(self, tr: Track, pt, t: float) -> None:
         """Жива самоперевірка напрямку: курс, який показувала мапа після останньої НАЗВАНОЇ позиції, проти того,
