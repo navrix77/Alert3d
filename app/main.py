@@ -830,7 +830,8 @@ def api_tts_status(request: Request):
 def api_sources_auto():
     """Автопошук джерел: прийняті (з доказами), перевірені в останньому проході, відхилені."""
     st = DISCOVER.state
-    return {"last": st["last"], "accepted": st["accepted"], "checked": st["checked"], "rejected_n": len(st["rejected"])}
+    return {"last": st["last"], "every_h": 2, "accepted_n": len(st["accepted"]), "accepted": st["accepted"], "checked": st["checked"],
+            "rejected_n": len(st["rejected"]), "rejected_recent": sorted(st["rejected"].items(), key=lambda kv: -kv[1].get("t", 0))[:30]}
 
 
 @app.get("/api/audit")
