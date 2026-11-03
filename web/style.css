@@ -620,3 +620,17 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .me .ai-ans .ai-note{display:block;opacity:.6;font-size:11.5px;margin-top:4px}
 .me .ai-ans{position:relative;padding-right:30px}
 .me .ai-ans .ai-x{position:absolute;top:-2px;right:0;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:13px;line-height:1}
+
+/* слоган (03.11): «Розумій, що відбувається в небі» — звичайний регістр, слова з'являються по черзі, «в небі» кольором SKY;
+   по боках тонкі риски кольорів емблеми: золото зліва, синь справа */
+#intro p.slogan{display:flex;align-items:center;justify-content:center;flex-wrap:nowrap;white-space:nowrap;gap:.3em;max-width:96vw;padding:0;
+  font:600 clamp(14px,4.15vw,23px)/1.25 var(--f);letter-spacing:.01em;text-transform:none;color:#e4eaf4;animation:none;position:relative}
+#intro p.slogan>*{opacity:0;animation:slw .9s cubic-bezier(.2,.8,.1,1) both}
+#intro p.slogan .s1{animation-delay:.85s}#intro p.slogan .s2{animation-delay:1.05s}
+#intro p.slogan em{font-style:normal;font-weight:800;animation-delay:1.3s;background:linear-gradient(90deg,#7cc0ff,#2f7bff 60%,#5aa8ff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 14px rgba(60,140,255,.55))}
+#intro p.slogan::before,#intro p.slogan::after{content:"";flex:none;width:clamp(14px,5vw,44px);height:1.5px;border-radius:2px;opacity:0;animation:fadeUp .8s 1.5s both}
+#intro p.slogan::before{background:linear-gradient(90deg,transparent,#f2c14e);margin-right:.4em}
+#intro p.slogan::after{background:linear-gradient(90deg,#3d8bff,transparent);margin-left:.4em}
+@keyframes slw{from{opacity:0;transform:translateY(8px);filter:blur(6px)}to{opacity:1;transform:none;filter:blur(0)}}
+@media (prefers-reduced-motion:reduce){#intro p.slogan>*{animation:none;opacity:1}}
