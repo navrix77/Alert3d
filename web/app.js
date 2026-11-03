@@ -57,7 +57,7 @@ function liteMode(fallback){
 const UA_BOUNDS=[[22.1,44.2],[40.3,52.45]];
 const REDUCE=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){return false;}})();
 const LASTCAM=null; // 03.11: старт завжди однаковий (2D по центру → 3D), без «там, де закрили»
-let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:LASTCAM?LASTCAM.c:[31.2,48.4],zoom:LASTCAM?LASTCAM.z:(innerWidth<640?3.9:5.2),pitch:LASTCAM?LASTCAM.p:0,bearing:0,attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
+let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:LASTCAM?LASTCAM.c:[31.2,48.4],zoom:LASTCAM?LASTCAM.z:(innerWidth<640?3.9:5.2),pitch:LASTCAM?LASTCAM.p:0,bearing:0,attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[2,28],[62,74]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
 // центр країни між верхніми плашками й нижньою панеллю; цю ж камеру тримає й перехід у 3D (03.11: «не по центру» — камера їхала на дім, Харків біля краю)
 let START_CAM=null,introDone=false;
 // Україна у верхній половині екрана (відступ знизу більший: там панель дому й док); перераховуємо після load/resize,
