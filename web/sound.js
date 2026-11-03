@@ -21,7 +21,7 @@
   // голос: серверна українська озвучка (Piper: Лада/Микита/Тетяна/Олекса), а якщо сервер ще не готовий, голос пристрою
   let curA=null;
   function speak(text){if(!text)return false;
-    if(S.voice&&S.voice!=='device'){try{if(curA)curA.pause();const a=new Audio('/api/tts?voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text));
+    if(S.voice&&S.voice!=='device'){try{if(curA)curA.pause();const a=new Audio('/api/tts?v=2&voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text));
       a.volume=S.vol;a.setAttribute('playsinline','');curA=a;a.onerror=()=>sysSpeak(text);a.play().catch(()=>sysSpeak(text));return true;}catch(e){}}
     return sysSpeak(text);}
   function sysSpeak(text){if(!text||!('speechSynthesis' in window))return false;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);

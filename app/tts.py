@@ -260,10 +260,46 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
         return base64.b64decode(r.json()["audioContent"])
 
 
+# Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
+# якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
+OAI_VOICES = {"lada": "nova", "tetiana": "shimmer", "mykyta": "onyx", "oleksa": "echo"}
+OAI_STYLE = ("Говори українською літературною мовою, як спокійний диктор новин: чітко, рівно, з правильними наголосами "
+             "в українських назвах міст і сіл (Харків, Чугуїв, Балаклія, Ізюм, Лозова), без драматизму.")
+
+
+async def _openai(text: str, key: str, rate: float) -> bytes | None:
+    k = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if not k:
+        return None
+    voice = os.getenv("TTS_OPENAI_VOICE") or OAI_VOICES.get(key, "nova")
+    async with httpx.AsyncClient(timeout=30) as cli:
+        for model in (os.getenv("TTS_OPENAI_MODEL") or "gpt-4o-mini-tts", "tts-1-hd"):
+            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.3, rate))}
+            if model.startswith("gpt-"):
+                body["instructions"] = OAI_STYLE
+            r = await cli.post("https://api.openai.com/v1/audio/speech", json=body, headers={"Authorization": f"Bearer {k}"})
+            if r.status_code == 200 and r.content:
+                return r.content
+            log.warning("openai tts %s: %s", model, r.status_code)
+    return None
+
+
 async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes | None, str]:
     text = " ".join((text or "").split())[:300]
     if not text:
         return None, "empty"
+    if os.getenv("OPENAI_API_KEY") and os.getenv("TTS_PROVIDER", "openai") != "piper":
+        ocache = BASE / "cache" / f"o-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
+        if ocache.exists():
+            return ocache.read_bytes(), "openai-cache"
+        try:
+            data = await _openai(text, key, rate)
+            if data:
+                ocache.parent.mkdir(parents=True, exist_ok=True)
+                ocache.write_bytes(data)
+                return data, "openai"
+        except Exception as e:  # noqa: BLE001 — недоступний OpenAI → Google/Piper
+            log.warning("openai tts: %s", e)
     if GKEY:
         gcache = BASE / "cache" / f"g-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
         if gcache.exists():
@@ -296,5 +332,5 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes 
 
 
 def status() -> dict:
-    return {"google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
+    return {"openai": bool(os.getenv("OPENAI_API_KEY")), "google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
             "ready": bool(list((BASE / VOICES[k][0]).glob('*.onnx')))} for k in VOICES]}
