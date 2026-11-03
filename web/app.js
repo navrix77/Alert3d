@@ -314,9 +314,9 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // повторний запуск протягом 5 хв: камера вже там, де її закрили; без прольоту
   if(LASTCAM){if(el)el.remove();tilt=map.getPitch()>20;finish();return;}
-  // є ціль у бік дому вже на старті: одразу кінцевий стан і картка цілі, без анімації
-  let thr=null;try{if(home&&SNAP)thr=SNAP.tracks.find(t=>t.status==='active'&&t.conf>=0.5&&(homeRel(t,[t.lon,t.lat])||{}).rel);}catch(e){}
-  if(skip||!INTRO||thr||REDUCE){if(el)el.remove();if(INTRO)map.jumpTo(cam);tilt=true;window.__introAt=Date.now();finish();if(thr)setTimeout(()=>{try{openSheet(thr.id);}catch(e){}},300);return;}
+  // 03.11: виняток «ціль у бік дому → одразу картка» прибрано: на старті відкривалася картка непідтвердженого шахеда за 84 км.
+  // Про загрозу дому й так каже панель унизу; старт завжди однаковий
+  if(skip||!INTRO||REDUCE){if(el)el.remove();if(INTRO)map.jumpTo(cam);tilt=true;window.__introAt=Date.now();finish();return;}
   // поки летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
   const wait=Math.max(0,2300-(Date.now()-introT0));   // логотип встигає зіграти
