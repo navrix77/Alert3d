@@ -154,7 +154,7 @@ class LLM:
             msg = f"HTTP {st}: {body}"
             low = body.lower()
             if st in (401, 402, 403) or (st == 429 and any(w in low for w in ("credit", "quota", "billing", "balance", "exceeded your"))):
-                self.off[prov] = time.time() + 6 * 3600
+                self.off[prov] = time.time() + 1800  # поповнили рахунок — за пів години спробуємо знову (або одразу через /api/llm/check)
             elif st in (400, 404) and "model" in low:
                 self.off[prov] = time.time() + 6 * 3600
             elif st == 429:

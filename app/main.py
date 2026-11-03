@@ -651,6 +651,7 @@ def api_msgs(kind: str | None = None, type: str | None = None, hours: float = 3,
 async def api_tts_check(text: str = "Перевірка голосу. Харків, Чугуїв, Балаклія."):
     """Діагностика озвучки: хто зараз говорить (openai / google / piper / нічого) і чому."""
     from . import tts
+    tts._off.clear()  # ручна перевірка: знову пробуємо всіх (наприклад, після поповнення рахунку)
     data, why = await tts.speak(text + f" {int(time.time()) % 1000}", "lada", 1.0)
     return {"ok": bool(data), "by": why, "bytes": len(data or b""), **tts.status()}
 
