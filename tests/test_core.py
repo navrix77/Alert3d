@@ -1559,10 +1559,20 @@ def test_say_form_and_radio_memory(monkeypatch):
 
     class L:
         on = True
+        n = 0
         async def call(self, *a, **k):
-            return "На Харківщині без змін.", "x:y"
+            self.n += 1
+            if self.n == 3:
+                return {"action": "silence"}, "x:y"
+            return {"action": "speak", "kind": "update", "display_text": "На Харківщині БпЛА у напрямку Пісочина.",
+                    "speech_text": "На Харківщині безпілотник у напрямку Пісочина."}, "x:y"
     monkeypatch.setattr(live, "radio_context", lambda *a: ("ctx", "fb"))
     monkeypatch.setattr(live, "RADIO_MEM", {})
-    r1 = asyncio.run(live.radio(L(), None, None, None, 0, None, "Харківська", "region"))
-    r2 = asyncio.run(live.radio(L(), None, None, None, 0, None, "Харківська", "region"))
-    assert r1["text"] and r2["text"] == "" and r2.get("quiet")
+    m = L()
+    r1 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s1"))
+    r2 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s1"))
+    r3 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s1"))
+    r4 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s2"))  # новий слухач: своє зведення
+    assert r1["text"] and "безпілотник" in r1["speech"] and r2["text"] == "" and r3.get("quiet") and r4["text"]
+    out = asyncio.run(live.radio(None, {"health": {"telegram": False, "alerts": True}}, None, None, 0, None, "Харківська", "region", "s3"))
+    assert out["kind"] == "outage" and "недоступні" in out["text"]

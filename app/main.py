@@ -559,12 +559,12 @@ async def api_stt(req: Request):
 
 
 @app.get("/api/radio")
-async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: float | None = None, scope: str = "region"):
+async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: float | None = None, scope: str = "region", sid: str = ""):
     """«Радіо SKY»: один голосовий випуск — свій регіон / сусідні області / уся Україна."""
     from . import live
     since, home, ob = _live_args(t, obl, lat, lon)
     sc = scope if scope in ("region", "neighbors", "country") else "region"
-    return await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc)
+    return await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc, sid[:40])
 
 
 @app.get("/api/llm")
