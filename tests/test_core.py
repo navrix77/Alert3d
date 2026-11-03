@@ -1734,3 +1734,8 @@ def test_radio_modes(monkeypatch):
     assert "Чугуїв" in nr["speech"] and "Ви слухаєте Скай" in nr["speech"]
     nr10 = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "m3", 10))
     assert "немає" in nr10["text"]
+
+
+def test_no_emotion_on_disappearance():
+    from app.live import scrub
+    assert "на жаль" not in scrub("Дрон-розвідник, на жаль, зник з мапи.").lower()
