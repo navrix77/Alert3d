@@ -93,11 +93,10 @@
         for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236; vec2 dv = vec2(cos(an), sin(an));
           o1 = max(o1, texture2D(u_tex, uv + dv * 0.022).a); o2 = max(o2, texture2D(u_tex, uv + dv * 0.055).a); }
         float outl = clamp(o1 - t.a, 0.0, 1.0);
-        float halo = clamp(o2 - max(t.a, o1), 0.0, 1.0) * 0.7;
-        vec3 body = t.rgb * (0.9 + 0.38 * dif) + vec3(spec * 0.35);   // текстура з реалістичним світлом, трохи контрастніше
-        body = (body - 0.5) * 1.12 + 0.5;
-        float a = max(t.a, max(outl * 0.92, halo));
-        gl_FragColor = vec4(clamp(body, 0.0, 1.0) * t.a + vec3(0.02, 0.03, 0.05) * outl * 0.92 + v_col.rgb * halo, a) * v_col.a;
+        float halo = 0.0 * o2;
+        vec3 body = t.rgb * (0.86 + 0.22 * dif) + vec3(spec * 0.12);   // текстура вже з реалістичним світлом: без «пластику»
+        float a = max(t.a, outl * 0.55);
+        gl_FragColor = vec4(clamp(body, 0.0, 1.0) * t.a + vec3(0.0) * outl, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -182,7 +181,7 @@
         const T = f.tail || [], N = T.length;
         for (let i = 0; i < N; i++) { const k = 1 - i / N, tm = mc(T[i]);
           glow.push([tm[0], tm[1], spr * (0.2 + 0.4 * k), 0, [c[0], c[1], c[2], 0.35 * k * k * a], 0]); }
-        glow.push([m[0], m[1], spr * (z < 6 ? 1.1 : 1.5), 0, [c[0], c[1], c[2], 0.45 * a], 0]);
+        glow.push([m[0], m[1], spr * (z < 6 ? 1.1 : 1.5), 0, [c[0], c[1], c[2], 0.16 * a], 0]);
         if (f.thr) glow.push([m[0], m[1], spr * (z < 6 ? 3 : 5.5), 0, [1, 0.24, 0.3, 0.95], 1]);
         if (f.sel) top.push([m[0], m[1], spr * 1.7, 0, [1, 1, 1, 0.9], 2, 0, 0]);
         f._m = m;
@@ -204,9 +203,8 @@
         for (const f of L) { if (!this.tex[f.type] || !f._m) continue; const c = f.col, a = f.weak ? 0.75 : 1;
           // місце лише оцінене (канали не назвали, де ціль зараз): без суцільної «шайби», лише тонке біле кільце,
           // сам силует напівпрозорий. 03.11: шахед «у місті», хоча про місто ніхто не писав
-          if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.25, 0, [1, 1, 1, 0.45], 2, 0, 0]); continue; }
-          pk.push([f._m[0], f._m[1], spr * 1.35, 0, [0.0, 0.0, 0.0, 0.62 * a], 0]);
-          pk.push([f._m[0], f._m[1], spr * 1.05, 0, [c[0], c[1], c[2], 0.8 * a], 2, 0, 0]); }
+          if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.2, 0, [1, 1, 1, 0.3], 2, 0, 0]); continue; }
+          pk.push([f._m[0], f._m[1], spr * 1.25, 0, [0.0, 0.0, 0.0, 0.42 * a], 0]); }
         if (pk.length) this.draw(gl, this.quads(pk), pk.length); }
       for (const f of L) {
         const tx = this.tex[f.type]; if (!tx) continue;
