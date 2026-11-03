@@ -270,6 +270,12 @@ def _brg(a, b) -> float:
     return (math.degrees(math.atan2((b[0] - a[0]) * 71.6, (b[1] - a[1]) * 111.2)) + 360) % 360
 
 
+def _kyiv_hm() -> str:
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    return _dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%H:%M")
+
+
 def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -> dict:
     """Факти для слухача: що біля нього, де (сторона світу, км), чи наближається, що нового; тривога; балістика.
     Без цифр на кшталт «39 повідомлень» — лише те, що людині треба знати зараз."""
@@ -293,8 +299,15 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
         eta = round(km / max(60, t.get("speed") or 170) * 60) if appr else None
         n = t.get("count") or 1
         w = TWORD.get(t["type"], (t.get("name") or "ціль", t.get("name") or "цілі"))
+        srcs = (t.get("ev") or {}).get("prim") or []
+        names = {k: (v or {}).get("name", k) for k, v in (state.get("sources") or {}).items()}
+        offi = [k for k in srcs if ((state.get("sources") or {}).get(k) or {}).get("official")]
+        src_txt = ("Повітряні сили" if any(k == "AIU" for k in offi) else "офіційне джерело") if offi else \
+            (f"моніторинговий канал {names.get(srcs[0], srcs[0])}" if len(srcs) == 1 else f"кілька незалежних моніторингових джерел ({len(srcs)})" if srcs else "джерело невідоме")
+        fix = t.get("fix_age")
         near.append({"id": t["id"], "type": t["type"], "word": (f"{n} " + w[1]) if n > 1 else w[0], "km": round(km), "side": side,
-                     "appr": appr, "eta": eta, "next": t.get("next"), "pos": t.get("pos_lvl"), "new": (t.get("first") or 0) > since})
+                     "appr": appr, "eta": eta, "next": t.get("next"), "pos": t.get("pos_lvl"), "new": (t.get("first") or 0) > since,
+                     "src": src_txt, "fix_min": round(fix / 60) if fix is not None else None, "at": (t.get("at") or [None])[0]})
     near.sort(key=lambda x: (not x["appr"], x["km"]))
     bal = [e for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") and (obl in e.get("obl", []) or "*" in e.get("obl", []))]
     urgent = bool(bal) or any(x["appr"] and x["km"] <= 30 for x in near)
@@ -311,7 +324,8 @@ def region_text(f: dict, obl: str) -> tuple[str, str]:
     if f["near"]:
         lines.append(f"Цілей у радіусі 120 км від слухача: {f['n_near']}. Найважливіші:")
         for x in f["near"]:
-            lines.append(f"- {x['word']}: {x['km']} км {x['side']} від слухача; " +
+            lines.append(f"- {x['word']}" + (f" біля {x['at']}" if x.get("at") else "") + f": {x['km']} км {x['side']} від слухача; джерело: {x['src']}; " +
+                         (f"місце назване {x['fix_min']} хв тому; " if x.get("fix_min") is not None else "місце не назване, це оцінка SKY; ") +
                          ("наближається" + (f", орієнтовно {x['eta']} хв" if x["eta"] is not None else "") if x["appr"] else
                           "рухається не в бік слухача" if x["appr"] is False else "напрямок невідомий") +
                          (f"; курс на {x['next']}" if x["next"] else "") + (f"; місце {x['pos']}" if x["pos"] else "") + ("; НОВА" if x["new"] else ""))
@@ -363,6 +377,14 @@ def radio_context(state: dict, hist: list, tracker, since: float, home, obl: str
 
 
 RADIO_SYSTEM = RADIO_SYSTEM + """
+ДЖЕРЕЛА В ЕФІРІ (концепція SKY Radio): Повітряні сили — «Повітряні Сили повідомляють…»; один моніторинговий канал —
+«Моніторинговий канал [назва] повідомляє…»; кілька незалежних — «Кілька моніторингових джерел повідомляють…»; непідтверджене —
+«За попередньою інформацією…»; оцінка системи (місце не назване) — «За оцінкою Скай…»; розбіжність — «Повідомлення про напрямок
+різняться…». Перепублікації не є підтвердженням. Назву джерела кажи на початку блоку, не в кожному реченні.
+СТРУКТУРА: Регіон → подія → джерело → важливе уточнення. Починай з назви області чи міста, географія має бути зрозуміла відразу.
+Краще дві зрозумілі події, ніж десять назв. «Щойно», «зараз» — лише для свіжих даних; час публікації не видавай за час події.
+Новому слухачеві: «Ви слухаєте Скай. Коротко про [регіон]. Станом на [час], [статус тривоги]…» (20–40 с). Оновлення — 8–20 с.
+Ніколи: «увага, увага», «можна видихнути», «все чисто», «ціль знищена» через зникнення повідомлень.
 РАДІО ДЛЯ ОДНІЄЇ ЛЮДИНИ: говори так, ніби звертаєшся до слухача: «біля вас», «на південь від вас». Головне — що поруч і чи
 наближається. Не перелічуй статистику повідомлень. Для всієї України — щонайбільше два речення."""
 
@@ -396,7 +418,7 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
         level = "info"
     said = mem["said"]
     ctx += ("\n\nВЖЕ ОЗВУЧЕНО цьому слухачеві (не повторюй без змін):\n" + "\n".join(f"- {x}" for x in said[-3:])) if said \
-        else "\n\nНОВИЙ СЛУХАЧ: щойно увімкнув радіо, потрібне коротке актуальне зведення."
+        else f"\n\nНОВИЙ СЛУХАЧ: щойно увімкнув радіо, потрібне коротке актуальне зведення. Зараз {_kyiv_hm()}."
     res, by = (None, None)
     if llm is not None and llm.on:
         import hashlib
@@ -422,6 +444,8 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
     else:
         disp = speech = fb
         kind, by = ("outage" if out_ else "summary" if not said else "update"), "rules"
+    if not said and scope != "country" and not speech.lower().startswith("ви слухаєте"):
+        speech = "Ви слухаєте Скай. " + speech  # перше звучання для нового слухача
     mem.update(fp=fp, t=now, said=(said + [disp])[-5:])
     if len(RADIO_STATE) > 3000:
         for k in list(RADIO_STATE)[:1500]:

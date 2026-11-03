@@ -265,8 +265,8 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
 LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
-VOICE_V = "r3"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
-OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo"}
+VOICE_V = "r4"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
+OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
 OAI_STYLE = ("Ти ведучий сучасного українського інформаційного радіо. Говори рідною українською без акценту: чітко, енергійно, "
              "впевнено, у живому темпі, як ведучий новин у прямому ефірі вдень. Рівний потік без зайвих і нетипових пауз: пауза лише "
@@ -276,16 +276,29 @@ OAI_STYLE = ("Ти ведучий сучасного українського і
              "Чернігів, Київ, Біла Церква, Вінниця, Одеса, Миколаїв.")
 
 
+# SKY Radio (04.11, концепція власника): один основний чоловічий голос, теплий середньо-низький баритон, радійна подача
+RADIO_STYLE = ("Озвучуй українською як сучасний професійний радіоведучий SKY Radio. Голос чоловічий, вікове враження 35–45 років, "
+               "теплий середньо-низький баритон із легкою природною шорсткістю. Близьке чисте студійне звучання. Природна розмовна "
+               "інтонація, виразна дикція, спокійна впевненість, живий розмовний темп без поспіху. Звертайся до одного слухача. "
+               "У вступі допустима легка привітність; у повідомленнях про загрозу, наслідки і виправлення будь нейтральним і зібраним. "
+               "Назви регіонів, населених пунктів, числа та слова невизначеності вимовляй особливо чітко й трохи повільніше; після "
+               "назви регіону на початку коротка пауза; інших зайвих пауз немає. Завершуй речення природною низхідною інтонацією. "
+               "Не додавай слів і не змінюй зміст, не прибирай «попередньо», «ймовірно», «за оцінкою». Без крику, шепоту, театральної "
+               "тривоги, рекламного пафосу й імітації військового радіозв'язку. SKY вимовляй «Скай». Наголоси як у літературній "
+               "українській: Харків, Чугуїв, Балаклія, Ізюм, Лозова, Куп'янськ, Мерефа, Дергачі, Золочів, Богодухів, Полтава, "
+               "Кременчук, Кропивницький, Олександрія, Суми, Охтирка, Миргород, Дніпро, Павлоград, Запоріжжя, Чернігів, Київ, Одеса, Миколаїв.")
+
+
 async def _openai(text: str, key: str, rate: float) -> bytes | None:
     k = (os.getenv("OPENAI_API_KEY") or "").strip()
     if not k:
         return None
-    voice = os.getenv("TTS_OPENAI_VOICE") or OAI_VOICES.get(key, "nova")
+    voice = (os.getenv("TTS_RADIO_VOICE") if key == "radio" else None) or os.getenv("TTS_OPENAI_VOICE") or OAI_VOICES.get(key, "nova")
     async with httpx.AsyncClient(timeout=30) as cli:
         for model in (os.getenv("TTS_OPENAI_MODEL") or "gpt-4o-mini-tts", "tts-1-hd"):
-            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.3, rate * 1.08))}
+            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.3, rate * (1.0 if key == "radio" else 1.05)))}
             if model.startswith("gpt-"):
-                body["instructions"] = OAI_STYLE
+                body["instructions"] = RADIO_STYLE if key == "radio" else OAI_STYLE
             r = await cli.post("https://api.openai.com/v1/audio/speech", json=body, headers={"Authorization": f"Bearer {k}"})
             if r.status_code == 200 and r.content:
                 return r.content
@@ -382,7 +395,31 @@ def say_form(text: str) -> str:
     return re.sub(r"\s{2,}", " ", t).strip()
 
 
+_ORD = ["нульова", "перша", "друга", "третя", "четверта", "п'ята", "шоста", "сьома", "восьма", "дев'ята", "десята", "одинадцята",
+        "дванадцята", "тринадцята", "чотирнадцята", "п'ятнадцята", "шістнадцята", "сімнадцята", "вісімнадцята", "дев'ятнадцята",
+        "двадцята", "двадцять перша", "двадцять друга", "двадцять третя"]
+_U = ["", "одна", "дві", "три", "чотири", "п'ять", "шість", "сім", "вісім", "дев'ять", "десять", "одинадцять", "дванадцять",
+      "тринадцять", "чотирнадцять", "п'ятнадцять", "шістнадцять", "сімнадцять", "вісімнадцять", "дев'ятнадцять"]
+_T = {2: "двадцять", 3: "тридцять", 4: "сорок", 5: "п'ятдесят"}
+
+
+def _clock(m) -> str:
+    h, mi = int(m.group(1)), int(m.group(2))
+    if h > 23 or mi > 59:
+        return m.group(0)
+    if mi == 0:
+        mm = "нуль нуль"
+    elif mi < 10:
+        mm = "нуль " + _U[mi]
+    elif mi < 20:
+        mm = _U[mi]
+    else:
+        mm = _T[mi // 10] + (" " + _U[mi % 10] if mi % 10 else "")
+    return f"{_ORD[h]} {mm}"
+
+
 def _say_form(text: str) -> str:
+    text = re.sub(r"(?<![\d:])([01]?\d|2[0-3]):([0-5]\d)(?![\d:])", _clock, text)
     t = re.sub(r"[×x](\d+)\b", r"\1", text).replace("→", " у напрямку ").replace("~", "приблизно ").replace("≈", "приблизно ")
     for a, b in SAY:
         t = re.sub(rf"(?<![\w-]){a}(?![\w])", b, t)
@@ -390,7 +427,7 @@ def _say_form(text: str) -> str:
 
 
 async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True) -> tuple[bytes | None, str]:
-    text = say_form(" ".join((text or "").split())[:300])
+    text = say_form(" ".join((text or "").split())[:600])
     if not text:
         return None, "empty"
     order = (os.getenv("TTS_ORDER") or "openai,gemini").split(",") if paid else []
