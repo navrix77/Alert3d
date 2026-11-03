@@ -957,7 +957,8 @@ $('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&N
 function b64u(s){const p='='.repeat((4-s.length%4)%4);const b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0));}
 async function webPushSync(loud){
   if(!('serviceWorker' in navigator)||!('PushManager' in window)){wpStatus(null,/iPhone|iPad/.test(navigator.userAgent)?'відкрийте SKY з іконки на початковому екрані («Поділитися» → «На початковий екран»)':'цей браузер не підтримує');if(loud&&PREF.sys)toast(/iPhone|iPad/.test(navigator.userAgent)?'На iPhone: «Поділитися → На початковий екран», потім відкрийте звідти':'Цей браузер не підтримує сповіщення із закритим сайтом');return;}
-  try{const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
+  try{// якщо служба сповіщень не запустилась, ready чекає вічно: обмежуємо 8 с і кажемо про це
+    const reg=await Promise.race([navigator.serviceWorker.ready,new Promise((_,j)=>setTimeout(()=>j(new Error('служба сповіщень не запустилась. Закрийте SKY свайпом і відкрийте з іконки ще раз')),8000))]);let sub=await reg.pushManager.getSubscription();
     if(!PREF.sys||!home||Notification.permission!=='granted'){
       if(sub){fetch('/api/webpush/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});await sub.unsubscribe();try{localStorage.removeItem('wp_home');}catch(e){}}
       if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');
