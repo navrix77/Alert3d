@@ -1147,3 +1147,10 @@ def test_launch_marker_expires_by_flight_time():
     assert launch.ttl(B) <= 20 * 60
     T = N(stage="takeoff", type=None, site=N(lat=48.5, lon=46.0))
     assert launch.ttl(T) == 3 * 3600
+
+
+def test_passed_place_is_position():
+    """TLK 03.11: «Пролетела Печенеги, курс на Шестаково» — Печеніги це де ціль була, Шестакове це курс."""
+    o = P.parse("Пролетела Печенеги, курс на Шестаково⚠️", "TLK")
+    roles = {r.place.name: r.role for r in o.places}
+    assert roles.get("Печеніги") == "p" and roles.get("Шестакове") == "t"
