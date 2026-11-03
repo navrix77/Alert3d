@@ -58,7 +58,9 @@ const UA_BOUNDS=[[22.1,44.2],[40.3,52.45]];
 const REDUCE=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){return false;}})();
 const LASTCAM=(()=>{try{const c=JSON.parse(localStorage.getItem('cam_last')||'null');return c&&Date.now()-c.t<5*60*1000?c:null;}catch(e){return null;}})();
 let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:LASTCAM?LASTCAM.c:[31.2,48.4],zoom:LASTCAM?LASTCAM.z:(innerWidth<640?3.9:5.2),pitch:LASTCAM?LASTCAM.p:0,bearing:0,attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
-if(!LASTCAM){try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.14),bottom:Math.round(innerHeight*0.22),left:16,right:16}});if(c)map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}catch(e){}}
+// центр країни між верхніми плашками й нижньою панеллю; цю ж камеру тримає й перехід у 3D (03.11: «не по центру» — камера їхала на дім, Харків біля краю)
+let START_CAM=null;
+if(!LASTCAM){try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.16),bottom:Math.round(innerHeight*0.24),left:12,right:12}});if(c){START_CAM={center:c.center,zoom:c.zoom};map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}}catch(e){}}
 map.on('moveend',()=>{try{const c=map.getCenter();localStorage.setItem('cam_last',JSON.stringify({c:[c.lng,c.lat],z:map.getZoom(),p:map.getPitch(),t:Date.now()}));}catch(e){}});
 // спливаючі вікна на мапі завжди цілком на екрані: після відкриття зсуваємо мапу, якщо вікно вилазить за край (03.11: «обрізає вікно»)
 try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo=function(m){const r=_add.call(this,m);const pp=this;
@@ -303,7 +305,9 @@ let introDone=false,introT0=Date.now();if(INTRO)document.body.classList.add('int
 function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
   const mob=innerWidth<640;
   // кінцевий стан: 3D (pitch 45–55°), північ угорі, zoom +0.7 від стартового (край країни ще в кадрі), центр — дім, якщо він є
-  const cam={center:home||map.getCenter(),zoom:Math.min(map.getZoom()+0.7,home?(mob?6.4:6.8):5.6),pitch:mob?45:52,bearing:0};
+  // кінцевий стан: той самий центр країни, лише нахил і трохи ближче (+0.3), північ угорі; на дім камера НЕ їде, Україна лишається по центру
+  const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
+  const cam={center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};
   const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // повторний запуск протягом 5 хв: камера вже там, де її закрили; без прольоту
