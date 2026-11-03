@@ -1739,3 +1739,9 @@ def test_radio_modes(monkeypatch):
 def test_no_emotion_on_disappearance():
     from app.live import scrub
     assert "на жаль" not in scrub("Дрон-розвідник, на жаль, зник з мапи.").lower()
+
+
+def test_stress_marks_for_tts():
+    from app.tts import stress_marks, words_numbers
+    t = stress_marks(words_numbers("Шахед на Чугуїв, 12 км"))
+    assert "Чугу́їв" in t and "Шахе́д" in t and "12" not in t
