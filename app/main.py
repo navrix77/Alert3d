@@ -152,6 +152,7 @@ def raion_centroid(n: str):
 
 STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "tracker_state.pkl"
 FUSION_FILE = Path(__file__).resolve().parent.parent / "data" / "fusion.json"
+SELFCHECK_FILE = Path(__file__).resolve().parent.parent / "data" / "selfcheck.json"
 RESTORED: dict[str, float] = {}  # посилання на пости, вже враховані у відновленому стані трекера
 
 
@@ -365,7 +366,23 @@ async def lifespan(app: FastAPI):
                 log.info("злиття напрямку: %s (%s)", "увімкнено" if rep["on"] else "вимкнено", rep["why"])
             except Exception as e:  # noqa: BLE001
                 log.warning("перевірка злиття: %s", e)
-    tasks = [asyncio.create_task(pusher()), asyncio.create_task(_save_state()), asyncio.create_task(_fusion_daily()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
+    async def _selfcheck_daily():
+        """Щоденний самоаналіз на самому сервері (тут журнал): о ~05:40 → data/selfcheck.json, читає рутина через /api/selfcheck."""
+        import sys as _sys
+        root = Path(__file__).resolve().parent.parent
+        while True:
+            lt = time.localtime()
+            await asyncio.sleep(((5 - lt.tm_hour) * 3600 + (40 - lt.tm_min) * 60 - lt.tm_sec) % 86400 or 86400)
+            try:
+                pr = await asyncio.create_subprocess_exec("nice", "-n", "15", _sys.executable, str(root / "scripts" / "selfcheck.py"),
+                                                          str(root / "data" / "brain.sqlite"), "--days", "3", "--out", str(SELFCHECK_FILE),
+                                                          cwd=str(root), stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+                _o, err = await asyncio.wait_for(pr.communicate(), timeout=1800)
+                if pr.returncode:
+                    log.warning("selfcheck: код %s %s", pr.returncode, (err or b"")[-300:].decode(errors="ignore"))
+            except Exception as e:  # noqa: BLE001
+                log.warning("selfcheck: %s", e)
+    tasks = [asyncio.create_task(pusher()), asyncio.create_task(_save_state()), asyncio.create_task(_fusion_daily()), asyncio.create_task(_selfcheck_daily()), asyncio.create_task(alerts.run()), asyncio.create_task(replay.run(tracker))]
     tasks.append(asyncio.create_task(pushsvc.run(state)))
     tasks.append(asyncio.create_task(ru.run()))
     tasks.append(asyncio.create_task(occupied.run()))
@@ -589,6 +606,32 @@ def api_history(full: int = 0, hours: float = 12):
     since = time.time() - max(0.5, min(hours, 12)) * 3600
     fr = [f for f in HIST if f["t"] >= since]
     return JSONResponse({"frames": fr if full else [_lite_frame(f) for f in fr]})
+
+
+@app.get("/api/selfcheck")
+def api_selfcheck():
+    """Останній щоденний самоаналіз (падіння парсера, підозрілі розбори з прикладами, бектест, джерела)."""
+    if not SELFCHECK_FILE.exists():
+        return {"error": "самоаналізу ще не було (запускається щодня о ~05:40)"}
+    return JSONResponse(json.loads(SELFCHECK_FILE.read_text(encoding="utf-8")))
+
+
+@app.get("/api/journal")
+def api_journal(hours: float = 24, q: str | None = None, src: str | None = None, kind: str | None = None, limit: int = 300):
+    """Журнал публічних повідомлень каналів (як розібрав SKY) — докази для виправлень і перевірки регресій."""
+    since = time.time() - max(0.1, min(hours, 24 * 14)) * 3600
+    sql, args = "SELECT t, src, link, kind, type, places, text FROM msg WHERE t > ?", [since]
+    if src:
+        sql += " AND src = ?"; args.append(src)
+    if kind:
+        sql += " AND kind = ?"; args.append(kind)
+    if q:
+        sql += " AND lower(text) LIKE ?"; args.append("%" + q.lower() + "%")
+    sql += " ORDER BY t DESC LIMIT ?"; args.append(max(1, min(limit, 5000)))
+    with brain.lock:
+        rows = brain.db.execute(sql, args).fetchall()
+    return {"n": len(rows), "items": [{"t": int(t), "src": s_, "link": l_, "kind": k_, "type": ty, "places": p_, "text": (tx or "")[:400]}
+                                      for t, s_, l_, k_, ty, p_, tx in rows]}
 
 
 @app.get("/api/fusion")

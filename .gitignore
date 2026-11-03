@@ -20,3 +20,4 @@ data/vapid_private.pem
 data/tracker_state.pkl
 data/tracker_state.tmp
 data/fusion.json
+data/selfcheck.json
