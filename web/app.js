@@ -426,6 +426,12 @@ function frame(now){
       const P=map.project(f.geometry.coordinates);const near=shown.find(g=>g.properties.type===f.properties.type&&Math.hypot(g._p.x-P.x,g._p.y-P.y)<34);
       if(near&&f.properties.id!==sel){near.properties.count+=f.properties.count;near.properties.merged=(near.properties.merged||1)+1;continue;}
       f._p=P;shown.push(f);}
+    // різні типи в одній точці (03.11: шахед і «Молнія» біля Прудянки злилися в «гібрид»): розводимо значки віялом на екрані,
+    // координати цілей не змінюються, зсув лише візуальний (до ~20 px)
+    {const used=new Set();for(const f of shown){if(used.has(f))continue;const grp=shown.filter(g=>!used.has(g)&&Math.hypot(g._p.x-f._p.x,g._p.y-f._p.y)<26);
+      if(grp.length<2)continue;const cx=grp.reduce((s,g)=>s+g._p.x,0)/grp.length,cy=grp.reduce((s,g)=>s+g._p.y,0)/grp.length,R=12+3*grp.length;
+      grp.forEach((g,i)=>{used.add(g);const a=-Math.PI/2+i*2*Math.PI/grp.length,q=map.unproject([cx+R*Math.cos(a),cy+R*Math.sin(a)]);g.geometry={type:'Point',coordinates:[q.lng,q.lat]};
+        const fx0=fx.find(z=>z.id===g.properties.id);if(fx0)fx0.p=[q.lng,q.lat];});}}
     feats.length=0;feats.push(...shown);
     const vis=new Set(shown.map(f=>f.properties.id));window.FX=fx.filter(f=>vis.has(f.id));
     {const top=threats.slice().sort((a,b)=>(a.rel.eta??999)-(b.rel.eta??999))[0];for(const f of window.FX)f.thr=!!(top&&f.id===top.tr.id);}

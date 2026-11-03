@@ -25,6 +25,19 @@ FROM = ["півночі", "північного сходу", "сходу", "пі
 NAME = {"shahed": "Шахед", "jet": "Реактивний БпЛА", "molniya": "«Молнія»", "cruise": "Крилата ракета", "ballistic": "Балістика",
         "geran5": "«Герань-5»", "banderol": "«Бандероль»", "rszv": "РСЗВ", "fpv": "FPV-дрон", "fpvf": "FPV на оптоволокні",
         "recon": "Дрон-розвідник", "lancet": "«Ланцет»"}
+# «зображення цілі» в тексті: iPhone не показує картинок у web push, тому силует типу емодзі в заголовку
+ICON = {"shahed": "🛩", "molniya": "🛩", "lancet": "🛩", "recon": "🛩", "geran5": "🛩", "banderol": "🛩", "fpv": "🛸", "fpvf": "🛸",
+        "jet": "✈️", "cruise": "🚀", "ballistic": "🚀", "kab": "💣", "rszv": "💥"}
+
+
+def _pl(n: int, one: str, few: str, many: str) -> str:
+    return one if n % 10 == 1 and n % 100 != 11 else few if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else many
+
+
+def _nm(tr: dict) -> str:
+    return NAME.get(tr["type"], "Ціль") + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
+
+
 COMPASS = ["на північ", "на північний схід", "на схід", "на південний схід", "на південь", "на південний захід", "на захід", "на північний захід"]
 
 
@@ -118,13 +131,11 @@ def _where(tr: dict, a: dict) -> str:
 
 
 def _move(tr: dict) -> str:
-    hd = tr.get("hd")
-    parts = []
+    """Куди летить: названий каналами пункт, інакше напрямок за оцінкою («ймовірно на південь»)."""
     if tr.get("next"):
-        parts.append(f"Курс → {tr['next']}")
-    if hd is not None:
-        parts.append(("ймовірно " if not tr.get("next") else "") + COMPASS[round(hd / 45) % 8])
-    return " · ".join(parts)
+        return f"на {tr['next']}"
+    hd = tr.get("hd")
+    return f"ймовірно {COMPASS[round(hd / 45) % 8]}" if hd is not None else ""
 
 VAPID_KEY = DB.parent / "vapid_private.pem"  # ключ сервера для Web Push (браузер/PWA/iPhone з початкового екрана)
 REARM = 600  # повтор по тій самій цілі — не раніше ніж за 10 хв після зникнення загрози
@@ -432,59 +443,58 @@ class Push:
 
     @staticmethod
     def _compose_zone(cand: list) -> tuple[str, str, str]:
-        """Зведення для обраних областей і громад: уже в зоні — першими, далі ті, що найшвидше увійдуть."""
+        """Зведення для обраних зон. Формат під екран блокування iPhone (заголовок + 2 рядки видно без розгортання):
+        заголовок «🟠🚀 Крилата ракета → Харківська обл. · ~5 хв», далі 📍 де, ➡️ куди, «+ ще N»."""
         cand.sort(key=lambda x: (x[2], -(x[0].get("count") or 1)))
         tr, z, eta = cand[0]
         n = sum(t.get("count") or 1 for t, _z, _e in cand)
         zones = sorted({c[1] for c in cand})
-        where = zones[0] if len(zones) == 1 else f"{zones[0]} і ще {len(zones) - 1}"
-        nm = NAME.get(tr["type"], "Ціль") + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
-        if n == 1:
-            title = f"🟠 {nm} · " + (f"~{eta} хв до «{z}»" if eta else f"у межах «{z}»")
+        if n > (tr.get("count") or 1):
+            where = zones[0] if len(zones) == 1 else f"{zones[0]} і ще {len(zones) - 1}"
+            title = f"🟠{ICON.get(tr['type'], '❗')} {where}: {n} {_pl(n, 'нова ціль', 'нові цілі', 'нових цілей')}"
         else:
-            title = f"🟠 {where}: {n} {'нова ціль' if n % 10 == 1 and n % 100 != 11 else 'нові цілі' if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else 'нових цілей'}"
+            title = f"🟠{ICON.get(tr['type'], '❗')} {_nm(tr)} " + (f"→ {z} · ~{eta} хв" if eta else f"· {z}")
         at = tr.get("at")
-        lines = [(f"{nm}: " if n > 1 else "") + (f"останнє місце {at[0]}" if at else "") + (f" · ~{eta} хв до «{z}»" if eta and n > 1 else ""),
-                 _move(tr)]
-        if len(cand) > 1:
-            lines.append("Ще: " + "; ".join(f"{NAME.get(t['type'], 'ціль')}" + (f" → {t['next']}" if t.get("next") else "") for t, _z, _e in cand[1:4])
-                         + (f" і ще {len(cand) - 4}" if len(cand) > 4 else ""))
-        return title, "\n".join(x.strip(" ·:") for x in lines if x.strip(" ·:")), tr["id"]
+        lines = [("📍 " + (f"{_nm(tr)} · " if n > (tr.get("count") or 1) else "") + at[0]) if at else "",
+                 ("➡️ " + _move(tr)) if _move(tr) else ""]
+        if n > (tr.get("count") or 1):
+            more = n - (tr.get("count") or 1)
+            lines.append(f"+ ще {more}: " + ", ".join(dict.fromkeys(NAME.get(t["type"], "ціль") for t, _z, _e in cand[1:])))
+        return title, "\n".join(x for x in lines if x), tr["id"]
 
     @staticmethod
     def _compose(thr: list, pre: list) -> tuple[str, str, str] | None:
-        """Одне повідомлення на телефон за тік, навіть коли цілей багато. Структура однакова для всіх рівнів:
-        заголовок — рівень (колір), що і коли; тіло — де зараз, куди летить, на чому ґрунтується, що робити."""
+        """Одне повідомлення на телефон за тік. Заголовок: рівень, силует типу (емодзі), що і коли.
+        Тіло: 📍 де, ➡️ куди, «+ ще N», дія. Без службових слів, кожен рядок коротший за ширину екрана."""
         if thr:
             # першою — найнебезпечніша: уже поруч, далі найменший час підльоту, далі найближча
             thr.sort(key=lambda x: (0 if x[1].get("d") is not None and x[1]["d"] <= NEAR_KM else 1,
                                     x[1]["eta"] if x[1]["eta"] is not None else 999, x[1]["d"] if x[1]["d"] is not None else 999))
             tr, a = thr[0]
-            nm = NAME.get(tr["type"], "Ціль") + (f" ×{tr['count']}" if (tr.get("count") or 1) > 1 else "")
             near = a.get("d") is not None and a["d"] <= NEAR_KM
             soon = a["eta"] is not None and a["eta"] <= 10
             lvl = "🔴" if near or soon else "🟠"
+            head = f"{lvl}{ICON.get(tr['type'], '❗')} {_nm(tr)}"
             n = sum(t.get("count") or 1 for t, _ in thr)
             if len(thr) > 1:
-                title = f"{lvl} {n} {'ціль' if n % 10 == 1 and n % 100 != 11 else 'цілі' if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else 'цілей'} до вас · найближча " + (f"~{max(1, round(a['eta']))} хв" if a["eta"] is not None else f"{round(a['d'])} км" if a.get("d") is not None else "місце невідоме")
-            elif a["eta"] is not None and soon:
-                title = f"{lvl} {nm} · ~{max(1, round(a['eta']))} хв до вас"
+                title = f"{lvl}{ICON.get(tr['type'], '❗')} {n} {_pl(n, 'ціль', 'цілі', 'цілей')} до вас · найближча " + (
+                    f"~{max(1, round(a['eta']))} хв" if a["eta"] is not None else f"{round(a['d'])} км" if a.get("d") is not None else "поруч")
             elif near:
-                title = f"{lvl} {nm} поруч · {max(1, round(a['d']))} км"
+                title = f"{head} поруч · {max(1, round(a['d']))} км"
             elif a["eta"] is not None:
-                title = f"{lvl} {nm} · ~{max(1, round(a['eta']))} хв до вас"
+                title = f"{head} · ~{max(1, round(a['eta']))} хв до вас"
             else:
-                title = f"{lvl} {nm} · курс на ваш район"
-            lines = [_where(tr, a), _move(tr) + (f" · шанс пройти поруч {round(a['p'] * 100)}%" if a["p"] < 1 else "")]
+                title = f"{head} · курс на ваш район"
+            lines = [("📍 " + (f"{_nm(tr)} · " if len(thr) > 1 else "") + _where(tr, a)) if _where(tr, a) else "", ("➡️ " + _move(tr)) if _move(tr) else ""]
             if len(thr) > 1:
-                rest = [f"{NAME.get(t['type'], 'ціль')} " + (_rel(x).replace(" від вас", "") if x.get("d") is not None else "місце невідоме") for t, x in thr[1:3]]
-                lines.append("Ще: " + "; ".join(rest) + (f" і ще {len(thr) - 3}" if len(thr) > 3 else ""))
+                lines.append(f"+ ще {sum(t.get('count') or 1 for t, _ in thr[1:])}: " + ", ".join(dict.fromkeys(NAME.get(t["type"], "ціль") for t, _ in thr[1:])))
             lines.append("Перейдіть в укриття." if lvl == "🔴" else "Будьте поруч з укриттям.")
-            return title, "\n".join(x.strip(" ·") for x in lines if x.strip(" ·")), tr["id"]
+            return title, "\n".join(x for x in lines if x), tr["id"]
         if pre:
             pre.sort(key=lambda x: -x[1]["p"])
             tr, a = pre[0]
-            title = f"🟡 Можлива загроза · {NAME.get(tr['type'], 'Ціль')} {round(a['d'])} км"
-            lines = [_where(tr, a), _move(tr) + f" · шанс пройти поруч ~{round(a['p'] * 100)}%", f"Ще {len(pre) - 1} поруч" if len(pre) > 1 else "", "Це ще не тривога. Будьте поруч з укриттям."]
-            return title, "\n".join(x.strip(" ·") for x in lines if x.strip(" ·")), tr["id"]
+            title = f"🟡{ICON.get(tr['type'], '❗')} {_nm(tr)} · {round(a['d'])} км, може наблизитися"
+            lines = [("📍 " + _where(tr, a)) if _where(tr, a) else "", ("➡️ " + _move(tr)) if _move(tr) else "",
+                     f"+ ще {len(pre) - 1} поруч" if len(pre) > 1 else "", "Це ще не тривога."]
+            return title, "\n".join(x for x in lines if x), tr["id"]
         return None
