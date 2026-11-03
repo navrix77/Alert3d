@@ -162,6 +162,7 @@ try:  # ключі, передані власником через GitHub (за�
 except Exception:  # noqa: BLE001
     logging.getLogger("secrets").exception("apply_pending")
 LLMX = LLM()
+AIX = None  # зв'язка моделі з SKY (app/ai_glue.py), створюється на старті
 RESTORED: dict[str, float] = {}  # посилання на пости, вже враховані у відновленому стані трекера
 
 
@@ -178,6 +179,9 @@ def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
     if not again:
         try:
             LLMX.consider(parser, text, key, ts, link)  # сумнівні — моделі (поки лише в журнал, мапу не змінює)
+            img = webmon.photo(link) if link else None
+            if img and AIX:
+                AIX.vision(text, key, ts, link, img)  # мапа/схема в пості — модель із зором (тінь)
         except Exception:  # noqa: BLE001
             log.exception("llm")
 
@@ -416,6 +420,11 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(_snap()))
     tasks.append(asyncio.create_task(LEARNER.run()))
     tasks.append(asyncio.create_task(LLMX.run()))
+    global AIX
+    from .ai_glue import AI
+    AIX = AI(LLMX, parser, tracker, state)
+    tasks.append(asyncio.create_task(AIX.merge_watch()))
+    tasks.append(asyncio.create_task(AIX.daily(SELFCHECK_FILE)))
 
     async def _tts_warm():  # українська озвучка: рушій і голос «Лада» готуються у фоні одразу після старту
         from . import tts
@@ -482,6 +491,34 @@ async def api_envkey():
     from fastapi.responses import PlainTextResponse
     from . import secrets_sync
     return PlainTextResponse(secrets_sync.public_pem())
+
+
+@app.get("/api/ask")
+async def api_ask(obl: str = "") -> dict:
+    """«Що зараз відбувається?» для області: коротке пояснення моделлю лише за даними SKY (кеш 90 с)."""
+    if not AIX or not obl:
+        return {"ok": False, "text": "ШІ ще не підключено."}
+    return await AIX.explain(obl[:40])
+
+
+@app.get("/api/llm/report")
+async def api_llm_report() -> dict:
+    """Самонавчання: згода моделі з правилами за добу, пропозиції словника, підсумок ночі (без ключів)."""
+    import subprocess as _sp
+    import sys as _sys
+    root = Path(__file__).resolve().parent.parent
+    out = {"stats": LLMX.stats()}
+    try:
+        r = _sp.run([_sys.executable, str(root / "scripts" / "llm_report.py"), str(root / "data" / "llm.jsonl")],
+                    capture_output=True, text=True, timeout=60)
+        out["report"] = json.loads(r.stdout or "{}")
+    except Exception as e:  # noqa: BLE001
+        out["report_error"] = type(e).__name__
+    for k, f in (("dictionary", "llm_dict.json"), ("night", "llm_night.json")):
+        p_ = root / "data" / f
+        if p_.exists():
+            out[k] = json.loads(p_.read_text(encoding="utf-8"))
+    return out
 
 
 @app.get("/api/llm")

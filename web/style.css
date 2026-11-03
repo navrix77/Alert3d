@@ -613,3 +613,8 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .me .bal-log a{color:inherit;opacity:.7;text-decoration:none}
 .me .bal-note{display:block;opacity:.65;font-size:11.5px;margin-top:6px}
 .me .bal-btn{margin-top:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:6px 12px;font:600 13px inherit;font-family:inherit}
+/* ШІ: пояснення ситуації (03.11) */
+.me .ai-box{margin-top:10px}
+.me .ai-ask{background:rgba(140,120,255,.16);border:1px solid rgba(160,140,255,.45);color:#E8E4FF;border-radius:999px;padding:7px 12px;font:600 13px inherit;font-family:inherit}
+.me .ai-ans{margin-top:8px;font-size:13.5px;line-height:1.45}
+.me .ai-ans .ai-note{display:block;opacity:.6;font-size:11.5px;margin-top:4px}

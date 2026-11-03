@@ -4,7 +4,11 @@
 де правила, ймовірно, помилились: тип не визначено, хоча є слова руху; є невідоме слово/скорочення після «на/над/курс»;
 місце поза областю регіонального каналу; зведення «N … в області: A, B, C».
 
-Режими (LLM_MODE у .env):
+Режими (LLM_MODE у .env): off / shadow / assist.
+  assist  — те саме, що shadow, плюс: ціль, яку правила пропустили зовсім, а модель розпізнала і її місця пройшли
+            перевірку газетиром і областю каналу, з'являється на мапі з позначкою «розпізнано ШІ»; підказки злиття
+            «та сама ціль» з упевненістю ≥0.8 враховуються, лише якщо цілі поруч.
+Режими детально:
   off     — вимкнено (так само, якщо немає ANTHROPIC_API_KEY);
   shadow  — за замовчуванням: модель відповідає, відповідь лише пишеться в data/llm.jsonl поруч із розбором правил.
             Мапу не змінює. Так ми міряємо, чи модель справді краща, перш ніж їй довіряти.
@@ -109,7 +113,15 @@ class LLM:
         self.last_error = ""
         self.others = _others()
         self.second_share = float(os.getenv("LLM_SECOND_SHARE", "0.2"))
+        self.ensemble = os.getenv("LLM_ENSEMBLE", "all").strip().lower() != "off"  # усі моделі голосують
+        # допомога на мапі (власник 03.11: «по максимуму»): лише за згоди більшості моделей + перевірки правилами;
+        # вимкнути без зміни коду: LLM_ASSIST=0 (тоді лише журнал)
+        self.assist = self.mode != "off" and (self.mode == "assist" or os.getenv("LLM_ASSIST", "1").strip() != "0")
+        self.used_p: dict[str, int] = {}
         self._secrets = [self.key] + [o[1] for o in self.others]
+        self.cli = None
+        self.on_ai = None      # assist: як додати ціль, розпізнану моделлю (задає main)
+        self.on_merge = None   # assist: підказка злиття двох цілей (задає main)
 
     @property
     def on(self) -> bool:
@@ -122,8 +134,9 @@ class LLM:
         return msg
 
     def stats(self) -> dict:
-        return {"enabled": self.on, "mode": self.mode if self.on else "off", "model": self.model if self.key else None,
-                "fallback": [o[0] + ":" + o[3] for o in self.others], "second_share": self.second_share, "today": self.used,
+        return {"enabled": self.on, "mode": self.mode if self.on else "off", "assist": self.assist and self.on, "model": self.model if self.key else None,
+                "ensemble": self.ensemble, "models": [o[0] + ":" + o[3] for o in self._chain()] if self.on else [],
+                "today": self.used, "today_by": self.used_p,
                 "daily_max": self.daily_max, "errors": self.errors, "last_error": self.last_error[:160]}
 
     # ---------- чи варто питати модель
@@ -179,26 +192,52 @@ class LLM:
                 rules.append({"type": o.type, "kind": o.kind, "count": o.count, "places": [[r.place.name, r.role] for r in o.places]})
         except Exception:  # noqa: BLE001
             pass
-        try:
-            self.q.put_nowait({"t": ts, "src": src, "link": link, "text": text[:600], "why": why, "rules": rules})
-        except asyncio.QueueFull:
-            pass
+        self.submit({"job": "parse", "t": ts, "src": src, "link": link, "text": text[:600], "why": why, "rules": rules})
 
     @staticmethod
     def _user(text: str, src: str) -> str:
         from .config import CHANNEL_REGION
         return f"Канал: {src} (регіон каналу: {CHANNEL_REGION.get(src) or 'загальнонаціональний'}).\nПовідомлення:\n{text}"
 
-    async def ask_compat(self, cli: httpx.AsyncClient, prov: tuple, text: str, src: str) -> dict:
-        """OpenAI-сумісний виклик з tool calling (та сама схема відповіді)."""
+    # ---------- єдиний виклик моделі (будь-який провайдер з ланцюжка), з інструментом або текстом, з картинкою або без
+    def _chain(self) -> list[tuple]:
+        return ([("anthropic", self.key, "", self.model)] if self.key else []) + self.others
+
+    def _budget(self) -> bool:
+        d = time.strftime("%Y-%m-%d")
+        if d != self.day:
+            self.day, self.used = d, 0
+        if self.used >= self.daily_max:
+            return False
+        self.used += 1
+        return True
+
+    async def _one(self, cli, prov, system: str, user: str, tool: dict | None, image: str | None, max_tokens: int):
         name, key, base, model = prov
-        body = {"model": model, "max_tokens": 600, "temperature": 0,
-                "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": self._user(text, src)}],
-                "tools": [{"type": "function", "function": {"name": TOOL["name"], "description": TOOL["description"], "parameters": TOOL["input_schema"]}}],
-                "tool_choice": {"type": "function", "function": {"name": TOOL["name"]}}}
-        r = await cli.post(base + "/chat/completions", json=body, headers={"Authorization": f"Bearer {key}", "content-type": "application/json"}, timeout=30)
+        if name == "anthropic":
+            content = ([{"type": "image", "source": {"type": "url", "url": image}}] if image else []) + [{"type": "text", "text": user}]
+            body = {"model": model, "max_tokens": max_tokens, "system": system, "messages": [{"role": "user", "content": content}]}
+            if tool:
+                body |= {"tools": [tool], "tool_choice": {"type": "tool", "name": tool["name"]}}
+            r = await cli.post(API, json=body, headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"}, timeout=40)
+            r.raise_for_status()
+            for c in r.json().get("content", []):
+                if tool and c.get("type") == "tool_use":
+                    return c.get("input") or {}
+                if not tool and c.get("type") == "text":
+                    return c.get("text", "")
+            return {} if tool else ""
+        content = [{"type": "text", "text": user}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
+        body = {"model": model, "max_tokens": max_tokens, "temperature": 0,
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": content if image else user}]}
+        if tool:
+            body |= {"tools": [{"type": "function", "function": {"name": tool["name"], "description": tool["description"], "parameters": tool["input_schema"]}}],
+                     "tool_choice": {"type": "function", "function": {"name": tool["name"]}}}
+        r = await cli.post(base + "/chat/completions", json=body, headers={"Authorization": f"Bearer {key}", "content-type": "application/json"}, timeout=40)
         r.raise_for_status()
         msg = (r.json().get("choices") or [{}])[0].get("message") or {}
+        if not tool:
+            return msg.get("content") or ""
         for tc in msg.get("tool_calls") or []:
             try:
                 return json.loads(tc["function"]["arguments"])
@@ -206,62 +245,176 @@ class LLM:
                 continue
         return {}
 
-    async def ask(self, cli: httpx.AsyncClient, text: str, src: str) -> dict:
-        body = {"model": self.model, "max_tokens": 600, "system": SYSTEM, "tools": [TOOL],
-                "tool_choice": {"type": "tool", "name": "report"},
-                "messages": [{"role": "user", "content": self._user(text, src)}]}
-        r = await cli.post(API, json=body, headers={"x-api-key": self.key, "anthropic-version": "2023-06-01",
-                                                   "content-type": "application/json"}, timeout=30)
-        r.raise_for_status()
-        for c in r.json().get("content", []):
-            if c.get("type") == "tool_use":
-                return c.get("input") or {}
-        return {}
+    async def call(self, system: str, user: str, tool: dict | None = None, image: str | None = None, max_tokens: int = 600,
+                   skip: str | None = None, vision: bool = False):
+        """Повертає (результат, хто відповів) або (None, None). Пробує провайдерів по черзі; для картинок — лише ті, що бачать зображення."""
+        if self.cli is None or not self._budget():
+            return None, None
+        for prov in self._chain():
+            tag = prov[0] + ":" + prov[3]
+            if tag == skip or (vision and prov[0] not in VISION):
+                continue
+            try:
+                return await self._one(self.cli, prov, system, user, tool, image, max_tokens), tag
+            except Exception as e:  # noqa: BLE001
+                self.errors += 1
+                self.last_error = self._clean(f"{prov[0]}: {type(e).__name__}: {e}")
+        return None, None
+
+    async def vote(self, system: str, user: str, tool: dict, image: str | None = None, max_tokens: int = 600) -> dict:
+        """Ансамбль (власник 03.11: «усі моделі по максимуму, SKY унікальний»): той самий запит паралельно всім
+        провайдерам з ключами (для картинок — тим, що бачать зображення). Повертає {хто: відповідь}."""
+        if self.cli is None:
+            return {}
+        chain = [p_ for p_ in self._chain() if not image or p_[0] in VISION]
+        if not self.ensemble:
+            chain = chain[:1]
+        async def one(prov):
+            if not self._budget_p(prov[0]):
+                return None
+            try:
+                return prov[0] + ":" + prov[3], await self._one(self.cli, prov, system, user, tool, image, max_tokens)
+            except Exception as e:  # noqa: BLE001
+                self.errors += 1
+                self.last_error = self._clean(f"{prov[0]}: {type(e).__name__}: {e}")
+                return None
+        res = await asyncio.gather(*(one(p_) for p_ in chain))
+        return {k: v for k, v in (r for r in res if r) if v}
+
+    def _budget_p(self, prov: str) -> bool:
+        d = time.strftime("%Y-%m-%d")
+        if d != self.day:
+            self.day, self.used, self.used_p = d, 0, {}
+        n = self.used_p.get(prov, 0)
+        if n >= self.daily_max:
+            return False
+        self.used_p[prov] = n + 1
+        self.used += 1
+        return True
+
+    def _log(self, item: dict) -> None:
+        try:
+            OUT.parent.mkdir(parents=True, exist_ok=True)
+            with OUT.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+
+    def submit(self, item: dict) -> None:
+        if self.q is not None:
+            try:
+                self.q.put_nowait(item)
+            except asyncio.QueueFull:
+                pass
+
+    # ---------- задачі
+    async def _job_parse(self, item: dict) -> None:
+        votes = await self.vote(SYSTEM, self._user(item["text"], item["src"]), TOOL)
+        if not votes:
+            return
+        item["votes"] = votes
+        item["llm"], item["agree"] = consensus(list(votes.values()))
+        item["by"] = "+".join(sorted(votes))
+        vs = list(votes.items())
+        if len(vs) >= 2:  # сумісність зі звітом: перша й друга думки
+            item["llm2"], item["by2"] = vs[1][1], vs[1][0]
+        self._log(item)
+        if self.assist and self.on_ai:
+            try:
+                item["applied"] = bool(self.on_ai(item))
+            except Exception:  # noqa: BLE001
+                log.exception("on_ai")
+
+    async def _job_merge(self, item: dict) -> None:
+        votes = await self.vote(MERGE_SYSTEM, item["prompt"], MERGE_TOOL, max_tokens=300)
+        if not votes:
+            return
+        yes = [v for v in votes.values() if v.get("same") and float(v.get("confidence") or 0) >= 0.7]
+        item["votes"], item["same_votes"], item["n_votes"] = votes, len(yes), len(votes)
+        self._log({k: v for k, v in item.items() if k != "prompt"} | {"prompt": item["prompt"][:900]})
+        # злиття лише за явної більшості моделей (одна модель — лише якщо вона одна підключена й упевнена ≥0.85)
+        need = 2 if len(votes) >= 2 else 1
+        strong = len(votes) >= 2 or (yes and float(yes[0].get("confidence") or 0) >= 0.85)
+        if self.assist and self.on_merge and len(yes) >= need and len(yes) * 2 > len(votes) and strong:
+            self.on_merge(item["a"], item["b"])
+
+    async def _job_vision(self, item: dict) -> None:
+        votes = await self.vote(VISION_SYSTEM, self._user(item.get("text") or "(лише зображення)", item["src"]), TOOL, image=item["image"])
+        if not votes:
+            return
+        item["votes"] = votes
+        item["llm"], item["agree"] = consensus(list(votes.values()))
+        self._log(item)
 
     async def run(self) -> None:
         if not self.on:
-            log.info("LLM вимкнено (немає ANTHROPIC_API_KEY або LLM_MODE=off)")
+            log.info("LLM вимкнено (немає ключів або LLM_MODE=off)")
             return
-        self.q = asyncio.Queue(maxsize=200)
-        log.info("LLM: режим %s, модель %s, ліміт %d/добу", self.mode, self.model, self.daily_max)
+        self.q = asyncio.Queue(maxsize=300)
+        log.info("LLM: режим %s, модель %s, ліміт %d/добу, резерв: %s", self.mode, self.model, self.daily_max,
+                 ", ".join(o[0] for o in self.others) or "немає")
         async with httpx.AsyncClient() as cli:
+            self.cli = cli
             while True:
                 item = await self.q.get()
-                d = time.strftime("%Y-%m-%d")
-                if d != self.day:
-                    self.day, self.used = d, 0
-                if self.used >= self.daily_max:
-                    continue
-                self.used += 1
                 t0 = time.time()
-                chain = ([("anthropic", self.key, "", self.model)] if self.key else []) + self.others
-                for prov in chain:
-                    try:
-                        item["llm"] = await (self.ask(cli, item["text"], item["src"]) if prov[0] == "anthropic"
-                                             else self.ask_compat(cli, prov, item["text"], item["src"]))
-                        item["by"] = prov[0] + ":" + prov[3]
-                        break
-                    except Exception as e:  # noqa: BLE001
-                        self.errors += 1
-                        self.last_error = self._clean(f"{prov[0]}: {type(e).__name__}: {e}")
-                if "llm" not in item:
-                    await asyncio.sleep(5)
-                    continue
-                item["ms"] = int((time.time() - t0) * 1000)
-                # друга думка іншої моделі для частини повідомлень: міра згоди для нічного розбору
-                rest = [p_ for p_ in chain if p_[0] + ":" + p_[3] != item["by"]]
-                if rest and random.random() < self.second_share:
-                    p2 = rest[0]
-                    try:
-                        item["llm2"] = await (self.ask(cli, item["text"], item["src"]) if p2[0] == "anthropic"
-                                              else self.ask_compat(cli, p2, item["text"], item["src"]))
-                        item["by2"] = p2[0] + ":" + p2[3]
-                    except Exception as e:  # noqa: BLE001
-                        self.last_error = self._clean(f"{p2[0]}: {type(e).__name__}: {e}")
                 try:
-                    OUT.parent.mkdir(parents=True, exist_ok=True)
-                    with OUT.open("a", encoding="utf-8") as f:
-                        f.write(json.dumps(item, ensure_ascii=False) + "\n")
-                except OSError:
-                    pass
+                    await {"parse": self._job_parse, "merge": self._job_merge, "vision": self._job_vision}[item.get("job", "parse")](item)
+                except Exception:  # noqa: BLE001
+                    log.exception("llm job")
+                item["ms"] = int((time.time() - t0) * 1000)
                 await asyncio.sleep(0.3)
+
+
+def consensus(results: list[dict]) -> tuple[dict, float]:
+    """Спільна відповідь ансамблю: тип і вид — більшістю; місця — ті, що назвала більшість моделей (за фонетичним ключем).
+    Друге число — частка моделей, згодних з типом (1.0 = усі)."""
+    from collections import Counter
+    from .geo import phon
+    rs = [r for r in results if isinstance(r, dict) and r]
+    if not rs:
+        return {}, 0.0
+    if len(rs) == 1:
+        return rs[0], 1.0
+    typ, nt = Counter(r.get("type") for r in rs).most_common(1)[0]
+    kind = Counter(r.get("kind") for r in rs).most_common(1)[0][0]
+    out = {"kind": kind, "type": typ}
+    for f in ("now", "to", "from", "oblasts"):
+        cnt, first = Counter(), {}
+        for r in rs:
+            for n in {x for x in (r.get(f) or []) if isinstance(x, str)}:
+                k = phon(n)[:6]
+                cnt[k] += 1
+                first.setdefault(k, n)
+        out[f] = [first[k] for k, c in cnt.items() if c * 2 > len(rs)]
+    cs = [r.get("count") for r in rs if isinstance(r.get("count"), int)]
+    out["count"] = Counter(cs).most_common(1)[0][0] if cs and Counter(cs).most_common(1)[0][1] * 2 > len(rs) else None
+    return out, round(nt / len(rs), 2)
+
+
+# ---------- суддя «одна ціль чи дві»
+MERGE_SYSTEM = """Ти аналітик моніторингу повітряних загроз. Дано дві цілі на мапі SKY і повідомлення каналів про кожну.
+Скажи, чи це, найімовірніше, ТА САМА ціль (різні канали або різні назви місць) чи різні цілі.
+Враховуй: «ще один», «новий», «другий», «група розділилась» означають різні цілі; той самий пункт призначення й близький час
+від різних каналів, тип «невизначений» проти конкретного — часто та сама ціль; великі відстані за короткий час неможливі.
+Не вигадуй фактів, яких немає в повідомленнях."""
+MERGE_TOOL = {
+    "name": "verdict",
+    "description": "Чи це та сама ціль.",
+    "input_schema": {"type": "object", "properties": {
+        "same": {"type": "boolean"}, "confidence": {"type": "number", "description": "0..1"},
+        "why": {"type": "string", "description": "одне речення"}}, "required": ["same", "confidence", "why"]},
+}
+
+# ---------- зображення з постів каналів (мапи зі стрілками, скріншоти)
+VISION = {"anthropic", "openai", "gemini", "openrouter", "xai"}
+VISION_SYSTEM = SYSTEM + """
+Тобі дано ЗОБРАЖЕННЯ з поста (часто мапа зі стрілками й підписами) і підпис до нього. Витягни лише те, що на ньому
+прямо видно: тип цілей, звідки й куди стрілки, підписані населені пункти. Якщо це не мапа загроз (реклама, фото наслідків,
+мем) — kind=other. Не вгадуй назви, яких не видно."""
+
+# ---------- «Що зараз відбувається?» для області
+EXPLAIN_SYSTEM = """Ти пояснюєш мешканцю, що зараз відбувається в небі над його областю, лише за даними SKY, які тобі дали.
+Пиши українською, коротко (3–6 речень), спокійно і по суті, без довгих тире. Не вигадуй цілей, місць, чисел і часу, яких немає в даних.
+Якщо даних мало — так і скажи. Не давай прогнозу удару по конкретному місцю. Якщо є офіційна тривога в області дому —
+нагадай про укриття. Наприкінці не додавай порад, крім укриття під час тривоги."""

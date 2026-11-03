@@ -1446,3 +1446,28 @@ def test_secrets_roundtrip_and_merge(tmp_path, monkeypatch):
     txt = env.read_text()
     assert "TG_SESSION=x" in txt and "ANTHROPIC_API_KEY=test-a" in txt and "old" not in txt and "LLM_MODE=shadow" in txt
     assert set(ch) >= {"ANTHROPIC_API_KEY", "GROQ_API_KEY"}
+
+
+def test_ai_consensus_and_ingest_validation():
+    """Ансамбль моделей: місця й тип — більшістю; на мапу лише з перевіркою правилами й областю каналу."""
+    import time
+    from app.llm import consensus
+    from app.ai_glue import AI
+    c, agree = consensus([{"kind": "target", "type": "shahed", "now": ["Пісочин"], "to": ["Харків"]},
+                          {"kind": "target", "type": "shahed", "now": ["Песочин"], "to": []},
+                          {"kind": "target", "type": "jet", "now": [], "to": ["Харків"]}])
+    assert c["type"] == "shahed" and c["now"] == ["Пісочин"] and c["to"] == ["Харків"] and agree == 0.67
+
+    class L:  # заглушка моделі
+        on_ai = on_merge = None
+    tr = Tracker(SOURCES)
+    ai = AI(L(), P, tr, lambda: {})
+    now = time.time()
+    good = {"src": "TLK", "t": now, "text": "Шахед Песочин → Харьков", "rules": [{"type": None, "places": []}],
+            "llm": {"kind": "target", "type": "shahed", "now": ["Пісочин"], "to": ["Харків"]},
+            "votes": {"a": {"type": "shahed"}, "b": {"type": "shahed"}}, "agree": 1.0}
+    assert ai.ai_ingest(good) and any(t.ai for t in tr.tracks)
+    far = dict(good, llm={"kind": "target", "type": "shahed", "now": [], "to": ["Одеса"]})
+    assert not ai.ai_ingest(far)  # харківський канал, а місце в Одесі — відкидаємо
+    split = dict(good, agree=0.5, votes={"a": {"type": "shahed"}, "b": {"type": "jet"}})
+    assert not ai.ai_ingest(split)  # моделі не згодні — лише журнал

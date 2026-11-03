@@ -763,6 +763,7 @@ function fillSheet(first){
    // можливості моделі поруч зі свіжістю; «скільки залишилося» не рахуємо: час запуску невідомий
    const END={shahed:'≈5 год 30 хв – 14 год (розрахунок за дальністю)',jet:'не встановлено: модель не названа',geran5:'до 2 год',banderol:'≈1 год на 500 км (розрахунок)',recon:'від 2 год до 16 год, залежно від моделі',molniya:'не встановлено',lancet:'до 30 хв («Ланцет-1») або до 40 хв («Ланцет-3»); версію канали зазвичай не називають'}[tr.type];
    if(END)h+='<br><small>Модель може бути в повітрі: '+END+'. Це не відлік і не відбій</small>';
+   if(tr.ai)h+='<br><b class=warn>✦ Розпізнано ШІ.</b> <small>Правила SKY це повідомлення не розібрали, а кілька мовних моделей погодились, що це ціль, і її місця перевірено довідником. Перевірте першоджерело нижче</small>';
    if(tr.pair==='lancet')h+='<br><b class=warn>Канал попереджає про можливий Ланцет.</b> <small>ZALA чи Орлан часто працюють у парі з Ланцетом і наводять його, але сам Ланцет поруч ніхто не підтвердив</small>';
    if(BAL){const lt=tr.last||tr.first,nm=tr.next||(at&&at[0]);
      h=(nm?'Згадано: <b>'+esc(nm)+'</b>':'Місце не назване')+' о '+fmt(lt)+' ('+mago(lt)+' хв тому)'+(mago(lt)>=3?'<br><b class=warn>Оновлень немає</b> · це не відбій':'')+
@@ -1319,4 +1320,12 @@ setInterval(()=>{
   if(seg){const upd=()=>seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===(PREF.radius||10)));upd();
     seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;PREF.radius=+b.dataset.v;savePref();upd();syncMe();FOL.fired.clear();toast('Радіус '+PREF.radius+' км');};}
   if(PREF.follow)followOn();}
+/* ---------- ШІ: «Що зараз відбувається?» для області дому (03.11) ---------- */
+fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const box=$('#ai-box');if(!box)return;box.hidden=false;
+  $('#ai-ask').onclick=async e=>{e.stopPropagation();const ob=homeObl();const a=$('#ai-ans');a.hidden=false;
+    if(!ob){a.innerHTML='Спершу позначте дім кнопкою ⌂';return;}
+    a.innerHTML='<small>Аналізую дані SKY…</small>';
+    try{const r=await (await fetch('/api/ask?obl='+encodeURIComponent(ob))).json();
+      a.innerHTML=esc(r.text||'Немає відповіді')+'<small class=ai-note>'+esc(r.note||'Оцінка ШІ за даними SKY')+(r.t?' · '+fmt(r.t):'')+'</small>';}
+    catch(x){a.innerHTML='Не вдалося отримати відповідь';}};}).catch(()=>{});
 })();

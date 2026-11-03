@@ -127,6 +127,7 @@ class Track:
     pred_naive_hit: bool = False
     closed: float | None = None
     likely: bool = False  # тип — непряма ознака («ймовірно розвідник»)
+    ai: bool = False  # ціль додано за розбором мовної моделі (правила її пропустили), позначка «розпізнано ШІ»
     pair: str | None = None  # канал попередив про можливу пару: «Зала (угроза ланцет)» → розвідник, pair="lancet"
     merged: str | None = None  # дублікат іншого треку (той самий об'єкт, різні канали/назви)
 
@@ -306,7 +307,9 @@ class Tracker:
         self.avia: dict[str, dict] = {}  # область -> {"t", "first", "n", "platform"}
         self.counters: dict[str, int] = {}
         self.log: list[dict] = []
-        self.bal: list[dict] = []  # повідомлення про балістику: які області названо (режим балістичної загрози)
+        self.bal: list[dict] = []
+        self.ai_merge: set = set()      # пари id, які модель вважає однією ціллю (assist)
+        self.merge_cands: dict = {}     # сумнівні пари для судді-моделі: frozenset(a, b) -> час  # повідомлення про балістику: які області названо (режим балістичної загрози)
         self.last_update = 0.0
         self.launches = LaunchBook(brain)
         self.exclude: set[str] = set()
@@ -668,6 +671,10 @@ class Tracker:
                 tr.course_to, tr.course_xy = None, None
         if getattr(obs, "pair", None):
             tr.pair = obs.pair
+        if getattr(obs, "ai", False) and len(tr.obs) <= 1:
+            tr.ai = True
+        elif not getattr(obs, "ai", False):
+            tr.ai = False  # правила підтвердили — це вже не лише оцінка моделі
         if obs.count:
             tr.count = max(tr.count or 0, obs.count) if t - tr.obs[0].t < 900 else obs.count
         rec["track"] = tr.id
@@ -900,19 +907,32 @@ class Tracker:
                 if b.merged:
                     continue
                 d = dist_km(pos[a.id], pos[b.id])
+                ai_same = frozenset((a.id, b.id)) in self.ai_merge
+                near_cand = d <= 25 and (a.type == b.type or {a.type, b.type} <= {"jet", "shahed", "recon", "molniya"})
                 if a.type == b.type:
                     lim = self.MERGE_KM.get(a.type, 10)
                     # шахеди летять групами — зливаємо лише «той самий пункт від різних каналів»
-                    if a.type in ("shahed", "molniya") and not (a.last.label == b.last.label or d < 3):
+                    if a.type in ("shahed", "molniya") and not (a.last.label == b.last.label or d < 3) and not ai_same:
+                        if near_cand:
+                            self.merge_cands.setdefault(frozenset((a.id, b.id)), now)
                         continue
                 elif {a.type, b.type} == {"jet", "shahed"}:
                     # «реактивний» і «шахед» в одній точці одним курсом — найчастіше той самий об'єкт, різні канали
                     lim = 8
+                elif ai_same:
+                    lim = 12
                 else:
+                    if near_cand:
+                        self.merge_cands.setdefault(frozenset((a.id, b.id)), now)
                     continue
                 # той самий пункт призначення («на П'ятихатки» від двох каналів) — курс із «центру міста» міг бути хибним (03.11)
                 dest = lambda tr: ({p.name for p in tr.route} | ({tr.course_to} if tr.course_to else set()))
-                if d > lim or not (same_way(a, b) or (a.type != b.type and dest(a) & dest(b))):
+                ok = d <= lim and (same_way(a, b) or (a.type != b.type and dest(a) & dest(b)))
+                if not ok and frozenset((a.id, b.id)) in self.ai_merge and d <= max(lim, 12) * 2:
+                    ok = True  # модель упевнено сказала «та сама ціль», і вони поруч
+                if not ok:
+                    if near_cand:
+                        self.merge_cands.setdefault(frozenset((a.id, b.id)), now)
                     continue
                 # той самий канал майже одночасно написав про дві цілі («шахед на Чугуїв» + «ще шахед на Чугуїв») — це різні
                 if a.srcs & b.srcs and abs(a.obs[0].t - b.obs[0].t) < 120:
@@ -1079,7 +1099,7 @@ class Tracker:
                         la, lo = from_xy(*p)
                         up(obl.of(lo, la), 1)
             out.append({
-                "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "pair": tr.pair, "count": tr.count, "status": status,
+                "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "pair": tr.pair, "ai": tr.ai, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
                 "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "nopos": all(o.est for o in tr.obs),
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],

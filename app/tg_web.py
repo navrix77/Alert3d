@@ -17,6 +17,9 @@ log = logging.getLogger("tg_web")
 MSG = re.compile(r'<div class="tgme_widget_message[^"]*"[^>]*data-post="([^"/]+)/(\d+)"(.*?)(?=<div class="tgme_widget_message_wrap|\Z)', re.S)
 TEXT = re.compile(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', re.S)
 TIME = re.compile(r'<time[^>]*datetime="([^"]+)"')
+# зображення поста (мапа зі стрілками, схема): t.me/s віддає його як background-image (03.11 — для моделі із зором)
+PHOTO = re.compile(r"tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)")
+PHOTOS: dict[str, str] = {}
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36"}
 
 
@@ -34,6 +37,12 @@ def parse_page(page: str) -> list[tuple[int, float, str]]:
         if not t or not x:
             continue
         ts = datetime.fromisoformat(t.group(1)).timestamp()
+        ph = PHOTO.search(body)
+        if ph:
+            PHOTOS[f"https://t.me/{_ch}/{mid}"] = ph.group(1)
+            if len(PHOTOS) > 3000:
+                for k in list(PHOTOS)[:1000]:
+                    PHOTOS.pop(k, None)
         out.append((int(mid), ts, _clean(x.group(1))))
     return out
 
@@ -43,6 +52,10 @@ class WebMonitor:
         self.last_id: dict[str, int] = {}
         self.last_ok: dict[str, float] = {}
         self.errors: dict[str, str] = {}
+
+    @staticmethod
+    def photo(link: str) -> str | None:
+        return PHOTOS.get(link)
 
     def state(self) -> dict:
         now = time.time()
