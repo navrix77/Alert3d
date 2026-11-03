@@ -126,7 +126,7 @@
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
           this.tex[t] = tx; map.triggerRepaint();
         };
-        img.src = 'sprites/t-' + t + '.png?v=ref2';
+        img.src = 'sprites/t-' + t + '.png?v=ref3';
       }
     },
     quads(list) { // list: [merc, size, rot, col4, kind, off]

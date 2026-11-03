@@ -79,7 +79,7 @@ async function setBase(kind){base=kind;localStorage.setItem('base2',kind);map.se
 function addImages(){
   // реалістичні спрайти цілей (вид згори, ніс на північ) + тіні
   for(const t of Object.keys(TYPE_COLOR))for(const v of ['','-d','-sh']){const id='t-'+t+v;if(map.hasImage(id))continue;
-    map.loadImage('sprites/t-'+t+v+'.png?v=ref2').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:2});}).catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
+    map.loadImage('sprites/t-'+t+v+'.png?v=ref3').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:2});}).catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
   if(!map.hasImage('home')){const c=drawHome(40);map.addImage('home',c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});}
   if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.88)';x.beginPath();x.roundRect(2,2,s-4,s-4,14);x.fill();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
 }
@@ -1061,7 +1061,7 @@ function note(n){
   const parts=String(n.sub||'').split(' · ').filter(Boolean);
   el.innerHTML='<span class="ni'+(n.type?' ni-t':'')+'">'+(n.type?'':(n.ic||'🔔'))+'</span><div class="nb"><b>'+esc(String(n.title).replace(/^(🔴|🟠|🟡|🟢)\s*/u,''))+'</b>'+
     (parts.length?'<div class="nch">'+parts.map((x,i)=>'<span'+(i===0?' class="lead"':'')+'>'+esc(x)+'</span>').join('')+'</div>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
-  if(n.type){const im=new Image();im.alt='';im.width=im.height=32;im.style.objectFit='contain';im.onerror=()=>{try{im.replaceWith(drawTarget(n.type,22));}catch(e){}};im.src='sprites/t-'+n.type+'.png?v=ref2';el.querySelector('.ni').appendChild(im);}
+  if(n.type){const im=new Image();im.alt='';im.width=im.height=32;im.style.objectFit='contain';im.onerror=()=>{try{im.replaceWith(drawTarget(n.type,22));}catch(e){}};im.src='sprites/t-'+n.type+'.png?v=ref3';el.querySelector('.ni').appendChild(im);}
   const close=()=>{if(el.classList.contains('out'))return;el.classList.add('out');setTimeout(()=>{el.remove();notesAll();},600);};
   // зникає сама за 3 с плавно; якщо застосунок у фоні, відлік починається, коли користувач його відкрив
   const arm=()=>{if(document.hidden){document.addEventListener('visibilitychange',function v(){if(!document.hidden){document.removeEventListener('visibilitychange',v);setTimeout(close,3000);}});}else setTimeout(close,3000);};arm();
