@@ -1552,6 +1552,7 @@ def test_llm_breaker_and_tts_wav():
 
 def test_say_form_and_radio_memory(monkeypatch):
     import asyncio
+    import time as _t
     from app.tts import say_form
     from app import live
     t = say_form("МіГ-31К зліт, Х-101 ×3, БпЛА")
@@ -1562,21 +1563,22 @@ def test_say_form_and_radio_memory(monkeypatch):
         n = 0
         async def call(self, *a, **k):
             self.n += 1
-            if self.n == 3:
-                return {"action": "silence"}, "x:y"
-            return {"action": "speak", "kind": "update", "display_text": "На Харківщині БпЛА у напрямку Пісочина.",
-                    "speech_text": "На Харківщині безпілотник у напрямку Пісочина."}, "x:y"
-    monkeypatch.setattr(live, "radio_context", lambda *a: ("ctx", "fb"))
-    monkeypatch.setattr(live, "RADIO_MEM", {})
+            return {"action": "speak", "kind": "update", "display_text": "Шахед на півдні, 20 км від вас, наближається.",
+                    "speech_text": "Шахед на півдні, двадцять кілометрів від вас, наближається."}, "x:y"
+    monkeypatch.setattr(live, "RADIO_STATE", {})
+    home = (36.23, 49.99)
+    st = {"now": _t.time(), "tracks": [{"id": "Ш-1", "type": "shahed", "status": "active", "lon": 36.25, "lat": 49.81, "hd": 0, "speed": 170,
+                                        "count": 1, "first": _t.time()}]}
     m = L()
-    r1 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s1"))
-    r2 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s1"))
-    r3 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s1"))
-    r4 = asyncio.run(live.radio(m, {}, None, None, 0, None, "Харківська", "region", "s2"))  # новий слухач: своє зведення
-    assert r1["text"] and "безпілотник" in r1["speech"] and r2["text"] == "" and r3.get("quiet") and r4["text"]
-    out = asyncio.run(live.radio(None, {"health": {"telegram": False, "alerts": True}}, None, None, 0, None, "Харківська", "region", "s3"))
-    assert out["kind"] == "outage" and "недоступні" in out["text"]
-
+    r1 = asyncio.run(live.radio(m, st, [], None, _t.time() - 600, home, "Харківська", "region", "s1"))
+    r2 = asyncio.run(live.radio(m, st, [], None, _t.time() - 600, home, "Харківська", "region", "s1"))
+    assert r1["text"] and r1["level"] == "urgent" and r2.get("quiet") and m.n == 1  # без змін — мовчить і не платить
+    f = live.near_facts(st, home, "Харківська", 0)
+    assert f["near"][0]["side"] == "на півдні" and f["near"][0]["appr"] is True
+    r4 = asyncio.run(live.radio(m, st, [], None, 0, home, "Харківська", "region", "s2"))
+    assert r4["text"]  # новий слухач — своє зведення
+    out = asyncio.run(live.radio(None, {"health": {"telegram": False, "alerts": True}}, [], None, 0, home, "Харківська", "region", "s3"))
+    assert out["level"] == "outage" and "недоступні" in out["text"]
 
 def test_scrub_track_ids():
     from app.live import scrub

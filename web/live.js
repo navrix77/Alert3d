@@ -230,30 +230,62 @@
     }, 60000);
   };
 
-  // ---------- «Радіо SKY»: голосові випуски кожні 2 хв про свій регіон; кожен 3-й — сусідні області; кожен 5-й — уся Україна
-  let radioSid = '', radioOn = false, radioN = 0, radioT = null, radioSeen = 0, radioQuiet = 0;
-  function chime() { try { const c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain();
-      o.type = 'sine'; o.frequency.setValueAtTime(880, c.currentTime); o.frequency.setValueAtTime(660, c.currentTime + 0.12);
-      g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(0.18, c.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.35);
-      o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.4); setTimeout(() => c.close(), 600); } catch (e) {} }
-  async function radioIssue() {
-    if (!radioOn || playing) return;
-    radioN++; const w = where();
-    const scope = radioN % 5 === 0 ? 'country' : radioN % 3 === 0 ? 'neighbors' : 'region';
+  // ---------- Sky Radio (04.11, переробка): говорить, коли біля вас щось змінилось; без змін мовчить (раз на 8 хв коротко
+  // нагадує обстановку); уся Україна — на початку й раз на 15 хв. Звуки як на радіо: позивний, сигнал новин, тривожний сигнал,
+  // тиха фонова підкладка, що стихає під голос. Усе синтезовано тут же (власні звуки, не чужа музика).
+  let radioSid = '', radioOn = false, radioT = null, radioSeen = 0, radioBusy = false, lastCountry = 0;
+  const RA = { ctx: null, bed: null, bedGain: null, master: null };
+  function raCtx() {
+    if (!RA.ctx) { const C = window.AudioContext || window.webkitAudioContext; RA.ctx = new C(); RA.master = RA.ctx.createGain(); RA.master.gain.value = 0.9; RA.master.connect(RA.ctx.destination); }
+    if (RA.ctx.state !== 'running') RA.ctx.resume();
+    return RA.ctx;
+  }
+  function tone(freq, t0, dur, vol, type, dest) {
+    const c = raCtx(), o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(dest || RA.master); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function bell(freq, t0, vol) { tone(freq, t0, 1.1, vol, 'sine'); tone(freq * 2.01, t0, 0.6, vol * 0.35, 'sine'); tone(freq * 3.02, t0, 0.3, vol * 0.12, 'sine'); }
+  const SND = {
+    ident() { try { const t = raCtx().currentTime + 0.05; [523.25, 659.25, 783.99, 1046.5].forEach((f, k) => bell(f, t + k * 0.16, 0.16)); } catch (e) {} return wait(1100); },
+    news() { try { const t = raCtx().currentTime + 0.05; bell(880, t, 0.14); bell(659.25, t + 0.18, 0.14); } catch (e) {} return wait(650); },
+    calm() { try { const t = raCtx().currentTime + 0.05; bell(587.33, t, 0.08); } catch (e) {} return wait(450); },
+    urgent() { try { const t = raCtx().currentTime + 0.05; for (let k = 0; k < 3; k++) { tone(740, t + k * 0.32, 0.22, 0.2, 'triangle'); tone(554, t + k * 0.32 + 0.11, 0.18, 0.14, 'triangle'); } } catch (e) {} return wait(1050); },
+  };
+  // фонова підкладка: тихі акорди (ля мінор → фа → до → соль), по 8 с; під час голосу стихає
+  function bedStart() {
+    if (RA.bed || LS.get('radio_bed') === '0') return;
     try {
-      const r = await (await fetch('/api/radio?scope=' + scope + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (NX().now() - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
-        (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : ''))).json();
-      if (!radioOn) return;
-      if (!r.text) { if (scope === 'region') radioSeen = NX().now(); return; }  // нового немає: мовчимо, не повторюємо
-      // свій регіон без змін — не повторюємо щоразу «змін немає», лише раз на ~6 хв
-      if (scope === 'region' && /суттєвих змін|змін немає|без змін/i.test(r.text || '') && ++radioQuiet % 3 !== 1) return;
-      if (scope === 'region') radioSeen = NX().now();
-      rsay((scope === 'country' ? '🇺🇦 Україна: ' : scope === 'neighbors' ? 'Сусіди: ' : '📍 Ваш регіон: ') + (r.text || ''),
-        new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) + ' · ' + (r.by && r.by !== 'rules' ? 'ШІ за даними SKY' : 'дані SKY'));
-      chime(); await wait(450); await speak(r.speech || r.text || '');
+      const c = raCtx(); RA.bedGain = c.createGain(); RA.bedGain.gain.value = 0.0001; RA.bedGain.connect(RA.master);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.connect(RA.bedGain);
+      const chords = [[220, 261.63, 329.63], [174.61, 220, 261.63], [196, 261.63, 329.63], [196, 246.94, 293.66]];
+      const oscs = [0, 1, 2].map(() => { const o = c.createOscillator(); o.type = 'triangle'; const g = c.createGain(); g.gain.value = 0.33; o.connect(g).connect(lp); o.start(); return o; });
+      let k = 0; const step = () => { const ch = chords[k++ % 4], t = c.currentTime; oscs.forEach((o, n) => o.frequency.setTargetAtTime(ch[n], t, 1.2)); };
+      step(); RA.bed = { oscs, timer: setInterval(step, 8000) };
+      RA.bedGain.gain.setTargetAtTime(0.05, c.currentTime, 1.5);
     } catch (e) {}
   }
-  const rbtn = document.createElement('button'); rbtn.id = 'radio-btn'; rbtn.title = 'Радіо SKY: голосові зведення кожні 2 хв про ваш регіон, періодично про сусідів і всю Україну';
+  function bedStop() { if (!RA.bed) return; try { clearInterval(RA.bed.timer); RA.bedGain.gain.setTargetAtTime(0.0001, RA.ctx.currentTime, 0.4); const o = RA.bed.oscs; setTimeout(() => o.forEach(x => { try { x.stop(); } catch (e) {} }), 1500); } catch (e) {} RA.bed = null; }
+  function duck(on) { try { if (RA.bedGain) RA.bedGain.gain.setTargetAtTime(on ? 0.012 : 0.05, RA.ctx.currentTime, 0.25); } catch (e) {} }
+
+  async function radioIssue(force) {
+    if (!radioOn || playing || radioBusy) return;
+    const w = where();
+    const now = NX().now();
+    const scope = force === 'country' || now - lastCountry > 900 ? 'country' : 'region';
+    radioBusy = true;
+    try {
+      const r = await (await fetch('/api/radio?scope=' + scope + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (now - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
+        (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : ''))).json();
+      if (scope === 'country') lastCountry = now;
+      if (!radioOn || !r.text) return;  // нового немає: мовчимо
+      if (scope === 'region') radioSeen = NX().now();
+      await (r.level === 'urgent' ? SND.urgent() : r.level === 'calm' ? SND.calm() : SND.news());
+      duck(true); await speak(r.speech || r.text || ''); duck(false);
+    } catch (e) { duck(false); } finally { radioBusy = false; }
+  }
+  const rbtn = document.createElement('button'); rbtn.id = 'radio-btn'; rbtn.title = 'Sky Radio: голосом про те, що біля вас, щойно щось змінюється; коротко про всю Україну';
   // лише кнопка-значок без тексту на мапі (власник 03.11: «текст не потрібен»)
   const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.innerHTML = '<span class=ri>📻</span><span class=rl>Sky Radio</span>'; rbtn.setAttribute('aria-label', radioOn ? 'Sky Radio в ефірі, вимкнути' : 'Увімкнути Sky Radio'); };
   rshow(); document.body.appendChild(rbtn);
@@ -274,14 +306,16 @@
   const rsay = () => {};
   rbtn.onclick = async () => {
     radioOn = !radioOn; rshow();
-    if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); return; }
+    if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); bedStop(); return; }
     audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on');
+    raCtx();  // звук розблоковується саме цим дотиком (iPhone)
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
-    radioN = 0; radioQuiet = 0; radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12);
-    rsay('Радіо SKY увімкнено: кожні 2 хвилини про ваш регіон, періодично про сусідні області й усю Україну.', 'Вимкнути: натисніть кнопку ще раз');
-    await speak('Радіо SKY. Кожні дві хвилини про ваш регіон, періодично про сусідні області і всю Україну.');
-    radioN = 4; await radioIssue();  // перший випуск — загальна картина країни, далі свій регіон
-    radioT = setInterval(radioIssue, 120000);
+    radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0;
+    bedStart(); await SND.ident();
+    duck(true); await speak('Скай Радіо. Розповім, що відбувається біля вас, і скажу, щойно щось зміниться.'); duck(false);
+    await radioIssue('region');          // спершу свій район
+    await radioIssue('country');         // далі коротко по Україні
+    radioT = setInterval(radioIssue, 40000);
   };
 
   // ---------- повернення після відсутності: запропонувати ефір

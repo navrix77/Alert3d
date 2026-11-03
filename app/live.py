@@ -246,55 +246,6 @@ def _neighbors(obl: str) -> list[str]:
     return NB.get(obl, [])
 
 
-def radio_context(state: dict, hist: list, tracker, since: float, home, obl: str, scope: str) -> tuple[str, str]:
-    """(контекст для моделі, запасний текст без моделі) для одного випуску."""
-    from collections import Counter
-    from .geo import oblasts
-    O = oblasts()
-    act = [t for t in state.get("tracks", []) if t.get("status") == "active"]
-    by_obl = Counter()
-    for t in act:
-        o = O.of(t["lon"], t["lat"])
-        if o:
-            by_obl[o] += t.get("count") or 1
-    levels = state.get("levels") or {}
-    off = state.get("official") or {}
-    alerts = set(levels) | set(off.get("alert_obl") or [])
-    now = time.time()
-    bal = [e for e in state.get("bal", []) if now - e["t"] < 1800 and not e.get("close")]
-    if scope == "region":
-        d = diff(state, hist, tracker, since, home, obl)
-        c = d["counts"]
-        near = [i for i in d["items"] if i["status"] != "same"][:5]
-        ctx = (f"ВИПУСК: ваш регіон ({obl}). Тривога в області: {'так' if obl in alerts else 'ні'}. "
-               f"Балістика/МіГ для області за 30 хв: {sum(1 for e in bal if obl in e.get('obl', []) or '*' in e.get('obl', []))}.\n"
-               f"За {d['minutes']} хв: нових {c['new']}, змінилось {c['changed']}, зникло {c['gone']}, зараз у районі {c['active']}.\n" +
-               "\n".join(f"- {i['name']}{' ×' + str(i['count']) if i['count'] > 1 else ''}: {i['status']}, "
-                         f"{('курс на ' + i['next']) if i['next'] else 'курс невідомий'}, {i['km']} км від дому" for i in near))
-        fb = fallback_script(d)[0]["say"]
-        if obl in alerts:
-            fb = f"У вашій області тривога. {fb} Будьте в укритті."
-        return ctx, fb
-    if scope == "neighbors":
-        nb = _neighbors(obl)
-        rows = [f"- {o}: тривога {'так' if o in alerts else 'ні'}, цілей {by_obl.get(o, 0)}" for o in nb]
-        ctx = f"ВИПУСК: сусідні області для {obl}.\n" + "\n".join(rows)
-        busy = [o for o in nb if by_obl.get(o, 0)]
-        fb = ("У сусідніх областях: " + ", ".join(f"{o} ({by_obl[o]})" for o in busy) + ".") if busy else "У сусідніх областях цілей не фіксують."
-        return ctx, fb
-    types = Counter()
-    for t in act:
-        types[t["name"]] += t.get("count") or 1
-    ctx = (f"ВИПУСК: уся Україна. Областей з тривогою: {len(alerts)}. Цілей у повітрі за даними каналів: {sum(types.values())}.\n"
-           + "\n".join(f"- {k}: {v}" for k, v in types.most_common(6)) +
-           f"\nНайбільше цілей: " + ", ".join(f"{o} ({n})" for o, n in by_obl.most_common(4)) +
-           (f"\nПовідомлень про балістику/МіГ-31К за 30 хв: {len(bal)}" if bal else ""))
-    n = len(alerts)
-    fb = ((f"По Україні тривога в {n} " + ("області" if n % 10 == 1 and n % 100 != 11 else "областях") + ". " if n else "Офіційних тривог в областях зараз немає. ") + (f"У повітрі приблизно {sum(types.values())} цілей, найбільше: " +
-          ", ".join(o for o, _n in by_obl.most_common(3)) + "." if types else "Цілей у повітрі не фіксують."))
-    return ctx, fb
-
-
 def _outage(state: dict) -> str:
     h = state.get("health") or {}
     if h.get("replay"):
@@ -307,14 +258,143 @@ def _outage(state: dict) -> str:
     return "; ".join(bad)
 
 
+TWORD = {"shahed": ("шахед", "шахеди"), "jet": ("реактивний безпілотник", "реактивні безпілотники"), "cruise": ("крилата ракета", "крилаті ракети"),
+         "ballistic": ("балістична ракета", "балістичні ракети"), "kab": ("керована авіабомба", "керовані авіабомби"),
+         "molniya": ("«Молнія»", "«Молнії»"), "lancet": ("«Ланцет»", "«Ланцети»"), "recon": ("розвідувальний дрон", "розвідувальні дрони"),
+         "geran5": ("«Герань-5»", "«Герані-5»"), "banderol": ("«Бандероль»", "«Бандеролі»"), "fpv": ("FPV-дрон", "FPV-дрони"),
+         "fpvf": ("FPV-дрон на оптоволокні", "FPV-дрони на оптоволокні"), "rszv": ("РСЗВ", "РСЗВ")}
+SIDES = ["на півночі", "на північному сході", "на сході", "на південному сході", "на півдні", "на південному заході", "на заході", "на північному заході"]
+
+
+def _brg(a, b) -> float:
+    return (math.degrees(math.atan2((b[0] - a[0]) * 71.6, (b[1] - a[1]) * 111.2)) + 360) % 360
+
+
+def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -> dict:
+    """Факти для слухача: що біля нього, де (сторона світу, км), чи наближається, що нового; тривога; балістика.
+    Без цифр на кшталт «39 повідомлень» — лише те, що людині треба знати зараз."""
+    now = state.get("now") or time.time()
+    levels = state.get("levels") or {}
+    off = state.get("official") or {}
+    alert = bool(obl) and (obl in levels or obl in (off.get("alert_obl") or []))
+    near = []
+    for t in state.get("tracks", []):
+        if t.get("status") != "active" or not home:
+            continue
+        km = _km((t["lon"], t["lat"]), home)
+        if km > radius:
+            continue
+        side = SIDES[int(((_brg(home, (t["lon"], t["lat"])) + 22.5) % 360) // 45)]
+        appr = None
+        if t.get("hd") is not None and km > 3:
+            to_home = _brg((t["lon"], t["lat"]), home)
+            diff_ = abs((t["hd"] - to_home + 180) % 360 - 180)
+            appr = diff_ <= 40
+        eta = round(km / max(60, t.get("speed") or 170) * 60) if appr else None
+        n = t.get("count") or 1
+        w = TWORD.get(t["type"], (t.get("name") or "ціль", t.get("name") or "цілі"))
+        near.append({"id": t["id"], "type": t["type"], "word": (f"{n} " + w[1]) if n > 1 else w[0], "km": round(km), "side": side,
+                     "appr": appr, "eta": eta, "next": t.get("next"), "pos": t.get("pos_lvl"), "new": (t.get("first") or 0) > since})
+    near.sort(key=lambda x: (not x["appr"], x["km"]))
+    bal = [e for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") and (obl in e.get("obl", []) or "*" in e.get("obl", []))]
+    urgent = bool(bal) or any(x["appr"] and x["km"] <= 30 for x in near)
+    fp = tuple(sorted((x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "") for x in near[:6])) + (alert, bool(bal))
+    return {"alert": alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:], "urgent": urgent, "fp": fp}
+
+
+def region_text(f: dict, obl: str) -> tuple[str, str]:
+    """(контекст для редактора, запасний текст без моделі) — про свій район."""
+    lines = [f"Область слухача: {obl or 'невідома'}. Офіційна тривога в області: {'так' if f['alert'] else 'ні'}."]
+    if f["bal"]:
+        b = f["bal"][0]
+        lines.append(f"Повідомлення про загрозу балістики для області о {time.strftime('%H:%M', time.localtime(b['t']))}.")
+    if f["near"]:
+        lines.append(f"Цілей у радіусі 120 км від слухача: {f['n_near']}. Найважливіші:")
+        for x in f["near"]:
+            lines.append(f"- {x['word']}: {x['km']} км {x['side']} від слухача; " +
+                         ("наближається" + (f", орієнтовно {x['eta']} хв" if x["eta"] is not None else "") if x["appr"] else
+                          "рухається не в бік слухача" if x["appr"] is False else "напрямок невідомий") +
+                         (f"; курс на {x['next']}" if x["next"] else "") + (f"; місце {x['pos']}" if x["pos"] else "") + ("; НОВА" if x["new"] else ""))
+    else:
+        lines.append("У радіусі 120 км від слухача цілей немає.")
+    # запасний текст
+    fb = []
+    if f["bal"]:
+        fb.append("Для вашої області повідомляють про загрозу балістики. Будьте в укритті.")
+    if f["near"]:
+        x = f["near"][0]
+        fb.append(f"{x['word'][:1].upper() + x['word'][1:]} {x['side']}, приблизно {x['km']} кілометрів від вас" +
+                  (", наближається" if x["appr"] else "") + (f", курсом на {x['next']}" if x["next"] else "") + ".")
+        if f["n_near"] > 1:
+            fb.append(f"Усього поруч {f['n_near']} цілей.")
+    else:
+        fb.append("Поруч з вами цілей немає." + (" Тривога в області триває." if f["alert"] else ""))
+    return "\n".join(lines), " ".join(fb)
+
+
+def country_text(state: dict) -> tuple[str, str]:
+    from collections import Counter
+    from .geo import oblasts
+    O = oblasts()
+    act = [t for t in state.get("tracks", []) if t.get("status") == "active"]
+    by_obl = Counter()
+    for t in act:
+        o = O.of(t["lon"], t["lat"])
+        if o:
+            by_obl[o] += t.get("count") or 1
+    levels = state.get("levels") or {}
+    off = state.get("official") or {}
+    n = len(set(levels) | set(off.get("alert_obl") or []))
+    now = time.time()
+    bal_obl = sorted({o for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") for o in e.get("obl", []) if o != "*"})
+    top = [o for o, _c in by_obl.most_common(3)]
+    ctx = (f"ВИПУСК: уся Україна. Областей з офіційною тривогою: {n}. Найбільше цілей: {', '.join(top) or 'немає'}." +
+           (f" Загроза балістики: {', '.join(bal_obl)}." if bal_obl else ""))
+    fb = ((f"По Україні тривога в {n} " + ("області" if n % 10 == 1 and n % 100 != 11 else "областях") + ". ") if n else "Офіційних тривог зараз немає. ") + \
+         (f"Найбільше цілей: {', '.join(top)}." if top else "")
+    return ctx, fb
+
+
+def radio_context(state: dict, hist: list, tracker, since: float, home, obl: str, scope: str) -> tuple[str, str]:
+    """(контекст для моделі, запасний текст без моделі) для одного випуску (сумісність зі старими викликами)."""
+    if scope == "country":
+        return country_text(state)
+    return region_text(near_facts(state, home, obl, since), obl)
+
+
+RADIO_SYSTEM = RADIO_SYSTEM + """
+РАДІО ДЛЯ ОДНІЄЇ ЛЮДИНИ: говори так, ніби звертаєшся до слухача: «біля вас», «на південь від вас». Головне — що поруч і чи
+наближається. Не перелічуй статистику повідомлень. Для всієї України — щонайбільше два речення."""
+
+
 async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "") -> dict:
-    ctx, fb = radio_context(state, hist, tracker, since, home, obl, scope)
+    """Ефір для одного слухача. Регіон: говоримо, коли щось змінилось (нова ціль, наближення, тривога, балістика);
+    без змін — мовчимо, а раз на 8 хв коротко нагадуємо обстановку без запиту до моделі. Україна — коротко."""
+    key = (sid or "-", scope, obl)
+    mem = RADIO_STATE.setdefault(key, {"fp": None, "t": 0.0, "said": []})
+    now = time.time()
     out_ = _outage(state)
+    if scope == "country":
+        ctx, fb = country_text(state)
+        level = "info"
+        fp = None
+    else:
+        f = near_facts(state, home, obl, since)
+        ctx, fb = region_text(f, obl)
+        level = "urgent" if f["urgent"] else "update"
+        fp = f["fp"]
+        if mem["said"] and fp == mem["fp"] and not out_:
+            if now - mem["t"] < 480:
+                return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
+            # 8 хв без змін — коротке нагадування з даних, без моделі
+            txt = ("Без змін. " + fb) if f["near"] or f["alert"] else "Без змін. Поруч з вами цілей немає."
+            mem["t"] = now
+            return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "rules"}
     if out_:
         ctx = f"ЗБІЙ ДЖЕРЕЛ: {out_}.\n" + ctx
         fb = "Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."
-    key = (sid or "-", scope, obl)
-    said = RADIO_MEM.get(key, [])
+        level = "info"
+    said = mem["said"]
     ctx += ("\n\nВЖЕ ОЗВУЧЕНО цьому слухачеві (не повторюй без змін):\n" + "\n".join(f"- {x}" for x in said[-3:])) if said \
         else "\n\nНОВИЙ СЛУХАЧ: щойно увімкнув радіо, потрібне коротке актуальне зведення."
     res, by = (None, None)
@@ -322,18 +402,19 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
         import hashlib
         ck = hashlib.sha1(ctx.encode()).hexdigest()
         hit = RADIO_CACHE.get(ck)
-        if hit and time.time() - hit[0] < 120:
+        if hit and now - hit[0] < 120:
             llm.count("saved:radio") if hasattr(llm, "count") else None
-            res, by = hit[1], hit[2]  # той самий стан і та сама пам'ять — відповідь для іншого слухача без нового запиту
+            res, by = hit[1], hit[2]
         else:
             res, by = await llm.call(RADIO_SYSTEM, ctx, RADIO_TOOL, max_tokens=500)
             if res:
-                RADIO_CACHE[ck] = (time.time(), res, by)
+                RADIO_CACHE[ck] = (now, res, by)
                 if len(RADIO_CACHE) > 500:
                     for k in list(RADIO_CACHE)[:250]:
                         RADIO_CACHE.pop(k, None)
     if isinstance(res, dict) and res.get("action") == "silence" and said:
-        return {"text": "", "speech": "", "by": by, "scope": scope, "quiet": True}
+        mem["fp"] = fp
+        return {"text": "", "speech": "", "by": by, "scope": scope, "quiet": True, "level": "calm"}
     if isinstance(res, dict) and res.get("action") == "speak" and (res.get("display_text") or res.get("speech_text")):
         disp = scrub((res.get("display_text") or res.get("speech_text")).strip().replace("—", ","))
         speech = scrub((res.get("speech_text") or disp).strip().replace("—", ","))
@@ -341,15 +422,15 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
     else:
         disp = speech = fb
         kind, by = ("outage" if out_ else "summary" if not said else "update"), "rules"
-    if said and disp == said[-1]:
-        return {"text": "", "speech": "", "by": by, "scope": scope, "quiet": True}
-    RADIO_MEM[key] = (said + [disp])[-5:]
-    if len(RADIO_MEM) > 2000:
-        for k in list(RADIO_MEM)[:1000]:
-            RADIO_MEM.pop(k, None)
-    return {"text": disp, "speech": speech, "kind": kind, "by": by, "scope": scope,
+    mem.update(fp=fp, t=now, said=(said + [disp])[-5:])
+    if len(RADIO_STATE) > 3000:
+        for k in list(RADIO_STATE)[:1500]:
+            RADIO_STATE.pop(k, None)
+    return {"text": disp, "speech": speech, "kind": kind, "by": by, "scope": scope, "level": "outage" if out_ else level,
             "review": [str(x)[:40] for x in (res or {}).get("pronunciation_review", [])][:5] if isinstance(res, dict) else []}
 
+
+RADIO_STATE: dict = {}
 
 RADIO_CACHE: dict = {}
 RADIO_MEM: dict = {}  # що «Радіо SKY» вже сказало для (охоплення, області): не повторювати незмінну обстановку

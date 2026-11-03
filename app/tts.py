@@ -265,9 +265,14 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
 LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
-OAI_VOICES = {"lada": "nova", "tetiana": "shimmer", "mykyta": "onyx", "oleksa": "echo"}
-OAI_STYLE = ("Говори українською літературною мовою, як спокійний диктор новин: чітко, рівно, з правильними наголосами "
-             "в українських назвах міст і сіл (Харків, Чугуїв, Балаклія, Ізюм, Лозова), без драматизму.")
+VOICE_V = "r2"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
+OAI_VOICES = {"lada": "coral", "tetiana": "sage", "mykyta": "ash", "oleksa": "onyx"}
+# 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
+OAI_STYLE = ("Ти диктор українського інформаційного радіо. Говори рідною українською без російського акценту, природно і впевнено, "
+             "як ведучий новин уночі: спокійний теплий тон, помірний темп, коротка пауза після кожного речення, без драматизму і без "
+             "співучості. Числа читай природно. Наголоси як у літературній українській: Харків, Чугуїв, Балаклія, Ізюм, Лозова, "
+             "Куп'янськ, Мерефа, Дергачі, Золочів, Богодухів, Красноград, Полтава, Кременчук, Кропивницький, Олександрія, Суми, "
+             "Охтирка, Миргород, Дніпро, Павлоград, Запоріжжя, Чернігів, Київ, Біла Церква, Вінниця, Одеса, Миколаїв.")
 
 
 async def _openai(text: str, key: str, rate: float) -> bytes | None:
@@ -277,7 +282,7 @@ async def _openai(text: str, key: str, rate: float) -> bytes | None:
     voice = os.getenv("TTS_OPENAI_VOICE") or OAI_VOICES.get(key, "nova")
     async with httpx.AsyncClient(timeout=30) as cli:
         for model in (os.getenv("TTS_OPENAI_MODEL") or "gpt-4o-mini-tts", "tts-1-hd"):
-            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.3, rate))}
+            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.3, rate * 0.97))}
             if model.startswith("gpt-"):
                 body["instructions"] = OAI_STYLE
             r = await cli.post("https://api.openai.com/v1/audio/speech", json=body, headers={"Authorization": f"Bearer {k}"})
@@ -339,7 +344,7 @@ async def _gemini(text: str, key: str, rate: float) -> bytes | None:
 
 
 async def _cached(prov: str, ext: str, fn, text: str, key: str, rate: float):
-    c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
+    c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{VOICE_V}|{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
     if c.exists():
         return c.read_bytes(), f"{prov}-cache"
     if _off.get(prov, 0) > time.time():
@@ -382,7 +387,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     order = (os.getenv("TTS_ORDER") or "openai,gemini").split(",") if paid else []
     if not paid:  # денний ліміт платного голосу вичерпано: уже синтезоване з кешу, нове — запасним голосом
         for prov, ext in (("openai", "mp3"), ("gemini", "wav")):
-            c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
+            c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{VOICE_V}|{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
             if c.exists():
                 return c.read_bytes(), f"{prov}-cache"
     for prov in order:
@@ -396,7 +401,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
         if data:
             return data, by
     if GKEY:
-        gcache = BASE / "cache" / f"g-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
+        gcache = BASE / "cache" / f"g-{hashlib.sha1(f'{VOICE_V}|{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
         if gcache.exists():
             return gcache.read_bytes(), "google-cache"
         try:
