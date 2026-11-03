@@ -620,6 +620,14 @@ def api_msgs(kind: str | None = None, type: str | None = None, hours: float = 3,
     return [{"t": int(r[0]), "src": r[1], "link": r[2], "kind": r[3], "type": r[4], "places": r[5], "text": r[6]} for r in rows]
 
 
+@app.get("/api/tts/check")
+async def api_tts_check(text: str = "Перевірка голосу. Харків, Чугуїв, Балаклія."):
+    """Діагностика озвучки: хто зараз говорить (openai / google / piper / нічого) і чому."""
+    from . import tts
+    data, why = await tts.speak(text + f" {int(time.time()) % 1000}", "lada", 1.0)
+    return {"ok": bool(data), "by": why, "bytes": len(data or b""), **tts.status()}
+
+
 @app.get("/api/tts/status")
 def api_tts_status():
     from . import tts

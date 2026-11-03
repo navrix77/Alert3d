@@ -262,6 +262,7 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
+LAST = {"openai": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
 OAI_VOICES = {"lada": "nova", "tetiana": "shimmer", "mykyta": "onyx", "oleksa": "echo"}
 OAI_STYLE = ("Говори українською літературною мовою, як спокійний диктор новин: чітко, рівно, з правильними наголосами "
              "в українських назвах міст і сіл (Харків, Чугуїв, Балаклія, Ізюм, Лозова), без драматизму.")
@@ -280,6 +281,7 @@ async def _openai(text: str, key: str, rate: float) -> bytes | None:
             r = await cli.post("https://api.openai.com/v1/audio/speech", json=body, headers={"Authorization": f"Bearer {k}"})
             if r.status_code == 200 and r.content:
                 return r.content
+            LAST["openai"] = f"{model}: HTTP {r.status_code} {r.text[:160]}"
             log.warning("openai tts %s: %s", model, r.status_code)
     return None
 
@@ -299,6 +301,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes 
                 ocache.write_bytes(data)
                 return data, "openai"
         except Exception as e:  # noqa: BLE001 — недоступний OpenAI → Google/Piper
+            LAST["openai"] = f"{type(e).__name__}: {str(e)[:160]}"
             log.warning("openai tts: %s", e)
     if GKEY:
         gcache = BASE / "cache" / f"g-{hashlib.sha1(f'{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
@@ -332,5 +335,5 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0) -> tuple[bytes 
 
 
 def status() -> dict:
-    return {"openai": bool(os.getenv("OPENAI_API_KEY")), "google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
+    return {"openai": bool(os.getenv("OPENAI_API_KEY")), "openai_error": LAST["openai"], "google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
             "ready": bool(list((BASE / VOICES[k][0]).glob('*.onnx')))} for k in VOICES]}
