@@ -470,7 +470,10 @@ function frame(now){
     // каша геть: показуємо лише активні цілі; цілі одного типу, що на екрані лягають одна на одну,, один значок ×N
     const shown=[];for(const f of feats.filter(f=>f.properties.active).sort((a,b)=>(b.properties.weak?0:1)-(a.properties.weak?0:1))){
       const P=map.project(f.geometry.coordinates);const near=shown.find(g=>g.properties.type===f.properties.type&&Math.hypot(g._p.x-P.x,g._p.y-P.y)<34);
-      if(near&&f.properties.id!==sel){near.properties.count+=f.properties.count;near.properties.merged=(near.properties.merged||1)+1;continue;}
+      if(near&&f.properties.id!==sel){// той самий тип і той самий пункт призначення, значок на значку: майже завжди одна й та сама група, про яку написали різні канали.
+        // Сумувати не можна (03.11: «×8 → Варва» від восьми каналів читалось як вісім шахедів), беремо найбільшу названу кількість.
+        // Різні пункти призначення: це різні цілі, тоді сума
+        if(near.properties.next&&near.properties.next===f.properties.next)near.properties.count=Math.max(near.properties.count,f.properties.count);else near.properties.count+=f.properties.count;near.properties.merged=(near.properties.merged||1)+1;continue;}
       f._p=P;shown.push(f);}
     // різні типи в одній точці (03.11: шахед і «Молнія» біля Прудянки злилися в «гібрид»): розводимо значки віялом на екрані,
     // координати цілей не змінюються, зсув лише візуальний (до ~20 px)
