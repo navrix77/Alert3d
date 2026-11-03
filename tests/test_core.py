@@ -1274,3 +1274,20 @@ def test_official_alert_push_home(monkeypatch):
     t[0] += 15; asyncio.run(pu.tick(Cli(), snap(True)))   # …і знову тривога за 15 с
     t[0] += 60; asyncio.run(pu.tick(Cli(), snap(True)))
     assert len(sent) == 1  # нового сповіщення немає: стан не змінився
+
+
+def test_maplibre_one_version_everywhere():
+    """Головна мапа й мапа доби на одній версії MapLibre (03.11: оновлення 5.1 → 5.24)."""
+    import re, pathlib
+    vers = set()
+    for f in pathlib.Path(__file__).resolve().parent.parent.joinpath("web").glob("*.html"):
+        vers |= set(re.findall(r"maplibre-gl@([0-9.]+)", f.read_text(encoding="utf-8")))
+    assert vers == {"5.24.0"}
+
+
+def test_no_zoom_inside_match_for_raion_lines():
+    """03.11: межі районів з тривогою не малювались з 02.11, бо zoom-інтерполяція була всередині match."""
+    import pathlib
+    s = pathlib.Path(__file__).resolve().parent.parent.joinpath("web", "app.js").read_text(encoding="utf-8")
+    i = s.index("id:'ra-line'"); line = s[i:s.index("\n", i)]
+    assert "['match',LV,0,['interpolate'" not in line

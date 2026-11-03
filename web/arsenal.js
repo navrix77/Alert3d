@@ -33,6 +33,7 @@ const A=[
 const LEG=[
  ['tgt','#FFA31A','Ціль','реалістичний силует типу, ніс за курсом. Чим ближче масштаб, тим більший силует. Торкніться, щоб побачити докази й прогноз'],
  ['est','#FFA31A','Місце не назване','напівпрозорий силует у тонкому білому кільці: канали назвали лише курс, а місце оцінив SKY. Підпис «→ пункт · місце не названо»'],
+ ['rep','#FFFFFF','Повідомлення і оцінка','у вибраної цілі: біла точка з часом, де її востаннє назвали канали («Повідомлення · 21:42»), і тонкий пунктир до поточного розрахованого положення з підписом «Оцінка · дані 4 хв тому». Біла хвиля від цілі: щойно прийшло нове повідомлення'],
  ['still','#FFA31A','Курс невідомий','кольорове кільце навколо цілі: де вона, відомо, а куди летить, ні. SKY не рухає таку ціль, щоб не вигадувати шлях'],
  ['flow','#FFA31A','Рух уперед','біжучі штрихи від цілі: куди вона долетить за ~8 хв, якщо триматиме курс'],
  ['trail','#FFA31A','Пройдений шлях','крапки по місцях, які називали канали. У всіх цілей ледь помітні білі, у вибраної й тих, що летять до вас, кольором цілі'],
@@ -52,6 +53,7 @@ function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=
   const spr=(t,al,cb)=>{const i=new Image();i.src='sprites/t-'+t+'.png?v=ref11';i.onload=()=>{x.save();x.globalAlpha=al;x.rotate(0.5);x.drawImage(i,-24,-24,48,48);x.restore();cb&&cb();};};
   if(k==='tgt'){x.globalAlpha=.35;x.fillStyle='#000';x.beginPath();x.arc(2,4,24,0,7);x.filter='blur(6px)';x.fill();x.filter='none';x.globalAlpha=1;spr('shahed',1);return C;}
   if(k==='est'){x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=1.5;x.beginPath();x.arc(0,0,28,0,7);x.stroke();spr('shahed',.45);return C;}
+  if(k==='rep'){x.strokeStyle='#fff';x.lineWidth=1.6;x.setLineDash([2,4]);x.beginPath();x.moveTo(-24,20);x.lineTo(10,-8);x.stroke();x.setLineDash([]);x.fillStyle='#fff';x.beginPath();x.arc(-24,20,5,0,7);x.fill();x.strokeStyle='#0B0F17';x.lineWidth=2;x.stroke();x.translate(14,-11);x.scale(.6,.6);spr('shahed',1);return C;}
   if(k==='still'){x.globalAlpha=.6;x.lineWidth=1.6;x.beginPath();x.arc(0,0,30,0,7);x.stroke();x.globalAlpha=1;spr('shahed',1);return C;}
   if(k==='flow'){x.setLineDash([7,6]);x.lineWidth=2.4;x.beginPath();x.moveTo(-10,10);x.lineTo(30,-24);x.stroke();x.setLineDash([]);x.translate(-14,13);x.scale(.7,.7);spr('shahed',1);return C;}
   if(k==='route'){x.setLineDash([5,6]);x.lineWidth=2.4;x.beginPath();x.moveTo(-28,20);x.lineTo(24,-18);x.stroke();x.setLineDash([]);x.fillStyle='#fff';x.font='bold 10px sans-serif';x.fillText('→',16,-20);return C;}

@@ -112,7 +112,7 @@
   const FX = {
     id: 'fx', type: 'custom', renderingMode: '2d',
     onAdd(map, gl) {
-      this.map = map; this.gl = gl; this.t0 = performance.now(); this.tex = {};
+      this.map = map; this.gl = gl; this.t0 = performance.now(); this.tex = {}; this.seen = new Map(); this.ping = new Map();
       const p = gl.createProgram();
       gl.attachShader(p, sh(gl, gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl, gl.FRAGMENT_SHADER, FS)); gl.linkProgram(p);
       this.p = p; this.buf = gl.createBuffer();
@@ -190,6 +190,8 @@
         if (f.thr) glow.push([m[0], m[1], spr * (z < 6 ? 3 : 5.5), 0, [0.85, 0.95, 1, 0.95], 1]);  // загроза: біла хвиля, не червона (червона = тривога на мапі)
         if (f.sel) top.push([m[0], m[1], spr * 1.7, 0, [1, 1, 1, 0.9], 2, 0, 0]);
         f._m = m;
+        // нове повідомлення (давність скинулась): одна біла хвиля «підтверджено щойно»
+        { const pv = this.seen.get(f.id); if (pv != null && age < 90 && age + 30 < pv) this.ping.set(f.id, performance.now()); this.seen.set(f.id, age); }
       }
       gl.useProgram(this.p);
       gl.uniformMatrix4fv(this.u.m, false, M);
@@ -205,7 +207,7 @@
       // підкладка під кожною ціллю: темна «шайба» і тонке кільце кольору типу. На супутнику (зелень, ліс, поля)
       // сірий силует зливався з фоном (03.11, Київщина)
       { const pk = [];
-        for (const f of L) { if (!this.tex[f.type] || !f._m) continue; const c = f.col, a = f.weak ? 0.75 : 1;
+        for (const f of L) { if (!this.tex[f.type] || !f._m) continue; const c = f.col, a = (f.weak ? 0.75 : 1);
           // місце лише оцінене (канали не назвали, де ціль зараз): без суцільної «шайби», лише тонке біле кільце,
           // сам силует напівпрозорий. 03.11: шахед «у місті», хоча про місто ніхто не писав
           if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.4, 0, [0.0, 0.0, 0.0, 0.45], 0]); pk.push([f._m[0], f._m[1], spr * 1.2, 0, [1, 1, 1, 0.6], 2, 0, 0]); continue; }  // 03.11: напівпрозорий FPV на супутнику не було видно
@@ -228,6 +230,11 @@
             hr.push([f._m[0], f._m[1], spr * (1.2 + 2.2 * u), 0, [c[0], c[1], c[2], (1 - u) * 0.95 * fade], 2, 0, 0]); }
           hr.push([f._m[0], f._m[1], spr * 1.25, 0, [1, 1, 1, 0.9 * fade], 2, 0, 0]); }
         if (hr.length) this.draw(gl, this.quads(hr), hr.length); }
+      { const pr = [], now = performance.now();
+        for (const f of L) { const t0 = this.ping.get(f.id); if (t0 == null || !f._m) continue; const u = (now - t0) / 1600;
+          if (u >= 1) { this.ping.delete(f.id); continue; }
+          pr.push([f._m[0], f._m[1], spr * (1.2 + 3 * u), 0, [1, 1, 1, 0.9 * (1 - u)], 2, 0, 0]); }
+        if (pr.length) this.draw(gl, this.quads(pr), pr.length); }
       for (const f of L) {
         const tx = this.tex[f.type]; if (!tx) continue;
         gl.bindTexture(gl.TEXTURE_2D, tx);
