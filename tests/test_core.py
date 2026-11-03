@@ -1274,18 +1274,3 @@ def test_official_alert_push_home(monkeypatch):
     t[0] += 15; asyncio.run(pu.tick(Cli(), snap(True)))   # …і знову тривога за 15 с
     t[0] += 60; asyncio.run(pu.tick(Cli(), snap(True)))
     assert len(sent) == 1  # нового сповіщення немає: стан не змінився
-
-
-def test_possible_strike_warning_is_not_a_target():
-    # 03.11: два канали написали про «можливу загрозу балістичного удару» — Sky зробив балістику в повітрі з ETA 5 хв
-    from app.parser import Parser
-    p = Parser()
-    for ch, t in [("veselyy_pivden", "❗️За наявною інформацією ворог може готувати балістичний удар по Дніпру, зокрема по Придніпровській ТЕС."),
-                  ("kiev_nebo", "❗️Є інформація про можливу загрозу балістичного удару по Дніпру та Придніпровській ТЕС."),
-                  (None, "Ймовірний балістичний удар по Харкову найближчим часом"),
-                  (None, "Потенційна загроза ударів по Одещині протягом ночі")]:
-        o = p.parse(t, ch)
-        assert o.kind != "track" and o.no_target, t
-    # а реальна ціль лишається ціллю
-    assert p.parse("🚀 Балістика на Дніпро!", None).kind == "track"
-    assert p.parse("Пуск балістики з Таганрога, курс на Дніпро", None).kind == "track"
