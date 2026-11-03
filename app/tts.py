@@ -268,7 +268,7 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
 LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
-VOICE_V = "r8"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
+VOICE_V = "r9"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
 OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
 OAI_STYLE = ("Читай українською як носій мови, чітко й природно, у звичайному темпі. У тексті стоять знаки наголосу (´): "
@@ -288,7 +288,7 @@ async def _openai(text: str, key: str, rate: float) -> bytes | None:
     voice = (os.getenv("TTS_RADIO_VOICE") if key == "radio" else None) or os.getenv("TTS_OPENAI_VOICE") or OAI_VOICES.get(key, "nova")
     async with httpx.AsyncClient(timeout=30) as cli:
         for model in (os.getenv("TTS_OPENAI_MODEL") or "gpt-4o-mini-tts", "tts-1-hd"):
-            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.3, rate))}
+            body = {"model": model, "voice": voice, "input": text, "response_format": "mp3", "speed": max(0.8, min(1.4, rate))}
             if model.startswith("gpt-"):
                 body["instructions"] = RADIO_STYLE if key == "radio" else OAI_STYLE
             r = await cli.post("https://api.openai.com/v1/audio/speech", json=body, headers={"Authorization": f"Bearer {k}"})
@@ -454,6 +454,8 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     if not text:
         return None, "empty"
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
+    if key == "radio":
+        rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо на 25% швидше
     order = (os.getenv("TTS_ORDER") or ("google,openai,gemini" if GKEY else "openai,gemini")).split(",") if paid else []
     if not paid:  # денний ліміт платного голосу вичерпано: уже синтезоване з кешу, нове — запасним голосом
         for prov, ext in (("openai", "mp3"), ("gemini", "wav")):
