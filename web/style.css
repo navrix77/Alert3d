@@ -600,3 +600,6 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 
 /* вибраний тип у лічильниках: решта тьмяніє на 3.5 с */
 .cnt{transition:opacity .25s}.cnt.hl-off{opacity:.3}
+
+/* спливаючі вікна мапи не ширші за екран */
+.maplibregl-popup{max-width:calc(100vw - 20px)!important}.maplibregl-popup-content{max-width:calc(100vw - 20px);box-sizing:border-box;overflow-wrap:anywhere}
