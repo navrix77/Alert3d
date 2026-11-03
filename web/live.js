@@ -28,6 +28,13 @@
     background:rgba(18,20,30,.9);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:20px;line-height:40px;text-align:center;backdrop-filter:blur(10px);box-shadow:0 4px 18px rgba(0,0,0,.45)}
   #radio-btn.on{background:rgba(160,30,45,.95);border-color:rgba(255,140,150,.9);animation:rdp 1.6s infinite}
   @keyframes rdp{0%,100%{box-shadow:0 0 0 0 rgba(255,77,94,.55)}50%{box-shadow:0 0 0 7px rgba(255,77,94,0)}}
+  #live .lv-ctl{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  #live:not(.full) .lv-ctl,#live:not(.full) .lv-help,#live:not(.full) .lv-chips,#live:not(.full) .lv-q,#live:not(.full) .lv-note{display:none}
+  #live:not(.full) .lv-x{max-height:64px}
+  #live:not(.full) .lv-say{margin:6px 0 2px;min-height:0;font-size:15px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  #live:not(.full){padding:10px 12px 8px}
+  #live.full #lv-pause2{display:none}
+  body.live-on #me{display:none!important}
   #live .lv-help{font-size:12px;opacity:.7;margin-top:2px}
   #live .lv-chips{display:flex;gap:6px;overflow-x:auto;margin-top:8px;padding-bottom:2px;scrollbar-width:none}
   #live .lv-chips button{white-space:nowrap;flex:none;background:rgba(120,160,255,.14);border-color:rgba(150,180,255,.35)}
@@ -55,7 +62,7 @@
   const btn = document.createElement('button'); btn.id = 'live-btn'; btn.innerHTML = '<i></i><span>Ефір<small>що змінилось</small></span>'; btn.title = 'Живий ефір: мапа розповість, що змінилось, і відповість на питання';
   document.body.appendChild(btn);
   const box = document.createElement('div'); box.id = 'live'; box.hidden = true;
-  box.innerHTML = `<div class="lv-h"><i></i><span>ЖИВИЙ ЕФІР</span><span class="sp"></span><button id="lv-close" title="Закрити">✕</button></div>
+  box.innerHTML = `<div class="lv-h"><i></i><span>ЕФІР</span><span class="sp"></span><button id="lv-pause2" title="Пауза">⏸</button><button id="lv-more" title="Питання й налаштування">⋯</button><button id="lv-close" title="Закрити">✕</button></div>
     <div class="lv-ctl"><button id="lv-audio" title="Озвучувати">🔊 Голос</button><button id="lv-shelter" title="Короткі голосові оновлення, поки ви в укритті">🛡 Я в укритті</button>
       <button id="lv-pause" title="Пауза">⏸ Пауза</button></div>
     <div class="lv-help">Мапа сама покаже, що змінилось біля вас, поки вас не було. Можна спитати текстом або голосом.</div>
@@ -85,7 +92,7 @@
   function bboxOf(pts) { let b = [180, 90, -180, -90]; for (const p of pts) if (p) b = [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])]; return b[0] <= b[2] ? b : null; }
   function fit(pts, maxZoom) { const m = NX().map(), b = bboxOf(pts); if (!m || !b) return;
     if (b[2] - b[0] < 0.02 && b[3] - b[1] < 0.02) { m.flyTo({ center: [b[0], b[1]], zoom: Math.min(maxZoom || 10, 10), duration: 900 }); return; }
-    m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 120, bottom: 330, left: 40, right: 40 }, maxZoom: maxZoom || 10, duration: 900 }); }
+    m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 110, bottom: Math.min(innerHeight * 0.45, (box.hidden ? 0 : box.offsetHeight) + 40), left: 40, right: 40 }, maxZoom: maxZoom || 10, duration: 900 }); }
   const item = id => curDiff && curDiff.items.find(i => i.id === id);
   function hl(ids, dim) { window.FXLIVE = { ids: new Set(ids || []), dim: !!dim, t0: performance.now() }; const m = NX().map(); m && m.triggerRepaint(); }
   function mentions(it) {
@@ -141,10 +148,14 @@
   }
   function start(manual) { stop = true; if (abortAudio) abortAudio(); setTimeout(() => live(null, null, manual ? seen : seen), 50); }
   btn.onclick = () => { btn.classList.remove('new'); btn.querySelector('small').textContent = 'що змінилось'; start(true); };
+  $('#lv-more').onclick = () => { box.classList.toggle('full'); };
+  $('#lv-pause2').onclick = () => $('#lv-pause').click();
+  try { new MutationObserver(() => { document.body.classList.toggle('live-on', !box.hidden); if (box.hidden) box.classList.remove('full'); })
+    .observe(box, { attributes: true, attributeFilter: ['hidden'] }); } catch (e) {}
   $('#lv-close').onclick = () => { if (shelter) $('#lv-shelter').click(); stop = true; paused = false; if (abortAudio) abortAudio(); box.hidden = true; hl([], false); window.FXLIVE = null; markSeen(); };
-  $('#lv-pause').onclick = () => { paused = !paused; $('#lv-pause').textContent = paused ? '▶ Далі' : '⏸ Пауза'; if (paused && abortAudio) abortAudio(); };
+  $('#lv-pause').onclick = () => { paused = !paused; $('#lv-pause').textContent = paused ? '▶ Далі' : '⏸ Пауза'; $('#lv-pause2').textContent = paused ? '▶' : '⏸'; if (paused && abortAudio) abortAudio(); };
   $('#lv-audio').onclick = () => { audioOn = !audioOn; LS.set('live_audio', audioOn ? '1' : '0'); $('#lv-audio').classList.toggle('on', audioOn); if (!audioOn && abortAudio) abortAudio(); };
-  const ask = q => { if (!q) return; stop = true; paused = false; if (abortAudio) abortAudio(); $('#lv-in').value = ''; setTimeout(() => live(q, lassoBox), 60); lassoBox = null; };
+  const ask = q => { if (!q) return; box.classList.remove('full'); stop = true; paused = false; if (abortAudio) abortAudio(); $('#lv-in').value = ''; setTimeout(() => live(q, lassoBox), 60); lassoBox = null; };
   $('#lv-go').onclick = () => ask($('#lv-in').value.trim());
   box.querySelectorAll('.lv-chips button').forEach(b => b.onclick = () => ask(b.dataset.q));
   $('#lv-in').onkeydown = e => { if (e.key === 'Enter') ask($('#lv-in').value.trim()); };
