@@ -220,7 +220,7 @@ KR_RIH = re.compile(r"(?<![\w])(?:кр\.?\s*|к\.\s*)р[іо]г(\s*:)?", re.I)
 KR_RIH_CASES = re.compile(r"(?i)(?<![\w'’])(?:крив(?:ий|ого|ому|им|ій|ім|ой|ом)\s+(?:ріг|рогу?|розі|рогом|роге|рогe)|криво?р+іжж\w*)(?![\w'’])")
 AIRFIELD = re.compile(r"(?i)(?<![\w])(аеродром\w*|аэродром\w*|аер\.|ае\.)\s*[«\"„“]?\s*[А-ЯІЇЄҐA-Z][\w\-]*(?:-\d)?[»\"”]?")
 AIR_FORCE = re.compile(r"(?i)(повітрян\w*|воздушн\w*)\s+(сил\w*)|(?<![\w'’])сил\w*\s+(?:оборон\w*|ппо|ппо\w*|протиповітрян\w*|безпілотн\w*|сво)|(?<![\w'’])(?:зсу|всу)(?![\w])")  # «Сили оборони знищили» (deraketaua 03.11) ≠ село Сила
-OBL_SUM = re.compile(r"^\W*\d+\s+[^.:]{0,40}?(?:в|по|на)\s+(?:област|регіон|районі|районе)\w*\s*[.:]\s*(.+)$")
+OBL_SUM = re.compile(r"^\W*\d+\s+[^.:]{0,40}?(?:в|по|на)\s+(?:област|регіон|районі|районе)\w*\s*[.:]?\s*(.+)$")
 SUMLINE = re.compile(r"^[^\w\d]*\d+\s+на\s+([А-ЯІЇЄҐа-яіїєґ']+?)(щині|ччині|жжі)\s*[–—-]\s*(.+)$")  # «1 на Запоріжжі – Комишуваха (1)»
 LISTITEM = re.compile(r"^[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+(?:\s+[А-ЯІЇЄҐ][а-яіїєґ'’ʼ\-]+)?(?:\s*\(\d+\))?$")
 POS_MARK = "⟐"  # маркер: сегмент — поточне місце цілі (з кількістю), а не пункт призначення
@@ -583,11 +583,11 @@ class Parser:
                     before = norm(words[i - 1]) if i else ""
                     role_ = "f" if before in ("з", "із", "зі", "с", "со", "от", "из") else ("p" if before in POS_PREV else "t")
                     dist_found.append((len(dist_found) + 1000, PlaceRef(role_, rc)))
-            if nxt in ("тг", "отг") and re.search(r"(ськ|цьк|зьк)а$", norm(w)):
+            if (nxt in ("тг", "отг") or (nxt.startswith("територіальн") and i + 2 < len(words) and norm(words[i + 2]).startswith("громад"))) and re.search(r"(ськ|цьк|зьк)а$", norm(w)):
                 hc = hromada_center(w, obs.oblast_hint, bbox)
                 if hc:  # «Покровська ТГ» → громада в області каналу
                     dist_found.append((len(dist_found) + 1000, PlaceRef("p" if i == 0 or prev in POS_PREV else "t", hc)))
-                i += 2
+                i += 3 if nxt.startswith("територіальн") else 2
                 continue
             if adj_gen and not raion_adj and i + 1 < len(words) and words[i + 1][:1].isupper():
                 ids = self.gaz.lookup_bigram(w, words[i + 1])

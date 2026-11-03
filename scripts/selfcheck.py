@@ -97,6 +97,72 @@ def main() -> None:
             cand.append({"place": k, "as_place": len(v), "as_word": low[stem], "channels": len({x[1] for x in v}), "examples": v[:3]})
     rep["word_villages"] = sorted(cand, key=lambda x: -x["as_word"])[:25]
 
+    # 2б. (03.11) пункт далеко від області регіонального каналу: тезка (Данилівка в Криму з харківського каналу)
+    from app.config import CHANNEL_REGION
+    from app.geo import dist_km, phon
+    obl = oblasts()
+    far = []
+    for t, src, link, kind, typ, pl, track, text in day:
+        reg = CHANNEL_REGION.get(src)
+        if not reg or not text or "щин" in (text or "").lower():
+            continue
+        try:
+            for seg in p.segments(text):
+                for r in p.parse(seg, src).places:
+                    ob = obl.of(r.place.lon, r.place.lat)
+                    if ob and ob != reg and not reg.startswith(ob[:5]):
+                        far.append({"t": kyiv(t), "src": src, "reg": reg, "place": r.place.name, "obl": ob, "text": seg[:140]})
+        except Exception:  # noqa: BLE001
+            pass
+    rep["far_from_channel"] = far[:40]
+
+    # 2в. (03.11) місцеві назви й скорочення, яких SKY не знає: слово з великої або АБРЕВІАТУРА після «на/над/курс/від/…»
+    # у регіональному каналі, з якого не вийшло жодного пункту. Кандидати на словник (як «БД», «МД», «Пісочин»)
+    unk = collections.Counter()
+    unk_ex = {}
+    for t, src, link, kind, typ, pl, track, text in day:
+        reg = CHANNEL_REGION.get(src)
+        if not reg or not text:
+            continue
+        try:
+            got = {phon(r.place.name)[:4] for seg in p.segments(text) for r in p.parse(seg, src).places}
+        except Exception:  # noqa: BLE001
+            continue
+        for m in _re.finditer(r"(?:на|над|курс(?:ом)?(?:\s+на)?|в\s+район[еі]|біля|около|от|від|через|повз|мимо|/)\s*([А-ЯІЇЄҐ][\w'’\-]+)", text):
+            w = m.group(1)
+            if phon(w)[:4] in got or len(w) < 2 or _re.search(r"(?i)щин|ччин|чин[іиу]|област|бпла|шахед|^схі", w):
+                continue
+            unk[(reg, w)] += 1
+            unk_ex.setdefault((reg, w), (kyiv(t), src, text[:120]))
+    rep["unknown_local_names"] = [{"reg": k[0], "word": k[1], "n": n, "example": unk_ex[k]} for k, n in unk.most_common(40) if n >= 2]
+
+    # 2г. (03.11) неможливий рух: та сама ціль між двома названими позиціями швидше за ~2,5× швидкості типу
+    # (так виглядає «стрибок» шахеда з півночі в центр міста або злиття різних цілей)
+    from app.tracker import TYPES as _T
+    last, jumps = {}, []
+    for t, src, link, kind, typ, pl, track, text in day:
+        if not track or not pl or typ not in _T:
+            continue
+        try:
+            pts = [x for x in json.loads(pl) if x.get("r") == "p"]
+        except Exception:  # noqa: BLE001
+            continue
+        if not pts:
+            continue
+        ids = p.gaz.lookup(pts[0]["n"]) or []
+        if not ids:
+            continue
+        P0 = p.gaz.places[ids[0]]
+        if track in last:
+            t0, q, s0 = last[track]
+            dt = max(60.0, t - t0)
+            v = dist_km(q.xy, P0.xy) / dt * 3600
+            if v > _T[typ]["speed"] * 2.5 and dist_km(q.xy, P0.xy) > 25:
+                jumps.append({"track": track, "type": typ, "from": q.name, "to": P0.name, "km": round(dist_km(q.xy, P0.xy)),
+                              "min": round(dt / 60, 1), "src": src, "t": kyiv(t), "text": (text or "")[:120]})
+        last[track] = (t, P0, src)
+    rep["impossible_moves"] = jumps[:30]
+
     # 3. бектест прогнозу
     import backtest
     rep["backtest"] = backtest.run(rows, t_end - 86400, verbose=False)
@@ -111,6 +177,9 @@ def main() -> None:
     print("Похибка курсу:", rep["backtest"].get("_heading_err", {}).get("ALL"))
     for x in rep["word_villages"][:12]:
         print(f"  слово→село? {x['place']}: як пункт {x['as_place']}×, як звичайне слово {x['as_word']}×; напр. {x['examples'][0]}")
+    print(f"Пунктів поза областю каналу: {len(far)}; невідомих місцевих назв (≥2): {len(rep['unknown_local_names'])}; неможливих переміщень: {len(jumps)}")
+    for x in rep["unknown_local_names"][:10]:
+        print(f"  невідома назва? {x['reg']}: «{x['word']}» ×{x['n']}; напр. {x['example']}")
     print("Звіт:", a.out)
     _ = analyze  # довідку на живих даних дає /api/analysis
 
