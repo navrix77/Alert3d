@@ -657,15 +657,16 @@ function homeOfficial(ob){const O=SNAP.official||{};const ra=homeObl.r;
    (страховка: 40 хв без жодного нового повідомлення про балістику для області). */
 const OBL_GEN={'Вінницька':'Вінниччина','Волинська':'Волинь','Дніпропетровська':'Дніпропетровщина','Донецька':'Донеччина','Житомирська':'Житомирщина','Закарпатська':'Закарпаття','Запорізька':'Запоріжжя','Івано-Франківська':'Прикарпаття','Київська':'Київщина','Київ':'Київ','Кіровоградська':'Кіровоградщина','Луганська':'Луганщина','Львівська':'Львівщина','Миколаївська':'Миколаївщина','Одеська':'Одещина','Полтавська':'Полтавщина','Рівненська':'Рівненщина','Сумська':'Сумщина','Тернопільська':'Тернопільщина','Харківська':'Харківщина','Херсонська':'Херсонщина','Хмельницька':'Хмельниччина','Черкаська':'Черкащина','Чернівецька':'Буковина','Чернігівська':'Чернігівщина'};
 let BALM=null;
-function balMode(ob,OF){if(!ob||!SNAP||!SNAP.bal)return null;const now=Date.now()/1000+offset;const cov=e=>e.obl.includes(ob)||(ob==='Київ'&&e.obl.includes('Київська'));
-  const ev=SNAP.bal.slice().sort((a,b)=>a.t-b.t);let start=null,last=null,items=[];
-  for(const e of ev){if(e.close){if(!e.obl.length||cov(e)){start=null;items=[];}continue;}
-    if(cov(e)){if(!start)start=e;last=e;items.push(e);}}
-  if(!start)return null;
+function balMode(ob,OF){if(!ob||!SNAP||!SNAP.bal)return null;const now=Date.now()/1000+offset;const cov=e=>e.obl.includes('*')||e.obl.includes(ob)||(ob==='Київ'&&e.obl.includes('Київська'));
+  // МіГ-31К/І (k:'mig'): окремий етап «носій у повітрі» для всієї України; його відбій закриває лише його
+  const ev=SNAP.bal.slice().sort((a,b)=>a.t-b.t);let items=[];
+  for(const e of ev){if(e.close){if(e.k==='mig')items=items.filter(x=>x.k!=='mig');else if(!e.obl.length||cov(e))items=items.filter(x=>x.k==='mig');continue;}
+    if(cov(e))items.push(e);}
+  if(!items.length)return null;const start=items[0],last=items[items.length-1];
   if(now-last.t>40*60)return null;
   // офіційний відбій для дому після початку режиму (повідомлення старше 90 с)
   if(OF&&OF.on===0&&SNAP.official&&SNAP.official.ok&&now-last.t>90)return null;
-  return {start,last,items:items.slice(-4).reverse(),obl:ob,names:last.obl};}
+  return {start,last,items:items.slice(-4).reverse(),obl:ob,names:last.obl.includes('*')?[]:last.obl,mig:items.every(e=>e.k==='mig')};}
 function showBalRegion(){if(!BALM||!window.__OBLGJ)return;const fs=window.__OBLGJ.features.filter(f=>BALM.names.includes(f.properties.n)||f.properties.n===BALM.obl);if(!fs.length)return;
   let b=[180,90,-180,-90];const walk=c=>{if(typeof c[0]==='number'){b=[Math.min(b[0],c[0]),Math.min(b[1],c[1]),Math.max(b[2],c[0]),Math.max(b[3],c[1])];}else c.forEach(walk);};fs.forEach(f=>walk(f.geometry.coordinates));
   map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:{top:120,bottom:260,left:30,right:30},duration:800});}
@@ -697,12 +698,12 @@ function renderMe(threats){
     sub=offL+esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(byRoute?(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':''):' · напрямок за оцінкою, може наблизитися');}
   BALM=(!isStale)?balMode(ob,OF):null;syncBalLayers();
   if(BALM){const now=Date.now()/1000+offset,L=BALM.last,ag=Math.max(0,Math.round(now-L.t));const nm=k=>esc(SNAP.sources[k]?.name||k);
-    cls='me danger bal';word='Балістична загроза · '+(OBL_GEN[BALM.obl]||BALM.obl);
+    cls='me danger bal';word=BALM.mig?'МіГ-31К у повітрі · загроза «Кинджала»':'Балістична загроза · '+(OBL_GEN[BALM.obl]||BALM.obl);
     sub=offL+'<div class="bal-age">Повідомлення отримано '+(ag<60?ag+' с':Math.round(ag/60)+' хв')+' тому · '+nm(L.src)+(SNAP.sources[L.src]?.official?' (офіційне)':'')+'</div>'+
       '<div class="bal-go">Перейдіть в укриття</div>'+
-      '<ol class="bal-log">'+BALM.items.map(e=>'<li><span>'+fmt(e.t)+'</span><b>'+nm(e.src)+'</b> '+esc(e.pl.length?e.pl.join(', '):e.obl.map(o=>OBL_GEN[o]||o).slice(0,4).join(', ')+(e.obl.length>4?' +'+(e.obl.length-4):''))+(e.link?' <a href="'+esc(e.link)+'" target=_blank rel=noopener>↗</a>':'')+'</li>').join('')+'</ol>'+
-      '<small class="bal-note">Це вік повідомлення, а не час до удару. Де ракета, канали не знають</small>'+
-      '<button class="bal-btn" id="bal-show">Показати регіон загрози</button>';}
+      '<ol class="bal-log">'+BALM.items.map(e=>'<li><span>'+fmt(e.t)+'</span><b>'+nm(e.src)+'</b> '+esc(e.k==='mig'?(e.txt||'МіГ-31К').slice(0,70):e.pl.length?e.pl.join(', '):e.obl.map(o=>OBL_GEN[o]||o).slice(0,4).join(', ')+(e.obl.length>4?' +'+(e.obl.length-4):''))+(e.link?' <a href="'+esc(e.link)+'" target=_blank rel=noopener>↗</a>':'')+'</li>').join('')+'</ol>'+
+      (BALM.mig?'<small class="bal-note">Зліт носія ще не пуск: на нього Повітряні сили зазвичай оголошують тривогу по всій Україні. Кількість бортів не дорівнює кількості ракет</small>':'<small class="bal-note">Це вік повідомлення, а не час до удару. Де ракета, канали не знають</small>')+
+      (BALM.mig?'':'<button class="bal-btn" id="bal-show">Показати регіон загрози</button>');}
   box.className=cls+(box.classList.contains('open')?' open':'');$('#me-word').textContent=word;
   // великі хвилини, лише коли маршрут названо каналами (обґрунтована оцінка), а не з напрямку
   if(first&&!isStale&&!BALM&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;

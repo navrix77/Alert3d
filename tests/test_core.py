@@ -1369,3 +1369,20 @@ def test_olshany_kharkiv_and_launchers_activity():
     assert P.parse("Активность пусковых⚠️", "TLK").type == "ballistic"
     from app.tracker import bal_oblasts
     assert "Харківська" in bal_oblasts("❗ Загроза балістики для низки східних та центральних регіонів")
+
+
+def test_mig31_carrier_events():
+    """Зліт МіГ-31К/І: окремий етап «носій у повітрі» для всієї України, свій відбій (скріни каналів 03.11)."""
+    from app.tracker import mig_event
+    for t in ["Зафіксовано зліт МіГ-31К! Підписатися | @svoiua", "Зліт МІГ 31-К‼️", "Зліт МіГ-31‼️ ‼️ ‼️",
+              "В повітрі МіГ-31, Ймовірність застосування \"Кинджалів\"", "2х борти МіГ-31К у повітрі."]:
+        assert mig_event(t) == "up", t
+    for t in ["UPD 05:02: без фіксації Кинджалів, знову імітація.", "Відбій ракетної небезпеки по МІГ", "Посадка МіГ-31К"]:
+        assert mig_event(t) == "down", t
+    assert mig_event("Кинджал на Київ") is None and mig_event("МіГ-29 ЗСУ") is None
+
+
+def test_alert_level_line_is_not_target_position():
+    """03.11 CXID: «🟡 Харків та передмістя» — рівень тривоги, а шахед «перестрибнув» у центр Харкова."""
+    o = P.parse("🟡 Харків та передмістя", "CX")
+    assert o.no_target and o.type is None

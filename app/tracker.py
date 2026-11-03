@@ -243,6 +243,26 @@ BAL_MACRO = [(r"східн\w*\s+(?:та\s+\w+\s+)?(?:регіон|област)|
 _BAL_OBL_RX = _re.compile(r"(?i)(?<![\w'’-])([а-яіїєґ'’-]+?(?:щин|ччин)\w*|[а-яіїєґ'’-]+?(?:ськ|цьк|зьк)(?:а|ої|ій|у)\s+обл\w*)")
 
 
+# Носій «Кинджала»: зліт МіГ-31К/І — це НЕ пуск, але Повітряні сили на нього оголошують тривогу по всій Україні
+# (Укрінформ, 2023–2026). Окремий етап «носій у повітрі», окремий відбій; кількість бортів ≠ кількість ракет.
+MIG_RX = _re.compile(r"(?i)(?<![\w])(?:міг|миг|mig)[\s-]*31")
+MIG_UP = _re.compile(r"(?i)зліт|злет|взлет|взлёт|в повітрі|у повітрі|в воздухе|підня|подня|борт|ймовірн\w*\s+застосуван|загроз\w*\s+застосуван")
+MIG_DOWN = _re.compile(r"(?i)посадк|(?<![\w])сів|(?<![\w])сіли|(?<![\w])сели|приземл|відбій|отбой|без фіксац|без фиксац|імітац|имитац|повернул|вернул")
+
+
+def mig_event(text: str) -> str | None:
+    """'up' / 'down' / None для повідомлення про МіГ-31К/І (або «без фіксації Кинджалів»)."""
+    t = text or ""
+    if _re.search(r"(?i)відбій|отбой", t) and _re.search(r"(?i)(?<![\w])(?:міг|миг|mig)(?![\w])", t):
+        return "down"  # «Відбій ракетної небезпеки по МІГ» (Байрактар News / Україна Головне)
+    if MIG_RX.search(t) or _re.search(r"(?i)кинджал|кинжал", t):
+        if MIG_DOWN.search(t):
+            return "down"
+        if MIG_RX.search(t) and MIG_UP.search(t) and not _re.search(r"(?i)може\s+злет|можуть\s+злет|может\s+взлет|прогноз", t):
+            return "up"
+    return None
+
+
 def bal_oblasts(text: str) -> list[str]:
     from .parser import OBL_LIST, _obl_list
     text = OBL_LIST.sub(_obl_list, text or "")  # «загроза для Донецька, Запорізька, …» → області
@@ -319,9 +339,21 @@ class Tracker:
         self.restored_at = d["saved"]
         return True
 
+    def _mig(self, raw: str, src: str, t: float, link: str | None) -> bool:
+        m = mig_event(raw)
+        if not m:
+            return False
+        if not any(e.get("k") == "mig" and e["src"] == src and e["txt"] == raw.strip()[:160] and t - e["t"] < 600 for e in self.bal):
+            self.bal.append({"t": int(t), "src": src, "link": link, "obl": ["*"], "close": m == "down", "k": "mig",
+                             "pl": [], "txt": raw.strip()[:160]})
+            self.bal = [e for e in self.bal if t - e["t"] < 3600][-60:]
+        return True
+
     def _bal_event(self, obs: Observation, src: str, t: float, link: str | None) -> None:
         from .config import CHANNEL_REGION
         raw = getattr(obs, "raw", None) or ""
+        if self._mig(raw, src, t, link):
+            return
         obl = bal_oblasts(raw)
         for r in obs.places:
             if r.role in ("t", "p"):
@@ -344,11 +376,16 @@ class Tracker:
                "places": [{"r": r.role, "n": r.place.name} for r in obs.places] if not obs.safety else []}
         self.log.append(rec)
         self.log = self.log[-400:]
-        if obs.type == "ballistic" and obs.kind in ("track", "info", "close", "zone"):
-            try:
+        try:
+            if obs.type == "ballistic" and obs.kind in ("track", "info", "close", "zone"):
                 self._bal_event(obs, src, t, link)
-            except Exception:
-                pass
+            elif getattr(obs, "raw", None):
+                self._mig(obs.raw, src, t, link)
+        except Exception:
+            pass
+        # статус тривоги («🟡 Харків та передмістя»), новина, умовний текст: місце в ньому не позиція цілі (03.11, CXID)
+        if obs.no_target and not obs.close:
+            return rec
         places = obs.places
         if obs.kind == "filtered":
             # «збито / вибухи / приліт» не публікуємо (безпека), але ціль після цього прибираємо з карти
