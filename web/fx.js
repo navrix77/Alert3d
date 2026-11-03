@@ -222,6 +222,13 @@
             hr.push([f._m[0], f._m[1], spr * (1.3 + 2.4 * u), 0, [c[0], c[1], c[2], (1 - u) * 0.95 * fade], 2, 0, 0]); }
           hr.push([f._m[0], f._m[1], spr * 1.3, 0, [c[0], c[1], c[2], 0.9 * fade], 2, 0, 0]); }
         if (hr.length) this.draw(gl, this.quads(hr), hr.length); }
+      // «Живий ефір»: підсвітка вибраних цілей хвилями і приглушення решти (03.11)
+      const LV = window.FXLIVE && window.FXLIVE.ids && window.FXLIVE.ids.size ? window.FXLIVE : null;
+      if (LV) { const ph = (performance.now() - (LV.t0 || 0)) / 1000, hr = [];
+        for (const f of L) if (LV.ids.has(f.id) && f._m) { for (let k = 0; k < 2; k++) { const u = (ph * 0.7 + k * 0.5) % 1;
+            hr.push([f._m[0], f._m[1], spr * (1.3 + 2.0 * u), 0, [1, 1, 1, (1 - u) * 0.9], 2, 0, 0]); }
+          hr.push([f._m[0], f._m[1], spr * 1.3, 0, [1, 1, 1, 0.95], 2, 0, 0]); }
+        if (hr.length) this.draw(gl, this.quads(hr), hr.length); }
       const HL = window.FXHL && performance.now() < window.FXHL.until ? window.FXHL : null;
       if (HL) { const ph = (performance.now() - HL.t0) / 1000, fade = Math.min(1, (HL.until - performance.now()) / 600);
         const hr = [];
@@ -242,7 +249,7 @@
         const ph = ((f.p[0] * 131.7 + f.p[1] * 71.3) % 6.283 + 6.283) % 6.283, tt = (performance.now() - this.t0) / 1000;
         const sw = Math.sin(tt * 0.55 + ph), alt = Math.sin(tt * 0.37 + ph * 1.7);
         const fast = f.type === 'ballistic' || f.type === 'cruise';
-        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.78 : f.weak ? 0.85 : 1) * (HL && f.type !== HL.type ? 0.22 : 1), c = f.col;
+        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.78 : f.weak ? 0.85 : 1) * (HL && f.type !== HL.type ? 0.22 : 1) * (LV && LV.dim && !LV.ids.has(f.id) ? 0.25 : 1), c = f.col;
         const bank = Math.max(-1, Math.min(1, Math.cos(tt * 0.55 + ph) * 0.9));
         const sz = spr * (1 + 0.035 * alt), sh = spr * (0.22 + 0.06 * alt);
         const rc = [Math.min(1, c[0] * 1.15 + 0.15), Math.min(1, c[1] * 1.15 + 0.15), Math.min(1, c[2] * 1.15 + 0.15), a];

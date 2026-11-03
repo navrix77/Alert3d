@@ -1471,3 +1471,20 @@ def test_ai_consensus_and_ingest_validation():
     assert not ai.ai_ingest(far)  # харківський канал, а місце в Одесі — відкидаємо
     split = dict(good, agree=0.5, votes={"a": {"type": "shahed"}, "b": {"type": "jet"}})
     assert not ai.ai_ingest(split)  # моделі не згодні — лише журнал
+
+
+def test_live_diff_and_validation():
+    """Живий ефір: різниця «що змінилось» з перевірених даних; дії моделі лише з наявними id."""
+    import time
+    from app import live
+    tr = Tracker(SOURCES)
+    now = time.time()
+    o = P.parse("4 ударних БпЛА курсом на Шевченкове ⚠️", "M"); o.raw = "4 ударних БпЛА курсом на Шевченкове ⚠️"
+    tr.ingest(o, "M", now - 60, None)
+    st = tr.snapshot(now)
+    d = live.diff(st, [], tr, now - 600, (36.25, 50.0), "Харківська")
+    assert d["counts"]["new"] >= 1 and d["items"][0]["mentions"]
+    steps = live.validate([{"say": "Ось — ціль", "action": "focus", "ids": ["НЕМАЄ-1"]},
+                           {"say": "Нова", "action": "focus", "ids": [d["items"][0]["id"]]}], d)
+    assert steps[0]["action"] is None and "—" not in steps[0]["say"] and steps[1]["action"] == "focus"
+    assert live.fallback_script(d)[0]["say"].startswith("За ")

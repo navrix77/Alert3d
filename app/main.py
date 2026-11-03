@@ -521,6 +521,33 @@ async def api_llm_report() -> dict:
     return out
 
 
+def _live_args(t: float, obl: str, lat: float | None, lon: float | None):
+    since = t if t > 0 else time.time() - 1800
+    home = (lon, lat) if lat is not None and lon is not None else None
+    return max(time.time() - 12 * 3600, since), home, (obl or None)
+
+
+@app.get("/api/since")
+def api_since(t: float = 0, obl: str = "", lat: float | None = None, lon: float | None = None):
+    """«Поки вас не було»: що змінилося з моменту t для району людини (лише перевірені дані)."""
+    from . import live
+    since, home, ob = _live_args(t, obl, lat, lon)
+    return JSONResponse(live.diff(state(), HIST, tracker, since, home, ob))
+
+
+@app.post("/api/live")
+async def api_live(req: Request):
+    """Живий ефір: сценарій для мапи (репліки + дозволені дії) з різниці та, за потреби, питання людини."""
+    from . import live
+    b = await req.json()
+    since, home, ob = _live_args(float(b.get("t") or 0), b.get("obl") or "", b.get("lat"), b.get("lon"))
+    bbox = b.get("bbox") if isinstance(b.get("bbox"), list) else None
+    d = live.diff(state(), HIST, tracker, since, home, ob, bbox)
+    q = (b.get("q") or "").strip()[:300] or None
+    out = await live.narrate(LLMX, d, q)
+    return {"diff": d, **out}
+
+
 @app.get("/api/llm")
 async def api_llm() -> dict:
     """Стан «другого парсера» (без ключа й без текстів повідомлень)."""

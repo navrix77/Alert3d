@@ -173,6 +173,7 @@
 <script src="fx.js"></script>
 <script src="app.js"></script>
 <script src="arsenal.js"></script>
+<script src="live.js"></script>
 <script src="cine.js"></script>
 <script src="real3d.js"></script>
 <script>if('serviceWorker' in navigator){let had=!!navigator.serviceWorker.controller,done=false;navigator.serviceWorker.register('sw.js').then(r=>{try{r.update();}catch(e){}/* нова версія сайту підтягується сама: перевірка раз на 3 хв і при поверненні в застосунок */setInterval(()=>{try{r.update();}catch(e){}},180000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){try{r.update();}catch(e){}}});});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!done){done=true;location.reload();}});}</script>
