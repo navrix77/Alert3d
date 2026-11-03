@@ -587,6 +587,21 @@ class Tracker:
                 # пункт, до якого понад годину польоту, — це тезка з іншого кінця країни, не маршрут цієї цілі
                 here = tr.est(t)
                 route = [p for p in route if dist_km(here, p.xy) <= min(tr.speed * 1.0 + 60, 260 if tr.type == "shahed" else 900)]
+                if len(route) >= 2:
+                    # «курсом на Лозова/Питомник» над Лісним (04.11): варіанти через «/» — сусідні пункти; пункт, що набагато
+                    # далі за найближчий і відірваний від решти маршруту на 80+ км, — тезка (Лозова на півдні), а не курс:
+                    # інакше оцінка «летить» через центр Харкова
+                    dmin = min(dist_km(here, p.xy) for p in route)
+                    keep = []
+                    for p in route:
+                        far = dist_km(here, p.xy) > 3 * dmin + 60
+                        lone = all(dist_km(p.xy, q.xy) > 80 for q in route if q is not p)
+                        if not (far and lone):
+                            keep.append(p)
+                    if keep and len(keep) < len(route):
+                        rec["dropped_far"] = [p.name for p in route if p not in keep]
+                        route = keep
+                        course_to = route[-1].name
                 if not route:
                     course_to = None  # усі пункти — тезки з іншого кінця країни: «→ X» не показуємо
             if route and tr.route and tr.route_src and tr.route_src != src and t - tr.route_t < 600 and self.brain and hasattr(self.brain, "dir_rel"):

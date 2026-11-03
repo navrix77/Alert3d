@@ -326,6 +326,7 @@ DISTRICTS = [
 ]
 COMPOUND_ADJ = re.compile(r"^(?:велик|мал|нов|стар|верхн|нижн|середн|червон|біл|чорн|зелен|сух|кам.ян)(?:а|у|ий|ого|ому|им|ій|ої|ою|е|і|их|ими|ая|ую|ой|ое)$")
 OBL_SUMMARY = re.compile(r"\d+\s+(?:\w+\s+){0,2}(?:бпла|бпл|шахед\w*|дрон\w*|ударн\w*|безпілот\w*|беспилот\w*)\s+(?:\w+\s+)?(?:в|у|по|над)\s+(?:област|обл\b|харківщин|харьковщин)")
+PREFER = {"Харківська": {"Лісне": (50.114, 36.275)}}  # область → {назва: (lat, lon) відомого місцевого пункту}
 DISTRICT_RX = [(re.compile(rx), n, la, lo) for rx, n, la, lo in DISTRICTS]
 WORD_SPLIT = re.compile(r"[\s,.;:!?()«»\"/]+")
 
@@ -522,6 +523,15 @@ class Parser:
                     break
         self._hint = obs.oblast_hint
         self._hint_n = sum(1 for rx, _n, _b in OBLAST_HINTS if rx.search(th)) + sum(1 for rx, _n in MORE_HINTS if rx.search(th))
+        # область, явно названа в тексті як «…щина» («(Миколаївщина)», заголовок сегмента); «Харківський масив» не рахується
+        txt_hint = None
+        for w_ in re.findall(r"[А-ЯІЇЄҐа-яіїєґ'’]+(?:щин|ччин|тчин)[аиіуою]?\b", text):
+            for rx_, n_ in [(a, b) for a, b, _c in OBLAST_HINTS] + MORE_HINTS:
+                if rx_.search(norm(w_)):
+                    txt_hint = n_
+                    break
+            if txt_hint:
+                break
         if bbox is None and channel:
             from .config import CHANNEL_REGION
             from .geo import oblasts
@@ -546,6 +556,9 @@ class Parser:
                   "Запоріжжя": creg == "Запорізька" or "запоріж" in tl or "запорож" in tl}.get(city, False)
             if not ok and dn not in ("Велика Данилівка (Харків)",):  # назва без тезок в Україні
                 continue
+            if txt_hint and txt_hint != {"Харків": "Харківська", "Київ": "Київська", "Запоріжжя": "Запорізька"}.get(city) \
+                    and not (city == "Київ" and txt_hint == "Київ"):
+                continue  # 04.11: «Лису Гору (Миколаївщина)» — інша область названа явно, це не район Харкова
             m_ = rx.search(tl)
             if m_:
                 before = tl[max(0, m_.start() - 25):m_.start()].split()
@@ -747,6 +760,13 @@ class Parser:
             if big and len(big) < len(cand) and all(P[i].pop < 5000 for i in cand if i not in big):
                 cand = big
 
+            # відомий місцевим каналам пункт серед тезок своєї області (без контексту сусідніх назв): «над Лісним» у
+            # харківських каналах — Лісне з Фельдман Екопарком під Харковом, а не Лісне біля Зміїва (04.11)
+            pref = PREFER.get(hint or "", {}).get(P[cand[0]].name) if cand and not ctx and len(found) == 1 else None
+            if pref:
+                near_ = [i for i in cand if abs(P[i].lat - pref[0]) < 0.03 and abs(P[i].lon - pref[1]) < 0.04]
+                if near_:
+                    cand = near_
             front = not ctx and getattr(self, "_typ", None) in FRONTLINE
 
             def score(i: int) -> float:

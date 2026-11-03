@@ -1601,3 +1601,19 @@ def test_vote_cheap_first_and_cache():
     assert set(calls) == {"groq", "mistral"} and len(v) == 2  # дешеві згодні — платну не питали
     asyncio.run(m.vote("S", "текст", {"name": "x"}))
     assert len(calls) == 2  # повтор того самого тексту — з кешу
+
+
+def test_ecopark_lysa_hora_and_far_alternative():
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p = Parser()
+    o = p.parse("1 ударний БпЛА рухається над Екопарком, курсом на Лісне", "KM")
+    assert all(abs(r.place.lat - 50.114) < 0.05 for r in o.places)  # Лісне під Харковом, не біля Зміїва
+    o = p.parse("2х БпЛА курсом на Лису Гору (Миколаївщина)", "D")
+    assert o.places[0].place.lat < 49 and "Харків" not in o.places[0].place.name
+    tr = Tracker(SOURCES)
+    t0 = 1_800_000_000
+    tr.ingest(p.parse("Шахед над Лісним", "D"), "D", t0)
+    tr.ingest(p.parse("1 ударний БпЛа курсом на Лозова/Питомник", "M"), "M", t0 + 60)
+    act = [x for x in tr.snapshot(t0 + 90)["tracks"] if x["status"] == "active" and x["type"] == "shahed"]
+    assert act and all(x.get("next") != "Лозова" for x in act) and act[0]["lat"] > 49.9  # не «летить» через центр Харкова на Лозову
