@@ -257,12 +257,8 @@ function addOverlays(){
   map.on('mouseenter','ru-dot',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','ru-dot',()=>map.getCanvas().style.cursor='');
   map.on('mouseenter','zones-t',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','zones-t',()=>map.getCanvas().style.cursor='');}
   map.addLayer({id:'chains',type:'line',source:'chains',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':['case',['get','s'],2.6,1.4],'line-dasharray':[2,1.6],'line-opacity':['get','o']}});
-  if(!map.getSource('lvec'))map.addSource('lvec',{type:'geojson',data:EMPTY});
-  map.addLayer({id:'lvec-f',type:'fill',source:'lvec',filter:['==',['geometry-type'],'Polygon'],paint:{'fill-color':'#FF5A5F','fill-opacity':0.10}});
-  map.addLayer({id:'lvec-l',type:'line',source:'lvec',filter:['==',['geometry-type'],'Polygon'],paint:{'line-color':'#FF8A8E','line-width':1.2,'line-opacity':0.6,'line-dasharray':[2,2]}});
-  map.addLayer({id:'lvec-t',type:'symbol',source:'lvec',minzoom:5,filter:['==',['geometry-type'],'Point'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-max-width':14},paint:{'text-color':'#FFC9CB','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4}});
   map.addLayer({id:'lsites',type:'circle',source:'lsites',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['case',['get','est'],3,4],7,['case',['get','est'],5,7]],'circle-color':['case',['get','est'],'rgba(255,77,77,0.25)','#FF3B3B'],'circle-stroke-color':'#fff','circle-stroke-width':['case',['get','est'],1.2,2],'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'lsites-t',type:'symbol',source:'lsites',minzoom:6.2,layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-max-width':14,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':false,'text-optional':true},paint:{'text-color':'#FFB3B3','text-halo-color':'#0B0F17','text-halo-width':2}});
+  map.addLayer({id:'lsites-t',type:'symbol',source:'lsites',minzoom:5,layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-max-width':14,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':false,'text-optional':true},paint:{'text-color':'#FFB3B3','text-halo-color':'#0B0F17','text-halo-width':2}});
   map.addLayer({id:'trails',type:'line',source:'trails',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':3,'line-dasharray':[0.1,2.2],'line-opacity':['get','o']}});
   map.addLayer({id:'ticks-c',type:'circle',source:'ticks',paint:{'circle-radius':4,'circle-color':['get','c'],'circle-stroke-color':'#0B0F17','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ticks-t',type:'symbol',source:'ticks',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,-1.1],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
@@ -520,12 +516,7 @@ function frame(now){
         ch.push({type:'Feature',properties:{c:isSel?(L.est?'#FF8A8A':'#FF3B3B'):'#E8ECF4',o:isSel?0.95:0.1,s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
         if(!ls.has(L.site))ls.set(L.site,{type:'Feature',properties:{est:true,l:'ймовірно · '+L.site.replace(/ \(.*\)/,'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       map.getSource('chains').setData({type:'FeatureCollection',features:ch});map.getSource('lsites').setData({type:'FeatureCollection',features:[...ls.values()]});
-      // ймовірний напрямок з місця пуску за історією (сектор, а не лінія): куди цілі з цього місця заходили раніше
-      if(map.getSource('lvec')){const VF=[],seen=new Set();for(const L of (SNAP.launches||[])){const v=L.vec;if(!v||isTO(L)||seen.has(L.site))continue;seen.add(L.site);
-        const C=xy([L.lon,L.lat]),R=170,ring=[ll(C)];for(let a=v.bearing-v.spread;a<=v.bearing+v.spread+0.1;a+=4){const r=a*D2R;ring.push(ll([C[0]+Math.sin(r)*R,C[1]+Math.cos(r)*R]));}ring.push(ll(C));
-        VF.push({type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[ring]}});
-        const rm=v.bearing*D2R;VF.push({type:'Feature',properties:{l:'ймовірно сюди\nза '+v.n+' попередніми'+(v.how==='near'?' (сусідні місця пуску)':'')},geometry:{type:'Point',coordinates:ll([C[0]+Math.sin(rm)*R*0.72,C[1]+Math.cos(rm)*R*0.72])}});}
-        map.getSource('lvec').setData({type:'FeatureCollection',features:VF});}}
+}
     T3D.heads=feats.map(f=>({id:f.properties.id,type:f.properties.type,hd:f.properties.hd,active:f.properties.active,weak:f.properties.weak,p:f.geometry.coordinates}));
     if(slow){map.getSource('trails').setData({type:'FeatureCollection',features:trails});
     map.getSource('preds').setData({type:'FeatureCollection',features:preds});if(map.getSource('lpred'))map.getSource('lpred').setData({type:'FeatureCollection',features:lpf});}

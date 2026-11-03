@@ -379,4 +379,4 @@ class LaunchBook:
         self.prune(now)
         return [{"id": L.id, "site": L.site.name, "lat": L.site.lat, "lon": L.site.lon, "kind": L.site.kind, "t": int(L.t), "until": int(L.t + ttl(L)),
                  "type": L.type, "count": L.count, "carrier": L.carrier, "srcs": sorted(L.srcs), "links": L.links[-3:],
-                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind, "stage": L.stage, "vec": self.site_vector(L.site, L.type) if L.stage != "takeoff" else None} for L in self.items if now - L.t < 6 * 3600 and (every or now < L.t + ttl(L))]
+                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind, "stage": L.stage} for L in self.items if now - L.t < 6 * 3600 and (every or now < L.t + ttl(L))]

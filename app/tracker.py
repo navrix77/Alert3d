@@ -507,7 +507,8 @@ class Tracker:
             tr = self._best(obs.type, pt, t, names)
         else:
             pt = None
-            tr = self._best_by_target(obs.type, route, t)
+            self._split_from = None
+            tr = self._best_by_target(obs.type, route, t, obs.count)
             if tr and getattr(self, "_alias", None):
                 route = [self._alias.get(p.name, p) for p in route]
                 course_to = route[-1].name if route else None
@@ -612,6 +613,10 @@ class Tracker:
         else:
             c = self.counters[obs.type] = self.counters.get(obs.type, 0) + 1
             tr = Track(f"{TYPES[obs.type]['label']}-{c}", obs.type, self.speed_over.get(obs.type, TYPES[obs.type]["speed"]))
+            grp = getattr(self, "_split_from", None)
+            if grp is not None and pos is None and (grp.count or 1) >= 2:
+                grp.count -= 1  # відділився від групи: у групі на одного менше
+                self._split_from = None
             tr.likely = bool(getattr(obs, "likely", False))
             if pos is not None:
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
@@ -804,7 +809,7 @@ class Tracker:
         elif t - t0 > 2400:
             tr.last_pred, tr.pred_moved, tr.pred_naive_hit = None, 0, False  # ціль зникла — невідомо, не рахуємо
 
-    def _best_by_target(self, typ: str, route, t: float) -> Track | None:
+    def _best_by_target(self, typ: str, route, t: float, count: int | None = None) -> Track | None:
         """Повідомлення без позиції («курсом на X») приєднуємо до треку з тим самим пунктом призначення
         або до треку, з якого X досяжний за час, що минув."""
         if not route:
@@ -826,6 +831,12 @@ class Tracker:
                 alias, alias_t = (tr, namesake), tr.last.t
             if tr.id == self.prefer and d < 80:
                 return tr  # канал прямо пише «далі …» про ту саму ціль
+            # «1 ударний курсом на Вільшани» не перенацілює всю групу «4 ударних на Шевченкове»: від групи відділився
+            # один дрон (03.11, monitor 1654 / Харьков INFO: «Шахед ×4 → Вільшани»)
+            if not shared and count == 1 and (tr.count or 1) >= 2 and tr.id != self.prefer:
+                if d <= 35:
+                    self._split_from = tr
+                continue
             if not shared:
                 # нова ціль-пункт має бути попереду (за курсом) і досяжна приблизно за 15 хв
                 if d > min(35, tr.speed * 0.25 + 15):
