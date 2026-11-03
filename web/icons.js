@@ -1,5 +1,5 @@
 // Силуети цілей зверху (ніс угору = північ). Малюються на canvas, щоб бути чіткими на будь-якому екрані.
-window.TYPE_COLOR={shahed:'#FFA31A',jet:'#FF2BD6',molniya:'#7CFF2A',cruise:'#9D3CFF',ballistic:'#FF2E2E',kab:'#22E1FF',geran5:'#FF5FA2',banderol:'#C08CFF',rszv:'#FF7A2E',fpv:'#FF4D6D',fpvf:'#3DA5FF',lancet:'#FFC43C',recon:'#2EE6A8'};
+window.TYPE_COLOR={shahed:'#FFA31A',jet:'#FF2BD6',molniya:'#7CFF2A',cruise:'#9D3CFF',ballistic:'#F2F5FA',kab:'#22E1FF',geran5:'#F49BE8',banderol:'#C08CFF',rszv:'#E3C9A1',fpv:'#A9B6C4',fpvf:'#3DA5FF',lancet:'#FFC43C',recon:'#2EE6A8'};
 window.TYPE_NAME={shahed:'Шахед',jet:'Реактивний БпЛА',molniya:'«Молнія»',cruise:'Крилата ракета',ballistic:'Балістика',kab:'КАБ',geran5:'«Герань-5»',banderol:'«Бандероль»',rszv:'РСЗВ',fpv:'FPV-дрон',fpvf:'FPV на оптоволокні',lancet:'«Ланцет»',recon:'Дрон-розвідник'};
 window.drawTarget=function(type,px,opts){
   opts=opts||{};const s=px*2,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');

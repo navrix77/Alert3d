@@ -64,7 +64,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
 <script>
 'use strict';
-const T={lancet:['«Ланцети»','#FFC43C'],shahed:['Шахеди / Герані','#FFA31A'],jet:['Реактивні БпЛА','#FF2BD6'],molniya:['«Молнії»','#7CFF2A'],cruise:['Крилаті ракети','#9D3CFF'],ballistic:['Балістичні ракети','#FF2E2E'],kab:['КАБи','#22E1FF'],geran5:['«Герань-5»','#FF5FA2'],banderol:['«Бандеролі»','#C08CFF'],rszv:['РСЗВ','#FF7A2E'],fpv:['FPV-дрони','#FF4D6D'],fpvf:['FPV на оптоволокні','#3DA5FF'],recon:['Дрони-розвідники','#2EE6A8']};
+const T={lancet:['«Ланцети»','#FFC43C'],shahed:['Шахеди / Герані','#FFA31A'],jet:['Реактивні БпЛА','#FF2BD6'],molniya:['«Молнії»','#7CFF2A'],cruise:['Крилаті ракети','#9D3CFF'],ballistic:['Балістичні ракети','#F2F5FA'],kab:['КАБи','#22E1FF'],geran5:['«Герань-5»','#F49BE8'],banderol:['«Бандеролі»','#C08CFF'],rszv:['РСЗВ','#E3C9A1'],fpv:['FPV-дрони','#A9B6C4'],fpvf:['FPV на оптоволокні','#3DA5FF'],recon:['Дрони-розвідники','#2EE6A8']};
 const $=s=>document.querySelector(s);
 const q=new URLSearchParams(location.search);let DAY=q.get('d')||null,D=null,CUR=1,playing=false;
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
