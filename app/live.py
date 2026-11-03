@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import time
 
 ACTIONS = {"say", "focus", "highlight", "dim", "breakdown", "sources", "only_new", "replay", "region", "overview"}
@@ -17,7 +18,8 @@ LIVE_SYSTEM = """Ти режисер «Живого ефіру» SKY. Тобі �
 Дозволені дії: focus(ids) — наблизити до цілей; highlight(ids) — підсвітити; dim(true/false) — приглушити все інше;
 breakdown(id) — розкласти лічильник «було → стало» зі згадками; sources(id) — показати першоджерела; only_new(true) — лише нове;
 replay(from) — програти відрізок від часу; region(bbox) — показати ділянку; overview — загальний вигляд.
-Посилайся ЛИШЕ на id з даних. Не вигадуй цілей, місць, чисел, часу, координат, підтверджень чи відбоїв. Без відліку до удару.
+Посилайся ЛИШЕ на id з даних і лише в полі ids; у реченні say НІКОЛИ не пиши службові id (Ш-1023, РБ-12…),
+називай ціль словами: «шахед біля Чугуєва», «група з трьох реактивних». Не вигадуй цілей, місць, чисел, часу, координат, підтверджень чи відбоїв. Без відліку до удару.
 Спершу найважливіше для людини: що ближче до її дому, балістика, нові цілі; далі — зміни; зниклі — коротко.
 Якщо є питання людини — відповідай саме на нього і обери дію, яка найкраще показує відповідь
 («скільки/чому стало N» → breakdown; «що змінилося» → only_new + highlight; «звідки відомо» → sources; ділянка → region).
@@ -132,8 +134,24 @@ def fallback_script(d: dict, question: str | None = None) -> list[dict]:
     return steps
 
 
+ID_RX = re.compile(r"(?<![\w-])(?:Ш|РБ|КР|Б|Г5|БД|РС|FPV|Л)-\d{1,6}(?![\w-])")
+
+
+def scrub(text: str, names: dict | None = None) -> str:
+    """Службові номери цілей (Ш-1023) людині нічого не кажуть: замінюємо назвою або прибираємо."""
+    names = names or {}
+    t = text or ""
+    for k in sorted(names, key=len, reverse=True):
+        t = re.sub(rf"(?<![\w-]){re.escape(k)}(?![\w-])", names[k], t)
+    t = ID_RX.sub(lambda m: "", t)
+    t = re.sub(r"\(\s*[,;]?\s*\)", "", t)
+    t = re.sub(r"\s+([,.;:])", r"\1", t)
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
 def validate(steps: list, d: dict) -> list[dict]:
     ids = {i["id"] for i in d["items"]} | {g["id"] for g in d["gone"]}
+    names = {i["id"]: (i.get("name") or "ціль").lower() for i in d["items"]} | {g["id"]: (g.get("name") or "ціль").lower() for g in d["gone"]}
     out = []
     for s in steps[:8] if isinstance(steps, list) else []:
         if not isinstance(s, dict) or not isinstance(s.get("say"), str):
@@ -142,7 +160,7 @@ def validate(steps: list, d: dict) -> list[dict]:
         good = [i for i in (s.get("ids") or []) if i in ids]
         if a in ("focus", "highlight", "breakdown", "sources") and not good:
             a = None  # посилання на неіснуючу ціль — дію відкидаємо, лишаємо лише репліку
-        st = {"say": s["say"][:240].replace("—", ","), "action": a, "ids": good[:6]}
+        st = {"say": scrub(s["say"][:240].replace("—", ","), names), "action": a, "ids": good[:6]}
         if a == "region" and isinstance(s.get("bbox"), list) and len(s["bbox"]) == 4:
             st["bbox"] = [float(x) for x in s["bbox"]]
         if a in ("dim", "only_new"):
@@ -305,8 +323,8 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
     if isinstance(res, dict) and res.get("action") == "silence" and said:
         return {"text": "", "speech": "", "by": by, "scope": scope, "quiet": True}
     if isinstance(res, dict) and res.get("action") == "speak" and (res.get("display_text") or res.get("speech_text")):
-        disp = (res.get("display_text") or res.get("speech_text")).strip().replace("—", ",")
-        speech = (res.get("speech_text") or disp).strip().replace("—", ",")
+        disp = scrub((res.get("display_text") or res.get("speech_text")).strip().replace("—", ","))
+        speech = scrub((res.get("speech_text") or disp).strip().replace("—", ","))
         kind = res.get("kind") or "update"
     else:
         disp = speech = fb

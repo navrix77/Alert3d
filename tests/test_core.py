@@ -1576,3 +1576,9 @@ def test_say_form_and_radio_memory(monkeypatch):
     assert r1["text"] and "безпілотник" in r1["speech"] and r2["text"] == "" and r3.get("quiet") and r4["text"]
     out = asyncio.run(live.radio(None, {"health": {"telegram": False, "alerts": True}}, None, None, 0, None, "Харківська", "region", "s3"))
     assert out["kind"] == "outage" and "недоступні" in out["text"]
+
+
+def test_scrub_track_ids():
+    from app.live import scrub
+    t = scrub("Ш-1023 курсом на Чугуїв, Х-101 і КН-23 (РБ-12).", {"Ш-1023": "шахед"})
+    assert "Ш-1023" not in t and "РБ-12" not in t and "Х-101" in t and "КН-23" in t and t.startswith("шахед")
