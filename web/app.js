@@ -697,6 +697,21 @@ function renderFresh(){const el=$('#me-fresh');if(!el)return;const F=SNAP&&SNAP.
   else{el.className='me-fresh';t='Дані оновлено '+ago(Math.max(F.any||0,F.alerts||0))+(myO?' · '+(lo?'по вашій області останнє повідомлення '+ago(lo):'по вашій області повідомлень про цілі не було 6 год'):'');
     if(alertMine&&(!lo||now-lo>1200)){el.className='me-fresh mid';t+='. Тривога триває: тиша в джерелах не означає безпеку.';}}
   el.textContent=t;el.hidden=false;}
+/* ---------- ціль зовсім поряд (04.11): мапа сама наближається так, щоб у кадрі були і ціль, і дім ----------
+   ≤10 км від дому або ~≤5 хв до вас за названим маршрутом; не частіше разу на ціль за 10 хв і не всупереч людині
+   (якщо вона щойно рухала мапу, стежить за ціллю чи грає машина часу) */
+let AF_LAST={},AF_USER=0;
+map.on('movestart',e=>{if(e.originalEvent)AF_USER=Date.now();});
+function autoFrame(close,first){
+  if(!home||REPLAY||follow||document.hidden||Date.now()-AF_USER<60000||!$('#sheet').hidden)return;
+  let c=null;const fc=close&&close[0];
+  if(fc&&fc.d<=10&&!fc.tr.pos_est)c={tr:fc.tr};
+  else if(first&&first.r.eta!=null&&first.r.eta<=5&&first.r.rel==='route')c={tr:first.tr};
+  if(!c)return;const id=c.tr.id,now=Date.now();if(AF_LAST[id]&&now-AF_LAST[id]<600000)return;AF_LAST[id]=now;
+  const d=DISP.get(id);if(!d)return;const p=d.p;
+  const b=[[Math.min(p[0],home[0]),Math.min(p[1],home[1])],[Math.max(p[0],home[0]),Math.max(p[1],home[1])]];
+  const me=$('#me'),bot=(me&&!me.hidden?me.offsetHeight:0)+110;
+  map.fitBounds(b,{padding:{top:130,bottom:Math.min(innerHeight*0.55,bot),left:50,right:50},maxZoom:12.5,duration:1400});}
 function renderMe(threats){
   const box=$('#me');if(!home){box.className='me'+(box.classList.contains('open')?' open':'');$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>(document.hidden?75:30);
@@ -714,6 +729,7 @@ function renderMe(threats){
   if(!first&&mb&&mb.r.d<=40){cls='me watch';word='Ціль неподалік';sub=offL+esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · може наблизитися';}
   // ціль поруч — загроза незалежно від курсу (03.11: дві цілі за 3–6 км від дому, а панель писала «Цілей у ваш бік немає»)
   const HX=xy(home);const close=SNAP.tracks.filter(t=>t.status==='active'&&!t.nopos).map(t=>{const d=DISP.get(t.id);return d?{tr:t,d:dist(HX,xy(d.p)),side:FROM[Math.round(brg(HX,xy(d.p))/45)%8]}:null;}).filter(x=>x&&x.d<=15).sort((a,b)=>a.d-b.d);
+  autoFrame(close,first);
   if(!first&&close.length){const c0=close[0],n=close.reduce((a,x)=>a+(x.tr.count||1),0);cls=c0.d<=8?'me danger':'me watch';word=n>1?'Цілі поруч: '+n:'Ціль поруч';
     sub=offL+esc(TYPE_NAME[c0.tr.type])+' · '+Math.max(1,Math.round(c0.d))+' км '+c0.side+(c0.tr.next?' · курс → '+esc(c0.tr.next):c0.tr.hd==null?' · курс невідомий':'')+(c0.tr.conf<0.5?' · ще не підтверджено':'')+(close.length>1?' · ще '+(close.length-1)+' в межах 15 км':'');}
   if(isStale){cls='me watch';word='Невідомо';sub=offL+'Немає звʼязку з сервером. Це <b>не відбій</b>.';}
