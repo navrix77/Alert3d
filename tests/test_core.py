@@ -1049,3 +1049,11 @@ def test_tracker_state_roundtrip():
     assert [t.id for t in b.tracks] == [t.id for t in a.tracks]
     assert b.launches.items and b.launches.items[0].site is launch.SITE_LIST[[x.name for x in launch.SITE_LIST].index("Орел")]
     assert not Tracker(SOURCES).load_state(a.dump_state(), max_age=-1)
+
+
+def test_channel_signature_is_not_air_defense_report():
+    """«🇺🇦 ППО Полтава» — підпис каналу; сам рядок не робить повідомлення «роботою ППО», а назви з малої читаються."""
+    from app.parser import Parser
+    o = Parser().parse("Заїченці курс в’язівок\n\n🇺🇦 ППО Полтава", "ppopoltavanightfighters")
+    assert o.kind != "filtered" and [p.place.name for p in o.places] == ["Заїченці", "В’язівок"]
+    assert Parser().parse("Шахед збито над Полтавою", "ppopoltavanightfighters").kind == "filtered"
