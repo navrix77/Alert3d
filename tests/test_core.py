@@ -1066,7 +1066,7 @@ def test_forecast_journal_logs_candidates_and_truth():
     from app.config import SOURCES
     from app.parser import Parser
     b = Brain(Path(":memory:")); trk = Tracker(SOURCES, b); P = Parser()
-    for txt, t in [("Шахед біля Мерефи", 1000.0), ("Шахед біля Люботина", 1900.0), ("Шахед біля Пісочина", 2800.0)]:
+    for txt, t in [("Шахед біля Мерефи", 1000.0), ("Шахед біля Люботина", 1900.0), ("Шахед біля Пересічного", 2800.0)]:
         o = P.parse(txt, "K"); o.raw = txt; trk.ingest(o, "K", t, None)
     rows = b.db.execute("SELECT type, cand, truth FROM fcast").fetchall()
     assert rows and rows[0][0] == "shahed" and '"mv"' in rows[0][1]
