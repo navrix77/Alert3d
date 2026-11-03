@@ -1497,3 +1497,16 @@ def test_stt_without_keys_returns_empty(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     from app.llm import LLM
     assert asyncio.run(LLM().transcribe(b"x" * 5000, "audio/mp4")) == ("", None)
+
+
+def test_radio_fallback_texts():
+    """Радіо SKY без моделі: чесні короткі випуски з даних (свій регіон, сусіди, Україна)."""
+    import asyncio, time
+    from app import live
+    tr = Tracker(SOURCES)
+    o = P.parse("4 ударних БпЛА курсом на Шевченкове ⚠️", "M"); o.raw = "x"
+    tr.ingest(o, "M", time.time() - 60, None)
+    st = tr.snapshot(time.time())
+    for sc in ("region", "neighbors", "country"):
+        r = asyncio.run(live.radio(None, st, [], tr, time.time() - 600, (36.25, 50.0), "Харківська", sc))
+        assert r["text"] and "—" not in r["text"] and r["scope"] == sc

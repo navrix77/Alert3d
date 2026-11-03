@@ -23,7 +23,7 @@
   #live{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);z-index:60;max-width:560px;margin:0 auto;
     background:rgba(12,14,22,.94);border:1px solid rgba(255,255,255,.18);border-radius:18px;padding:12px 12px 10px;color:#fff;
     font:14px/1.45 system-ui,sans-serif;box-shadow:0 12px 40px rgba(0,0,0,.5);backdrop-filter:blur(12px)}
-  #live .lv-h{display:flex;align-items:center;gap:6px;font-weight:800;font-size:12px;letter-spacing:.02em;white-space:nowrap}
+  #live .lv-h{display:flex;align-items:center;gap:6px;font-weight:800;font-size:12px;letter-spacing:.02em;white-space:nowrap;flex-wrap:wrap;row-gap:6px}
   #live .lv-h button{padding:4px 9px;font-size:12px}
   #live .lv-h i{width:8px;height:8px;border-radius:50%;background:#FF4D5E}
   #live .lv-h .sp{flex:1}
@@ -45,7 +45,7 @@
   document.body.appendChild(btn);
   const box = document.createElement('div'); box.id = 'live'; box.hidden = true;
   box.innerHTML = `<div class="lv-h"><i></i><span>ЖИВИЙ ЕФІР</span><span class="sp"></span>
-      <button id="lv-audio" title="Озвучувати">🔊</button><button id="lv-shelter" title="Короткі голосові оновлення, поки ви в укритті">Я в укритті</button>
+      <button id="lv-audio" title="Озвучувати">🔊</button><button id="lv-radio" title="Радіо SKY: голосові зведення про ваш регіон, сусідів і всю Україну">📻 Радіо</button><button id="lv-shelter" title="Короткі голосові оновлення, поки ви в укритті">Я в укритті</button>
       <button id="lv-pause">❚❚</button><button id="lv-close">✕</button></div>
     <div class="lv-say" id="lv-say"></div><div class="lv-x" id="lv-x"></div>
     <div class="lv-q"><input id="lv-in" placeholder="Спитайте: чому стало 6? що нового? звідки відомо?" enterkeyhint="send">
@@ -125,7 +125,7 @@
   }
   function start(manual) { stop = true; if (abortAudio) abortAudio(); setTimeout(() => live(null, null, manual ? seen : seen), 50); }
   btn.onclick = () => { $('#live-tip') && $('#live-tip').remove(); start(true); };
-  $('#lv-close').onclick = () => { stop = true; paused = false; if (abortAudio) abortAudio(); box.hidden = true; hl([], false); window.FXLIVE = null; markSeen(); };
+  $('#lv-close').onclick = () => { if (radioOn) $('#lv-radio').click(); if (shelter) $('#lv-shelter').click(); stop = true; paused = false; if (abortAudio) abortAudio(); box.hidden = true; hl([], false); window.FXLIVE = null; markSeen(); };
   $('#lv-pause').onclick = () => { paused = !paused; $('#lv-pause').textContent = paused ? '▶' : '❚❚'; if (paused && abortAudio) abortAudio(); };
   $('#lv-audio').onclick = () => { audioOn = !audioOn; LS.set('live_audio', audioOn ? '1' : '0'); $('#lv-audio').classList.toggle('on', audioOn); if (!audioOn && abortAudio) abortAudio(); };
   const ask = q => { if (!q) return; stop = true; paused = false; if (abortAudio) abortAudio(); $('#lv-in').value = ''; setTimeout(() => live(q, lassoBox), 60); lassoBox = null; };
@@ -211,6 +211,40 @@
         if (c.new || c.changed || (d.bal || []).length || (d.alert && d.alert.now !== d.alert.was)) { lastSpoken = d.now; await live(null, null, d.since); }
       } catch (e) {}
     }, 60000);
+  };
+
+  // ---------- «Радіо SKY»: голосові випуски кожні 2 хв про свій регіон; кожен 3-й — сусідні області; кожен 5-й — уся Україна
+  let radioOn = false, radioN = 0, radioT = null, radioSeen = 0, radioQuiet = 0;
+  function chime() { try { const c = new (window.AudioContext || window.webkitAudioContext)(), o = c.createOscillator(), g = c.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(880, c.currentTime); o.frequency.setValueAtTime(660, c.currentTime + 0.12);
+      g.gain.setValueAtTime(0.0001, c.currentTime); g.gain.exponentialRampToValueAtTime(0.18, c.currentTime + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.35);
+      o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + 0.4); setTimeout(() => c.close(), 600); } catch (e) {} }
+  async function radioIssue() {
+    if (!radioOn || playing) return;
+    radioN++; const w = where();
+    const scope = radioN % 5 === 0 ? 'country' : radioN % 3 === 0 ? 'neighbors' : 'region';
+    try {
+      const r = await (await fetch('/api/radio?scope=' + scope + '&t=' + Math.round(radioSeen || (NX().now() - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
+        (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : ''))).json();
+      if (!radioOn) return;
+      // свій регіон без змін — не повторюємо щоразу «змін немає», лише раз на ~6 хв
+      if (scope === 'region' && /суттєвих змін|змін немає|без змін/i.test(r.text || '') && ++radioQuiet % 3 !== 1) return;
+      if (scope === 'region') radioSeen = NX().now();
+      say.textContent = (scope === 'country' ? '🇺🇦 Україна: ' : scope === 'neighbors' ? 'Сусіди: ' : '📍 ') + (r.text || '');
+      xtra.innerHTML = '<small>' + new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) + ' · ' + (r.by && r.by !== 'rules' ? 'ШІ за даними SKY' : 'дані SKY') + '</small>';
+      chime(); await wait(450); await speak(r.text || '');
+    } catch (e) {}
+  }
+  $('#lv-radio').onclick = async () => {
+    radioOn = !radioOn; $('#lv-radio').classList.toggle('on', radioOn);
+    if (!radioOn) { clearInterval(radioT); radioT = null; say.textContent = 'Радіо вимкнено'; return; }
+    audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on'); stop = true; if (abortAudio) abortAudio();
+    try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
+    radioN = 0; radioQuiet = 0; radioSeen = seen || (NX().now() - 1800);
+    say.textContent = 'Радіо SKY: кожні 2 хвилини про ваш регіон, періодично про сусідів і всю Україну.';
+    await speak('Радіо SKY. Кожні дві хвилини про ваш регіон, періодично про сусідні області і всю Україну.');
+    radioN = 4; await radioIssue();  // перший випуск — загальна картина країни, далі свій регіон
+    radioT = setInterval(radioIssue, 120000);
   };
 
   // ---------- повернення після відсутності: запропонувати ефір

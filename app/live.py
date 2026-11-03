@@ -164,3 +164,92 @@ async def narrate(llm, d: dict, question: str | None = None) -> dict:
     if not steps:
         return {"steps": fallback_script(d, question), "by": "rules"}
     return {"steps": steps, "by": by}
+
+
+# ---------------- «Радіо SKY» (03.11): голосові зведення — свій регіон, періодично сусіди й уся Україна
+RADIO_SYSTEM = """Ти ведучий «Радіо SKY»: коротко і спокійно озвучуєш повітряну обстановку для слухача в укритті чи в дорозі.
+Лише з даних, які тобі дали; не вигадуй цілей, місць, чисел, часу; без відліку до удару; без довгих тире.
+2–4 коротких речення, природна усна мова українською, числа словами не обов'язково. Якщо змін немає, так і скажи одним реченням.
+Якщо в області слухача тривога або балістика — почни з цього і нагадай про укриття."""
+
+
+def _neighbors(obl: str) -> list[str]:
+    from .geo import oblasts
+    O = oblasts()
+    try:
+        cs = O.centroids() if hasattr(O, "centroids") else None
+    except Exception:  # noqa: BLE001
+        cs = None
+    NB = {"Харківська": ["Сумська", "Полтавська", "Дніпропетровська", "Донецька", "Луганська"],
+          "Сумська": ["Чернігівська", "Полтавська", "Харківська"], "Полтавська": ["Сумська", "Харківська", "Дніпропетровська", "Кіровоградська", "Черкаська", "Київська", "Чернігівська"],
+          "Дніпропетровська": ["Харківська", "Полтавська", "Кіровоградська", "Миколаївська", "Херсонська", "Запорізька", "Донецька"],
+          "Донецька": ["Харківська", "Луганська", "Дніпропетровська", "Запорізька"], "Запорізька": ["Дніпропетровська", "Донецька", "Херсонська"],
+          "Київська": ["Київ", "Чернігівська", "Полтавська", "Черкаська", "Вінницька", "Житомирська"], "Київ": ["Київська"],
+          "Чернігівська": ["Київська", "Сумська", "Полтавська"], "Черкаська": ["Київська", "Полтавська", "Кіровоградська", "Вінницька"],
+          "Кіровоградська": ["Черкаська", "Полтавська", "Дніпропетровська", "Миколаївська", "Одеська", "Вінницька"],
+          "Миколаївська": ["Одеська", "Кіровоградська", "Дніпропетровська", "Херсонська"], "Херсонська": ["Миколаївська", "Дніпропетровська", "Запорізька"],
+          "Одеська": ["Миколаївська", "Кіровоградська", "Вінницька"], "Вінницька": ["Житомирська", "Київська", "Черкаська", "Кіровоградська", "Одеська", "Хмельницька"],
+          "Житомирська": ["Київська", "Вінницька", "Хмельницька", "Рівненська"], "Хмельницька": ["Житомирська", "Вінницька", "Тернопільська", "Рівненська", "Чернівецька"],
+          "Рівненська": ["Волинська", "Житомирська", "Хмельницька", "Тернопільська", "Львівська"], "Волинська": ["Рівненська", "Львівська"],
+          "Львівська": ["Волинська", "Рівненська", "Тернопільська", "Івано-Франківська", "Закарпатська"], "Тернопільська": ["Львівська", "Рівненська", "Хмельницька", "Івано-Франківська", "Чернівецька"],
+          "Івано-Франківська": ["Львівська", "Тернопільська", "Чернівецька", "Закарпатська"], "Чернівецька": ["Івано-Франківська", "Тернопільська", "Хмельницька", "Вінницька"],
+          "Закарпатська": ["Львівська", "Івано-Франківська"], "Луганська": ["Харківська", "Донецька"]}
+    _ = cs
+    return NB.get(obl, [])
+
+
+def radio_context(state: dict, hist: list, tracker, since: float, home, obl: str, scope: str) -> tuple[str, str]:
+    """(контекст для моделі, запасний текст без моделі) для одного випуску."""
+    from collections import Counter
+    from .geo import oblasts
+    O = oblasts()
+    act = [t for t in state.get("tracks", []) if t.get("status") == "active"]
+    by_obl = Counter()
+    for t in act:
+        o = O.of(t["lon"], t["lat"])
+        if o:
+            by_obl[o] += t.get("count") or 1
+    levels = state.get("levels") or {}
+    off = state.get("official") or {}
+    alerts = set(levels) | set(off.get("alert_obl") or [])
+    now = time.time()
+    bal = [e for e in state.get("bal", []) if now - e["t"] < 1800 and not e.get("close")]
+    if scope == "region":
+        d = diff(state, hist, tracker, since, home, obl)
+        c = d["counts"]
+        near = [i for i in d["items"] if i["status"] != "same"][:5]
+        ctx = (f"ВИПУСК: ваш регіон ({obl}). Тривога в області: {'так' if obl in alerts else 'ні'}. "
+               f"Балістика/МіГ для області за 30 хв: {sum(1 for e in bal if obl in e.get('obl', []) or '*' in e.get('obl', []))}.\n"
+               f"За {d['minutes']} хв: нових {c['new']}, змінилось {c['changed']}, зникло {c['gone']}, зараз у районі {c['active']}.\n" +
+               "\n".join(f"- {i['name']}{' ×' + str(i['count']) if i['count'] > 1 else ''}: {i['status']}, "
+                         f"{('курс на ' + i['next']) if i['next'] else 'курс невідомий'}, {i['km']} км від дому" for i in near))
+        fb = fallback_script(d)[0]["say"]
+        if obl in alerts:
+            fb = f"У вашій області тривога. {fb} Будьте в укритті."
+        return ctx, fb
+    if scope == "neighbors":
+        nb = _neighbors(obl)
+        rows = [f"- {o}: тривога {'так' if o in alerts else 'ні'}, цілей {by_obl.get(o, 0)}" for o in nb]
+        ctx = f"ВИПУСК: сусідні області для {obl}.\n" + "\n".join(rows)
+        busy = [o for o in nb if by_obl.get(o, 0)]
+        fb = ("У сусідніх областях: " + ", ".join(f"{o} ({by_obl[o]})" for o in busy) + ".") if busy else "У сусідніх областях цілей не фіксують."
+        return ctx, fb
+    types = Counter()
+    for t in act:
+        types[t["name"]] += t.get("count") or 1
+    ctx = (f"ВИПУСК: уся Україна. Областей з тривогою: {len(alerts)}. Цілей у повітрі за даними каналів: {sum(types.values())}.\n"
+           + "\n".join(f"- {k}: {v}" for k, v in types.most_common(6)) +
+           f"\nНайбільше цілей: " + ", ".join(f"{o} ({n})" for o, n in by_obl.most_common(4)) +
+           (f"\nПовідомлень про балістику/МіГ-31К за 30 хв: {len(bal)}" if bal else ""))
+    fb = (f"По Україні тривога в {len(alerts)} областях. " + (f"У повітрі приблизно {sum(types.values())} цілей, найбільше: " +
+          ", ".join(o for o, _n in by_obl.most_common(3)) + "." if types else "Цілей у повітрі не фіксують."))
+    return ctx, fb
+
+
+async def radio(llm, state, hist, tracker, since, home, obl, scope) -> dict:
+    ctx, fb = radio_context(state, hist, tracker, since, home, obl, scope)
+    if llm is None or not llm.on:
+        return {"text": fb, "by": "rules", "scope": scope}
+    txt, by = await llm.call(RADIO_SYSTEM, ctx, None, max_tokens=260)
+    txt = (txt or "").strip().replace("—", ",")
+    return {"text": txt or fb, "by": by if txt else "rules", "scope": scope}
