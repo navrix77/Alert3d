@@ -96,8 +96,8 @@
         float halo = 0.0 * o2;
         vec3 body = t.rgb * (0.86 + 0.22 * dif) + vec3(spec * 0.12);   // текстура вже з реалістичним світлом: без «пластику»
         // тонкий світлий край: на темному супутнику вночі силует не зникає; тінь під ціллю тримає контраст на світлих полях
-        float a = max(t.a, outl * 0.6);
-        gl_FragColor = vec4(clamp(body, 0.0, 1.0) * t.a + vec3(0.78, 0.82, 0.88) * outl * 0.6, a) * v_col.a;
+        float a = max(t.a, outl * 0.3);
+        gl_FragColor = vec4(clamp(body, 0.0, 1.0) * t.a + vec3(0.78, 0.82, 0.88) * outl * 0.3, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -120,14 +120,14 @@
           const tx = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tx);
           gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
           // 256×256 (степінь двійки) з mip-рівнями: при зменшенні силует не «сиплеться» і не розмивається
-          const cv = document.createElement('canvas'); cv.width = cv.height = 256; const cx = cv.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(img, 0, 0, 256, 256);
+          const cv = document.createElement('canvas'); cv.width = cv.height = 512; const cx = cv.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(img, 0, 0, 512, 512);
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
           gl.generateMipmap(gl.TEXTURE_2D);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
           this.tex[t] = tx; map.triggerRepaint();
         };
-        img.src = 'sprites/t-' + t + '.png?v=ref3';
+        img.src = 'sprites/t-' + t + '.png?v=ref5';
       }
     },
     quads(list) { // list: [merc, size, rot, col4, kind, off]
