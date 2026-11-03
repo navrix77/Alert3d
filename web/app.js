@@ -675,6 +675,25 @@ function showBalRegion(){if(!BALM||!window.__OBLGJ)return;const fs=window.__OBLG
 function syncBalLayers(){if(!map.getLayer('bal-dim'))return;const on=!!BALM;const names=on?Array.from(new Set([BALM.obl,...BALM.names])):[];
   map.setLayoutProperty('bal-dim','visibility',on?'visible':'none');map.setLayoutProperty('bal-hl','visibility',on?'visible':'none');
   if(on){const key=names.join('|');if(syncBalLayers.k!==key){syncBalLayers.k=key;map.setFilter('bal-dim',['!',['in',['get','n'],['literal',names]]]);map.setFilter('bal-hl',['in',['get','n'],['literal',names]]);}}}
+/* ---------- поділитись зведенням (04.11): картка «область, час, джерела», що при відкритті показує свій вік ---------- */
+{const sb=$('#me-share');if(sb)sb.onclick=async e=>{e.stopPropagation();if(!home){toast('Спершу позначте своє місце ⌂');return;}
+  const obl=window.OBLPOLY?window.OBLPOLY(home[0],home[1]):null;if(!obl){toast('Не вдалося визначити область');return;}
+  try{const r=await(await fetch('/api/brief',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({obl})})).json();
+    if(!r.ok)throw 0;const url=location.origin+r.url,title=obl+' область · NAVRYX SKY';
+    if(navigator.share){try{await navigator.share({title,text:'Обстановка: '+obl+' область',url});}catch(_){}}
+    else{try{await navigator.clipboard.writeText(url);toast('Посилання скопійовано');}catch(_){prompt('Посилання на зведення',url);}}}
+  catch(_){toast('Не вдалося створити зведення');}};}
+/* ---------- свіжість і збої на першому екрані (04.11): вік даних по вашій області й чесна позначка, коли джерела мовчать ---------- */
+function renderFresh(){const el=$('#me-fresh');if(!el)return;const F=SNAP&&SNAP.fresh;if(!F||!home||REPLAY){el.hidden=true;return;}
+  const now=liveNow(),ago=s=>{const m=Math.round((now-s)/60);return m<1?'щойно':m<60?m+' хв тому':Math.floor(m/60)+' год '+(m%60)+' хв тому';};
+  const myO=window.OBLPOLY?window.OBLPOLY(home[0],home[1]):null,lo=myO&&F.obl?F.obl[myO]:0;
+  const alertMine=!!(myO&&SNAP.levels&&SNAP.levels[myO]);const warn=[];
+  if(!F.alerts_ok||now-F.alerts>180)warn.push('Офіційні тривоги не оновлюються'+(F.alerts?' '+ago(F.alerts).replace(' тому',''):'')+'. Перевіряйте застосунок «Повітряна тривога».');
+  if(F.channels&&F.live/F.channels<0.3)warn.push('Більшість джерел зараз не оновлюється: картина може бути неповною.');
+  let t;if(warn.length){el.className='me-fresh bad';t='⚠ '+warn.join(' ');}
+  else{el.className='me-fresh';t='Дані оновлено '+ago(Math.max(F.any||0,F.alerts||0))+(myO?' · '+(lo?'по вашій області останнє повідомлення '+ago(lo):'по вашій області повідомлень про цілі не було 6 год'):'');
+    if(alertMine&&(!lo||now-lo>1200)){el.className='me-fresh mid';t+='. Тривога триває: тиша в джерелах не означає безпеку.';}}
+  el.textContent=t;el.hidden=false;}
 function renderMe(threats){
   const box=$('#me');if(!home){box.className='me'+(box.classList.contains('open')?' open':'');$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>(document.hidden?75:30);
@@ -711,7 +730,7 @@ function renderMe(threats){
   if(first&&!isStale&&!BALM&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
     sub=offL+'<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
       '<div class="big-t"><b>'+esc(TYPE_NAME[first.tr.type])+(first.tr.count>1?' ×'+first.tr.count:'')+'</b> · ~'+eta+' хв до вас<br><span>'+Math.round(first.r.d)+' км '+first.r.from+(first.tr.next?' · курс → '+esc(first.tr.next):'')+' · за повідомленнями каналів</span></div>';}
-  $('#me-sub').innerHTML=sub;{const bs=$('#bal-show');if(bs)bs.onclick=e=>{e.stopPropagation();showBalRegion();};}
+  $('#me-sub').innerHTML=sub;renderFresh();{const bs=$('#bal-show');if(bs)bs.onclick=e=>{e.stopPropagation();showBalRegion();};}
   $('#me-list').innerHTML='';
   const nearIds=new Set(near.map(x=>x.tr.id));const closeAsNear=close.filter(x=>!nearIds.has(x.tr.id)).map(x=>({tr:x.tr,r:{d:x.d,from:x.side,eta:null,rel:null,away:false,maybe:false,p:0,near:true}}));
   (thr.length?thr:closeAsNear.concat(near)).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');

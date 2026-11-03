@@ -1692,3 +1692,18 @@ def test_geo_holdout_error_rate():
     spec.loader.exec_module(m)
     r = m.run()
     assert r["wrong_rate"] <= 0.03 and r["missed_rate"] <= 0.05, r
+
+
+def test_brief_card_snapshot_and_age():
+    import time as _t
+    from fastapi.testclient import TestClient
+    from app import main as M
+    c = TestClient(M.app)
+    M._hits.clear()
+    r = c.post("/api/brief", json={"obl": "Харківська"}).json()
+    assert r["ok"] and r["url"].startswith("/b/")
+    h = c.get(r["url"])
+    assert h.status_code == 200 and "Харківська область" in h.text and "знімок на момент створення" in h.text and "og:title" in h.text
+    assert c.get("/b/nope").status_code == 404
+    st = c.get("/api/state").json()
+    assert "fresh" in st and "alerts_ok" in st["fresh"]

@@ -52,6 +52,19 @@ CTX: dict[str, tuple[float, float, float]] = {}
 LASTC: dict[str, tuple[float, str, str]] = {}
 
 
+FRESH: dict = {"any": 0.0, "obl": {}}  # коли востаннє були повідомлення про цілі: загалом і по кожній області
+
+
+def _fresh(obs, ts: float) -> None:
+    from .geo import oblasts
+    FRESH["any"] = max(FRESH["any"], ts)
+    O = oblasts()
+    for r in obs.places:
+        o = O.of(r.place.lon, r.place.lat)
+        if o:
+            FRESH["obl"][o] = max(FRESH["obl"].get(o, 0), ts)
+
+
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool, typ_hint: str | None = None) -> None:
     """Одне повідомлення каналу може містити кілька цілей, ділимо на сегменти й кожен веде в трекер."""
     segs = parser.segments(text)
@@ -97,6 +110,8 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
                 brain.log_msg(ts, key, link, "launch", ltyp, obs.count, [{"r": "L", "n": s.name} for s in sites], None, seg)
             if all(p.role == "f" for p in obs.places):  # «пуски з X» без місця в Україні — це не трек
                 continue
+        if obs.places and obs.type and time.time() - ts < 3600:
+            _fresh(obs, ts)
         if obs.kind in ("track", "zone", "close", "filtered", "avia"):
             obs.raw = seg
             rec = trk.ingest(obs, key, ts, link)
@@ -270,6 +285,10 @@ def state() -> dict:
                            **({"dir": _dt[k]} if k in _dt else {})} for k, s in config.SOURCES.items()}
     snap["daily"] = daily.ready
     snap["pred_acc"] = brain.pred_acc()
+    _ws = webmon.state()
+    snap["fresh"] = {"any": int(FRESH["any"]), "obl": {k: int(v) for k, v in FRESH["obl"].items() if time.time() - v < 6 * 3600},
+                     "alerts": int(off.get("updated") or 0), "alerts_ok": bool(off.get("ok")),
+                     "live": _ws.get("live", 0), "channels": _ws.get("channels", 0)}
     snap["health"] = {
         "telegram": bool(config.TG_SESSION) or os.getenv("REPLAY") == "1" or webmon.state()["live"] > 0,
         "channels": webmon.state(),
@@ -491,7 +510,7 @@ def _client_ip(scope_client, headers) -> str | None:
 # ---------- захист (04.11, незалежна оцінка): ліміти на платні ендпоінти, службове лише для власника, заголовки безпеки
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
 RATE = {"/api/tts": (30, 60), "/api/stt": (6, 60), "/api/live": (8, 60), "/api/ask": (8, 60), "/api/radio": (8, 60),
-        "/api/tts/check": (3, 60), "/api/llm/check": (3, 60), "/api/llm/report": (6, 60)}
+        "/api/tts/check": (3, 60), "/api/brief": (6, 60), "/api/llm/check": (3, 60), "/api/llm/report": (6, 60)}
 _hits: dict = {}
 
 
@@ -621,6 +640,32 @@ async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: 
     since, home, ob = _live_args(t, obl, lat, lon)
     sc = scope if scope in ("region", "neighbors", "country") else "region"
     return await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc, sid[:40])
+
+
+@app.post("/api/brief")
+async def api_brief(req: Request) -> dict:
+    """Створити картку-зведення по області для поширення (без дому користувача)."""
+    from . import brief
+    try:
+        body = await req.json()
+    except Exception:  # noqa: BLE001
+        body = {}
+    obl = str(body.get("obl") or "")[:40]
+    if not obl:
+        return JSONResponse({"ok": False, "why": "obl"}, status_code=400)
+    b = brief.make(state(), obl)
+    return {"ok": True, "id": b["id"], "url": f"/b/{b['id']}"}
+
+
+@app.get("/b/{bid}")
+async def brief_page(bid: str, request: Request):
+    from fastapi.responses import HTMLResponse
+    from . import brief
+    b = brief.get(bid[:20])
+    if not b:
+        return HTMLResponse("<!doctype html><meta charset=utf-8><p style='font-family:system-ui'>Зведення не знайдено. <a href='/'>Жива мапа</a></p>", status_code=404)
+    base = f"{request.url.scheme}://{request.url.netloc}"
+    return HTMLResponse(brief.page(b, base), headers={"Cache-Control": "public, max-age=60"})
 
 
 @app.get("/api/llm")

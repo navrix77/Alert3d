@@ -656,3 +656,8 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .q2 em{font-style:normal;flex:1;min-width:0}
 .q2 span{min-width:110px;opacity:.65;font-size:12.5px}
 .q2 b.ok{color:#35D07F}.q2 b.mid{color:#FFB020}.q2 b.warn{color:#FF6B6B}
+
+/* свіжість даних у картці «Мій дім» (04.11) */
+.me .me-fresh{margin:6px 0 0;font-size:12.5px;line-height:1.35;color:var(--mute,#8a94a6)}
+.me .me-fresh.mid{color:#FFB020}.me .me-fresh.bad{color:#FF6B6B;font-weight:600}
+.me .me-share{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#dfe6f2;font-size:15px;line-height:28px;padding:0;cursor:pointer}

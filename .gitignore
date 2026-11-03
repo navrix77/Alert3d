@@ -26,3 +26,4 @@ data/selfcheck.json
 data/llm_usage.json
 data/fc_calib_live.json
 widget/src-tauri/Cargo.lock
+data/briefs.jsonl
