@@ -1311,3 +1311,17 @@ def test_oblast_adjective_list_is_not_a_route():
     # родовий міст лишається містами
     o = P.parse("Шахед з Донецька на Луганськ", "X")
     assert [r.place.name for r in o.places] == ["Донецьк", "Луганськ"]
+
+
+def test_ballistic_fast_target_and_false_places():
+    """03.11 журнал: «швидкісна (ціль) на X» — балістика (DN, Shturval_media); «Зеленський» ≠ Зелень;
+    «Воронєж» (РФ) ≠ Вороніж на Сумщині; реклама «Київський Іван» ≠ Київське, Іванів."""
+    o = P.parse("На Харківщині швидкісні в напрямку м. Харків, тривожаться 7 областей.", "DN")
+    assert o.type == "ballistic" and [r.place.name for r in o.places] == ["Харків"]
+    o = P.parse("Швидкісна на Одесу", "Shturval_media")
+    assert o.type == "ballistic" and [r.place.name for r in o.places] == ["Одеса"]
+    o = P.parse("⚠️ За інформацією розвідки, російські війська готуються до чергових ударів балістичними ракетами, — Зеленський.", "TRK")
+    assert o.places == []
+    assert P.parse("Воронєж загроза балістики", "SU").places == []
+    assert P.parse("Єдиний шлях, яким чином раніше усіх знати, що до нас летить балістика — слідкувати за Київським Іваном — @kyiv_vanek", "X").places == []
+    assert [r.place.name for r in P.parse("Балістика на Вороніж (Сумщина)", "X").places] == ["Вороніж"]
