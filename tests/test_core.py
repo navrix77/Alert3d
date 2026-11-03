@@ -1154,3 +1154,12 @@ def test_passed_place_is_position():
     o = P.parse("Пролетела Печенеги, курс на Шестаково⚠️", "TLK")
     roles = {r.place.name: r.role for r in o.places}
     assert roles.get("Печеніги") == "p" and roles.get("Шестакове") == "t"
+
+
+def test_sw_shell_no_duplicates():
+    """03.11: дубль у SHELL → cache.addAll відхиляє встановлення, служба не стартує, push мертвий."""
+    import re, pathlib
+    s = (pathlib.Path(__file__).parent.parent / "web" / "sw.js").read_text()
+    shell = re.findall(r"'(/[^']*)'", re.search(r"SHELL=\[(.*?)\]", s).group(1))
+    assert len(shell) == len(set(shell))
+    assert "addAll(SHELL)" not in s
