@@ -73,7 +73,7 @@
         gl_FragColor = vec4(v_col.rgb * a, a);
       } else {                                  // спрайт (3.0–3.4, дробова частина, крен) або його тінь (4)
         vec2 uv = vec2(v_c.x, -v_c.y) * 0.5 + 0.5;
-        vec4 t = texture2D(u_tex, uv);
+        vec4 t = texture2D(u_tex, uv, -0.7);  // зсув mip-рівня: різкіше при зменшенні (без «мила»)
         if (v_kind > 3.5 && v_kind < 4.5) {     // м'яка тінь на землі
           float sa = t.a * 0.4;
           for (int i = 0; i < 6; i++) { float an = float(i) * 1.0472; sa += texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.03).a * 0.1; }
@@ -190,7 +190,7 @@
       }
       gl.useProgram(this.p);
       gl.uniformMatrix4fv(this.u.m, false, M);
-      gl.uniform2f(this.u.vp, gl.drawingBufferWidth / devicePixelRatio, gl.drawingBufferHeight / devicePixelRatio);
+      { const pr = (this.map.getPixelRatio && this.map.getPixelRatio()) || devicePixelRatio; gl.uniform2f(this.u.vp, gl.drawingBufferWidth / pr, gl.drawingBufferHeight / pr); }
       gl.uniform1f(this.u.px, 1 / (512 * Math.pow(2, z)));
       gl.uniform1f(this.u.t, (performance.now() - this.t0) / 1000);
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.STENCIL_TEST); gl.enable(gl.BLEND);
