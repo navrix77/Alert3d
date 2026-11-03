@@ -319,7 +319,18 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
         else "\n\nНОВИЙ СЛУХАЧ: щойно увімкнув радіо, потрібне коротке актуальне зведення."
     res, by = (None, None)
     if llm is not None and llm.on:
-        res, by = await llm.call(RADIO_SYSTEM, ctx, RADIO_TOOL, max_tokens=500)
+        import hashlib
+        ck = hashlib.sha1(ctx.encode()).hexdigest()
+        hit = RADIO_CACHE.get(ck)
+        if hit and time.time() - hit[0] < 120:
+            res, by = hit[1], hit[2]  # той самий стан і та сама пам'ять — відповідь для іншого слухача без нового запиту
+        else:
+            res, by = await llm.call(RADIO_SYSTEM, ctx, RADIO_TOOL, max_tokens=500)
+            if res:
+                RADIO_CACHE[ck] = (time.time(), res, by)
+                if len(RADIO_CACHE) > 500:
+                    for k in list(RADIO_CACHE)[:250]:
+                        RADIO_CACHE.pop(k, None)
     if isinstance(res, dict) and res.get("action") == "silence" and said:
         return {"text": "", "speech": "", "by": by, "scope": scope, "quiet": True}
     if isinstance(res, dict) and res.get("action") == "speak" and (res.get("display_text") or res.get("speech_text")):
@@ -339,4 +350,5 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
             "review": [str(x)[:40] for x in (res or {}).get("pronunciation_review", [])][:5] if isinstance(res, dict) else []}
 
 
+RADIO_CACHE: dict = {}
 RADIO_MEM: dict = {}  # що «Радіо SKY» вже сказало для (охоплення, області): не повторювати незмінну обстановку

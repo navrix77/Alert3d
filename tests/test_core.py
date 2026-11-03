@@ -1582,3 +1582,22 @@ def test_scrub_track_ids():
     from app.live import scrub
     t = scrub("Ш-1023 курсом на Чугуїв, Х-101 і КН-23 (РБ-12).", {"Ш-1023": "шахед"})
     assert "Ш-1023" not in t and "РБ-12" not in t and "Х-101" in t and "КН-23" in t and t.startswith("шахед")
+
+
+def test_vote_cheap_first_and_cache():
+    import asyncio
+    from app import llm as L
+    m = L.LLM()
+    m.cli = object()
+    m.others = [("openai", "k", "", "gpt-4o-mini"), ("groq", "k", "", "gpt-oss"), ("mistral", "k", "", "small")]
+    m.key = ""
+    calls = []
+
+    async def one(cli, prov, *a, **k):
+        calls.append(prov[0])
+        return {"kind": "target", "type": "shahed", "to": ["Чугуїв"]}
+    m._one = one
+    v = asyncio.run(m.vote("S", "текст", {"name": "x"}))
+    assert set(calls) == {"groq", "mistral"} and len(v) == 2  # дешеві згодні — платну не питали
+    asyncio.run(m.vote("S", "текст", {"name": "x"}))
+    assert len(calls) == 2  # повтор того самого тексту — з кешу

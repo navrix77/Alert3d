@@ -23,6 +23,7 @@ LLM_SECOND_SHARE (0..1, за замовчуванням 0.2): частка по�
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -69,6 +70,10 @@ TOOL = {
         "required": ["kind", "type", "now", "to", "from"],
     },
 }
+
+# Відносна ціна запиту: 0 — безкоштовний ліміт, далі дорожчі. Змінюється LLM_COST_<NAME>.
+COST = {"groq": 0, "mistral": 0, "sambanova": 0, "gemini": 1, "openrouter": 2, "openai": 2, "moonshot": 2, "xai": 2, "anthropic": 3}
+COST.update({k: int(os.getenv(f"LLM_COST_{k.upper()}", v)) for k, v in COST.items()})
 
 # OpenAI-сумісні провайдери: (назва, змінні з ключем, базова адреса, модель за замовчуванням)
 PROVIDERS = [
@@ -119,7 +124,8 @@ class LLM:
         self.assist = self.mode != "off" and (self.mode == "assist" or os.getenv("LLM_ASSIST", "1").strip() != "0")
         self.used_p: dict[str, int] = {}
         self.err_by: dict[str, str] = {}   # остання помилка кожного провайдера (без ключів)
-        self.ok_by: dict[str, int] = {}    # скільки вдалих відповідей сьогодні
+        self.ok_by: dict[str, int] = {}
+        self._vcache: dict = {}            # хеш запиту → (час, голоси): ретрансляції того самого тексту    # скільки вдалих відповідей сьогодні
         self.off: dict[str, float] = {}    # провайдер → до якого часу не питати (немає кредитів, неправильний ключ/модель, ліміт)
         self._secrets = [self.key] + [o[1] for o in self.others]
         self.cli = None
@@ -231,7 +237,10 @@ class LLM:
 
     # ---------- єдиний виклик моделі (будь-який провайдер з ланцюжка), з інструментом або текстом, з картинкою або без
     def _chain(self) -> list[tuple]:
-        return ([("anthropic", self.key, "", self.model)] if self.key else []) + self.others
+        """Від найдешевшого до найдорожчого (власник 03.11: «максимально економити кошти, не в ущерб функціоналу»):
+        безкоштовні ліміти (Groq, Mistral, Gemini, SambaNova) першими, платні далі."""
+        ch = ([("anthropic", self.key, "", self.model)] if self.key else []) + self.others
+        return sorted(ch, key=lambda p_: COST.get(p_[0], 2))
 
     def _budget(self) -> bool:
         d = time.strftime("%Y-%m-%d")
@@ -310,6 +319,10 @@ class LLM:
             chain.append(p_)
         if not self.ensemble:
             chain = chain[:1]
+        ck = hashlib.sha1((system[:60] + "|" + user + "|" + (image or "")).encode()).hexdigest()
+        hit = self._vcache.get(ck)
+        if hit and time.time() - hit[0] < 1800:
+            return hit[1]  # те саме повідомлення з іншого каналу-ретранслятора — не платимо вдруге
         async def one(prov):
             if not self._budget_p(prov[0]):
                 return None
@@ -320,8 +333,18 @@ class LLM:
             except Exception as e:  # noqa: BLE001
                 self._fail(prov[0], e)
                 return None
-        res = await asyncio.gather(*(one(p_) for p_ in chain))
-        return {k: v for k, v in (r for r in res if r) if v}
+        # спершу дві найдешевші моделі; якщо вони згодні, решту не питаємо; якщо ні — питаємо всіх інших (суддя більшості)
+        first = await asyncio.gather(*(one(p_) for p_ in chain[:2]))
+        out = {k: v for k, v in (r for r in first if r) if v}
+        vals = list(out.values())
+        if len(chain) > 2 and not (len(vals) == 2 and _agree(vals[0], vals[1])):
+            more = await asyncio.gather(*(one(p_) for p_ in chain[2:]))
+            out |= {k: v for k, v in (r for r in more if r) if v}
+        if out:
+            self._vcache[ck] = (time.time(), out)
+            if len(self._vcache) > 3000:
+                self._vcache = dict(list(self._vcache.items())[-1500:])
+        return out
 
     def _budget_p(self, prov: str) -> bool:
         d = time.strftime("%Y-%m-%d")
@@ -431,6 +454,20 @@ class LLM:
                     log.exception("llm job")
                 item["ms"] = int((time.time() - t0) * 1000)
                 await asyncio.sleep(0.3)
+
+
+def _agree(a, b) -> bool:
+    """Дві відповіді по суті однакові (тоді третя модель не потрібна)."""
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return False
+    if "same" in a or "same" in b:
+        return bool(a.get("same")) == bool(b.get("same"))
+    if a.get("kind") != b.get("kind") or a.get("type") != b.get("type"):
+        return False
+    from .geo import phon
+    pa = {phon(x)[:6] for f in ("now", "to") for x in (a.get(f) or []) if isinstance(x, str)}
+    pb = {phon(x)[:6] for f in ("now", "to") for x in (b.get(f) or []) if isinstance(x, str)}
+    return pa == pb
 
 
 def consensus(results: list[dict]) -> tuple[dict, float]:
