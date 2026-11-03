@@ -246,16 +246,25 @@
     g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(g).connect(dest || RA.master); o.start(t0); o.stop(t0 + dur + 0.05);
   }
-  function bell(freq, t0, vol) { tone(freq, t0, 1.1, vol, 'sine'); tone(freq * 2.01, t0, 0.6, vol * 0.35, 'sine'); tone(freq * 3.02, t0, 0.3, vol * 0.12, 'sine'); }
+  // сучасні короткі «стінги» радіо (04.11, друга версія): чисті синтетичні звуки 0.2–0.6 с, без «дзвіночків» і без музичної підкладки
+  function sweep(t0, f0, f1, dur, vol) {  // шум, що проноситься («вжух»): фільтр ковзає вгору
+    const c = raCtx(), n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let k = 0; k < n; k++) d[k] = (Math.random() * 2 - 1) * (1 - k / n);
+    const src = c.createBufferSource(); src.buffer = buf; const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.4;
+    bp.frequency.setValueAtTime(f0, t0); bp.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(bp).connect(g).connect(RA.master); src.start(t0); src.stop(t0 + dur + 0.02);
+  }
+  function blip(freq, t0, dur, vol) { tone(freq, t0, dur, vol, 'square'); tone(freq * 2, t0, dur * 0.7, vol * 0.25, 'sine'); }
   const SND = {
-    ident() { try { const t = raCtx().currentTime + 0.05; [523.25, 659.25, 783.99, 1046.5].forEach((f, k) => bell(f, t + k * 0.16, 0.16)); } catch (e) {} return wait(1100); },
-    news() { try { const t = raCtx().currentTime + 0.05; bell(880, t, 0.14); bell(659.25, t + 0.18, 0.14); } catch (e) {} return wait(650); },
-    calm() { try { const t = raCtx().currentTime + 0.05; bell(587.33, t, 0.08); } catch (e) {} return wait(450); },
-    urgent() { try { const t = raCtx().currentTime + 0.05; for (let k = 0; k < 3; k++) { tone(740, t + k * 0.32, 0.22, 0.2, 'triangle'); tone(554, t + k * 0.32 + 0.11, 0.18, 0.14, 'triangle'); } } catch (e) {} return wait(1050); },
+    ident() { try { const t = raCtx().currentTime + 0.03; sweep(t, 300, 4200, 0.45, 0.22); blip(1046.5, t + 0.38, 0.09, 0.07); blip(1567.98, t + 0.48, 0.14, 0.08); } catch (e) {} return wait(750); },
+    news() { try { const t = raCtx().currentTime + 0.03; blip(1318.5, t, 0.07, 0.07); blip(1760, t + 0.09, 0.11, 0.08); } catch (e) {} return wait(320); },
+    calm() { try { const t = raCtx().currentTime + 0.03; blip(1174.66, t, 0.08, 0.05); } catch (e) {} return wait(220); },
+    urgent() { try { const t = raCtx().currentTime + 0.03; for (let k = 0; k < 3; k++) { blip(988, t + k * 0.2, 0.1, 0.09); blip(740, t + k * 0.2 + 0.1, 0.08, 0.08); } } catch (e) {} return wait(700); },
   };
-  // фонова підкладка: тихі акорди (ля мінор → фа → до → соль), по 8 с; під час голосу стихає
+  // фонова музика — лише якщо власник її ввімкне (LS radio_bed=1); за замовчуванням вимкнена (04.11: «звуки й музика — погано»)
   function bedStart() {
-    if (RA.bed || LS.get('radio_bed') === '0') return;
+    if (RA.bed || LS.get('radio_bed') !== '1') return;
     try {
       const c = raCtx(); RA.bedGain = c.createGain(); RA.bedGain.gain.value = 0.0001; RA.bedGain.connect(RA.master);
       const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.connect(RA.bedGain);
@@ -312,7 +321,7 @@
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
     radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0;
     bedStart(); await SND.ident();
-    duck(true); await speak('Скай Радіо. Розповім, що відбувається біля вас, і скажу, щойно щось зміниться.'); duck(false);
+    duck(true); await speak('Скай Радіо. Слідкую за небом біля вас.'); duck(false);
     await radioIssue('region');          // спершу свій район
     await radioIssue('country');         // далі коротко по Україні
     radioT = setInterval(radioIssue, 40000);
