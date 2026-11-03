@@ -34,6 +34,7 @@ from .ru_strikes import RuStrikes
 from .strikes_ua import UaStrikes
 from .forecast import forecast as make_forecast
 from . import lan_tls, occupied
+from .llm import LLM
 
 brain = Brain()
 pushsvc = Push()
@@ -155,6 +156,7 @@ def raion_centroid(n: str):
 STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "tracker_state.pkl"
 FUSION_FILE = Path(__file__).resolve().parent.parent / "data" / "fusion.json"
 SELFCHECK_FILE = Path(__file__).resolve().parent.parent / "data" / "selfcheck.json"
+LLMX = LLM()
 RESTORED: dict[str, float] = {}  # посилання на пости, вже враховані у відновленому стані трекера
 
 
@@ -168,6 +170,11 @@ def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
     tracker.learn = not again
     feed(tracker, text, key, ts, link, log=not again)
     tracker.learn = True
+    if not again:
+        try:
+            LLMX.consider(parser, text, key, ts, link)  # сумнівні — моделі (поки лише в журнал, мапу не змінює)
+        except Exception:  # noqa: BLE001
+            log.exception("llm")
 
 
 async def learn_history() -> None:
@@ -403,6 +410,7 @@ async def lifespan(app: FastAPI):
                 await asyncio.to_thread(brain.snapshot)
         tasks.append(asyncio.create_task(_snap()))
     tasks.append(asyncio.create_task(LEARNER.run()))
+    tasks.append(asyncio.create_task(LLMX.run()))
 
     async def _tts_warm():  # українська озвучка: рушій і голос «Лада» готуються у фоні одразу після старту
         from . import tts
@@ -461,6 +469,12 @@ async def count_visits(request, call_next):
         except Exception:  # noqa: BLE001
             pass
     return resp
+
+
+@app.get("/api/llm")
+async def api_llm() -> dict:
+    """Стан «другого парсера» (без ключа й без текстів повідомлень)."""
+    return LLMX.stats()
 
 
 @app.get("/api/visits")

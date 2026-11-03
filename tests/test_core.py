@@ -1415,3 +1415,18 @@ def test_oblast_summary_list_is_positions_not_route():
     segs = P.segments("11 Ударных БпЛА в области. Безлюдовка, Довжик, Первомайский, Дружба, Шевченково.")
     assert len(segs) == 5
     assert all(P.parse(s, "R").places[0].role == "p" for s in segs)
+
+
+def test_short_reaktyv_is_jet():
+    """03.11 (знайшов відбір для моделі): «1 реактив кружляє над Дніпром» (MK, SU, sumygo) не мав типу — 22 повідомлення."""
+    assert P.parse("1 реактив кружляє над Дніпром.", "MK").type == "jet"
+    assert P.parse("2 реактиви на Полтаву", "MK").type == "jet"
+
+
+def test_llm_disabled_without_key(monkeypatch):
+    """Без ANTHROPIC_API_KEY «другий парсер» вимкнено, сервер працює як раніше."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    from app.llm import LLM
+    m = LLM()
+    assert not m.on and m.stats()["mode"] == "off"
+    assert LLM.suspicious(P, "1 реактив на Шпилівку", "SU") is None
