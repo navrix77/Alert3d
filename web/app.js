@@ -56,11 +56,11 @@ function liteMode(fallback){
 // повторний запуск протягом 5 хв — камера там, де її закрили, без прольоту
 const UA_BOUNDS=[[22.1,44.2],[40.3,52.45]];
 const REDUCE=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){return false;}})();
-const LASTCAM=(()=>{try{const c=JSON.parse(localStorage.getItem('cam_last')||'null');return c&&Date.now()-c.t<5*60*1000?c:null;}catch(e){return null;}})();
+const LASTCAM=null; // 03.11: старт завжди однаковий (2D по центру → 3D), без «там, де закрили»
 let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:LASTCAM?LASTCAM.c:[31.2,48.4],zoom:LASTCAM?LASTCAM.z:(innerWidth<640?3.9:5.2),pitch:LASTCAM?LASTCAM.p:0,bearing:0,attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[8,36],[56,62]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
 // центр країни між верхніми плашками й нижньою панеллю; цю ж камеру тримає й перехід у 3D (03.11: «не по центру» — камера їхала на дім, Харків біля краю)
 let START_CAM=null;
-if(!LASTCAM){try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.16),bottom:Math.round(innerHeight*0.24),left:12,right:12}});if(c){START_CAM={center:c.center,zoom:c.zoom};map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}}catch(e){}}
+if(!LASTCAM){try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.13),bottom:Math.round(innerHeight*0.13),left:12,right:12}});if(c){START_CAM={center:c.center,zoom:c.zoom};map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}}catch(e){}}
 map.on('moveend',()=>{try{const c=map.getCenter();localStorage.setItem('cam_last',JSON.stringify({c:[c.lng,c.lat],z:map.getZoom(),p:map.getPitch(),t:Date.now()}));}catch(e){}});
 // спливаючі вікна на мапі завжди цілком на екрані: після відкриття зсуваємо мапу, якщо вікно вилазить за край (03.11: «обрізає вікно»)
 try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo=function(m){const r=_add.call(this,m);const pp=this;
@@ -306,8 +306,10 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const mob=innerWidth<640;
   // кінцевий стан: 3D (pitch 45–55°), північ угорі, zoom +0.7 від стартового (край країни ще в кадрі), центр — дім, якщо він є
   // кінцевий стан: той самий центр країни, лише нахил і трохи ближче (+0.3), північ угорі; на дім камера НЕ їде, Україна лишається по центру
+  // кінцевий стан (03.11): 3D з наближенням до дому; якщо дому немає — до геопозиції (GEOPOS, визначається під час паузи); інакше центр країни
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
-  const cam={center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};
+  const camFor=()=>{const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
+  const cam=camFor();
   const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // повторний запуск протягом 5 хв: камера вже там, де її закрили; без прольоту
@@ -318,8 +320,12 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   // поки летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
   const wait=Math.max(0,2300-(Date.now()-introT0));   // логотип встигає зіграти
-  setTimeout(()=>{el&&el.classList.add('out');map.easeTo({...cam,duration:1400,easing:t=>1-Math.pow(1-t,3),essential:true});window.__introAt=Date.now();tilt=true;
-    setTimeout(finish,1500);setTimeout(()=>el&&el.remove(),1400);},wait);}
+  // без дому: за час паузи питаємо геопозицію (тихо, 4 с), щоб було куди наближатися
+  if(!home&&navigator.geolocation){try{navigator.geolocation.getCurrentPosition(p=>{window.__GEOPOS=[p.coords.longitude,p.coords.latitude];},()=>{},{enableHighAccuracy:false,timeout:4000,maximumAge:600000});}catch(e){}}
+  setTimeout(()=>{el&&el.classList.add('out');setTimeout(()=>el&&el.remove(),1400);document.body.classList.remove('intro');
+    // 2D по центру стоїть 5 с, потім плавний переліт у 3D з наближенням (2.4 с)
+    setTimeout(()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
+      map.flyTo({...camFor(),duration:2400,curve:1.25,essential:true});window.__introAt=Date.now();tilt=true;setTimeout(finish,2500);},5000);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').reduce((a,t)=>a+(t.count||1),0);// так само, як лічильники вгорі: з урахуванням ×N у групах
