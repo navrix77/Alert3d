@@ -69,7 +69,7 @@
         gl_FragColor = vec4(v_col.rgb * a, a);
       } else if (v_kind < 2.5) {                // кільце вибору
         if (r > 1.0) discard;
-        float a = smoothstep(0.045, 0.0, abs(r - 0.88)) * v_col.a;
+        float a = smoothstep(0.08, 0.0, abs(r - 0.86)) * v_col.a;
         gl_FragColor = vec4(v_col.rgb * a, a);
       } else {                                  // спрайт (3.0–3.4, дробова частина, крен) або його тінь (4)
         vec2 uv = vec2(v_c.x, -v_c.y) * 0.5 + 0.5;
@@ -91,14 +91,14 @@
         // чіткість на будь-якій підкладці: тонкий темний контур по силуету + зовнішній ореол кольору типу
         float o1 = 0.0, o2 = 0.0;
         for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236; vec2 dv = vec2(cos(an), sin(an));
-          o1 = max(o1, texture2D(u_tex, uv + dv * 0.014).a); o2 = max(o2, texture2D(u_tex, uv + dv * 0.055).a); }
+          o1 = max(o1, texture2D(u_tex, uv + dv * 0.022).a); o2 = max(o2, texture2D(u_tex, uv + dv * 0.055).a); }
         float outl = clamp(o1 - t.a, 0.0, 1.0);
         float halo = 0.0 * o2;
         vec3 body = t.rgb * (0.86 + 0.22 * dif) + vec3(spec * 0.12);   // текстура вже з реалістичним світлом: без «пластику»
         // тонкий світлий край: на темному супутнику вночі силует не зникає; тінь під ціллю тримає контраст на світлих полях
         // тонкий контур кольору типу: читається на червоній заливці тривоги, на полі й уночі; тип видно з першого погляду
-        float a = max(t.a, outl * 0.8);
-        gl_FragColor = vec4(clamp(body * 1.1, 0.0, 1.0) * t.a + v_col.rgb * outl * 0.8, a) * v_col.a;
+        float a = max(t.a, outl * 0.9);
+        gl_FragColor = vec4(clamp(body * 1.1, 0.0, 1.0) * t.a + v_col.rgb * outl * 0.9, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -157,8 +157,7 @@
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
-      // напіврозмір спрайта, px. 03.11 (ревізія візуалу): −25% проти попереднього, щоб моделі не перекривали назви міст; мінімум 7 px на масштабі країни
-      const spr = (z < 6 ? Math.max(8, z * 2.2 - 0.5) : Math.min(38, 9 + z * 2.6)) * 0.75;
+      const spr = z < 6 ? Math.max(8, z * 2.2 - 0.5) : Math.min(38, 9 + z * 2.6);  // країна: компактно (z4 ≈ 23 px), область і місто: крупно (z7 ≈ 54 px)  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
       const glow = [], top = [];
       const day = !!window.FXDAY;
       if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
@@ -184,9 +183,9 @@
         const T = f.tail || [], N = T.length;
         for (let i = 0; i < N; i++) { const k = 1 - i / N, tm = mc(T[i]);
           glow.push([tm[0], tm[1], spr * (0.2 + 0.4 * k), 0, [c[0], c[1], c[2], 0.35 * k * k * a], 0]); }
-        // ореолу кольору типу навколо кожної цілі більше немає: без світіння, колір лишається в тонкому контурі силуету
+        glow.push([m[0], m[1], spr * (z < 6 ? 1.1 : 1.5), 0, [c[0], c[1], c[2], 0.16 * a], 0]);
         if (f.thr) glow.push([m[0], m[1], spr * (z < 6 ? 3 : 5.5), 0, [0.85, 0.95, 1, 0.95], 1]);  // загроза: біла хвиля, не червона (червона = тривога на мапі)
-        if (f.sel) top.push([m[0], m[1], spr * 1.9, 0, [1, 1, 1, 0.85], 2, 0, 0]);  // тонке кільце, лише у вибраної
+        if (f.sel) top.push([m[0], m[1], spr * 1.7, 0, [1, 1, 1, 0.9], 2, 0, 0]);
         f._m = m;
       }
       gl.useProgram(this.p);
@@ -206,8 +205,8 @@
         for (const f of L) { if (!this.tex[f.type] || !f._m) continue; const c = f.col, a = f.weak ? 0.75 : 1;
           // місце лише оцінене (канали не назвали, де ціль зараз): без суцільної «шайби», лише тонке біле кільце,
           // сам силует напівпрозорий. 03.11: шахед «у місті», хоча про місто ніхто не писав
-          // білих кілець навколо цілей більше немає (03.11, ревізія візуалу): кільце лише у вибраної. Оцінене місце видно по напівпрозорому силуету
-          pk.push([f._m[0], f._m[1], spr * 1.35, 0, [0.0, 0.0, 0.0, (f.est ? 0.4 : 0.55) * a], 0]); }
+          if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.4, 0, [0.0, 0.0, 0.0, 0.45], 0]); pk.push([f._m[0], f._m[1], spr * 1.2, 0, [1, 1, 1, 0.6], 2, 0, 0]); continue; }  // 03.11: напівпрозорий FPV на супутнику не було видно
+          pk.push([f._m[0], f._m[1], spr * 1.45, 0, [0.0, 0.0, 0.0, 0.62 * a], 0]); }
         if (pk.length) this.draw(gl, this.quads(pk), pk.length); }
       const HL = window.FXHL && performance.now() < window.FXHL.until ? window.FXHL : null;
       if (HL) { const ph = (performance.now() - HL.t0) / 1000, fade = Math.min(1, (HL.until - performance.now()) / 600);
