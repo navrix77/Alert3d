@@ -946,7 +946,7 @@ async function webPushSync(loud){
       if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');wpStatus(null);return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
     // обрані області й громади (явно, не автоматична «область дому») — сервер шле по них зведення навіть із закритим застосунком
-    const MZ=myZones(),zones=MZ.auto?null:{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)};
+    const MZ=myZones(),zones=(MZ.obl&&MZ.obl.length)||(MZ.hrom&&MZ.hrom.length)?{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)}:null;// без явного вибору — область дому
     const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false)+'|'+JSON.stringify(zones);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
     if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false,zones})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
@@ -959,6 +959,31 @@ function wpStatus(sub){const row=$('#st-wp-row');if(!row)return;row.hidden=!sub;
     const j=r?await r.json().catch(()=>({})):{};toast(r&&r.ok?'Надіслано. Заблокуйте екран: сповіщення має прийти за кілька секунд':'Не вдалося: '+(j.why||'немає звʼязку'));};}
 if($('#st-pre')){$('#st-pre').checked=PREF.pre!==false;$('#st-pre').onchange=e=>{PREF.pre=e.target.checked;savePref();webPushSync(false);};}
 window.webPushSync=webPushSync;setTimeout(()=>webPushSync(false),4000);
+/* одне натискання замість трьох кроків: картка «Увімкнути сповіщення» (iPhone дозволяє вмикати лише дотиком користувача) */
+function pushCard(){if(document.getElementById('push-card'))return;
+  const ios=/iPhone|iPad/.test(navigator.userAgent),standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  const can='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+  let dismissed=0;try{dismissed=+localStorage.getItem('push_card_x')||0;}catch(e){}
+  if(Date.now()-dismissed<3*864e5)return;
+  let txt,btn;
+  if(can&&Notification.permission==='granted'&&PREF.sys)return;
+  if(can&&Notification.permission==='denied')return;
+  if(!can&&ios&&!standalone){txt='Щоб SKY попереджав навіть із закритим телефоном: «Поділитися» → «На початковий екран», і відкрийте SKY звідти.';btn=null;}
+  else if(can){txt=home?'Попереджати про загрози для вашого дому й області навіть із закритим застосунком?':'Позначте свій дім, і SKY попереджатиме про загрози для нього навіть із закритим застосунком.';btn=home?'Увімкнути сповіщення':'Позначити дім';}
+  else return;
+  const el=document.createElement('div');el.id='push-card';el.className='push-card';
+  el.innerHTML='<b>🔔 Сповіщення</b><span>'+esc(txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>';
+  document.body.appendChild(el);
+  $('#pc-x').onclick=()=>{try{localStorage.setItem('push_card_x',Date.now());}catch(e){}el.remove();};
+  const on=$('#pc-on');if(on)on.onclick=async()=>{
+    if(!home){el.remove();armHome();return;}
+    const r=await Notification.requestPermission();if(r!=='granted'){toast('Телефон не дозволив сповіщення. Увімкніть їх у налаштуваннях телефону для SKY');el.remove();return;}
+    PREF.sys=true;savePref();if($('#st-sys'))$('#st-sys').checked=true;await webPushSync(true);el.remove();
+    // одразу перевіряємо доставку: тестове сповіщення
+    try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+      if(sub)fetch('/api/webpush/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});}catch(e){}
+    toast('Готово. Зараз прийде тестове сповіщення');};}
+setTimeout(pushCard,6000);
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
 $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};
