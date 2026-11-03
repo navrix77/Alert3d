@@ -597,3 +597,6 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .home-pop .maplibregl-popup-content{background:rgba(12,15,22,.92);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .home-pop .maplibregl-popup-tip{border-top-color:rgba(12,15,22,.92)!important}
 #st-home-del[data-ask]{background:#FF4D57;color:#fff;border-color:#FF4D57}
+
+/* вибраний тип у лічильниках: решта тьмяніє на 3.5 с */
+.cnt{transition:opacity .25s}.cnt.hl-off{opacity:.3}

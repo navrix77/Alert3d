@@ -548,7 +548,11 @@ const CNTI={};
 const CNT_LBL={lancet:'«ланцети»',shahed:'шахеди',jet:'реактивні',cruise:'крилаті',ballistic:'балістика',molniya:'«молнії»',kab:'КАБи',geran5:'Герань-5',banderol:'бандеролі',rszv:'РСЗВ',fpv:'FPV',fpvf:'FPV-оптоволокно',recon:'розвідники'};
 // натиск на лічильник, показати всі цілі цього типу
 function focusType(t){const ps=SNAP.tracks.filter(x=>x.status==='active'&&x.type===t).map(x=>(DISP.get(x.id)||{p:[x.lon,x.lat]}).p);if(!ps.length)return;
-  const b=ps.reduce((a,p)=>a.extend(p),new maplibregl.LngLatBounds(ps[0],ps[0]));map.fitBounds(b,{padding:{top:140,bottom:180,left:60,right:60},maxZoom:9,duration:900});toast(TYPE_NAME[t]+': '+ps.length);}
+  const b=ps.reduce((a,p)=>a.extend(p),new maplibregl.LngLatBounds(ps[0],ps[0]));map.fitBounds(b,{padding:{top:140,bottom:180,left:60,right:60},maxZoom:9,duration:900});toast(TYPE_NAME[t]+': '+ps.length);
+  // підсвітка на 3.5 с: цілі цього типу пульсують кільцями, решта тьмяніє; лічильник виділено
+  window.FXHL={type:t,t0:performance.now(),until:performance.now()+3500};map.triggerRepaint();
+  document.querySelectorAll('#counters .cnt').forEach(c=>c.classList.toggle('hl-off',c.title!==TYPE_NAME[t]));clearTimeout(focusType.t);
+  focusType.t=setTimeout(()=>{document.querySelectorAll('#counters .cnt').forEach(c=>c.classList.remove('hl-off'));map.triggerRepaint();},3500);}
 function renderCounters(){
   const act=SNAP.tracks.filter(t=>t.status==='active');const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+(t.count||1));
   const order=['shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','lancet','fpv','fpvf'];

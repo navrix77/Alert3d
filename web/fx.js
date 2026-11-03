@@ -206,6 +206,14 @@
           if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.2, 0, [1, 1, 1, 0.3], 2, 0, 0]); continue; }
           pk.push([f._m[0], f._m[1], spr * 1.25, 0, [0.0, 0.0, 0.0, 0.42 * a], 0]); }
         if (pk.length) this.draw(gl, this.quads(pk), pk.length); }
+      const HL = window.FXHL && performance.now() < window.FXHL.until ? window.FXHL : null;
+      if (HL) { const ph = (performance.now() - HL.t0) / 1000, fade = Math.min(1, (HL.until - performance.now()) / 600);
+        const hr = [];
+        for (const f of L) if (f.type === HL.type && f._m) { const c = f.col;
+          for (let k = 0; k < 2; k++) { const u = (ph * 0.9 + k * 0.5) % 1;   // дві хвилі, що розходяться від цілі
+            hr.push([f._m[0], f._m[1], spr * (1.2 + 2.2 * u), 0, [c[0], c[1], c[2], (1 - u) * 0.95 * fade], 2, 0, 0]); }
+          hr.push([f._m[0], f._m[1], spr * 1.25, 0, [1, 1, 1, 0.9 * fade], 2, 0, 0]); }
+        if (hr.length) this.draw(gl, this.quads(hr), hr.length); }
       for (const f of L) {
         const tx = this.tex[f.type]; if (!tx) continue;
         gl.bindTexture(gl.TEXTURE_2D, tx);
@@ -213,14 +221,14 @@
         const ph = ((f.p[0] * 131.7 + f.p[1] * 71.3) % 6.283 + 6.283) % 6.283, tt = (performance.now() - this.t0) / 1000;
         const sw = Math.sin(tt * 0.55 + ph), alt = Math.sin(tt * 0.37 + ph * 1.7);
         const fast = f.type === 'ballistic' || f.type === 'cruise';
-        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = f.est ? 0.45 : f.weak ? 0.8 : 1, c = f.col;
+        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.45 : f.weak ? 0.8 : 1) * (HL && f.type !== HL.type ? 0.22 : 1), c = f.col;
         const bank = Math.max(-1, Math.min(1, Math.cos(tt * 0.55 + ph) * 0.9));
         const sz = spr * (1 + 0.035 * alt), sh = spr * (0.22 + 0.06 * alt);
         const rc = [Math.min(1, c[0] * 1.15 + 0.15), Math.min(1, c[1] * 1.15 + 0.15), Math.min(1, c[2] * 1.15 + 0.15), a];
         const q = [[f._m[0], f._m[1], sz * 0.97, r, [1, 1, 1, a], 4, 0, 0, sh * 0.7, sh],
                    [f._m[0], f._m[1], sz, r, rc, 3 + (bank + 1) / 2 * 0.4]];
         this.draw(gl, this.quads(q), 2);
-        if (f.type === 'jet') { // язик полум'я позаду сопла (сопло ≈ 0.88 напіврозміру від центру)
+        if (f.type === 'jet' && !(HL && HL.type !== 'jet')) { // язик полум'я позаду сопла (сопло ≈ 0.88 напіврозміру від центру)
           const fs = sz * 0.85, back = sz * 0.86 + fs * 0.95, seed = ((f.p[0] * 97 + f.p[1] * 31) % 1 + 1) % 1;
           const nb = sz * 0.9, flick = 0.55 + 0.25 * Math.sin(tt * 29 + seed * 40) * Math.sin(tt * 13 + seed * 9);
           fl.push([f._m[0], f._m[1], sz * 0.55, r, [1, 0.45, 0.12, 0.55 * flick], 0, 0, 0, -Math.sin(r) * nb, Math.cos(r) * nb]); // відсвіт від сопла
