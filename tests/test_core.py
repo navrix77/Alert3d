@@ -1430,3 +1430,19 @@ def test_llm_disabled_without_key(monkeypatch):
     m = LLM()
     assert not m.on and m.stats()["mode"] == "off"
     assert LLM.suspicious(P, "1 реактив на Шпилівку", "SU") is None
+
+
+def test_secrets_roundtrip_and_merge(tmp_path, monkeypatch):
+    """Ключі через GitHub: шифр публічним ключем сервера → розшифрування лише сервером → злиття в .env (без втрати інших рядків)."""
+    monkeypatch.setenv("ENV_KEY_FILE", str(tmp_path / "k.pem"))
+    from app import secrets_sync as S
+    blob = S.encrypt(S.public_pem(), "ANTHROPIC_API_KEY=test-a\ngroq=test-g\n# коментар\n")
+    assert "test-a" not in blob
+    new = S.parse_env(S.decrypt(blob))
+    assert new == {"ANTHROPIC_API_KEY": "test-a", "GROQ_API_KEY": "test-g"}
+    env = tmp_path / ".env"
+    env.write_text("TG_SESSION=x\nANTHROPIC_API_KEY=old\n")
+    ch = S.merge(env, new)
+    txt = env.read_text()
+    assert "TG_SESSION=x" in txt and "ANTHROPIC_API_KEY=test-a" in txt and "old" not in txt and "LLM_MODE=shadow" in txt
+    assert set(ch) >= {"ANTHROPIC_API_KEY", "GROQ_API_KEY"}

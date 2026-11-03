@@ -156,6 +156,11 @@ def raion_centroid(n: str):
 STATE_FILE = Path(__file__).resolve().parent.parent / "data" / "tracker_state.pkl"
 FUSION_FILE = Path(__file__).resolve().parent.parent / "data" / "fusion.json"
 SELFCHECK_FILE = Path(__file__).resolve().parent.parent / "data" / "selfcheck.json"
+try:  # ключі, передані власником через GitHub (зашифровано для цього сервера) — до створення LLM
+    from . import secrets_sync
+    secrets_sync.apply_pending()
+except Exception:  # noqa: BLE001
+    logging.getLogger("secrets").exception("apply_pending")
 LLMX = LLM()
 RESTORED: dict[str, float] = {}  # посилання на пости, вже враховані у відновленому стані трекера
 
@@ -469,6 +474,14 @@ async def count_visits(request, call_next):
         except Exception:  # noqa: BLE001
             pass
     return resp
+
+
+@app.get("/api/admin/envkey")
+async def api_envkey():
+    """ПУБЛІЧНИЙ ключ сервера: ним дія GitHub шифрує ключі власника (розшифрувати може лише цей сервер)."""
+    from fastapi.responses import PlainTextResponse
+    from . import secrets_sync
+    return PlainTextResponse(secrets_sync.public_pem())
 
 
 @app.get("/api/llm")
