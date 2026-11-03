@@ -69,7 +69,8 @@ TOOL = {
 # OpenAI-сумісні провайдери: (назва, змінні з ключем, базова адреса, модель за замовчуванням)
 PROVIDERS = [
     ("openrouter", ("OPENROUTER_API_KEY",), "https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
-    ("groq", ("GROQ_API_KEY", "groq"), "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    ("groq", ("GROQ_API_KEY", "groq", "GROQ", "GROK", "grok"), "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile"),
+    ("xai", ("XAI_API_KEY", "GROK", "grok", "GROQ", "groq"), "https://api.x.ai/v1", "grok-3-mini"),
     ("openai", ("OPENAI_API_KEY",), "https://api.openai.com/v1", "gpt-4o-mini"),
     ("gemini", ("GEMINI_API_KEY",), "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.0-flash"),
     ("mistral", ("MISTRAL_API_KEY",), "https://api.mistral.ai/v1", "mistral-small-latest"),
@@ -81,7 +82,13 @@ PROVIDERS = [
 def _others() -> list[tuple[str, str, str, str]]:
     out = []
     for name, envs, base, model in PROVIDERS:
-        key = next((os.getenv(e, "").strip() for e in envs if os.getenv(e, "").strip()), "")
+        # «GROK»/«groq» у файлі власника: Groq (ключ gsk_…) чи xAI Grok (ключ xai-…) — розрізняємо за префіксом
+        keys = [os.getenv(e, "").strip() for e in envs if os.getenv(e, "").strip()]
+        if name == "groq":
+            keys = [k for k in keys if not k.startswith("xai-")]
+        if name == "xai":
+            keys = [k for k in keys if not k.startswith("gsk_")]
+        key = keys[0] if keys else ""
         if key:
             out.append((name, key, base, os.getenv(f"LLM_{name.upper()}_MODEL", model).strip()))
     return out
