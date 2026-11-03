@@ -615,6 +615,15 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .me .bal-btn{margin-top:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:6px 12px;font:600 13px inherit;font-family:inherit}
 /* ШІ: пояснення ситуації (03.11) */
 .me .ai-box{margin-top:10px}
+/* один ряд дій у картці «Мій дім» (03.11, варіант А): ✦ Що зараз? · ● Ефір · 📻 */
+.me .ai-row{display:flex;gap:8px;align-items:center}
+.me .ai-row .ai-ask{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me .ai-row #live-btn,.me .ai-row #radio-btn{position:static!important;box-shadow:none!important;backdrop-filter:none;-webkit-backdrop-filter:none}
+.me .ai-row #live-btn{flex:none;border-radius:999px;padding:7px 13px;font:700 13px var(--f);background:rgba(255,77,94,.14);border:1px solid rgba(255,120,130,.5);gap:7px}
+.me .ai-row #live-btn small{display:none}
+.me .ai-row #live-btn.new{border-color:#FFB020}
+.me .ai-row #radio-btn{flex:none;width:36px;height:36px;font-size:17px;line-height:34px;margin-left:auto}
+.me .ai-row .ai-ask[hidden]+#live-btn{margin-right:auto}
 .me .ai-ask{background:rgba(140,120,255,.16);border:1px solid rgba(160,140,255,.45);color:#E8E4FF;border-radius:999px;padding:7px 12px;font:600 13px inherit;font-family:inherit}
 .me .ai-ans{margin-top:8px;font-size:13.5px;line-height:1.45}
 .me .ai-ans .ai-note{display:block;opacity:.6;font-size:11.5px;margin-top:4px}

@@ -258,10 +258,14 @@
   const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.textContent = '📻'; rbtn.setAttribute('aria-label', radioOn ? 'Радіо в ефірі, вимкнути' : 'Увімкнути радіо'); };
   rshow(); document.body.appendChild(rbtn);
   // під рядком лічильників цілей (він може перенестись у два рядки), щоб нічого не перекривати
-  function place() { const c = document.getElementById('counters'); const b = c && c.getBoundingClientRect();
-    const y = b && b.height ? Math.round(b.bottom + 8) : 60; rbtn.style.top = y + 'px'; btn.style.top = (y + 48) + 'px'; }
-  try { new ResizeObserver(place).observe(document.getElementById('counters')); } catch (e) {}
-  addEventListener('resize', place); setInterval(place, 3000); place();
+  // варіант А (власник 03.11): Ефір і Радіо в одному ряду з «Що зараз?» у картці «Мій дім»; без картки — зліва вгорі
+  const row = document.getElementById('ai-row');
+  if (row) { row.appendChild(btn); row.appendChild(rbtn); }
+  else {
+    const place = () => { const c = document.getElementById('counters'); const b = c && c.getBoundingClientRect();
+      const y = b && b.height ? Math.round(b.bottom + 8) : 60; rbtn.style.top = y + 'px'; btn.style.top = (y + 48) + 'px'; };
+    addEventListener('resize', place); setInterval(place, 3000); place();
+  }
   const rsay = () => {};
   rbtn.onclick = async () => {
     radioOn = !radioOn; rshow();

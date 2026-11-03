@@ -1322,7 +1322,7 @@ setInterval(()=>{
     seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;PREF.radius=+b.dataset.v;savePref();upd();syncMe();FOL.fired.clear();toast('Радіус '+PREF.radius+' км');};}
   if(PREF.follow)followOn();}
 /* ---------- ШІ: «Що зараз відбувається?» для області дому (03.11) ---------- */
-fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const box=$('#ai-box');if(!box)return;box.hidden=false;
+fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const box=$('#ai-box');if(!box)return;$('#ai-ask').hidden=false;
   const aiHide=()=>{const a=$('#ai-ans');a.hidden=true;a.innerHTML='';clearTimeout(aiHide.t);};
   $('#ai-ans').onclick=e=>{e.stopPropagation();if(e.target.closest('.ai-x'))aiHide();};
   $('#ai-ask').onclick=async e=>{e.stopPropagation();const a=$('#ai-ans');if(!a.hidden){aiHide();return;}// друге торкання — сховати
