@@ -96,7 +96,7 @@ async function setBase(kind){base=kind;localStorage.setItem('base2',kind);map.se
 function addImages(){
   // реалістичні спрайти цілей (вид згори, ніс на північ) + тіні
   for(const t of Object.keys(TYPE_COLOR))for(const v of ['','-d','-sh']){const id='t-'+t+v;if(map.hasImage(id))continue;
-    map.loadImage('sprites/t-'+t+v+'.png?v=ref6').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:Math.max(1,r.data.width/80)});})/*розмір ~80 px незалежно від файлу*/.catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
+    map.loadImage('sprites/t-'+t+v+'.png?v=ref7').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:Math.max(1,r.data.width/80)});})/*розмір ~80 px незалежно від файлу*/.catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
   if(!map.hasImage('home')){const c=drawHome(40);map.addImage('home',c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});}
   if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.88)';x.beginPath();x.roundRect(2,2,s-4,s-4,14);x.fill();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
 }
@@ -209,7 +209,7 @@ function addOverlays(){
   map.addLayer({id:'xr-t',type:'symbol',source:'xr',filter:['has','l'],layout:{visibility:'none','text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['match',['get','k'],'step',13,12],'text-offset':['match',['get','k'],'step',['literal',[0,0]],['literal',[0,1.5]]],'text-anchor':['match',['get','k'],'step','center','top'],'text-allow-overlap':true,'text-max-width':14},paint:{'text-color':['match',['get','k'],'step','#FFFFFF','now','#E3D4FF','dest','#FFD27A','#fff'],'text-halo-color':['match',['get','k'],'step','rgba(0,0,0,0)','#000'],'text-halo-width':1.6}});
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-radius':['interpolate',['linear'],['zoom'],5,5,9,13,12,18],'circle-color':TYPE_COLOR.kab,'circle-opacity':0.16,'circle-stroke-color':TYPE_COLOR.kab,'circle-stroke-width':1.6,'circle-stroke-opacity':0.9,'circle-blur':0.1}});
   // загроза КАБ: маленький значок авіабомби над пунктом і підпис, замість великих помаранчевих кіл
-  if(!map.hasImage('kab-mini')){const im=new Image();im.onload=()=>{if(!map.hasImage('kab-mini'))map.addImage('kab-mini',im,{pixelRatio:Math.max(1,im.naturalWidth/40)});};im.src='sprites/t-kab.png?v=ref6';}
+  if(!map.hasImage('kab-mini')){const im=new Image();im.onload=()=>{if(!map.hasImage('kab-mini'))map.addImage('kab-mini',im,{pixelRatio:Math.max(1,im.naturalWidth/40)});};im.src='sprites/t-kab.png?v=ref7';}
   map.addLayer({id:'zones-t',type:'symbol',source:'zones',layout:{'icon-image':'kab-mini','icon-size':['interpolate',['linear'],['zoom'],5,0.5,9,0.9],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',7,'загроза КАБ'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.6],'text-anchor':'top','text-optional':true},paint:{'text-color':TYPE_COLOR.kab,'text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4}});
   // ворожа тактична авіація (носії КАБ) і зона пусків
   ['avia','avia-z','avia-l'].forEach(id=>{if(!map.getSource(id))map.addSource(id,{type:'geojson',data:EMPTY});});
@@ -1101,7 +1101,7 @@ function note(n){
   const parts=String(n.sub||'').split(' · ').filter(Boolean);
   el.innerHTML='<span class="ni'+(n.type?' ni-t':'')+'">'+(n.type?'':(n.ic||'🔔'))+'</span><div class="nb"><b>'+esc(String(n.title).replace(/^(🔴|🟠|🟡|🟢)\s*/u,''))+'</b>'+
     (parts.length?'<div class="nch">'+parts.map((x,i)=>'<span'+(i===0?' class="lead"':'')+'>'+esc(x)+'</span>').join('')+'</div>':'')+'</div><time>'+tm+'</time><button class="nx" aria-label="Закрити">✕</button>';
-  if(n.type){const im=new Image();im.alt='';im.width=im.height=32;im.style.objectFit='contain';im.onerror=()=>{try{im.replaceWith(drawTarget(n.type,22));}catch(e){}};im.src='sprites/t-'+n.type+'.png?v=ref6';el.querySelector('.ni').appendChild(im);}
+  if(n.type){const im=new Image();im.alt='';im.width=im.height=32;im.style.objectFit='contain';im.onerror=()=>{try{im.replaceWith(drawTarget(n.type,22));}catch(e){}};im.src='sprites/t-'+n.type+'.png?v=ref7';el.querySelector('.ni').appendChild(im);}
   const close=()=>{if(el.classList.contains('out'))return;el.classList.add('out');setTimeout(()=>{el.remove();notesAll();},600);};
   // зникає сама за 3 с плавно; якщо застосунок у фоні, відлік починається, коли користувач його відкрив
   const arm=()=>{if(document.hidden){document.addEventListener('visibilitychange',function v(){if(!document.hidden){document.removeEventListener('visibilitychange',v);setTimeout(close,3000);}});}else setTimeout(close,3000);};arm();
