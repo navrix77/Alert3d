@@ -23,7 +23,9 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 .legend .r i{width:26px;height:4px;border-radius:3px;box-shadow:0 0 8px currentColor}
 .legend .r b{margin-left:auto;font-variant-numeric:tabular-nums}
 .legend .r.t{cursor:pointer;border-radius:8px;padding:2px 4px;margin:2px -4px;transition:opacity .2s,background .2s}.legend .r.t:hover{background:rgba(255,255,255,.07)}
-.legend .r.off{opacity:.35}.legend .r.on{background:rgba(255,255,255,.12)}.legend .r.maj{font-weight:800}.legend .r:not(.maj) i{opacity:.6;box-shadow:none}
+.legend .r.off{opacity:.35!important}.legend .r.on{background:rgba(255,255,255,.12)}
+.legend .r.th1{font-weight:800;color:#fff}.legend .r.th1 i{height:5px}.legend .r.th2{font-weight:700;color:#E6EAF2}.legend .r.th3{font-weight:600;color:#C3CAD6}.legend .r.th3 i{opacity:.75;box-shadow:none}
+.legend .r.th4{font-weight:500;color:#98A2B3}.legend .r.th4 i{opacity:.55;box-shadow:none;height:3px}
 .legend small.hint{color:#C9D2E3;font-weight:600}
 .legend .grp{display:flex;gap:4px;margin:0 0 8px;padding:3px;background:rgba(255,255,255,.06);border-radius:12px;grid-column:1/-1}
 .legend .grp button{flex:1;padding:6px 8px;border-radius:9px;background:transparent;font-size:12.5px;color:var(--mute)}.legend .grp button.on{background:rgba(255,255,255,.16);color:#fff}
@@ -90,7 +92,8 @@ map.on('load',async()=>{
   map.addLayer({id:'obl',type:'line',source:'obl',paint:{'line-color':'rgba(255,255,255,.28)','line-width':0.8}});
   map.addSource('tr',{type:'geojson',lineMetrics:true,data:{type:'FeatureCollection',features:[]}});
   map.addImage('chev',chev(),{pixelRatio:2,sdf:true});
-  for(const k of Object.keys(T)){const c=T[k][1];
+  // шари від найменш до найбільш загрозливого: балістика й ракети завжди поверх дронів
+  for(const k of [...Object.keys(T).filter(x=>!ORDER.includes(x)),...ORDER.slice().reverse()].filter(x=>T[x])){const c=T[k][1];
     map.addLayer({id:'trg-'+k,type:'line',source:'tr',filter:['all',['==',['get','k'],k],['==',['get','g'],1]],layout:{'line-cap':'round','line-join':'round'},
       paint:{'line-width':7,'line-blur':6,'line-gradient':['interpolate',['linear'],['line-progress'],0,'rgba(0,0,0,0)',1,hexA(c,.35)]}});
     map.addLayer({id:'tr-'+k,type:'line',source:'tr',filter:['==',['get','k'],k],layout:{'line-cap':'round','line-join':'round','line-sort-key':['get','z']},
@@ -158,7 +161,12 @@ addEventListener('resize',()=>{if(D)fit();});
 const MAJOR=new Set(['cruise','ballistic','kab','geran5','banderol','rszv']);let SEL=null,GRP=null;
 // режим за замовчуванням: «Ракети», якщо вони були, бо саме вони губилися серед сотень дронів
 const GRPS=[['miss','Ракети й КАБи'],['dron','Дрони'],['all','Усе']];
-function style(type){const maj=MAJOR.has(type);
+// рівень загрози типу: 1 найнебезпечніший (балістика: хвилини до удару, найбільша бойова частина) … 4 найменший
+const THREAT={ballistic:1,cruise:1,kab:1,geran5:2,jet:2,banderol:2,rszv:2,shahed:3,lancet:3,molniya:3,fpv:4,fpvf:4,recon:4};
+const ORDER=['ballistic','cruise','kab','geran5','jet','banderol','rszv','shahed','lancet','molniya','fpv','fpvf','recon'];
+const TW={1:1.25,2:1,3:0.85,4:0.7};
+function style(type){const s0=style0(type);if(!s0)return s0;const k=TW[THREAT[type]||3];return {...s0,w:s0.w*k,z:s0.z*10+(5-(THREAT[type]||3))};}
+function style0(type){const maj=MAJOR.has(type);
   if(SEL)return SEL===type?{g:maj?1:0,w:maj?2.2:1.3,o:0.95,z:3}:null;
   if(GRP==='miss')return maj?{g:1,w:2.3,o:1,z:2}:null;
   if(GRP==='dron')return maj?null:{g:0,w:1,o:0.4,z:1};
@@ -198,8 +206,8 @@ function links(f,T1){const L=[],Hh=[],Pu=[],fired={};
   for(const key in fired){const g=fired[key]/1500;Pu.push({type:'Feature',properties:{r:8+g*42,a:Math.max(0,1-g)},geometry:{type:'Point',coordinates:key.split(',').map(Number)}});}
   map.getSource('links').setData({type:'FeatureCollection',features:L});map.getSource('lhead').setData({type:'FeatureCollection',features:Hh});map.getSource('spulse').setData({type:'FeatureCollection',features:Pu});}
 function legend(){const cnt={};for(const t of D.tracks)cnt[t.type]=(cnt[t.type]||0)+1;
-  const ord=Object.keys(T).filter(k=>cnt[k]&&(GRP==='all'||(GRP==='miss')===MAJOR.has(k))).sort((a,b)=>MAJOR.has(b)-MAJOR.has(a));
-  $('#legend').innerHTML='<div class="grp">'+GRPS.map(([k,n])=>'<button data-g="'+k+'"'+(GRP===k?' class="on"':'')+'>'+n+'</button>').join('')+'</div>'+ord.map(k=>'<div class="r t'+(SEL===k?' on':SEL?' off':'')+(MAJOR.has(k)?' maj':'')+'" data-k="'+k+'" role="button" tabindex="0"><i style="background:'+T[k][1]+';color:'+T[k][1]+'"></i>'+T[k][0]+'</div>').join('')+
+  const ord=ORDER.filter(k=>T[k]&&cnt[k]&&(GRP==='all'||(GRP==='miss')===MAJOR.has(k)));
+  $('#legend').innerHTML='<div class="grp">'+GRPS.map(([k,n])=>'<button data-g="'+k+'"'+(GRP===k?' class="on"':'')+'>'+n+'</button>').join('')+'</div>'+ord.map(k=>'<div class="r t'+(SEL===k?' on':SEL?' off':'')+' th'+(THREAT[k]||3)+'" data-k="'+k+'" role="button" tabindex="0"><i style="background:'+T[k][1]+';color:'+T[k][1]+'"></i>'+T[k][0]+'</div>').join('')+
     '<div class="r"><span style="width:26px;text-align:center">🔥</span>Вибухи'+(D.crawling?' <small style="display:inline;margin:0">· збираю з історії каналів…</small>':'')+'<b>'+D.booms.length+'</b></div><div class="r"><span style="width:26px;text-align:center">🚀</span>Місця пусків<b>'+D.sites.length+'</b></div>'+
     '<small class="hint">'+(SEL?'Показано лише: '+T[SEL][0]+'. Торкніться ще раз, щоб повернути все.':'Торкніться типу, щоб побачити лише його. Лінії умовні: з\'єднують місця, які назвали канали.')+'</small>'+
     '<small>Маршрути відтворено з повідомлень моніторів і приблизні; кількість цілей дивіться в підсумку Повітряних сил. Вибухи, з точністю до населеного пункту.</small>';
