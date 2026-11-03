@@ -1291,3 +1291,11 @@ def test_no_zoom_inside_match_for_raion_lines():
     s = pathlib.Path(__file__).resolve().parent.parent.joinpath("web", "app.js").read_text(encoding="utf-8")
     i = s.index("id:'ra-line'"); line = s[i:s.index("\n", i)]
     assert "['match',LV,0,['interpolate'" not in line
+
+
+def test_no_has_filters_in_map_layers():
+    """03.11: у MapLibre 5.24 властивість зі значенням undefined проходить ['has', ...], і на мапі
+    з'являлись порожні чорні плашки «→». Фільтри мають перевіряти значення: ['!=',['get',k],null]."""
+    import pathlib, re
+    s = pathlib.Path(__file__).resolve().parent.parent.joinpath("web", "app.js").read_text(encoding="utf-8")
+    assert not re.search(r"\[\s*'has'\s*,", s)
