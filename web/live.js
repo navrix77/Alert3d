@@ -254,7 +254,7 @@
   // ---------- Sky Radio (04.11, переробка): говорить, коли біля вас щось змінилось; без змін мовчить (раз на 8 хв коротко
   // нагадує обстановку); уся Україна — на початку й раз на 15 хв. Звуки як на радіо: позивний, сигнал новин, тривожний сигнал,
   // тиха фонова підкладка, що стихає під голос. Усе синтезовано тут же (власні звуки, не чужа музика).
-  let radioSid = '', radioOn = false, radioT = null, radioSeen = 0, radioBusy = false, lastCountry = 0;
+  let radioLast = 0, radioBusy2 = false, radioSid = '', radioOn = false, radioT = null, radioSeen = 0, radioBusy = false, lastCountry = 0;
   const RA = { ctx: null, bed: null, bedGain: null, master: null };
   function raCtx() {
     if (!RA.ctx) { const C = window.AudioContext || window.webkitAudioContext; RA.ctx = new C(); RA.master = RA.ctx.createGain(); RA.master.gain.value = 0.9; RA.master.connect(RA.ctx.destination); }
@@ -330,7 +330,16 @@
       const r = await (await fetch('/api/radio?scope=' + scope + '&radius=' + (LS.get('radio_radius') || 25) + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (now - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
         (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : ''))).json();
       if (scope === 'country') lastCountry = now;
-      if (!radioOn || !r.text) return;  // нового немає: мовчимо
+      if (!radioOn) return;
+      // 04.11 власник: новин і змін немає — радіо, як і ефір, вимикається само (через 10 хв без жодного оновлення)
+      if (!r.text || r.level === 'calm') {
+        if (radioLast && NX().now() - radioLast > 600 && !radioBusy2) {
+          radioBusy2 = true; await SND.outro(); await speak('Нових змін біля вас немає. Вимикаю Скай Радіо.', 'radio'); radioBusy2 = false;
+          if (radioOn) rbtn.click();
+          return;
+        }
+        if (!r.text) return;  // нового немає: мовчимо
+      } else radioLast = NX().now();
       if (scope === 'near') radioSeen = NX().now();
       const hard = r.level === 'urgent' || r.level === 'outage' || r.kind === 'correction';
       if (hard) bedStop(); else bedStart();  // важливе, виправлення, збій — без фону
@@ -365,7 +374,7 @@
     audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on');
     raCtx();  // звук розблоковується саме цим дотиком (iPhone)
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
-    radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0;
+    radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0; radioLast = NX().now();
     bedStart(); await SND.ident();
     await radioIssue();                  // зведення в обраному режимі охоплення
     radioT = setInterval(radioIssue, 40000);
