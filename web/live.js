@@ -17,23 +17,17 @@
 
   // ---------- інтерфейс
   const css = `
-  #live-btn{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:40;border-radius:16px;padding:6px 12px 6px 11px;
+  #live-btn{position:fixed;left:10px;top:calc(max(8px,env(safe-area-inset-top,0px)) + 108px);z-index:4;border-radius:16px;padding:6px 12px 6px 11px;
     background:rgba(18,20,30,.9);border:1px solid rgba(255,120,130,.55);color:#fff;font:800 14px/1.15 system-ui,sans-serif;backdrop-filter:blur(10px);
     display:flex;align-items:center;gap:8px;text-align:left;box-shadow:0 4px 18px rgba(0,0,0,.45)}
   #live-btn i{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF4D5E;flex:none;animation:lvp 1.6s infinite}
   #live-btn small{display:block;font:600 11px system-ui,sans-serif;opacity:.7}
   #live-btn.new{border-color:#FFB020;box-shadow:0 0 0 2px rgba(255,176,32,.35),0 4px 18px rgba(0,0,0,.45)}
   @keyframes lvp{0%,100%{opacity:1}50%{opacity:.35}}
-  #radio-btn{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:41;border-radius:999px;padding:8px 13px;
-    background:rgba(18,20,30,.9);border:1px solid rgba(255,255,255,.25);color:#fff;font:800 13.5px system-ui,sans-serif;backdrop-filter:blur(10px);
-    display:flex;align-items:center;gap:7px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
-  #radio-btn.on{background:rgba(160,30,45,.92);border-color:rgba(255,140,150,.8)}
-  #radio-btn.on b{display:inline-block;width:8px;height:8px;border-radius:50%;background:#fff;animation:lvp 1.2s infinite}
-  #radio-card{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 112px);z-index:41;max-width:min(300px,calc(100vw - 150px));
-    background:rgba(12,14,22,.93);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:8px 10px;color:#fff;
-    font:13px/1.4 system-ui,sans-serif;backdrop-filter:blur(10px);box-shadow:0 8px 26px rgba(0,0,0,.5)}
-  #radio-card small{display:block;opacity:.6;font-size:11px;margin-top:3px}
-  #live .lv-ctl{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  #radio-btn{position:fixed;left:10px;top:calc(max(8px,env(safe-area-inset-top,0px)) + 60px);z-index:4;width:42px;height:42px;border-radius:50%;padding:0;
+    background:rgba(18,20,30,.9);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:20px;line-height:40px;text-align:center;backdrop-filter:blur(10px);box-shadow:0 4px 18px rgba(0,0,0,.45)}
+  #radio-btn.on{background:rgba(160,30,45,.95);border-color:rgba(255,140,150,.9);animation:rdp 1.6s infinite}
+  @keyframes rdp{0%,100%{box-shadow:0 0 0 0 rgba(255,77,94,.55)}50%{box-shadow:0 0 0 7px rgba(255,77,94,0)}}
   #live .lv-help{font-size:12px;opacity:.7;margin-top:2px}
   #live .lv-chips{display:flex;gap:6px;overflow-x:auto;margin-top:8px;padding-bottom:2px;scrollbar-width:none}
   #live .lv-chips button{white-space:nowrap;flex:none;background:rgba(120,160,255,.14);border-color:rgba(150,180,255,.35)}
@@ -260,13 +254,18 @@
     } catch (e) {}
   }
   const rbtn = document.createElement('button'); rbtn.id = 'radio-btn'; rbtn.title = 'Радіо SKY: голосові зведення кожні 2 хв про ваш регіон, періодично про сусідів і всю Україну';
-  const rcard = document.createElement('div'); rcard.id = 'radio-card'; rcard.hidden = true;
-  const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.innerHTML = radioOn ? '<b></b>📻 Радіо в ефірі ✕' : '📻 Радіо'; };
-  rshow(); document.body.appendChild(rbtn); document.body.appendChild(rcard);
-  const rsay = (txt, sub) => { rcard.hidden = false; rcard.innerHTML = esc(txt) + (sub ? '<small>' + esc(sub) + '</small>' : ''); };
+  // лише кнопка-значок без тексту на мапі (власник 03.11: «текст не потрібен»)
+  const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.textContent = '📻'; rbtn.setAttribute('aria-label', radioOn ? 'Радіо в ефірі, вимкнути' : 'Увімкнути радіо'); };
+  rshow(); document.body.appendChild(rbtn);
+  // під рядком лічильників цілей (він може перенестись у два рядки), щоб нічого не перекривати
+  function place() { const c = document.getElementById('counters'); const b = c && c.getBoundingClientRect();
+    const y = b && b.height ? Math.round(b.bottom + 8) : 60; rbtn.style.top = y + 'px'; btn.style.top = (y + 48) + 'px'; }
+  try { new ResizeObserver(place).observe(document.getElementById('counters')); } catch (e) {}
+  addEventListener('resize', place); setInterval(place, 3000); place();
+  const rsay = () => {};
   rbtn.onclick = async () => {
     radioOn = !radioOn; rshow();
-    if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); rcard.hidden = true; return; }
+    if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); return; }
     audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on');
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
     radioN = 0; radioQuiet = 0; radioSeen = seen || (NX().now() - 1800);
