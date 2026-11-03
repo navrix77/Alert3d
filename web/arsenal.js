@@ -31,23 +31,39 @@ const A=[
   d:'Кабель тягнеться за дроном, тож радіоелектронна боротьба його не зупиняє. На мапі синій.'}
 ];
 const LEG=[
- ['dot','#FF3B3B','Місце пуску','червона точка в РФ або на окупованій території. Торкніться ціль: пунктир покаже, звідки вона ймовірно летить'],
+ ['tgt','#FFA31A','Ціль','реалістичний силует типу, ніс за курсом. Чим ближче масштаб, тим більший силует. Торкніться, щоб побачити докази й прогноз'],
+ ['est','#FFA31A','Місце не назване','напівпрозорий силует у тонкому білому кільці: канали назвали лише курс, а місце оцінив SKY. Підпис «→ пункт · місце не названо»'],
+ ['still','#FFA31A','Курс невідомий','кольорове кільце навколо цілі: де вона, відомо, а куди летить, ні. SKY не рухає таку ціль, щоб не вигадувати шлях'],
+ ['flow','#FFA31A','Рух уперед','біжучі штрихи від цілі: куди вона долетить за ~8 хв, якщо триматиме курс'],
+ ['trail','#FFA31A','Пройдений шлях','крапки по місцях, які називали канали. У всіх цілей ледь помітні білі, у вибраної й тих, що летять до вас, кольором цілі'],
+ ['route','#FFA31A','Куди летить за каналами','штрихи кольору цілі до пункту, який назвали канали («курсом на…»). Для вибраної цілі й тих, що летять до вас'],
+ ['pred','#FFA31A','Ймовірно далі','дрібний пунктир і підпис «ймовірно пункт»: куди ціль найчастіше летіла далі на попередніх перельотах, коли канали пункту ще не назвали'],
+ ['home','#2FE38A','Дім','ваша точка; кольорове коло показує стан: зелений спокійно, жовтий увага, червоний загроза. Торкніться, щоб перемістити або видалити'],
+ ['dot','#FF3B3B','Місце пуску','червона точка в РФ або на окупованій території; бліда, якщо місце лише оцінене. Торкніться, щоб побачити, що й коли пускали'],
  ['plane','#FF3B3B','Ворожа тактична авіація','силует літака над типовим районом пусків КАБ; блякне з часом'],
  ['ring','#FF5A5A','Зона пусків КАБ','пунктирне коло навколо району, звідки скидають КАБи'],
- ['kab','#22E1FF','Загроза КАБ','значок авіабомби над громадою; зникає за 10–15 хв без нових пусків або після «відбою»; торкніться, де й коли пускали'],
- ['trail','#FFA31A','Пройдений шлях','світлими крапками: місця, які назвали канали; у вибраної цілі й тих, що летять до вас, кольором цілі'],
- ['pred','#FFFFFF','Ймовірно далі','штрихами, куди ціль найімовірніше полетить, якщо канали ще не назвали пункт; навчено на попередніх перельотах, поруч, імовірність. Для вибраної цілі й тих, що летять до вас'],
+ ['kab','#22E1FF','Загроза КАБ','значок авіабомби над громадою; зникає за 10–15 хв без нових пусків або після «відбою»'],
  ['fill','#E8B931','Тривога','офіційна тривога: заливка області, району чи громади'],
- ['fire','#FF7A1A','Вибухи (мапа доби)','приглушений вогонь там, де за добу фіксували прильоти'],
+ ['hl','#FF2BD6','Лічильники вгорі','торкніться типу: мапа покаже всі такі цілі й на кілька секунд підсвітить їх хвилями'],
+ ['fire','#FF7A1A','Вибухи (мапа доби)','вогонь там, де за добу повідомляли про прильоти'],
 ];
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=72;const x=C.getContext('2d');x.translate(36,36);x.lineWidth=3;x.strokeStyle=c;x.fillStyle=c;
+  const spr=(t,al,cb)=>{const i=new Image();i.src='sprites/t-'+t+'.png?v=ref3';i.onload=()=>{x.save();x.globalAlpha=al;x.rotate(0.5);x.drawImage(i,-24,-24,48,48);x.restore();cb&&cb();};};
+  if(k==='tgt'){x.globalAlpha=.35;x.fillStyle='#000';x.beginPath();x.arc(2,4,24,0,7);x.filter='blur(6px)';x.fill();x.filter='none';x.globalAlpha=1;spr('shahed',1);return C;}
+  if(k==='est'){x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=1.5;x.beginPath();x.arc(0,0,28,0,7);x.stroke();spr('shahed',.45);return C;}
+  if(k==='still'){x.globalAlpha=.6;x.lineWidth=1.6;x.beginPath();x.arc(0,0,30,0,7);x.stroke();x.globalAlpha=1;spr('shahed',1);return C;}
+  if(k==='flow'){x.setLineDash([7,6]);x.lineWidth=2.4;x.beginPath();x.moveTo(-10,10);x.lineTo(30,-24);x.stroke();x.setLineDash([]);x.translate(-14,13);x.scale(.7,.7);spr('shahed',1);return C;}
+  if(k==='route'){x.setLineDash([5,6]);x.lineWidth=2.4;x.beginPath();x.moveTo(-28,20);x.lineTo(24,-18);x.stroke();x.setLineDash([]);x.fillStyle='#fff';x.font='bold 10px sans-serif';x.fillText('→',16,-20);return C;}
+  if(k==='home'){x.globalAlpha=.25;x.beginPath();x.arc(0,0,30,0,7);x.fill();x.globalAlpha=1;x.lineWidth=2;x.beginPath();x.arc(0,0,30,0,7);x.stroke();
+    x.fillStyle='#fff';x.beginPath();x.arc(0,0,13,0,7);x.fill();x.strokeStyle='#2F7BFF';x.lineWidth=3;x.stroke();x.fillStyle='#1B2A4A';x.beginPath();x.moveTo(-7,1);x.lineTo(0,-6);x.lineTo(7,1);x.lineTo(5,1);x.lineTo(5,7);x.lineTo(-5,7);x.lineTo(-5,1);x.closePath();x.fill();return C;}
+  if(k==='hl'){for(const [r,a] of [[30,.35],[22,.7]]){x.globalAlpha=a;x.lineWidth=2;x.beginPath();x.arc(0,0,r,0,7);x.stroke();}x.globalAlpha=1;x.strokeStyle='#fff';x.beginPath();x.arc(0,0,16,0,7);x.stroke();x.scale(.6,.6);spr('jet',1);return C;}
   if(k==='dot'){x.beginPath();x.arc(0,0,11,0,7);x.fill();x.strokeStyle='#fff';x.stroke();}
   else if(k==='plane'){const p=new Path2D('M0,-26 L3,-19 L3,-8 L22,5 L22,9 L3,5 L3,15 L9,20 L9,23 L0,21 L-9,23 L-9,20 L-3,15 L-3,5 L-22,9 L-22,5 L-3,-8 L-3,-19 Z');x.fill(p);x.strokeStyle='#fff';x.lineWidth=1.5;x.stroke(p);}
   else if(k==='ring'){x.globalAlpha=.2;x.beginPath();x.arc(0,0,26,0,7);x.fill();x.globalAlpha=1;x.setLineDash([6,5]);x.stroke();}
-  else if(k==='kab'){const i=new Image();i.src='sprites/t-kab.png?v=ref1';i.onload=()=>{x.drawImage(i,-28,-28,56,56);};}
-  else if(k==='trail'){for(let i=-24;i<=24;i+=10){x.beginPath();x.arc(i,i*.4,3,0,7);x.fill();}}
-  else if(k==='pred'){x.setLineDash([8,6]);x.beginPath();x.moveTo(-26,12);x.quadraticCurveTo(0,-20,26,-8);x.stroke();}
+  else if(k==='kab'){const i=new Image();i.src='sprites/t-kab.png?v=ref3';i.onload=()=>{x.drawImage(i,-28,-28,56,56);};}
+  else if(k==='trail'){for(let i=-26;i<=26;i+=9){x.globalAlpha=.35;x.fillStyle='#E8ECF4';x.beginPath();x.arc(i,-10+i*.25,2.4,0,7);x.fill();x.globalAlpha=1;x.fillStyle=c;x.beginPath();x.arc(i,10+i*.25,2.6,0,7);x.fill();}}
+  else if(k==='pred'){x.lineWidth=2.2;x.setLineDash([2,6]);x.lineCap='round';x.beginPath();x.moveTo(-26,14);x.quadraticCurveTo(0,-14,22,-6);x.stroke();x.setLineDash([]);x.font='bold 9px sans-serif';x.fillText('ймовірно',-6,-18);}
   else if(k==='fill'){x.globalAlpha=.45;x.fillRect(-26,-20,52,40);x.globalAlpha=1;x.strokeStyle='#fff';x.lineWidth=2;x.strokeRect(-26,-20,52,40);}
   else if(k==='ru'){[[-14,-8],[8,-14],[2,10],[18,6]].forEach(([a,b])=>{x.beginPath();x.arc(a,b,5,0,7);x.fillStyle='#FFD500';x.fill();x.strokeStyle='#2F7BFF';x.lineWidth=2;x.stroke();});}
   else if(k==='fire'){const g=x.createRadialGradient(0,4,2,0,0,26);g.addColorStop(0,'rgba(255,230,140,.9)');g.addColorStop(.4,'rgba(255,120,30,.6)');g.addColorStop(1,'rgba(255,60,0,0)');x.fillStyle=g;x.beginPath();x.arc(0,0,26,0,7);x.fill();}
@@ -55,7 +71,7 @@ function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=
 function build(){const el=document.getElementById('arsenal');if(el.dataset.ok)return;el.dataset.ok=1;
   const box=el.querySelector('.ars-list');
   A.forEach(a=>{const c=document.createElement('article');c.className='ars-card';c.style.setProperty('--tc',(window.TYPE_COLOR||{})[a.t]||'#fff');
-    c.innerHTML='<div class="ars-img"><img alt="" decoding="async" src="sprites/ref/'+a.t+'.png?v=ref3" onerror="this.onerror=function(){this.style.visibility=\'hidden\'};this.src=\'sprites/t-'+a.t+'.png\'"></div><div class="ars-b"><small>'+esc(a.k)+'</small><h4>'+esc(a.n)+'</h4><dl>'+a.s.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><p>'+esc(a.d)+'</p><button class="ars-map" data-t="'+a.t+'" hidden></button></div>';
+    c.innerHTML='<div class="ars-img"><img alt="" decoding="async" src="sprites/ref/'+a.t+'.png?v=ref4" onerror="this.onerror=function(){this.style.visibility=\'hidden\'};this.src=\'sprites/t-'+a.t+'.png\'"></div><div class="ars-b"><small>'+esc(a.k)+'</small><h4>'+esc(a.n)+'</h4><dl>'+a.s.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><p>'+esc(a.d)+'</p><button class="ars-map" data-t="'+a.t+'" hidden></button></div>';
     c.querySelector('.ars-map').onclick=()=>{const n=((window.NX&&NX.snap())?NX.snap().tracks:[]).filter(x=>x.status==='active'&&x.type===a.t).length;if(!n&&a.t!=='kab'){if(window.NX)NX.toast('Зараз у повітрі не видно: '+a.n);return;}el.hidden=true;if(a.t==='kab'){const z=((window.NX&&NX.snap())?NX.snap().zones:[])[0];if(z&&window.tryvogaMap)tryvogaMap.flyTo({center:z.places[0],zoom:8});else if(window.NX)NX.toast('Зараз загроз КАБ немає');return;}if(window.NX)NX.focusType(a.t);};
     box.appendChild(c);});
   const lg=el.querySelector('.ars-leg');
