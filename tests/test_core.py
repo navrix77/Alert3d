@@ -1631,3 +1631,14 @@ def test_public_endpoints_hide_internals_and_rate_limit():
     M._hits.clear()
     codes = [c.get("/api/ask?obl=").status_code for _ in range(10)]
     assert 429 in codes
+
+
+def test_forecast_calibration_only_lowers():
+    from app.forecast import _cal
+    for h in (30, 60, 120):
+        for p in (0.05, 0.5, 0.95):
+            assert 0 <= min(p, _cal(h, p)) <= p
+    from fastapi.testclient import TestClient
+    from app import main as M
+    st = TestClient(M.app).get("/api/tts/status").json()
+    assert "openai" not in st and "gemini" not in st and "neural" in st

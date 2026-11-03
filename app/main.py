@@ -276,7 +276,7 @@ def state() -> dict:
         "replay": os.getenv("REPLAY") == "1",
         "alerts": off["ok"],
         "uptime": int(time.time() - started),
-        "version": "2026-11-02.1",
+        "version": "2026-11-04.1",
         "push_subs": pushsvc.count(),
         "brain": brain.stats(),
     }
@@ -425,6 +425,21 @@ async def lifespan(app: FastAPI):
     AIX = AI(LLMX, parser, tracker, state)
     tasks.append(asyncio.create_task(AIX.merge_watch()))
     tasks.append(asyncio.create_task(AIX.daily(SELFCHECK_FILE)))
+
+    async def _calib_nightly():  # 09:20 щодня: перерахунок калібрування прогнозу за історією знімків (окремий процес)
+        root = Path(__file__).resolve().parent.parent
+        while True:
+            lt = time.localtime()
+            await asyncio.sleep(((9 - lt.tm_hour) * 3600 + (20 - lt.tm_min) * 60 - lt.tm_sec) % 86400 or 86400)
+            try:
+                import sys as _sys2
+                pr = await asyncio.create_subprocess_exec("nice", "-n", "15", _sys2.executable, str(root / "scripts" / "calib_forecast.py"),
+                                                          str(root / "data" / "brain.sqlite"), str(root / "data" / "fc_calib_live.json"), cwd=str(root),
+                                                          stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
+                await asyncio.wait_for(pr.wait(), 1800)
+            except Exception:  # noqa: BLE001
+                log.exception("calib")
+    tasks.append(asyncio.create_task(_calib_nightly()))
 
     async def _tts_warm():  # українська озвучка: рушій і голос «Лада» готуються у фоні одразу після старту
         from . import tts
@@ -731,15 +746,20 @@ async def api_tts_check(request: Request):
     from . import tts
     tts._off.clear()  # ручна перевірка: знову пробуємо всіх (наприклад, після поповнення рахунку)
     data, why = await tts.speak(f"Перевірка голосу. Харків, Чугуїв, Балаклія. {int(time.time()) % 1000}", "lada", 1.0)
-    out = {"ok": bool(data), "by": why}
-    return out | tts.status() if _is_admin(request) else out
+    if _is_admin(request):
+        return {"ok": bool(data), "by": why} | tts.status()
+    return {"ok": bool(data), "voice": "neural" if why.startswith(("openai", "gemini", "google")) else "basic" if data else "none"}
 
 
 @app.get("/api/tts/status")
 def api_tts_status(request: Request):
     from . import tts
     st = tts.status()
-    return st if _is_admin(request) else {k: v for k, v in st.items() if not k.endswith("_error") and k != "google_voices"}
+    if _is_admin(request):
+        return st
+    # публічно — без назв сторонніх провайдерів: лише чи є природний голос і чи готовий запасний
+    return {"neural": bool(st.get("openai") or st.get("gemini") or st.get("google")), "ready": bool(st.get("piper")),
+            "voices": [{"key": v["key"], "name": v["name"]} for v in st.get("voices", [])]}
 
 
 @app.get("/api/sources_auto")

@@ -109,8 +109,47 @@ def forecast(snap: dict, launches: list[dict], brain=None, gaz=None) -> dict:
 
     out = {}
     for name, row in acc.items():
-        # стеля 0.95 (04.11, незалежна оцінка): «1.0» читається як «гарантовано», а відкаліброваної певності такої немає
-        out[name] = {f"p{h}": min(0.95, round(1 - row[h], 2)) for h in HORIZONS}
+        # стеля 0.95 (04.11, незалежна оцінка): «1.0» читається як «гарантовано»; далі — калібрування за історією:
+        # якщо сирі «90%» справджувались у 63% випадків, показуємо 63%. Лише вниз (надмірна впевненість), не вгору:
+        # нові цілі з нових пусків модель не бачить, і підняти низькі значення за однією ніччю масованої атаки було б нечесно
+        out[name] = {f"p{h}": min(0.95, round(min(1 - row[h], _cal(h, 1 - row[h])), 2)) for h in HORIZONS}
         out[name].update({f"n{h}": round(exp_n[name][h], 1) for h in HORIZONS})
     top = sorted(out.items(), key=lambda kv: -kv[1]["p60"])
-    return {"oblasts": dict(top), "model": "fan-v2"}
+    c = _calib()
+    return {"oblasts": dict(top), "model": "fan-v2" + ("+cal" if c else ""),
+            **({"calib": {"span_h": c.get("span_h"), "snapshots": c.get("n_snapshots")}} if c else {})}
+
+
+_CAL: dict | None = None
+_CAL_T = 0.0
+
+
+def _calib() -> dict:
+    """data/fc_calib.json (scripts/calib_forecast.py, щоночі на сервері); перечитується раз на годину."""
+    global _CAL, _CAL_T
+    import json
+    import time
+    from pathlib import Path
+    if _CAL is None or time.time() - _CAL_T > 3600:
+        _CAL_T = time.time()
+        _CAL = {}
+        d = Path(__file__).resolve().parent.parent / "data"
+        for f in ("fc_calib_live.json", "fc_calib.json"):  # серверний (щоночі, більша історія) має перевагу над стартовим із репозиторію
+            try:
+                _CAL = json.loads((d / f).read_text(encoding="utf-8"))
+                break
+            except (OSError, ValueError):
+                continue
+    return _CAL or {}
+
+
+def _cal(h: int, p: float) -> float:
+    m = ((_calib().get("horizons") or {}).get(str(h)) or {}).get("map") or []
+    if len(m) < 2:
+        return p
+    if p <= m[0][0]:
+        return m[0][1] if p >= m[0][0] * 0.5 else p
+    for (x0, y0, _n0), (x1, y1, _n1) in zip(m, m[1:]):
+        if x0 <= p <= x1:
+            return y0 + (y1 - y0) * (p - x0) / ((x1 - x0) or 1)
+    return m[-1][1]
