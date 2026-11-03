@@ -19,7 +19,7 @@ from . import parser as parser_mod
 from .tg_web import WebMonitor
 from .alerts import OfficialAlerts
 from .parser import Parser
-from .tracker import Tracker
+from .tracker import TYPES, Tracker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("tryvoga")
@@ -956,6 +956,52 @@ def api_history(full: int = 0, hours: float = 12):
     since = time.time() - max(0.5, min(hours, 12)) * 3600
     fr = [f for f in HIST if f["t"] >= since]
     return JSONResponse({"frames": fr if full else [_lite_frame(f) for f in fr]})
+
+
+@app.get("/api/counts")
+def api_counts(hours: float = 3, typ: str = "shahed"):
+    """Діагностика лічильника: чому «цілей більше, ніж у сусідів». Розклад активних треків типу на складові:
+    множники ×N, давність останньої згадки, одне джерело, і скільки треків злилося б при ширшому порозі склеювання."""
+    import math
+    snap = state()
+    now = snap["now"]
+    act = [t for t in snap["tracks"] if t["status"] == "active" and t["type"] == typ]
+    units = sum((t.get("count") or 1) for t in act)
+    age = [max(0, now - t["last"]) / 60 for t in act]
+    buckets = {"<5": 0, "5-10": 0, "10-15": 0, "15-25": 0, ">25": 0}
+    for a in age:
+        buckets["<5" if a < 5 else "5-10" if a < 10 else "10-15" if a < 15 else "15-25" if a < 25 else ">25"] += 1
+    single = sum(1 for t in act if len(t.get("srcs") or []) <= 1)
+    est = sum(1 for t in act if t.get("pos_est") or t.get("nopos"))
+    # скільки лишилося б треків, якби склеювати все одного типу в радіусі R км із різницею останньої згадки до 15 хв
+    def km(a, b):
+        return math.hypot((a["lon"] - b["lon"]) * 111.32 * math.cos(math.radians(49)), (a["lat"] - b["lat"]) * 110.57)
+    def clusters(r):
+        left, n = list(act), 0
+        while left:
+            seed = left.pop(0); n += 1
+            grp, i = [seed], 0
+            while i < len(grp):
+                g = grp[i]; i += 1
+                for o in list(left):
+                    if km(g, o) <= r and abs(g["last"] - o["last"]) <= 900:
+                        left.remove(o); grp.append(o)
+        return n
+    merge = {str(r): clusters(r) for r in (7, 15, 30, 50)}
+    # історія: середнє й пік одночасних треків і «одиниць» (з ×N) за останні години
+    since = now - max(0.5, min(hours, 12)) * 3600
+    fr = [f for f in HIST if f["t"] >= since]
+    series = [(len([t for t in f["tracks"] if t["type"] == typ]), sum((t.get("count") or 1) for t in f["tracks"] if t["type"] == typ)) for f in fr]
+    hist = {"frames": len(series),
+            "tracks_avg": round(sum(s[0] for s in series) / len(series), 1) if series else None, "tracks_peak": max((s[0] for s in series), default=None),
+            "units_avg": round(sum(s[1] for s in series) / len(series), 1) if series else None, "units_peak": max((s[1] for s in series), default=None)}
+    return {"now": int(now), "type": typ, "tracks": len(act), "units": units, "multiplier_extra": units - len(act),
+            "with_count_gt1": sum(1 for t in act if (t.get("count") or 1) > 1),
+            "age_since_last_min": buckets, "single_source": single, "pos_estimated": est,
+            "tracks_if_merged_within_km": merge, "life_min": TYPES[typ]["life"] / 60 if typ in TYPES else None,
+            "history": hist,
+            "rows": [{"id": t["id"], "count": t.get("count"), "age_min": round(max(0, now - t["last"]) / 60, 1), "srcs": len(t.get("srcs") or []),
+                      "est": bool(t.get("pos_est") or t.get("nopos")), "next": t.get("next")} for t in sorted(act, key=lambda t: t["last"])]}
 
 
 @app.get("/api/selfcheck")
