@@ -23,7 +23,7 @@ jobs:
         run: npx tauri icon ../capacitor/assets/icon-only.png
       - name: Версія
         run: |
-          sed -i 's/"version": "1.0.0"/"version": "1.0.${{ github.run_number }}"/' src-tauri/tauri.conf.json
+          sed -i 's/"version": "1.1.0"/"version": "1.1.${{ github.run_number }}"/' src-tauri/tauri.conf.json
           grep '"version"' src-tauri/tauri.conf.json
       - name: Збірка інсталятора
         run: npx tauri build
@@ -43,5 +43,27 @@ jobs:
           make_latest: false
           files: widget/NAVRYX-SKY-Widget-Setup.exe
           body: |
-            Віджет NAVRYX SKY для Windows 10/11 (1.0.${{ github.run_number }}): маленьке вікно з вашим станом поверх усіх програм,
-            значок у треї, автозапуск разом з Windows. Завантажте NAVRYX-SKY-Widget-Setup.exe і запустіть.
+            SKY для Windows 10/11 (1.1.${{ github.run_number }}): вікно з вашим станом поверх інших програм, значок біля годинника,
+            запуск разом з Windows. Налаштування: ⚙ у віджеті (тема, прозорість, розмір тексту, що показувати) і меню значка
+            (розмір вікна, кут екрана, поверх усіх вікон, автозапуск). Встановлюється як звичайна програма й видаляється
+            в «Параметри → Програми».
+      # Microsoft Store: пакет MSIX (Store підписує сам). Збирається, лише коли задано змінні репозиторію з Partner Center:
+      # MSIX_IDENTITY_NAME, MSIX_PUBLISHER, MSIX_PUBLISHER_NAME (це не секрети, а ідентифікатори застосунку в Store).
+      - name: MSIX для Microsoft Store
+        if: ${{ vars.MSIX_IDENTITY_NAME != '' }}
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $v = "1.1.${{ github.run_number }}.0"
+          $root = "msix-root"; New-Item -ItemType Directory -Force "$root\Assets" | Out-Null
+          Copy-Item src-tauri\target\release\navryx-widget.exe $root\
+          Copy-Item src-tauri\icons\Square150x150Logo.png $root\Assets\Square150x150Logo.png
+          Copy-Item src-tauri\icons\Square44x44Logo.png $root\Assets\Square44x44Logo.png
+          Copy-Item src-tauri\icons\StoreLogo.png $root\Assets\StoreLogo.png
+          Copy-Item src-tauri\icons\Square310x310Logo.png $root\Assets\Wide310x150Logo.png
+          (Get-Content msix\AppxManifest.xml -Raw).Replace('__IDENTITY__','${{ vars.MSIX_IDENTITY_NAME }}').Replace('__PUBLISHER__','${{ vars.MSIX_PUBLISHER }}').Replace('__PUBLISHER_NAME__','${{ vars.MSIX_PUBLISHER_NAME }}').Replace('__VERSION__',$v) | Set-Content "$root\AppxManifest.xml" -Encoding utf8
+          $mk = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter makeappx.exe | Where-Object FullName -like "*x64*" | Select-Object -Last 1
+          & $mk.FullName pack /d $root /p NAVRYX-SKY.msix /o
+      - uses: actions/upload-artifact@v4
+        if: ${{ vars.MSIX_IDENTITY_NAME != '' }}
+        with: { name: navryx-sky-msix-for-store, path: widget/NAVRYX-SKY.msix, if-no-files-found: ignore }
