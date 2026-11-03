@@ -93,7 +93,7 @@ def main() -> None:
     cand = []
     for k, v in words.items():
         stem = k.lower()[:-1]
-        if low.get(stem, 0) >= 5:
+        if low.get(stem, 0) >= 3:  # 03.11: поріг 5 пропускав «Сили оборони»→Сила, «триває»→Тривайли
             cand.append({"place": k, "as_place": len(v), "as_word": low[stem], "channels": len({x[1] for x in v}), "examples": v[:3]})
     rep["word_villages"] = sorted(cand, key=lambda x: -x["as_word"])[:25]
 
