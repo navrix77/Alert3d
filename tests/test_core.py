@@ -1241,3 +1241,36 @@ def test_kharkiv_districts_russian_forms():
     names = [r.place.name for r in P.parse("Шахед курсом на Северную Салтовку", "D").places]
     assert "Сєверне" not in names and "Північна Салтівка (Харків)" in names
     assert [r.place.name for r in P.parse("Реактивный шахед на Новую Баварию", "D").places] == ["Нова Баварія (Харків)"]
+
+
+def test_official_alert_push_home(monkeypatch):
+    """Офіційна тривога й відбій для громади дому, з затримкою 45 с: «відбій і знову тривога за 20 с» не дає двох сповіщень."""
+    import asyncio
+    from pathlib import Path as P_
+    from app import push as pm
+    sent = []
+
+    class Cli:
+        async def post(self, url, json=None, headers=None):
+            sent.extend(json)
+
+            class R:
+                def json(self_):
+                    return {"data": []}
+            return R()
+    pu = pm.Push(P_(":memory:"))
+    pu.db.execute("INSERT INTO subs VALUES('ExponentPushToken[abcdefghijkl]', 36.23, 50.0, 0)")
+    pu.home_area["ExponentPushToken[abcdefghijkl]"] = (7, "Харківська", "Харківський р-н", "Харківська")
+    t = [1000.0]
+    monkeypatch.setattr(pm.time, "time", lambda: t[0])
+    snap = lambda h: {"tracks": [], "levels": {}, "official": {"ok": True, "updated": t[0], "hromadas": {7: 2} if h else {}, "raion_levels": {}}}
+    asyncio.run(pu.tick(Cli(), snap(False)))          # перший погляд: тиша
+    t[0] += 10; asyncio.run(pu.tick(Cli(), snap(True)))   # тривога почалась
+    t[0] += 20; asyncio.run(pu.tick(Cli(), snap(True)))   # ще не 45 с
+    assert sent == []
+    t[0] += 30; asyncio.run(pu.tick(Cli(), snap(True)))
+    assert len(sent) == 1 and sent[0]["title"].startswith("🔴 Повітряна тривога")
+    t[0] += 10; asyncio.run(pu.tick(Cli(), snap(False)))  # відбій…
+    t[0] += 15; asyncio.run(pu.tick(Cli(), snap(True)))   # …і знову тривога за 15 с
+    t[0] += 60; asyncio.run(pu.tick(Cli(), snap(True)))
+    assert len(sent) == 1  # нового сповіщення немає: стан не змінився

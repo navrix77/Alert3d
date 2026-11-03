@@ -73,6 +73,52 @@ def _in_ring(r, x, y) -> bool:
     return c
 
 
+_RAI = None
+
+
+def _raions():
+    global _RAI
+    if _RAI is None:
+        fc = _json.loads((Path(__file__).resolve().parent.parent / "data" / "raions.geojson").read_text(encoding="utf-8"))
+        out = []
+        for f in fc["features"]:
+            g = f["geometry"]
+            polys = [g["coordinates"]] if g["type"] == "Polygon" else g["coordinates"]
+            xs = [p[0] for pl in polys for p in pl[0]]
+            ys = [p[1] for pl in polys for p in pl[0]]
+            out.append((f["properties"].get("n", ""), polys, (min(xs), min(ys), max(xs), max(ys))))
+        _RAI = out
+    return _RAI
+
+
+def home_area(lon: float, lat: float) -> tuple:
+    """(індекс громади, назва громади, район, область) для точки дому."""
+    hi, hn = None, None
+    for i, (n, polys, bb) in enumerate(_hromadas()):
+        if bb[0] <= lon <= bb[2] and bb[1] <= lat <= bb[3] and any(_in_ring(pl[0], lon, lat) for pl in polys):
+            hi, hn = i, n
+            break
+    rn = next((n for n, polys, bb in _raions() if bb[0] <= lon <= bb[2] and bb[1] <= lat <= bb[3] and any(_in_ring(pl[0], lon, lat) for pl in polys)), None)
+    from .geo import oblasts
+    return hi, hn, rn, oblasts().of(lon, lat)
+
+
+def official_home(area: tuple, off: dict, levels: dict) -> str | None:
+    """Де саме офіційна тривога для дому (назва для сповіщення) або None."""
+    hi, hn, rn, ob = area
+    if ob and levels.get(ob):
+        return f"{ob} обл."
+    if rn and (off.get("raion_levels") or {}).get(rn):
+        return rn
+    H = off.get("hromadas") or {}
+    if hi is not None and (H.get(hi) or H.get(str(hi))):
+        return f"{hn} громада" if hn else "ваша громада"
+    return None
+
+
+OFF_STABLE = 45  # с: тривога/відбій мають протриматися стільки, щоб «відбій і знову тривога за 20 с» не давали двох сповіщень
+
+
 def zone_of(lon: float, lat: float, zones: dict) -> str | None:
     if zones.get("obl"):
         from .geo import oblasts
@@ -183,6 +229,9 @@ class Push:
         self.armed: dict[str, dict[str, float]] = {}  # телефон → цілі, про які вже була «загроза» (для явного відбою)
         self.zseen: dict[tuple, float] = {}  # (пристрій, ціль) → коли сповістили про ціль у його зоні
         self.zlast: dict[str, float] = {}  # пристрій → коли надіслали останнє зональне зведення
+        # офіційна тривога для дому: (стан, з якого моменту стабільний, чи вже повідомили) — як застосунок «Повітряна тривога»
+        self.offst: dict[str, list] = {}
+        self.home_area: dict[str, tuple] = {}  # пристрій → (громада idx, район, область) — рахується раз
         self.sent = 0
 
     def register(self, token: str, lon: float, lat: float) -> bool:
@@ -381,6 +430,27 @@ class Push:
             if msg:
                 out.append({"to": token, "title": msg[0], "body": msg[1], "sound": "default", "priority": "high",
                             "channelId": "threats", "data": {"track": msg[2], "type": (tracks.get(msg[2]) or {}).get("type")}})
+            # офіційна тривога / відбій для дому (як «Повітряна тривога»): лише коли стан протримався OFF_STABLE с
+            off = snap.get("official") or {}
+            if off.get("ok") and off.get("updated") and now - off["updated"] < 300:
+                if token not in self.home_area:
+                    self.home_area[token] = home_area(lon, lat)
+                where = official_home(self.home_area[token], off, snap.get("levels") or {})
+                on = bool(where)
+                st = self.offst.get(token)  # [поточний стан, з якого моменту, стан, про який уже повідомили, назва]
+                if st is None:
+                    self.offst[token] = [on, now, on, where]  # перший погляд: не сповіщаємо про поточний стан
+                elif st[0] != on:
+                    st[0], st[1], st[3] = on, now, where or st[3]
+                elif st[2] != on and now - st[1] >= OFF_STABLE:
+                    st[2] = on
+                    nm = st[3] or "ваш район"
+                    if on:
+                        out.append({"to": token, "title": f"🔴 Повітряна тривога · {nm}", "body": "Офіційна тривога. Пройдіть в укриття.",
+                                    "sound": "default", "priority": "high", "channelId": "threats", "data": {"track": f"alert-{int(now)}"}})
+                    else:
+                        out.append({"to": token, "title": f"🟢 Відбій тривоги · {nm}", "body": "Офіційний відбій. Тривога може повторитися, стежте за сповіщеннями.",
+                                    "sound": "default", "priority": "high", "channelId": "threats", "data": {"track": f"clear-{int(now)}"}})
             # обрані області й громади: нові цілі в зоні (або що увійдуть за ≤15 хв), одним зведенням не частіше разу на 5 хв
             zones = zmap.get(token)
             if zones and not msg:
@@ -430,7 +500,7 @@ class Push:
                     out.append({"to": token, "title": "🟢 Цілі, що йшли до вас, віддалились",
                                 "body": "За повідомленнями каналів вони віддаляються або більше не фіксуються.\n"
                                         "Це ще не відбій: офіційний відбій лише за сиреною та «Повітряною тривогою».",
-                                "sound": "default", "channelId": "threats", "data": {}})
+                                "sound": "default", "channelId": "threats", "data": {"track": f"gone-{int(now)}"}})
         self.fired = {k: v for k, v in self.fired.items() if now - v < 3 * REARM}
         self.zseen = {k: v for k, v in self.zseen.items() if now - v < 3600}
         web_out = [dict(m, sub=webs[m["to"]]) for m in out if m["to"] in webs]
