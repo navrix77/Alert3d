@@ -17,18 +17,19 @@
 
   // ---------- інтерфейс
   const css = `
-  #live-btn{position:fixed;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);z-index:40;border-radius:16px;padding:8px 14px 8px 12px;
+  #live-btn{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:40;border-radius:16px;padding:6px 12px 6px 11px;
     background:rgba(18,20,30,.9);border:1px solid rgba(255,120,130,.55);color:#fff;font:800 14px/1.15 system-ui,sans-serif;backdrop-filter:blur(10px);
     display:flex;align-items:center;gap:8px;text-align:left;box-shadow:0 4px 18px rgba(0,0,0,.45)}
   #live-btn i{display:inline-block;width:9px;height:9px;border-radius:50%;background:#FF4D5E;flex:none;animation:lvp 1.6s infinite}
   #live-btn small{display:block;font:600 11px system-ui,sans-serif;opacity:.7}
+  #live-btn.new{border-color:#FFB020;box-shadow:0 0 0 2px rgba(255,176,32,.35),0 4px 18px rgba(0,0,0,.45)}
   @keyframes lvp{0%,100%{opacity:1}50%{opacity:.35}}
   #radio-btn{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:41;border-radius:999px;padding:8px 13px;
     background:rgba(18,20,30,.9);border:1px solid rgba(255,255,255,.25);color:#fff;font:800 13.5px system-ui,sans-serif;backdrop-filter:blur(10px);
     display:flex;align-items:center;gap:7px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
   #radio-btn.on{background:rgba(160,30,45,.92);border-color:rgba(255,140,150,.8)}
   #radio-btn.on b{display:inline-block;width:8px;height:8px;border-radius:50%;background:#fff;animation:lvp 1.2s infinite}
-  #radio-card{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 54px);z-index:41;max-width:min(300px,calc(100vw - 150px));
+  #radio-card{position:fixed;left:10px;top:calc(env(safe-area-inset-top,0px) + 112px);z-index:41;max-width:min(300px,calc(100vw - 150px));
     background:rgba(12,14,22,.93);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:8px 10px;color:#fff;
     font:13px/1.4 system-ui,sans-serif;backdrop-filter:blur(10px);box-shadow:0 8px 26px rgba(0,0,0,.5)}
   #radio-card small{display:block;opacity:.6;font-size:11px;margin-top:3px}
@@ -145,7 +146,7 @@
     } catch (e) { say.textContent = 'Не вдалося отримати дані. Перевірте з’єднання.'; }
   }
   function start(manual) { stop = true; if (abortAudio) abortAudio(); setTimeout(() => live(null, null, manual ? seen : seen), 50); }
-  btn.onclick = () => { $('#live-tip') && $('#live-tip').remove(); start(true); };
+  btn.onclick = () => { btn.classList.remove('new'); btn.querySelector('small').textContent = 'що змінилось'; start(true); };
   $('#lv-close').onclick = () => { if (shelter) $('#lv-shelter').click(); stop = true; paused = false; if (abortAudio) abortAudio(); box.hidden = true; hl([], false); window.FXLIVE = null; markSeen(); };
   $('#lv-pause').onclick = () => { paused = !paused; $('#lv-pause').textContent = paused ? '▶ Далі' : '⏸ Пауза'; if (paused && abortAudio) abortAudio(); };
   $('#lv-audio').onclick = () => { audioOn = !audioOn; LS.set('live_audio', audioOn ? '1' : '0'); $('#lv-audio').classList.toggle('on', audioOn); if (!audioOn && abortAudio) abortAudio(); };
@@ -276,16 +277,13 @@
   };
 
   // ---------- повернення після відсутності: запропонувати ефір
+  // повернення після відсутності: жодних вікон поверх мапи (власник 03.11), лише підпис на кнопці «Ефір»
   function offer() {
     if (!NX() || playing || !box.hidden) return;
     const gap = NX().now() - seen;
     if (!seen || gap < 300) return;
-    const tip = document.createElement('div'); tip.id = 'live-tip';
-    tip.innerHTML = '<span>Вас не було ' + Math.round(gap / 60) + ' хв. Показати, що змінилося для вашого району?</span><button id="lt-y">Показати</button><button id="lt-n">✕</button>';
-    $('#live-tip') && $('#live-tip').remove(); document.body.appendChild(tip);
-    $('#lt-y').onclick = () => { tip.remove(); start(true); };
-    $('#lt-n').onclick = () => { tip.remove(); markSeen(); };
-    setTimeout(() => { if (tip.isConnected) { tip.remove(); } }, 20000);
+    btn.classList.add('new'); btn.querySelector('small').textContent = 'що змінилось за ' + Math.round(gap / 60) + ' хв';
+    setTimeout(() => { btn.classList.remove('new'); btn.querySelector('small').textContent = 'що змінилось'; }, 60000);
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(offer, 1500); else markSeen(); });
   setTimeout(offer, 4000);
