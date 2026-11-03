@@ -1035,6 +1035,26 @@ class Tracker:
             q *= 1 - (self.brain.rel(s, prior) if self.brain else prior)
         return 1 - q
 
+    def quality(self, tr: Track, now: float, conf: float | None = None) -> dict:
+        """Дві різні речі замість одного «conf» (04.11, незалежна оцінка):
+        впізнання — наскільки певно, що така ціль справді є (джерела, їхня надійність);
+        місце — наскільки точно відомо, де вона зараз (остання названа точка + час, що минув, і швидкість)."""
+        conf = self.conf(tr) if conf is None else conf
+        n_ind = len(self.evidence(tr)["prim"]) if tr.evidence else len(tr.srcs)
+        id_lvl = "висока" if conf >= 0.85 and n_ind >= 2 else "середня" if conf >= 0.5 else "низька"
+        fixes = [o for o in tr.obs if not o.est]
+        if not fixes:
+            return {"id_conf": round(conf, 2), "id_lvl": id_lvl, "n_indep": n_ind, "pos_km": None, "pos_lvl": "невідоме", "fix_age": None}
+        f = fixes[-1]
+        pop = getattr(f.place, "pop", 0) or 0
+        base = 2 if getattr(f.place, "kind", "") == "D" else 8 if pop >= 100_000 else 4  # район міста / велике місто / селище
+        age = max(0.0, (now - f.t) / 60)
+        # журнал: похибка оцінки ≈15–20 км через 10 хв і ≈30 км через 20 хв для шахедів; швидші цілі — пропорційно
+        km = base + 1.6 * min(age, 90) * max(1.0, tr.speed / 170) ** 0.5
+        km = min(round(km), 200)
+        lvl = "точне" if km <= 8 else "приблизне" if km <= 30 else "грубе"
+        return {"id_conf": round(conf, 2), "id_lvl": id_lvl, "n_indep": n_ind, "pos_km": km, "pos_lvl": lvl, "fix_age": int(now - f.t)}
+
     def snapshot(self, now: float | None = None) -> dict:
         now = now or time.time()
         obl = oblasts()
@@ -1116,6 +1136,7 @@ class Tracker:
             out.append({
                 "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "pair": tr.pair, "ai": tr.ai, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
+                **self.quality(tr, now, conf),
                 "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "nopos": all(o.est for o in tr.obs),
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],

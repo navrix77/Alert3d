@@ -643,3 +643,10 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 #intro p.slogan::after{background:linear-gradient(90deg,#3d8bff,transparent);margin-left:.4em}
 @keyframes slw{from{opacity:0;transform:translateY(8px);filter:blur(6px)}to{opacity:1;transform:none;filter:blur(0)}}
 @media (prefers-reduced-motion:reduce){#intro p.slogan>*{animation:none;opacity:1}}
+
+/* дві певності цілі (04.11): «що ціль є» і «де вона зараз» */
+.q2{display:grid;gap:6px;margin:6px 0 10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:13.5px}
+.q2 div{display:flex;gap:10px;align-items:baseline}
+.q2 em{font-style:normal;flex:1;min-width:0}
+.q2 span{min-width:110px;opacity:.65;font-size:12.5px}
+.q2 b.ok{color:#35D07F}.q2 b.mid{color:#FFB020}.q2 b.warn{color:#FF6B6B}

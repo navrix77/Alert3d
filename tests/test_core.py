@@ -1642,3 +1642,18 @@ def test_forecast_calibration_only_lowers():
     from app import main as M
     st = TestClient(M.app).get("/api/tts/status").json()
     assert "openai" not in st and "gemini" not in st and "neural" in st
+
+
+def test_quality_split_identity_vs_position():
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p, tr = Parser(), Tracker(SOURCES)
+    t0 = 1_800_000_000
+    tr.ingest(p.parse("Шахед над Чугуєвом курсом на Харків", "D"), "D", t0)
+    a = [x for x in tr.snapshot(t0 + 60)["tracks"] if x["type"] == "shahed"][0]
+    b = [x for x in tr.snapshot(t0 + 20 * 60)["tracks"] if x["type"] == "shahed"][0]
+    assert a["pos_lvl"] == "точне" and a["pos_km"] <= 8 and b["pos_km"] > a["pos_km"]  # місце старіє, впізнання — ні
+    assert a["id_lvl"] == b["id_lvl"] and a["n_indep"] == 1
+    tr.ingest(p.parse("Шахед курсом на Полтаву", "ND"), "ND", t0)
+    c = [x for x in tr.snapshot(t0 + 60)["tracks"] if x.get("next") == "Полтава"]
+    assert c and c[0]["pos_lvl"] == "невідоме" and c[0]["pos_km"] is None
