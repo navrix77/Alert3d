@@ -1188,3 +1188,13 @@ def test_push_only_real_threat_within_40km():
     assert sent == []  # ~89 км: лише на мапі
     asyncio.run(pu.tick(Cli(), {"tracks": [near]}))
     assert len(sent) == 1 and sent[0]["title"].startswith(("🟠", "🔴"))
+
+
+def test_aftermath_is_not_target():
+    """03.11 monitor 1654: «Так виглядає міська клінічна лікарня після ракетного удару у Харкові» стало ракетою на Харків."""
+    for t in ["Так виглядає міська клінічна лікарня після ракетного удару у Харкові.", "Наслідки нічної атаки на Харків",
+              "ЛПДС «Самара» після чергової атаки БПЛА 🔥"]:
+        o = P.parse(t, "M")
+        assert o.no_target and o.type is None, t
+    assert P.parse("Шахед на Харків, після удару ще один курсом на Чугуїв", "M").type == "shahed"
+    assert P.parse("Ракета на Харків!", "M").type == "cruise"
