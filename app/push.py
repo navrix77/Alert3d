@@ -114,7 +114,7 @@ def _where(tr: dict, a: dict) -> str:
     if a.get("d") is None:
         return ""  # без службових пояснень: лише те, що допомагає вирішити
     at = tr.get("at")
-    return _rel(a) + (f" · останнє місце: {at[0]}" if at else "")
+    return (f"{at[0]}, " if at else "") + _rel(a).replace(" від вас", " від вас")  # коротко, як на екрані блокування: «Люботин, 12 км на захід від вас»
 
 
 def _move(tr: dict) -> str:
