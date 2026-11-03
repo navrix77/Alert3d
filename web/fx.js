@@ -157,7 +157,7 @@
         const hm = mc(H.p), mpp = 40075016.686 * Math.cos(H.p[1] * Math.PI / 180) / (512 * Math.pow(2, z));
         const c = H.state === 'danger' ? [1, 0.23, 0.3] : H.state === 'watch' ? [1, 0.72, 0.2] : [0.2, 0.95, 0.55];
         const kz = Math.max(0, Math.min(1, (12.5 - z) / 1.5)); // зблизька радар не фарбує весь екран
-        if (kz > 0) glow.push([hm[0], hm[1], Math.max(30, 15000 / mpp), 0, [c[0], c[1], c[2], (H.state === 'calm' ? 0.28 : 0.7) * kz], 5]);  // спокійно, ледь помітно
+        if (kz > 0) glow.push([hm[0], hm[1], Math.max(z < 7 ? 16 : 30, 15000 / mpp), 0, [c[0], c[1], c[2], (H.state === 'calm' ? 0.28 : 0.7) * kz], 5]);  // спокійно, ледь помітно
         // світловий потік від кожної загрози до дому
         const tnow = performance.now() / 1000;
         for (const f of L) if (f.thr && Math.hypot(f.p[0] - H.p[0], (f.p[1] - H.p[1]) * 1.5) < 1.2) { const tm = mc(f.p);
