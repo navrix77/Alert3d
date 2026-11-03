@@ -1234,3 +1234,10 @@ def test_common_words_not_places():
     assert "Червоне" in [r.place.name for r in P.parse("⚠️ Реактивный от Студенок на Червоное, Лозовую", "ND").places]
     assert "Зелений Колодязь" in [r.place.name for r in P.parse("Реактивний БПЛА на Зелений Колодязь‼️", "M").places]
     assert "Харків" in [r.place.name for r in P.parse("Шахед залетел, курс Новые Дома", "R").places]
+
+
+def test_kharkiv_districts_russian_forms():
+    """Аудит 03.11: «на Северную Салтовку» ставило ціль у Сєверне на окупованій Донеччині."""
+    names = [r.place.name for r in P.parse("Шахед курсом на Северную Салтовку", "D").places]
+    assert "Сєверне" not in names and "Північна Салтівка (Харків)" in names
+    assert [r.place.name for r in P.parse("Реактивный шахед на Новую Баварию", "D").places] == ["Нова Баварія (Харків)"]
