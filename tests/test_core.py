@@ -1222,3 +1222,15 @@ def test_defense_forces_not_place():
     o = P.parse("🔱В ніч на 3 листопада Сили оборони знищили:", "deraketaua")
     assert o.type is None and not o.places
     assert P.parse("Ситуація станом на 00:43: • Р-Шахед на Близнюки", "shovnebi").type is not None
+
+
+def test_common_words_not_places():
+    """Аудит журналу 03.11: колір тривоги, «триває», «серед», вулиці, «Нова пошта» ставали селами."""
+    for src, t in [("DN", "Над Дніпром реактивний. Червоний 🟥."), ("DN", "Для нас поки без загроз. Жовтий для всієї області 🟨"),
+                   ("MU", "Триває загроза балістики з Таганрогу."), ("M", "Реактивний Шахед продовжує рух на вул. Світла❗️"),
+                   ("SU", "Молнія на Проспект Перемоги"), ("TRK", "⚡️ «Нова пошта» оголосила про запуск")]:
+        names = [r.place.name for r in P.parse(t, src).places]
+        assert not set(names) & {"Червоне", "Жовте", "Тривайли", "Світле", "Перемога", "Нова"}, (t, names)
+    assert "Червоне" in [r.place.name for r in P.parse("⚠️ Реактивный от Студенок на Червоное, Лозовую", "ND").places]
+    assert "Зелений Колодязь" in [r.place.name for r in P.parse("Реактивний БПЛА на Зелений Колодязь‼️", "M").places]
+    assert "Харків" in [r.place.name for r in P.parse("Шахед залетел, курс Новые Дома", "R").places]
