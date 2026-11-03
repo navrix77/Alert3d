@@ -1120,3 +1120,18 @@ def test_zone_push_aggregated_and_rate_limited(tmp_path, monkeypatch):
     assert len(got) == 1 and "Полтавська обл." in got[0]["title"] and "2" in got[0]["title"]
     asyncio.run(pu.tick(Cli(), {"tracks": [tr(1, 49.59, 34.55), tr(2, 49.07, 33.42), tr(3, 50.0, 33.0)]}))
     assert len(got) == 1  # нова ціль за хвилину — чекає 5 хв, а ті самі не повторюються
+
+
+def test_daily_served_from_disk_without_rebuild(tmp_path, monkeypatch):
+    """Після перезапуску мапа доби віддається з диска одразу, без перебудови (люди не чекають «Збираю маршрути…»)."""
+    import asyncio, json, time
+    import app.daily as dm
+    monkeypatch.setattr(dm, "OUT", tmp_path)
+    d = dm.Daily(None, None, None, None, [])
+    day = "2026-11-03"
+    (tmp_path / f"{day}.json").write_text(json.dumps({"v": dm.VER, "day": day, "final": True, "built": int(time.time()), "tracks": [], "booms": [], "crawl": 1}))
+    async def boom(*a, **k):
+        raise AssertionError("не мало перебудовувати")
+    monkeypatch.setattr(dm, "build", boom)
+    r = asyncio.run(d.get(day))
+    assert r["day"] == day and r["final"] is True

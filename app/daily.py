@@ -319,28 +319,46 @@ class Daily:
         self.lock = asyncio.Lock()
         OUT.mkdir(parents=True, exist_ok=True)
 
-    async def get(self, day: str) -> dict:
+    def _disk(self, day: str) -> dict | None:
         f = OUT / f"{day}.json"
-        c = self.cache.get(day)
-        if c and c.get("v") == VER and ((c["final"] and (c.get("crawl") or day in self.crawling)) or time.time() - c["built"] < 300):
-            c["crawling"] = day in self.crawling
-            return c
-        if f.exists():
-            d = json.loads(f.read_text(encoding="utf-8"))
-            if d.get("v") == VER and d.get("crawl"):
-                self.cache[day] = d
-                return d
+        try:
+            d = json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
+        except (OSError, ValueError):
+            return None
+        return d if d and d.get("v") == VER else None
+
+    def _save(self, d: dict) -> None:
+        """Одразу на диск — і чернетку, і без вибухів з історії: перезапуск сервера не змушує людей чекати перебудови."""
+        try:
+            (OUT / f"{d['day']}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        except OSError:
+            log.exception("daily save")
+
+    async def _build(self, day: str) -> dict:
         async with self.lock:
             d = await build(day, *self.args)
-        old = self.cache.get(day)
-        if old and old.get("crawl"):  # уже зібрані вибухи з повної історії каналів
+        old = self.cache.get(day) or self._disk(day)
+        if old and old.get("crawl") and not d.get("crawl"):  # уже зібрані вибухи з повної історії каналів
             d["booms"], d["crawl"] = old["booms"], old["crawl"]
         self.cache[day] = d
-        if d["final"] and d.get("crawl"):
-            f.write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-        if not d.get("crawl") and day not in self.crawling:
+        self._save(d)
+        if not d.get("crawl") and day not in self.crawling and time.time() > window(day)[1]:
             self.crawling.add(day)
             asyncio.create_task(self._crawl(day))
+        return d
+
+    async def get(self, day: str) -> dict:
+        """Ніколи не змушуємо чекати, якщо є хоч якась зібрана версія: віддаємо її, а оновлення — у фоні."""
+        c = self.cache.get(day) or self._disk(day)
+        if c:
+            self.cache[day] = c
+            stale = not c.get("final") and time.time() - c.get("built", 0) > 300
+            if stale and not self.lock.locked():
+                asyncio.create_task(self._build(day))
+            c["crawling"] = day in self.crawling
+            c["updating"] = stale
+            return c
+        d = await self._build(day)
         d["crawling"] = day in self.crawling
         return d
 
@@ -357,8 +375,7 @@ class Daily:
                 d["booms"] = sorted(merged.values(), key=lambda b: -b["c"])
                 d["crawl"] = int(time.time())
                 d["crawling"] = False
-                if d["final"]:
-                    (OUT / f"{day}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+                self._save(d)
                 log.info("мапа доби %s: вибухи з історії каналів, %d місць", day, len(got))
         except Exception:  # noqa: BLE001
             log.exception("impacts crawl")
@@ -366,24 +383,33 @@ class Daily:
             self.crawling.discard(day)
 
     async def run(self) -> None:
-        """Щоранку о 09:00 (Київ), збирає мапу минулої доби й сповіщає застосунки."""
-        await asyncio.sleep(60)
+        """Мапа доби готова до 09:05 без очікування в застосунку:
+        08:50 — чернетка поточної доби на диск; одразу після 09:00 — повна доба; далі оновлення, поки не стане остаточною
+        (підсумок Повітряних сил або +4 год). Після перезапуску сервера — з диска, без перебудови."""
+        await asyncio.sleep(30)
+        pushed: set[str] = set()
         while True:
-            day = last_finished()
             try:
-                f = OUT / f"{day}.json"
-                if not f.exists() or json.loads(f.read_text(encoding="utf-8")).get("v") != VER:
-                    d = await self.get(day)
-                    for _ in range(90):  # до 15 хв чекаємо, поки зберуться вибухи з історії каналів
-                        if not self.crawling:
-                            break
-                        await asyncio.sleep(10)
-                    log.info("мапа доби %s: %d цілей, %d вибухів", day, len(d["tracks"]), len(d["booms"]))
-                    hour = (time.time() / 3600 + kyiv_offset(time.time())) % 24
-                    if self.push and d["tracks"] and 9 <= hour < 12:  # пуш лише вранці, не вночі після перезапуску
-                        n = sum(d["by_type"].values())
-                        await self.push.broadcast("Мапа доби готова", f"За добу до 09:00, {n} цілей. Маршрути, пуски й вибухи на одній мапі.", {"daily": day})
+                now = time.time()
+                hour = (now / 3600 + kyiv_offset(now)) % 24
+                if 8 + 50 / 60 <= hour < 9:
+                    cur = current_day()
+                    c = self.cache.get(cur) or self._disk(cur)
+                    if not c or now - c.get("built", 0) > 1200:
+                        await self._build(cur)
+                day = last_finished()
+                c = self.cache.get(day) or self._disk(day)
+                if not c or c.get("built", 0) < window(day)[1] or (not c.get("final") and now - c.get("built", 0) > 600):
+                    c = await self._build(day)
+                    log.info("мапа доби %s: %d цілей, %d вибухів (остаточна: %s)", day, len(c["tracks"]), len(c["booms"]), c["final"])
                 self.ready = day
+                if self.push and c["tracks"] and 9 <= hour < 12 and day not in pushed and c.get("built", 0) >= window(day)[1]:
+                    pushed.add(day)  # пуш лише вранці і раз на добу, не після кожного перезапуску
+                    flag = OUT / f"{day}.pushed"
+                    if not flag.exists():
+                        flag.write_text("1")
+                        n = sum(c["by_type"].values())
+                        await self.push.broadcast("Мапа доби готова", f"За добу до 09:00, {n} цілей. Маршрути, пуски й вибухи на одній мапі.", {"daily": day})
             except Exception:  # noqa: BLE001
                 log.exception("daily")
-            await asyncio.sleep(120)
+            await asyncio.sleep(45)

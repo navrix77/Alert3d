@@ -84,6 +84,8 @@ function addImages(){
   if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.88)';x.beginPath();x.roundRect(2,2,s-4,s-4,14);x.fill();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
 }
 const EMPTY={type:'FeatureCollection',features:[]};
+// біжучі штрихи (ant path): зсув візерунка кроками, бо MapLibre не має dash-offset
+const FLOW_DASH=[[0,4,3],[0.5,4,2.5],[1,4,2],[1.5,4,1.5],[2,4,1],[2.5,4,0.5],[3,4,0],[0,0.5,3,3.5],[0,1,3,3],[0,1.5,3,2.5],[0,2,3,2],[0,2.5,3,1.5],[0,3,3,1],[0,3.5,3,0.5]];
 function addRelief(){
   // об'єм: рельєф (висоти Terrarium/AWS) + тіньовий відмив + 3D-будівлі в містах
   try{
@@ -240,6 +242,12 @@ function addOverlays(){
   map.addLayer({id:'trails',type:'line',source:'trails',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':['get','c'],'line-width':3,'line-dasharray':[0.1,2.2],'line-opacity':['get','o']}});
   map.addLayer({id:'ticks-c',type:'circle',source:'ticks',paint:{'circle-radius':4,'circle-color':['get','c'],'circle-stroke-color':'#0B0F17','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ticks-t',type:'symbol',source:'ticks',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,-1.1],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
+  // «жива» мапа без вигаданих позицій: напрямок руху — біжучими штрихами на ~8 хв уперед (лише де курс відомий),
+  // а нерухомі цілі (місце невідоме або лише оцінене) «дихають» кільцем: рухати їх бектест не дозволяє (03.11: точність гірша)
+  if(!map.getSource('flow'))map.addSource('flow',{type:'geojson',data:EMPTY});
+  if(!map.getSource('pulse'))map.addSource('pulse',{type:'geojson',data:EMPTY});
+  if(!map.getLayer('flow'))map.addLayer({id:'flow',type:'line',source:'flow',layout:{'line-cap':'butt'},paint:{'line-color':['get','c'],'line-width':['interpolate',['linear'],['zoom'],4,1.6,9,2.6],'line-opacity':0.85,'line-dasharray':[0,4,3]}});
+  if(!map.getLayer('pulse'))map.addLayer({id:'pulse',type:'circle',source:'pulse',paint:{'circle-radius':10,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':['get','c'],'circle-stroke-width':1.6,'circle-stroke-opacity':0.6,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'preds',type:'line',source:'preds',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':2,'line-dasharray':[1.5,2],'line-opacity':0.9}});
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':1,'icon-allow-overlap':true,'text-field':'Дім','text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
   map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['has','next'],['==',['get','active'],true],['any',['get','thr'],['==',['get','sk'],0],['>=',['zoom'],7]]],layout:{'text-field':['concat',['case',['>',['get','count'],1],['concat','×',['to-string',['get','count']],'  '],''],'→ ',['get','next']],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[3,7,3,7],'text-variable-anchor':['left','right','bottom','top'],'text-radial-offset':['interpolate',['linear'],['zoom'],2,1.9,5,2.3,7,2.8,9.5,3.4,12,3.8],'text-justify':'auto','icon-allow-overlap':false,'text-allow-overlap':false,'text-optional':false,'symbol-sort-key':['get','sk']},paint:{'text-color':'#fff'}});
@@ -424,6 +432,15 @@ function frame(now){
     window.FXHOME=home?{p:home,state:$('#me').classList.contains('danger')?'danger':$('#me').classList.contains('watch')?'watch':'calm'}:null;
     if(slow)window.FXBEACONS=PREFL().launch?(SNAP.launches||[]).filter(L=>serverT-L.t<3*3600).map(L=>({p:[L.lon,L.lat]})):[];
     if(slow)map.getSource('targets').setData({type:'FeatureCollection',features:feats});
+    try{if(slow&&map.getSource('flow')){const FL=[],PU=[];const sT=serverT;
+      for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
+        const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next)||(tr.hd==null&&!tr.route.length);
+        if(still){PU.push({type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:f.geometry});continue;}
+        const a=f.geometry.coordinates,b=posAt(tr,sT+8*60).p;if(Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])<1e-4)continue;
+        FL.push({type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:{type:'LineString',coordinates:[a,b]}});}
+      map.getSource('flow').setData({type:'FeatureCollection',features:FL});map.getSource('pulse').setData({type:'FeatureCollection',features:PU});}
+    {const k=Math.floor(now/90)%FLOW_DASH.length;if(k!==frame.fk&&map.getLayer('flow')){frame.fk=k;map.setPaintProperty('flow','line-dasharray',FLOW_DASH[k]);}
+     const ph=(now%2400)/2400;if(map.getLayer('pulse')&&now-(frame.pk||0)>60){frame.pk=now;map.setPaintProperty('pulse','circle-radius',8+ph*22);map.setPaintProperty('pulse','circle-stroke-opacity',0.7*(1-ph));}}}catch(e){}// «жива» мапа — лише оздоблення: її помилка не має зупиняти малювання цілей
     if(false){const thr=new Set(threats.map(x=>x.tr.id)),z=map.getZoom(),sz=Math.max(18,Math.min(70,10+z*5));
      window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
        return {p:f.geometry.coordinates,c:t?[1,0.23,0.27]:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],a:f.properties.weak?0.3:0.7,s:t?sz*1.9:sz,ring:t};});}
