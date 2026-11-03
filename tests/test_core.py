@@ -1215,3 +1215,10 @@ def test_kab_namesakes_near_front():
     assert not P.parse("СУшки в бнр, угроза КАБ⚠️", "R").places
     assert P.parse("Через аварію на кабельній лінії знеструмлено абонентів у Чернігові.", "horizon_of_war_Official").type is None
     assert not P.parse("Південний схід області: тактична тактика на КАБи", "DN").places
+
+
+def test_defense_forces_not_place():
+    """03.11 deraketaua: «В ніч на 3 листопада Сили оборони знищили:» стало балістикою на село Сила."""
+    o = P.parse("🔱В ніч на 3 листопада Сили оборони знищили:", "deraketaua")
+    assert o.type is None and not o.places
+    assert P.parse("Ситуація станом на 00:43: • Р-Шахед на Близнюки", "shovnebi").type is not None
