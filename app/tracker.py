@@ -927,10 +927,18 @@ class Tracker:
                 if a.type == b.type:
                     lim = self.MERGE_KM.get(a.type, 10)
                     # шахеди летять групами — зливаємо лише «той самий пункт від різних каналів»
+                    # або сильний збіг (04.11, дублі в наліт): різні канали назвали сусідні пункти (≤12 км) майже одночасно
+                    # (≤6 хв), і в обох той самий названий пункт призначення/курс або близький напрямок (<30°).
+                    # Групи (у обох count>1) і повідомлення одного й того ж каналу не склеюємо — це справді різні
                     if a.type in ("shahed", "molniya") and not (a.last.label == b.last.label or d < 3) and not ai_same:
-                        if near_cand:
-                            self.merge_cands.setdefault(frozenset((a.id, b.id)), now)
-                        continue
+                        strong = (d <= 12 and abs(a.last.t - b.last.t) <= 360 and not (a.srcs & b.srcs)
+                                  and not ((a.count or 1) > 1 and (b.count or 1) > 1)
+                                  and ((a.course_to and a.course_to == b.course_to)
+                                       or (a.heading is not None and b.heading is not None and ang_diff(a.heading, b.heading) < 30)))
+                        if not strong:
+                            if near_cand:
+                                self.merge_cands.setdefault(frozenset((a.id, b.id)), now)
+                            continue
                 elif {a.type, b.type} == {"jet", "shahed"}:
                     # «реактивний» і «шахед» в одній точці одним курсом — найчастіше той самий об'єкт, різні канали
                     lim = 8

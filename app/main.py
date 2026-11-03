@@ -995,7 +995,8 @@ def api_counts(hours: float = 3, typ: str = "shahed"):
     hist = {"frames": len(series),
             "tracks_avg": round(sum(s[0] for s in series) / len(series), 1) if series else None, "tracks_peak": max((s[0] for s in series), default=None),
             "units_avg": round(sum(s[1] for s in series) / len(series), 1) if series else None, "units_peak": max((s[1] for s in series), default=None)}
-    return {"now": int(now), "type": typ, "tracks": len(act), "units": units, "multiplier_extra": units - len(act),
+    merged = sum(1 for t in tracker.tracks if getattr(t, "merged", None) and t.type == typ)
+    return {"now": int(now), "type": typ, "tracks": len(act), "units": units, "multiplier_extra": units - len(act), "merged_as_duplicates": merged,
             "with_count_gt1": sum(1 for t in act if (t.get("count") or 1) > 1),
             "age_since_last_min": buckets, "single_source": single, "pos_estimated": est,
             "tracks_if_merged_within_km": merge, "life_min": TYPES[typ]["life"] / 60 if typ in TYPES else None,
