@@ -24,6 +24,7 @@ jobs:
           P=ios/App/App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'Щоб показати, що летить саме до вас. Місце зберігається лише на телефоні.'" $P
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Для режиму «Небо в камері»: відео обробляється лише на телефоні.'" $P
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Щоб поставити питання мапі голосом у «Живому ефірі». Звук не зберігається.'" $P || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" -c "Add :UIBackgroundModes:0 string remote-notification" $P
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'NAVRYX SKY'" $P || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'NAVRYX SKY'" $P
           sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = ${{ github.run_number }};/g" ios/App/App.xcodeproj/project.pbxproj

@@ -292,6 +292,31 @@ class LLM:
         self.used += 1
         return True
 
+    async def transcribe(self, audio: bytes, ctype: str) -> tuple[str, str | None]:
+        """Голос → текст (для iPhone, де браузер не розпізнає мову): Whisper через OpenAI або Groq, мова українська.
+        Аудіо нікуди не зберігається."""
+        ext = "mp4" if "mp4" in ctype or "aac" in ctype or "m4a" in ctype else "ogg" if "ogg" in ctype else "wav" if "wav" in ctype else "webm"
+        cands = []
+        for name, key, base, _m in self.others:
+            if name == "openai":
+                cands.append((name, key, base, os.getenv("LLM_STT_OPENAI", "whisper-1")))
+            if name == "groq":
+                cands.append((name, key, base, os.getenv("LLM_STT_GROQ", "whisper-large-v3")))
+        async with httpx.AsyncClient() as cli:
+            for name, key, base, model in cands:
+                if not self._budget_p(name + "-stt"):
+                    continue
+                try:
+                    r = await cli.post(base + "/audio/transcriptions", headers={"Authorization": f"Bearer {key}"},
+                                       data={"model": model, "language": "uk", "prompt": "Шахед, реактивний, балістика, Харків, курсом на"},
+                                       files={"file": (f"q.{ext}", audio, ctype or "application/octet-stream")}, timeout=40)
+                    r.raise_for_status()
+                    return (r.json().get("text") or "").strip(), name
+                except Exception as e:  # noqa: BLE001
+                    self.errors += 1
+                    self.last_error = self._clean(f"{name} stt: {type(e).__name__}: {e}")
+        return "", None
+
     def _log(self, item: dict) -> None:
         try:
             OUT.parent.mkdir(parents=True, exist_ok=True)

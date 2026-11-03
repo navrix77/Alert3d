@@ -548,6 +548,16 @@ async def api_live(req: Request):
     return {"diff": d, **out}
 
 
+@app.post("/api/stt")
+async def api_stt(req: Request):
+    """Голосове питання з iPhone: аудіо (до ~3 МБ) → текст. Аудіо не зберігається."""
+    body = await req.body()
+    if not body or len(body) > 3_000_000:
+        return {"ok": False, "text": ""}
+    txt, by = await LLMX.transcribe(body, req.headers.get("content-type", ""))
+    return {"ok": bool(txt), "text": txt, "by": by}
+
+
 @app.get("/api/llm")
 async def api_llm() -> dict:
     """Стан «другого парсера» (без ключа й без текстів повідомлень)."""

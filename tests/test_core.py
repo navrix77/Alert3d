@@ -1488,3 +1488,12 @@ def test_live_diff_and_validation():
                            {"say": "Нова", "action": "focus", "ids": [d["items"][0]["id"]]}], d)
     assert steps[0]["action"] is None and "—" not in steps[0]["say"] and steps[1]["action"] == "focus"
     assert live.fallback_script(d)[0]["say"].startswith("За ")
+
+
+def test_stt_without_keys_returns_empty(monkeypatch):
+    """Голос з iPhone: без ключів OpenAI/Groq розпізнавання чесно повертає порожньо (без помилки сервера)."""
+    import asyncio
+    for k in ("OPENAI_API_KEY", "GROQ_API_KEY", "GROK", "groq", "GROQ"):
+        monkeypatch.delenv(k, raising=False)
+    from app.llm import LLM
+    assert asyncio.run(LLM().transcribe(b"x" * 5000, "audio/mp4")) == ("", None)

@@ -133,16 +133,51 @@
   $('#lv-in').onkeydown = e => { if (e.key === 'Enter') ask($('#lv-in').value.trim()); };
 
   // ---------- голосове питання (де браузер уміє розпізнавати мову)
+  // iPhone/iPad (і PWA на них): вбудоване розпізнавання браузера ненадійне — записуємо голос і розпізнаємо на сервері
+  // (Whisper через OpenAI/Groq, українська). На Android Chrome — вбудоване розпізнавання браузера, з тим самим запасним шляхом.
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) $('#lv-mic').hidden = true;
-  $('#lv-mic').onclick = () => {
-    if (!SR) return; const r = new SR(); r.lang = 'uk-UA'; r.interimResults = false; r.maxAlternatives = 1;
+  const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const canRec = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  if (!SR && !canRec) $('#lv-mic').hidden = true;
+  let rec = null;
+  async function recordAndAsk() {
+    const mic = $('#lv-mic');
+    if (rec) { try { rec.stop(); } catch (e) {} return; }  // друге торкання — стоп
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+    catch (e) { say.textContent = 'Немає доступу до мікрофона. Дозвольте його в Налаштуваннях → Safari (або для застосунку) → Мікрофон.'; return; }
+    const mt = ['audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+    const chunks = []; rec = new MediaRecorder(stream, mt ? { mimeType: mt } : undefined);
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    // автостоп: 1,3 с тиші після мовлення або 10 с загалом
+    let ctx, stopT = setTimeout(() => rec && rec.state === 'recording' && rec.stop(), 10000);
+    try { ctx = new (window.AudioContext || window.webkitAudioContext)(); const an = ctx.createAnalyser(); an.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(an);
+      const buf = new Uint8Array(an.fftSize); let spoke = false, quietSince = 0;
+      const tick = () => { if (!rec || rec.state !== 'recording') return; an.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128));
+        const now = performance.now(); if (m > 18) { spoke = true; quietSince = 0; } else if (spoke) { quietSince = quietSince || now; if (now - quietSince > 1300) { rec.stop(); return; } }
+        requestAnimationFrame(tick); }; requestAnimationFrame(tick); } catch (e) {}
+    rec.onstop = async () => {
+      clearTimeout(stopT); stream.getTracks().forEach(t => t.stop()); try { ctx && ctx.close(); } catch (e) {}
+      mic.classList.remove('on'); mic.textContent = '🎤'; const type = rec.mimeType || mt || 'audio/mp4'; rec = null; paused = false;
+      const blob = new Blob(chunks, { type }); if (blob.size < 2000) { say.textContent = 'Не почув. Торкніться 🎤 і скажіть питання.'; return; }
+      say.textContent = 'Розпізнаю…';
+      try { const r = await (await fetch('/api/stt', { method: 'POST', headers: { 'content-type': type }, body: blob })).json();
+        if (r.text) { $('#lv-in').value = r.text; ask(r.text); } else say.textContent = 'Не вдалося розпізнати. Спробуйте ще раз або напишіть питання (на клавіатурі iPhone є 🎙 диктування).';
+      } catch (e) { say.textContent = 'Немає зв’язку з сервером для розпізнавання.'; }
+    };
+    paused = true; if (abortAudio) abortAudio();
+    mic.classList.add('on'); mic.textContent = '■'; say.textContent = 'Говоріть… (торкніться ■, щоб закінчити)';
+    rec.start(250);
+  }
+  function browserSR() {
+    const r = new SR(); r.lang = 'uk-UA'; r.interimResults = false; r.maxAlternatives = 1; let got = false;
     $('#lv-mic').classList.add('on'); paused = true; if (abortAudio) abortAudio();
-    r.onresult = e => { const q = e.results[0][0].transcript; $('#lv-in').value = q; ask(q); };
+    r.onresult = e => { got = true; const q = e.results[0][0].transcript; $('#lv-in').value = q; ask(q); };
     r.onend = () => { $('#lv-mic').classList.remove('on'); paused = false; };
-    r.onerror = () => { $('#lv-mic').classList.remove('on'); paused = false; };
-    try { r.start(); } catch (e) {}
-  };
+    r.onerror = e => { $('#lv-mic').classList.remove('on'); paused = false; if (!got && canRec && /not-allowed|service|network|audio/.test(e.error || '')) recordAndAsk(); };
+    try { r.start(); } catch (e) { if (canRec) recordAndAsk(); }
+  }
+  $('#lv-mic').onclick = () => { if (IOS || !SR) { if (canRec) recordAndAsk(); } else browserSR(); };
 
   // ---------- обвести ділянку пальцем
   let lassoBox = null;
