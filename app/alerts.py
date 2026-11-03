@@ -63,6 +63,7 @@ class OfficialAlerts:
                 except Exception as e:  # мережа/ліміт — статус стане «застарілим», але не «відбій»
                     self.ok, self.error = False, str(e)[:200]
                     log.warning("alerts poll failed: %s", e)
+                    await self.ualarm_once(cli)
                 await asyncio.sleep(config.ALERTS_POLL_SEC)
 
     on_threat = None
@@ -158,6 +159,10 @@ class OfficialAlerts:
             for uk, lv in got:
                 areas[uk] = max(areas.get(uk, 0), lv)
                 area_obl[uk] = name
+        self._finish(obl, areas, area_obl, "alerts.in.ua (відкрите зведення)")
+
+    def _finish(self, obl: dict, areas: dict, area_obl: dict, source: str) -> None:
+        hrom = self._hromadas()
         raions: dict[str, int] = {}
         points: list[list] = []
         hrom_poly: dict[int, int] = {}
@@ -190,7 +195,69 @@ class OfficialAlerts:
         self.hromada_levels = hrom_poly
         self.raions = sorted(raions)
         self.updated, self.ok, self.error = time.time(), True, None
-        self.source = "alerts.in.ua (відкрите зведення)"
+        self.source = source
+
+    # ---------- ukrainealarm.com (офіційне API, ключ UKRAINEALARM_API_KEY): резерв з районами й громадами
+    UA_BASE = "https://api.ukrainealarm.com/api/v3"
+    _ua_parent: dict | None = None
+
+    @staticmethod
+    def _ua_tree(regions, parent: str | None = None, out: dict | None = None) -> dict:
+        """regionId → назва області з дерева /regions (будь-яка вкладеність regionChildIds)."""
+        out = {} if out is None else out
+        items = regions.get("states", []) if isinstance(regions, dict) else regions
+        for r in items or []:
+            name = r.get("regionName") or ""
+            obl = parent or (OfficialAlerts.short(name) if r.get("regionType") == "State" else None)
+            if obl:
+                out[str(r.get("regionId"))] = obl
+            OfficialAlerts._ua_tree(r.get("regionChildIds") or [], obl, out)
+        return out
+
+    def apply_ualarm(self, data: list, parent: dict | None = None) -> None:
+        """Відповідь /alerts → ті самі рівні, що й зі зведення alerts.in.ua. Лише повітряна тривога (AIR)."""
+        parent = parent or {}
+        names = self._hromadas()["_oblasts"]
+        obl: dict[str, int] = {}
+        areas: dict[str, int] = {}
+        area_obl: dict[str, str] = {}
+        for r in data or []:
+            if not any((a.get("type") or "").upper() == "AIR" for a in r.get("activeAlerts") or []):
+                continue
+            rt, name = r.get("regionType"), (r.get("regionName") or "").strip()
+            o = parent.get(str(r.get("regionId")))
+            if rt == "State":
+                k = self.short(name)
+                if k in names or k == "Київ":
+                    obl[k] = 2
+                continue
+            if not o or o not in names:
+                continue
+            if rt == "District":
+                uk = name.replace(" район", "").strip()
+            else:  # Community / місто: «м. Харків та Харківська територіальна громада» → «м. Харків»
+                uk = re.split(r"\s+та\s+", name)[0].replace(" територіальна громада", "").strip()
+            areas[uk] = max(areas.get(uk, 0), 1)
+            area_obl[uk] = o
+        self._finish(obl, areas, area_obl, "ukrainealarm.com (офіційне API)")
+
+    async def ualarm_once(self, cli) -> bool:
+        key = config.UKRAINEALARM_KEY
+        if not key:
+            return False
+        h = {"accept": "application/json", "authorization": key}
+        try:
+            if self._ua_parent is None:
+                r = await cli.get(f"{self.UA_BASE}/regions", headers=h)
+                r.raise_for_status()
+                self._ua_parent = self._ua_tree(r.json())
+            r = await cli.get(f"{self.UA_BASE}/alerts", headers=h)
+            r.raise_for_status()
+            self.apply_ualarm(r.json(), self._ua_parent)
+            return True
+        except Exception as e:  # noqa: BLE001
+            log.warning("ukrainealarm failed: %s", e)
+            return False
 
     _H = None
     _HP = None
@@ -261,7 +328,7 @@ class OfficialAlerts:
                 except Exception as e:  # noqa: BLE001
                     fails += 1
                     log.warning("alerts.in.ua md failed: %s", e)
-                    if fails >= 2:
+                    if fails >= 2 and not await self.ualarm_once(cli):
                         await self.ubilling_once(cli)
                 await asyncio.sleep(7)  # зведення оновлюється приблизно щохвилини — ловимо зміни якнайшвидше
 

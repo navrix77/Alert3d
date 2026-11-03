@@ -1510,3 +1510,25 @@ def test_radio_fallback_texts():
     for sc in ("region", "neighbors", "country"):
         r = asyncio.run(live.radio(None, st, [], tr, time.time() - 600, (36.25, 50.0), "Харківська", sc))
         assert r["text"] and "—" not in r["text"] and r["scope"] == sc
+
+
+def test_ukrainealarm_failover_parse():
+    from app.alerts import OfficialAlerts
+    tree = {"states": [{"regionId": "22", "regionType": "State", "regionName": "Харківська область", "regionChildIds": [
+        {"regionId": "1293", "regionType": "District", "regionName": "Чугуївський район", "regionChildIds": [
+            {"regionId": "1300", "regionType": "Community", "regionName": "Малинівська територіальна громада"}]},
+        {"regionId": "1280", "regionType": "District", "regionName": "Харківський район", "regionChildIds": [
+            {"regionId": "1281", "regionType": "Community", "regionName": "м. Харків та Харківська територіальна громада"}]}]},
+        {"regionId": "9", "regionType": "State", "regionName": "Дніпропетровська область", "regionChildIds": []}]}
+    par = OfficialAlerts._ua_tree(tree)
+    assert par["1300"] == "Харківська" and par["9"] == "Дніпропетровська"
+    data = [{"regionId": "9", "regionType": "State", "regionName": "Дніпропетровська область", "activeAlerts": [{"type": "AIR"}]},
+            {"regionId": "1293", "regionType": "District", "regionName": "Чугуївський район", "activeAlerts": [{"type": "AIR"}]},
+            {"regionId": "1281", "regionType": "Community", "regionName": "м. Харків та Харківська територіальна громада", "activeAlerts": [{"type": "AIR"}]},
+            {"regionId": "1300", "regionType": "Community", "regionName": "Малинівська територіальна громада", "activeAlerts": [{"type": "ARTILLERY"}]}]
+    a = OfficialAlerts()
+    a.apply_ualarm(data, par)
+    assert a.oblast_levels.get("Дніпропетровська") == 2
+    assert "Чугуївський" in a.raion_levels
+    assert any(p[2] == "м. Харків" for p in a.points)
+    assert a.source.startswith("ukrainealarm")

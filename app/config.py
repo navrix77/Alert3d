@@ -19,6 +19,7 @@ TG_API_ID = int(os.getenv("TG_API_ID", "0") or 0)
 TG_API_HASH = os.getenv("TG_API_HASH", "")
 TG_SESSION = os.getenv("TG_SESSION", "")  # StringSession, створюється scripts/telegram_login.py
 ALERTS_TOKEN = os.getenv("ALERTS_IN_UA_TOKEN", "")  # https://alerts.in.ua/api-request
+UKRAINEALARM_KEY = os.getenv("UKRAINEALARM_API_KEY", "")  # https://api.ukrainealarm.com (ключ — через форму на сайті)
 ALERTS_POLL_SEC = int(os.getenv("ALERTS_POLL_SEC", "15"))
 PUSH_SEC = float(os.getenv("PUSH_SEC", "2"))
 TG_WEB_CYCLE_SEC = float(os.getenv("TG_WEB_CYCLE_SEC", "8"))  # цикл: головні канали щоразу, решта — порціями по 30

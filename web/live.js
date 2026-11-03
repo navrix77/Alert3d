@@ -59,7 +59,9 @@
   async function speak(text) {
     if (!audioOn || !text) return;
     try {
-      const a = new Audio('/api/tts?v=2&text=' + encodeURIComponent(text.slice(0, 300)) + '&voice=' + (LS.get('voice') || 'lada'));
+      const url = '/api/tts?v=3&text=' + encodeURIComponent(text.slice(0, 300)) + '&voice=' + (LS.get('voice') || 'lada');
+      if (window.SKYVOICE) { abortAudio = () => window.SKYVOICE.stop(); await window.SKYVOICE.play(url, 1); return; }
+      const a = new Audio(url);
       await new Promise(res => { abortAudio = () => { try { a.pause(); } catch (e) {} res(); }; a.onended = res; a.onerror = res; a.play().catch(res); setTimeout(res, 20000); });
     } catch (e) {}
   }

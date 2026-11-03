@@ -8,7 +8,15 @@
   const SILENT='data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAACAgICA';
   let unlocked=false;function unlock(){if(unlocked)return;unlocked=true;try{const a=new Audio(SILENT);a.setAttribute('playsinline','');a.loop=true;a.volume=0.01;a.play().catch(()=>{unlocked=false;});}catch(e){unlocked=false;}
     try{ctx();}catch(e){}try{if('speechSynthesis' in window){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}}catch(e){}}
-  ['touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true}));
+  // iOS дозволяє програвати без дотику лише той <audio>, який уже запускали з дотику, тому весь голос іде через один елемент
+  const VA=new Audio();VA.setAttribute('playsinline','');VA.preload='auto';let vaOk=false;
+  function vaUnlock(){if(vaOk)return;try{VA.src=SILENT;const p=VA.play();p&&p.then(()=>{vaOk=true;}).catch(()=>{});}catch(e){}}
+  ['touchend','click','keydown'].forEach(ev=>{document.addEventListener(ev,unlock,{passive:true});document.addEventListener(ev,vaUnlock,{passive:true});});
+  let vaEnd=null;
+  function vaPlay(url,vol){return new Promise(res=>{let done=false;const fin=ok=>{if(done)return;done=true;VA.onended=VA.onerror=null;res(ok);};
+    if(vaEnd)vaEnd(true);vaEnd=fin;try{VA.pause();}catch(e){}VA.onended=()=>fin(true);VA.onerror=()=>fin(false);VA.src=url;VA.volume=vol==null?1:vol;
+    const p=VA.play();if(p)p.catch(()=>fin(false));setTimeout(()=>fin(true),30000);});}
+  window.SKYVOICE={play:vaPlay,stop:()=>{try{VA.pause();}catch(e){}if(vaEnd)vaEnd(true);}};
   function env(g,t,a,d,v){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(0.001,v),t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d);}
   function osc(type,f,t,dur,v,f2){const a=ctx(),o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.linearRampToValueAtTime(f2,t+dur);o.connect(g);g.connect(a.destination);env(g,t,0.02,dur,v);o.start(t);o.stop(t+dur+0.05);}
   const TONES={
@@ -21,8 +29,7 @@
   // голос: серверна українська озвучка (Piper: Лада/Микита/Тетяна/Олекса), а якщо сервер ще не готовий, голос пристрою
   let curA=null;
   function speak(text){if(!text)return false;
-    if(S.voice&&S.voice!=='device'){try{if(curA)curA.pause();const a=new Audio('/api/tts?v=2&voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text));
-      a.volume=S.vol;a.setAttribute('playsinline','');curA=a;a.onerror=()=>sysSpeak(text);a.play().catch(()=>sysSpeak(text));return true;}catch(e){}}
+    if(S.voice&&S.voice!=='device'){try{vaPlay('/api/tts?v=3&voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text),S.vol).then(ok=>{if(!ok)sysSpeak(text);});return true;}catch(e){}}
     return sysSpeak(text);}
   function sysSpeak(text){if(!text||!('speechSynthesis' in window))return false;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
     const v=voices.find(x=>/^uk/i.test(x.lang))||voices.find(x=>/^ru/i.test(x.lang)&&false);if(v)u.voice=v;u.lang='uk-UA';u.rate=S.rate;u.volume=S.vol;speechSynthesis.speak(u);return true;}catch(e){return false;}}
