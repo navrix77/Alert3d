@@ -299,7 +299,15 @@ class LLM:
         провайдерам з ключами (для картинок — тим, що бачать зображення). Повертає {хто: відповідь}."""
         if self.cli is None:
             return {}
-        chain = [p_ for p_ in self._chain() if (not image or p_[0] in VISION) and self._live(p_[0])]
+        chain, seen_m = [], set()
+        for p_ in self._chain():
+            if (image and p_[0] not in VISION) or not self._live(p_[0]):
+                continue
+            base = p_[3].split("/")[-1].lower()
+            if base in seen_m:
+                continue  # та сама модель через іншого посередника (OpenRouter → gpt-4o-mini) — не окремий голос
+            seen_m.add(base)
+            chain.append(p_)
         if not self.ensemble:
             chain = chain[:1]
         async def one(prov):
