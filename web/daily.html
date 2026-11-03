@@ -96,6 +96,15 @@ map.on('load',async()=>{
     map.addLayer({id:'tr-'+k,type:'line',source:'tr',filter:['==',['get','k'],k],layout:{'line-cap':'round','line-join':'round','line-sort-key':['get','z']},
       paint:{'line-width':['interpolate',['linear'],['zoom'],5,['get','w'],8,['*',1.7,['get','w']]],'line-opacity':['get','o'],
         'line-gradient':['interpolate',['linear'],['line-progress'],0,hexA(c,0),0.55,hexA(c,.55),1,c]}});}
+  // звідки летіло: дуга від місця пуску до першої фіксації, росте в реальному часі польоту; пуск спалахує кільцем
+  map.addSource('links',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({id:'links-glow',type:'line',source:'links',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':6,'line-blur':5,'line-opacity':['*',0.35,['get','a']]}});
+  map.addLayer({id:'links',type:'line',source:'links',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':['get','w'],'line-opacity':['get','a'],'line-dasharray':[2,1.5]}});
+  map.addSource('lhead',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({id:'lhead-glow',type:'circle',source:'lhead',paint:{'circle-radius':12,'circle-color':['get','c'],'circle-blur':1,'circle-opacity':0.7}});
+  map.addLayer({id:'lhead',type:'circle',source:'lhead',paint:{'circle-radius':2.6,'circle-color':'#fff'}});
+  map.addSource('spulse',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+  map.addLayer({id:'spulse',type:'circle',source:'spulse',paint:{'circle-radius':['get','r'],'circle-color':'rgba(255,80,70,.12)','circle-opacity':['get','a'],'circle-stroke-color':'#FF5A4E','circle-stroke-width':2,'circle-stroke-opacity':['get','a']}});
   map.addSource('arr',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'arr',type:'symbol',source:'arr',layout:{'icon-image':'chev','icon-size':['case',['==',['get','g'],1],0.55,0.36],'icon-rotate':['get','b'],'icon-rotation-alignment':'map','icon-allow-overlap':true,'icon-ignore-placement':true},
     paint:{'icon-color':['get','c'],'icon-opacity':['get','o']}});
@@ -119,6 +128,8 @@ async function load(day){
   if(D.error){$('#sub').textContent=D.error;return;}
   DAY=D.day;history.replaceState(null,'','?d='+DAY);
   $('#sub').textContent=fd(D.t0)+' – '+fd(D.t1)+' '+new Date(D.t1*1000).getFullYear()+' · з 09:00 до 09:00'+(D.final?'':' · доба ще триває');
+  const SXY={};for(const x of D.sites)SXY[x.n]=[x.lon,x.lat];
+  for(const t of D.tracks){const xy=t.lxy||SXY[t.launch];if(xy){const a=t.pts[0];t.arc=arcify([xy,[a[0],a[1]]],0.12);const st=a[2];t.lt0=(t.lt&&t.lt<st)?t.lt:st-1200;}}
   for(const t of D.tracks){t.sp=t.pts.length>2?smoothPts(t.pts):arcify(t.pts,t.type==='ballistic'?0.16:0.08);t.len=plen(t.pts);}
   if(!GRP||load.gd!==DAY){load.gd=DAY;GRP=D.tracks.some(t=>MAJOR.has(t.type)&&t.len>=25)?'miss':'all';SEL=null;}
   legend();stats();
@@ -169,10 +180,23 @@ function draw(f){CUR=f;const T1=D.t0+(Math.min(D.t1,D.built)-D.t0)*f;const F=[],
       if(f>=1&&(st.g||SEL===t.type)){const n=pts.length;A.push({type:'Feature',properties:{c,g:st.g,o:st.o,b:brg(pts[n-2],pts[n-1])},geometry:{type:'Point',coordinates:pts[n-1]}});}}
     if(f<1&&t.pts[t.pts.length-1][2]>T1)Hd.push({type:'Feature',properties:{c,g:st.g},geometry:{type:'Point',coordinates:pts[pts.length-1]}});}
   map.getSource('tr').setData({type:'FeatureCollection',features:F});
-  map.getSource('heads').setData({type:'FeatureCollection',features:Hd});map.getSource('arr').setData({type:'FeatureCollection',features:A});
+  map.getSource('heads').setData({type:'FeatureCollection',features:Hd});links(f,T1);map.getSource('arr').setData({type:'FeatureCollection',features:A});
   map.getSource('sites').setData({type:'FeatureCollection',features:D.sites.map(s=>({type:'Feature',properties:{n:s.n,c:s.c},geometry:{type:'Point',coordinates:[s.lon,s.lat]}}))});
   map.getSource('booms').setData({type:'FeatureCollection',features:D.booms.filter(b=>b.t<=T1).map(b=>({type:'Feature',properties:{n:b.n+(b.c>1?' ×'+b.c:''),c:b.c,a:(f<1&&T1-b.t<900)?1:0.42},geometry:{type:'Point',coordinates:[b.lon,b.lat]}}))});
   $('#tl').textContent=f>=1?'усе':hm(T1);}
+// дуги «звідки летіло»: під час відтворення ростуть від пуску до першої фіксації (голова-комета), потім гаснуть;
+// на повній мапі лишаються ледь видимі, лише для ракет або вибраного типу (сотні шахедів з Курська інакше закриють усе)
+function links(f,T1){const L=[],Hh=[],Pu=[],fired={};
+  for(const t of D.tracks){if(!t.arc)continue;const st=style(t.type);if(!st)continue;const c=(T[t.type]||T.shahed)[1],s0=t.lt0,e0=t.pts[0][2];
+    if(f>=1){if(MAJOR.has(t.type)||SEL===t.type)L.push({type:'Feature',properties:{c,a:0.28,w:1},geometry:{type:'LineString',coordinates:t.arc}});continue;}
+    if(T1<s0||T1>e0+1800)continue;
+    const fr=Math.min(1,(T1-s0)/Math.max(60,e0-s0)),n=t.arc.length-1,k=fr*n,i=Math.floor(k),q=k-i,a=t.arc[i],b=t.arc[Math.min(n,i+1)],hp=[a[0]+(b[0]-a[0])*q,a[1]+(b[1]-a[1])*q];
+    const pts=[...t.arc.slice(0,i+1),hp];const fade=T1>e0?Math.max(0,1-(T1-e0)/1800):1;
+    if(pts.length>1)L.push({type:'Feature',properties:{c,a:0.85*fade,w:MAJOR.has(t.type)?1.8:1.1},geometry:{type:'LineString',coordinates:pts}});
+    if(fr<1)Hh.push({type:'Feature',properties:{c},geometry:{type:'Point',coordinates:hp}});
+    if(T1-s0<1500){const key=t.arc[0].join();if(!fired[key]||fired[key]>T1-s0)fired[key]=T1-s0;}}
+  for(const key in fired){const g=fired[key]/1500;Pu.push({type:'Feature',properties:{r:8+g*42,a:Math.max(0,1-g)},geometry:{type:'Point',coordinates:key.split(',').map(Number)}});}
+  map.getSource('links').setData({type:'FeatureCollection',features:L});map.getSource('lhead').setData({type:'FeatureCollection',features:Hh});map.getSource('spulse').setData({type:'FeatureCollection',features:Pu});}
 function legend(){const cnt={};for(const t of D.tracks)cnt[t.type]=(cnt[t.type]||0)+1;
   const ord=Object.keys(T).filter(k=>cnt[k]&&(GRP==='all'||(GRP==='miss')===MAJOR.has(k))).sort((a,b)=>MAJOR.has(b)-MAJOR.has(a));
   $('#legend').innerHTML='<div class="grp">'+GRPS.map(([k,n])=>'<button data-g="'+k+'"'+(GRP===k?' class="on"':'')+'>'+n+'</button>').join('')+'</div>'+ord.map(k=>'<div class="r t'+(SEL===k?' on':SEL?' off':'')+(MAJOR.has(k)?' maj':'')+'" data-k="'+k+'" role="button" tabindex="0"><i style="background:'+T[k][1]+';color:'+T[k][1]+'"></i>'+T[k][0]+'</div>').join('')+

@@ -183,6 +183,8 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
             e["count"] = max(e["count"], tr["count"] or 1)
             if tr.get("launch") and not tr["launch"].get("est"):
                 e["launch"] = tr["launch"]["site"]
+                e["lxy"] = [round(tr["launch"]["lon"], 3), round(tr["launch"]["lat"], 3)]  # звідки летіло: для дуги на мапі доби
+                e["lt"] = tr["launch"].get("t")
             e["next"] = tr["next"] or e["next"]
             p = [round(tr["lon"], 4), round(tr["lat"], 4), int(ts)]
             if not e["pts"] or abs(e["pts"][-1][0] - p[0]) + abs(e["pts"][-1][1] - p[1]) > 0.004:
@@ -233,7 +235,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
                 ob.append(last)
         pts = ob if len(ob) >= 2 else v["pts"]
         if len(pts) >= 2:
-            tracks.append({"id": k, "type": v["type"], "count": v["count"], "launch": v["launch"], "next": v["next"], "pts": pts})
+            tracks.append({"id": k, "type": v["type"], "count": v["count"], "launch": v["launch"], "lxy": v.get("lxy"), "lt": v.get("lt"), "next": v["next"], "pts": pts})
     tracks = stitch(tracks)
     by_type: dict[str, int] = {}
     for tr in tracks:
@@ -303,7 +305,8 @@ def stitch(tracks: list[dict]) -> list[dict]:
             k = nxt[k]
             chain["pts"] += ts[k]["pts"]
             chain["count"] = max(chain["count"] or 1, ts[k]["count"] or 1)
-            chain["launch"] = chain["launch"] or ts[k]["launch"]
+            if not chain["launch"] and ts[k]["launch"]:
+                chain["launch"], chain["lxy"], chain["lt"] = ts[k]["launch"], ts[k].get("lxy"), ts[k].get("lt")
             chain["next"] = ts[k]["next"] or chain["next"]
         out.append(chain)
     return out
