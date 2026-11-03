@@ -204,7 +204,7 @@
         for (const f of L) { if (!this.tex[f.type] || !f._m) continue; const c = f.col, a = f.weak ? 0.75 : 1;
           // місце лише оцінене (канали не назвали, де ціль зараз): без суцільної «шайби», лише тонке біле кільце,
           // сам силует напівпрозорий. 03.11: шахед «у місті», хоча про місто ніхто не писав
-          if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.2, 0, [1, 1, 1, 0.3], 2, 0, 0]); continue; }
+          if (f.est) { pk.push([f._m[0], f._m[1], spr * 1.4, 0, [0.0, 0.0, 0.0, 0.45], 0]); pk.push([f._m[0], f._m[1], spr * 1.2, 0, [1, 1, 1, 0.6], 2, 0, 0]); continue; }  // 03.11: напівпрозорий FPV на супутнику не було видно
           pk.push([f._m[0], f._m[1], spr * 1.45, 0, [0.0, 0.0, 0.0, 0.62 * a], 0]); }
         if (pk.length) this.draw(gl, this.quads(pk), pk.length); }
       const HL = window.FXHL && performance.now() < window.FXHL.until ? window.FXHL : null;
@@ -222,7 +222,7 @@
         const ph = ((f.p[0] * 131.7 + f.p[1] * 71.3) % 6.283 + 6.283) % 6.283, tt = (performance.now() - this.t0) / 1000;
         const sw = Math.sin(tt * 0.55 + ph), alt = Math.sin(tt * 0.37 + ph * 1.7);
         const fast = f.type === 'ballistic' || f.type === 'cruise';
-        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.45 : f.weak ? 0.8 : 1) * (HL && f.type !== HL.type ? 0.22 : 1), c = f.col;
+        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.78 : f.weak ? 0.85 : 1) * (HL && f.type !== HL.type ? 0.22 : 1), c = f.col;
         const bank = Math.max(-1, Math.min(1, Math.cos(tt * 0.55 + ph) * 0.9));
         const sz = spr * (1 + 0.035 * alt), sh = spr * (0.22 + 0.06 * alt);
         const rc = [Math.min(1, c[0] * 1.15 + 0.15), Math.min(1, c[1] * 1.15 + 0.15), Math.min(1, c[2] * 1.15 + 0.15), a];
