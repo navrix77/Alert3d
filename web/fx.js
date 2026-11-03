@@ -88,13 +88,16 @@
         vec3 L = normalize(vec3(-0.45, 0.55, 0.7));
         float dif = clamp(dot(n, L), 0.0, 1.0);
         float spec = pow(max(dot(reflect(-L, n), vec3(0.0, 0.0, 1.0)), 0.0), 22.0);
-        float o = 0.0;
-        for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236;
-          o = max(o, texture2D(u_tex, uv + vec2(cos(an), sin(an)) * 0.03).a); }
-        float rim = clamp(o - t.a, 0.0, 1.0) * 0.55;
-        vec3 body = t.rgb * (0.82 + 0.3 * dif) + vec3(spec * 0.25);   // текстура вже з реалістичним світлом, лише легке підсилення
-        float a = max(t.a, rim);
-        gl_FragColor = vec4(body * t.a + v_col.rgb * rim, a) * v_col.a;
+        // чіткість на будь-якій підкладці: тонкий темний контур по силуету + зовнішній ореол кольору типу
+        float o1 = 0.0, o2 = 0.0;
+        for (int i = 0; i < 12; i++) { float an = float(i) * 0.5236; vec2 dv = vec2(cos(an), sin(an));
+          o1 = max(o1, texture2D(u_tex, uv + dv * 0.022).a); o2 = max(o2, texture2D(u_tex, uv + dv * 0.055).a); }
+        float outl = clamp(o1 - t.a, 0.0, 1.0);
+        float halo = clamp(o2 - max(t.a, o1), 0.0, 1.0) * 0.7;
+        vec3 body = t.rgb * (0.9 + 0.38 * dif) + vec3(spec * 0.35);   // текстура з реалістичним світлом, трохи контрастніше
+        body = (body - 0.5) * 1.12 + 0.5;
+        float a = max(t.a, max(outl * 0.92, halo));
+        gl_FragColor = vec4(clamp(body, 0.0, 1.0) * t.a + vec3(0.02, 0.03, 0.05) * outl * 0.92 + v_col.rgb * halo, a) * v_col.a;
       }
     }`;
   const Q = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
@@ -116,8 +119,11 @@
         const img = new Image(); img.onload = () => {
           const tx = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tx);
           gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          // 256×256 (степінь двійки) з mip-рівнями: при зменшенні силует не «сиплеться» і не розмивається
+          const cv = document.createElement('canvas'); cv.width = cv.height = 256; const cx = cv.getContext('2d'); cx.imageSmoothingQuality = 'high'; cx.drawImage(img, 0, 0, 256, 256);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
+          gl.generateMipmap(gl.TEXTURE_2D);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
           this.tex[t] = tx; map.triggerRepaint();
         };
@@ -150,7 +156,7 @@
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
-      const spr = Math.max(13, Math.min(24, 6 + z * 2.0));  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
+      const spr = Math.max(15, Math.min(34, 7 + z * 2.4));  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
       const glow = [], top = [];
       const day = !!window.FXDAY;
       if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
