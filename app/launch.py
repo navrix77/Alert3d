@@ -107,6 +107,20 @@ class Launch:
     stage: str = "launch"
 
 
+FAR_UA = [(48.62, 22.29), (51.55, 23.90), (45.35, 28.84), (52.37, 33.20), (49.90, 40.10), (45.30, 36.50)]  # крайні точки України
+
+
+def ttl(L) -> float:
+    """Скільки секунд позначка пуску актуальна (див. Launches.snapshot)."""
+    if L.stage == "takeoff" or not L.type:
+        return float(MAXAGE.get(L.type, 3 * 3600) if L.type else 3 * 3600)
+    import math
+    la, lo = L.site.lat, L.site.lon
+    far = max(math.hypot((la - a) * 111.2, (lo - b) * 111.2 * math.cos(math.radians((la + a) / 2))) for a, b in FAR_UA)
+    far = min(far, RANGE.get(L.type, far))
+    return float(min(MAXAGE.get(L.type, 3600), far / SPEED.get(L.type, 300) * 3600 * 1.25 + 900))
+
+
 def detect(text: str, typ: str | None) -> tuple[list[Site], str | None, str | None, bool]:
     """→ (точки пуску, тип, носій, це підсумок за ніч). Порожньо, якщо повідомлення не про пуск."""
     t = norm(text)
@@ -299,8 +313,11 @@ class LaunchBook:
         return {"site": site.name, "lat": site.lat, "lon": site.lon, "kind": site.kind, "t": int(t) if t else None, "est": est,
                 "carrier": carrier, "srcs": srcs, "link": link, "p": p, "id": lid, "count": count}
 
-    def snapshot(self, now: float) -> list[dict]:
+    def snapshot(self, now: float, every: bool = False) -> list[dict]:
+        """Актуальні пуски. Позначка живе, доки її зброя фізично може бути в повітрі над Україною: політ від місця пуску
+        до найдальшої точки України зі швидкістю типу (×1.25 + 15 хв), не довше за MAXAGE (03.11: «ПУСК: крилаті ракети
+        з Бєлгорода · 05:37» висіла о 10:47, а така ракета долітає за ~1,5 год). every=True: усі за 6 год (мапа доби)."""
         self.prune(now)
-        return [{"id": L.id, "site": L.site.name, "lat": L.site.lat, "lon": L.site.lon, "kind": L.site.kind, "t": int(L.t),
+        return [{"id": L.id, "site": L.site.name, "lat": L.site.lat, "lon": L.site.lon, "kind": L.site.kind, "t": int(L.t), "until": int(L.t + ttl(L)),
                  "type": L.type, "count": L.count, "carrier": L.carrier, "srcs": sorted(L.srcs), "links": L.links[-3:],
-                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind, "stage": L.stage} for L in self.items if now - L.t < 6 * 3600]
+                 "tracks": len(L.tracks), "ev": L.ev, "site_types": sorted(L.site.types or []), "site_kind": L.site.kind, "stage": L.stage} for L in self.items if now - L.t < 6 * 3600 and (every or now < L.t + ttl(L))]

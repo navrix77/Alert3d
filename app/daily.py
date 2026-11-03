@@ -223,7 +223,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
         for live, old in zip(ctx_dicts, saved):
             live.clear()
             live.update(old)
-    launches = shadow.launches.snapshot(t1 if t1 < time.time() else time.time())
+    launches = shadow.launches.snapshot(t1 if t1 < time.time() else time.time(), every=True)
     tracks = []
     for k, v in traj.items():
         ob = [v["obs"][t] for t in sorted(v["obs"])]

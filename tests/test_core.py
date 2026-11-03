@@ -1135,3 +1135,15 @@ def test_daily_served_from_disk_without_rebuild(tmp_path, monkeypatch):
     monkeypatch.setattr(dm, "build", boom)
     r = asyncio.run(d.get(day))
     assert r["day"] == day and r["final"] is True
+
+
+def test_launch_marker_expires_by_flight_time():
+    """03.11: «ПУСК: крилаті ракети з Бєлгорода · 05:37» висіла на мапі о 10:47. Позначка живе стільки, скільки зброя може летіти."""
+    from types import SimpleNamespace as N
+    from app import launch
+    L = N(stage="launch", type="cruise", site=N(lat=50.6, lon=36.6))
+    assert 1.5 * 3600 < launch.ttl(L) < 2.5 * 3600
+    B = N(stage="launch", type="ballistic", site=N(lat=50.6, lon=36.6))
+    assert launch.ttl(B) <= 20 * 60
+    T = N(stage="takeoff", type=None, site=N(lat=48.5, lon=46.0))
+    assert launch.ttl(T) == 3 * 3600
