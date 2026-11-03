@@ -578,10 +578,15 @@ function homeObl(){if(!home||!window.__OBLGJ)return null;if(homeObl.k===home.joi
   homeObl.k=home.join();homeObl.v=find(window.__OBLGJ);homeObl.r=find(window.__RAGJ);return homeObl.v;}
 // офіційний статус для дому: уся область → район дому → «у частині області» (громади) → немає
 function homeOfficial(ob){const O=SNAP.official||{};const ra=homeObl.r;
-  if((SNAP.levels||{})[ob])return {on:1,t:'тривога в усій області'};
-  if(ra&&(O.raion_levels||{})[ra])return {on:1,t:'тривога у вашому районі'};
-  if((O.alert_obl||[]).includes(ob))return {on:2,t:'тривога в частині області'};
-  return {on:0,t:'тривоги немає'};}
+  // офіційне зведення застаріло (джерело не відповідає): чесно кажемо, а не показуємо старий стан як поточний
+  const age=O.updated?(Date.now()/1000+offset-O.updated)/60:999;const st=age>3?' · дані тривог '+(age>120?'недоступні':Math.round(age)+' хв тому'):'';
+  if((SNAP.levels||{})[ob])return {on:1,t:'тривога в усій області'+st};
+  if(ra&&(O.raion_levels||{})[ra])return {on:1,t:'тривога у вашому районі'+st};
+  // громада дому (м. Харків має власну тривогу, окремо від району): 03.11 карта показувала «тривога: м. Харків», а панель «у частині області»
+  const H=O.hromadas||{};if(HPDATA&&home)for(const id in H){const f=HPDATA.features[+id];if(H[id]&&f&&geomIn(f.geometry,home[0],home[1]))return {on:1,t:'тривога у вашій громаді'+st};}
+  if(!HPDATA&&Object.keys(H).length)loadHP();
+  if((O.alert_obl||[]).includes(ob))return {on:2,t:'тривога в частині області'+st};
+  return {on:0,t:'тривоги немає'+st};}
 function renderMe(threats){
   const box=$('#me');if(!home){box.className='me'+(box.classList.contains('open')?' open':'');$('#me-word').textContent='Що летить до мене?';$('#me-sub').innerHTML='Покажу, що летить саме до вас.<button class="cta" id="me-cta">Визначити моє місце</button>';const cta=$('#me-cta');if(cta)cta.onclick=()=>$('#b-locate').click();$('#me-list').innerHTML='';return;}
   const isStale=!SNAP||(Date.now()-recvAt)/1000>(document.hidden?75:30);
@@ -595,7 +600,8 @@ function renderMe(threats){
   let cls=lvl?'me watch':'me',word='Цілей у ваш бік немає',sub=offL;
   if(!tg){cls='me watch';word='Дані неповні';sub=offL+'Канали моніторів зараз не надходять.';}
   const mb=near.filter(x=>!x.r.rel&&x.r.maybe).sort((a,b)=>b.r.p-a.r.p)[0];
-  if(!first&&mb){cls='me watch';word='Можлива загроза';sub=offL+esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · шанс пройти поруч ~'+Math.round(mb.r.p*100)+'%';}
+  // «може наблизитися» лише в межах 40 км, як і push (калібрування 03.11: показаний відсоток завищений ~10 разів, тому без чисел)
+  if(!first&&mb&&mb.r.d<=40){cls='me watch';word='Ціль неподалік';sub=offL+esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · може наблизитися';}
   // ціль поруч — загроза незалежно від курсу (03.11: дві цілі за 3–6 км від дому, а панель писала «Цілей у ваш бік немає»)
   const HX=xy(home);const close=SNAP.tracks.filter(t=>t.status==='active'&&!t.nopos).map(t=>{const d=DISP.get(t.id);return d?{tr:t,d:dist(HX,xy(d.p)),side:FROM[Math.round(brg(HX,xy(d.p))/45)%8]}:null;}).filter(x=>x&&x.d<=15).sort((a,b)=>a.d-b.d);
   if(!first&&close.length){const c0=close[0],n=close.reduce((a,x)=>a+(x.tr.count||1),0);cls=c0.d<=8?'me danger':'me watch';word=n>1?'Цілі поруч: '+n:'Ціль поруч';
