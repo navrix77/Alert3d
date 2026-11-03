@@ -574,7 +574,9 @@ function renderAsOf(){
   if(age>30){el.className='asof stale';el.innerHTML='<i class="live-dot"></i>Немає звʼязку '+Math.round(age)+' с, це не відбій';return;}
   const h=SNAP.health,ok=h.telegram||h.replay;
   el.className='asof'+(ok?'':' stale');
-  el.innerHTML='<i class="live-dot'+(ok?'':' wait')+'"></i>'+(h.replay?'Демо':ok?'Наживо':'Дані затримуються')+' · '+fmt(SNAP.now);
+  // не «Наживо», а час знімка даних із секундами (03.11, ревізія візуалу): «немає» о 17:20 і «немає» о 17:35 без нових даних — різні речі
+  el.title='час останніх даних від моніторів';
+  el.innerHTML='<i class="live-dot'+(ok?'':' wait')+'"></i>'+(h.replay?'Демо · ':ok?'':'Дані затримуються · ')+'<b>'+fmtS(SNAP.now)+'</b>';
 }
 setInterval(()=>SNAP&&renderAsOf(),1000);
 let SHELTER=+(localStorage.getItem('shelter')||3);if($('#me-sh'))$('#me-sh').textContent=SHELTER;
@@ -605,7 +607,9 @@ function renderMe(threats){
   const offL=ob?'<div class="me-off '+(OF.on===1?'on':OF.on===2?'part':'')+'"><i></i>'+esc(OF.t)+'</div>':'';
   // що відомо моніторам: давність останнього повідомлення поруч (≤60 км), непідтверджені цілі теж рахуємо
   const tg=!SNAP.health||SNAP.health.telegram||SNAP.health.replay;
-  let cls=lvl?'me watch':'me',word='Цілей у ваш бік немає',sub=offL;
+  // «Цілей у ваш бік немає» звучало як гарантія для даних із повідомлень; тепер чесно: не підтверджено, за повідомленнями, станом на час
+  const srcL='<div class="me-src">за повідомленнями моніторів · '+fmt(SNAP.now)+'</div>';
+  let cls=lvl?'me watch':'me',word='Руху у ваш бік не підтверджено',sub=offL+srcL;
   if(!tg){cls='me watch';word='Дані неповні';sub=offL+'Канали моніторів зараз не надходять.';}
   const mb=near.filter(x=>!x.r.rel&&x.r.maybe).sort((a,b)=>b.r.p-a.r.p)[0];
   // «може наблизитися» лише в межах 40 км, як і push (калібрування 03.11: показаний відсоток завищений ~10 разів, тому без чисел)
