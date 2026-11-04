@@ -367,7 +367,7 @@ class Tracker:
             o = _obl_name(CHANNEL_REGION.get(src))
             if o:
                 obl.append(o)
-        self.bal.append({"t": int(t), "src": src, "link": link, "obl": obl, "close": obs.kind == "close",
+        self.bal.append({"t": int(t), "src": src, "link": link, "obl": obl, "close": obs.kind == "close", "ty": obs.type,
                          "pl": [r.place.name for r in obs.places if r.role in ("t", "p")][:4], "txt": raw.strip()[:160]})
         self.bal = [e for e in self.bal if t - e["t"] < 3600][-60:]
 
@@ -380,7 +380,7 @@ class Tracker:
         self.log.append(rec)
         self.log = self.log[-400:]
         try:
-            if obs.type == "ballistic" and obs.kind in ("track", "info", "close", "zone"):
+            if obs.type in ("ballistic", "banderol") and obs.kind in ("track", "info", "close", "zone"):
                 self._bal_event(obs, src, t, link)
             elif getattr(obs, "raw", None):
                 self._mig(obs.raw, src, t, link)

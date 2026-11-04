@@ -146,7 +146,7 @@ class AI:
         kab = [z for z in s.get("zones", []) if z.get("obl") == obl]
         ctx = (f"Область: {obl}. Зараз {time.strftime('%H:%M')}.\nОфіційна тривога в області: {'так' if alert else 'ні'}.\n"
                f"Цілей в області (за повідомленнями каналів): {len(tr)}\n" + "\n".join(lines) +
-               (f"\nПовідомлень про балістику/МіГ-31К за 30 хв: {len(bal)}" if bal else "") +
+               (f"\nПовідомлень про балістику/МіГ-31К/«Бандероль» за 30 хв: {len(bal)}" if bal else "") +
                (f"\nЗон загрози КАБ: {len(kab)}" if kab else ""))
         txt, by = await self.llm.call(EXPLAIN_SYSTEM, ctx, None, max_tokens=350)
         if not txt:  # усі моделі недоступні — чесне зведення з даних SKY, без вигадок

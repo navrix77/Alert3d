@@ -46,6 +46,16 @@ LIVE_TOOL = {
 }
 
 
+def _bword(es: list, case: str = "gen") -> str:
+    """Слово для «посиленої уваги»: балістика або ракета «Бандероль» (04.11, власник: Бандероль так само, як балістика)."""
+    ty = {(e.get("ty") or "ballistic") for e in es}
+    if ty == {"banderol"}:
+        return "ракету «Бандероль»" if case == "acc" else "ракети «Бандероль»"
+    if "banderol" in ty:
+        return "балістику й «Бандероль»" if case == "acc" else "балістики й «Бандероль»"
+    return "балістику" if case == "acc" else "балістики"
+
+
 def _km(a, b) -> float:
     return math.hypot((a[0] - b[0]) * 71.6, (a[1] - b[1]) * 111.2)
 
@@ -100,7 +110,7 @@ def diff(state: dict, hist: list[dict], tracker, since: float, home: tuple | Non
     return {"since": int(since), "now": int(now), "minutes": max(0, round((now - since) / 60)), "obl": obl,
             "alert": {"now": bool(lv_now), "was": bool(lv_was)} if obl else None,
             "items": items[:25], "gone": gone[:10], "bal": [{"t": e["t"], "src": e["src"], "obl": e.get("obl"), "close": e.get("close"),
-                                                            "txt": e.get("txt", "")[:120], "k": e.get("k")} for e in bal][-6:],
+                                                            "txt": e.get("txt", "")[:120], "k": e.get("k"), "ty": e.get("ty")} for e in bal][-6:],
             "counts": {"new": sum(i["status"] == "new" for i in items), "changed": sum(i["status"] == "changed" for i in items),
                        "gone": len(gone), "active": len(items)}}
 
@@ -123,7 +133,7 @@ def fallback_script(d: dict, question: str | None = None) -> list[dict]:
     steps.append({"say": head + (", ".join(parts) if parts else "суттєвих змін у вашому районі немає") + ".", "action": "overview"})
     if d["bal"]:
         b = d["bal"][-1]
-        steps.append({"say": ("Відбій балістики" if b.get("close") else "Повідомлення про балістику") + f" о {time.strftime('%H:%M', time.localtime(b['t']))}, {b['src']}.",
+        steps.append({"say": ("Відбій " + _bword([b]) if b.get("close") else "Повідомлення про " + _bword([b], "acc")) + f" о {time.strftime('%H:%M', time.localtime(b['t']))}, {b['src']}.",
                       "action": "dim", "value": True})
     for it in [i for i in d["items"] if i["status"] in ("new", "changed")][:5]:
         say = it["name"] + (f" ×{it['count']}" if it["count"] > 1 else "")
@@ -386,7 +396,7 @@ def region_text(f: dict, obl: str) -> tuple[str, str]:
              (f" Район геомітки: {f['raion']}, тривога в районі: {'так' if f.get('raion_alert') else 'ні'}." if f.get("raion") else "")]
     if f["bal"]:
         b = f["bal"][0]
-        lines.append(f"Повідомлення про загрозу балістики для області о {time.strftime('%H:%M', time.localtime(b['t']))}.")
+        lines.append(f"Повідомлення про загрозу {_bword(f['bal'])} для області о {time.strftime('%H:%M', time.localtime(b['t']))}.")
     if f["near"]:
         lines.append(f"Цілей у радіусі {f.get('radius', 120):.0f} км: {f['n_near']}. Найважливіші:")
         for x in f["near"]:
@@ -401,7 +411,7 @@ def region_text(f: dict, obl: str) -> tuple[str, str]:
     # запасний текст
     fb = []
     if f["bal"]:
-        fb.append("Для вашої області повідомляють про загрозу балістики. Будьте в укритті.")
+        fb.append(f"Для вашої області повідомляють про загрозу {_bword(f['bal'])}. Будьте в укритті.")
     if f["near"]:
         x = f["near"][0]
         W = x['word'][:1].upper() + x['word'][1:]
@@ -504,6 +514,7 @@ def country_facts(state: dict) -> dict:
     al = sorted(set(levels) | set(off.get("alert_obl") or []))
     now = time.time()
     bal = sorted({o for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") for o in e.get("obl", []) if o != "*"})
+    bal_ev = [e for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close")]
     top = sorted(by, key=lambda o: -sum(by[o].values()))[:4]
     allt = Counter()
     for c in by.values():
@@ -513,14 +524,14 @@ def country_facts(state: dict) -> dict:
           tuple(sorted({z["obl"] for z in state.get("zones", []) if z.get("obl") and now - (z.get("last") or z["t"]) < 1800})))
     types = sorted(allt, key=lambda k: (pri.index(k) if k in pri else 99, -allt[k]))  # спершу найнебезпечніші
     kab_obl = sorted({z["obl"] for z in state.get("zones", []) if z.get("obl") and now - (z.get("last") or z["t"]) < 1800})
-    return {"al": al, "bal": bal, "top": [(o, by[o].most_common(2)) for o in top], "types": types, "fp": fp,
+    return {"al": al, "bal": bal, "bal_ev": bal_ev, "top": [(o, by[o].most_common(2)) for o in top], "types": types, "fp": fp,
             "launches": _launches(state), "kab_obl": kab_obl}
 
 
 def country_text(state: dict, f: dict | None = None) -> tuple[str, str]:
     f = f or country_facts(state)
     ctx = (f"РЕЖИМ: «Вся Україна». Зараз {_kyiv_hm()}. Областей з офіційною тривогою: {len(f['al'])}." +
-           (f" Загроза балістики: {', '.join(f['bal'])}." if f["bal"] else "") +
+           (f" Загроза {_bword(f.get('bal_ev') or [])}: {', '.join(f['bal'])}." if f["bal"] else "") +
            "\nРегіони з найбільшою активністю за повідомленнями моніторингу (кількість не є встановленим фактом, не називай її):\n" +
            "\n".join(f"- {o}: " + ", ".join(TWORD.get(k, (k, k))[1] for k, _n in ty) for o, ty in f["top"]))
     n = len(f["al"])

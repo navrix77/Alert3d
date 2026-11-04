@@ -1351,6 +1351,22 @@ def test_ballistic_threat_mode_events():
     assert [e["close"] for e in b] == [False, False, True]
 
 
+def test_banderol_gets_threat_mode_like_ballistic():
+    """04.11 власник: для «Бандероль» така сама посилена увага, як для балістики."""
+    import time
+    from app.live import _bword
+    p, tr = Parser(), Tracker(SOURCES)
+    now = time.time()
+    t = "Бандероль на Харків"
+    o = p.parse(t, "X"); o.raw = t
+    tr.ingest(o, "X", now, None)
+    b = tr.snapshot(now + 2)["bal"]
+    if o.type == "banderol":
+        assert b and b[-1].get("ty") == "banderol"
+    assert _bword([{"ty": "banderol"}]) == "ракети «Бандероль»" and _bword([{}]) == "балістики"
+    assert _bword([{"ty": "banderol"}, {"ty": "ballistic"}]) == "балістики й «Бандероль»"
+
+
 def test_recon_with_lancet_threat_is_recon():
     """03.11: «Зала (угроза ланцет)»: ZALA розвідник, що може наводити Ланцет; Ланцет поруч не підтверджено."""
     o = P.parse("Зала (угроза ланцет) от Староверовки на Шевченково", "X")
