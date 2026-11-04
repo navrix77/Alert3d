@@ -860,3 +860,12 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 @keyframes glPulse{0%,100%{opacity:.55}50%{opacity:1}}
 #intro .lg .gl{display:none!important}
 #intro .lg::before{left:50%!important;margin-left:-36%!important;top:-1%!important;width:72%!important;height:72%!important;right:auto!important;bottom:auto!important;transform-origin:50% 50%!important}
+
+/* ===== Заставка v2 «збирання з частинок» (перекриває попередні шари) ===== */
+#intro .lg::before,#intro .lg::after,#intro .lg .st,#intro .lg .ar{display:none!important}
+#intro .lg{animation:none!important;transform:none!important}
+#intro .lg img{animation:ixImg .5s ease-out 1.7s both!important;opacity:0;filter:none!important;transform:none!important}
+@keyframes ixImg{from{opacity:0}to{opacity:1}}
+#intro #ix{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+#intro p.slogan .s1{animation-delay:1.9s!important}#intro p.slogan .s2{animation-delay:2.1s!important}#intro p.slogan em{animation-delay:2.35s!important}
+@media (prefers-reduced-motion:reduce){#intro .lg img{animation:none!important;opacity:1}}
