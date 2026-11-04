@@ -659,7 +659,7 @@ function frame(now){
     if(slow&&map.getSource('tac')){const TF=[];
       const A6=TAC?window.App06:null;const RAIL=[];
       if(TAC)for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
-        const ageS=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),mins=Math.floor(ageS/60),o=ageS<300?1:Math.max(0.4,1-(ageS-300)/1500),c=f.properties.c,P=f.geometry.coordinates;
+        const ageS=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),mins=Math.floor(ageS/60),o=ageS>=(((SNAP.counts&&SNAP.counts.live_min)||{})[tr.type]||10)*60?0.3:1,c=f.properties.c,P=f.geometry.coordinates;// те саме правило, що в лічильнику: старша за час життя типу — напівпрозора «тінь», і в лічильник не входить
         TF.push({type:'Feature',properties:{k:'age',l:mins<1?'<1 хв':mins+' хв',o,c},geometry:{type:'Point',coordinates:P}});
         if(A6&&f.properties.active)RAIL.push({id:tr.id,aff:tacAff(tr),type:A6.MAP[tr.type]?tr.type:'unknown',n:f.properties.count,m:mins,hd:null});
         if(A6){const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next);// напрямок у символі лише коли він відомий
