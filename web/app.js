@@ -693,7 +693,7 @@ function balMode(ob,OF){if(!ob||!SNAP||!SNAP.bal)return null;const now=Date.now(
   if(now-last.t>40*60)return null;
   // офіційний відбій для дому після початку режиму (повідомлення старше 90 с)
   if(OF&&OF.on===0&&SNAP.official&&SNAP.official.ok&&now-last.t>90)return null;
-  return {start,last,items:items.slice(-4).reverse(),obl:ob,names:last.obl.includes('*')?[]:last.obl,mig:items.every(e=>e.k==='mig')};}
+  return {start,last,items:items.slice(-4).reverse(),obl:ob,names:last.obl.includes('*')?[]:last.obl,mig:items.every(e=>e.k==='mig'),bw:(()=>{const t=new Set(items.map(e=>e.ty||'ballistic'));return t.size===1&&t.has('banderol')?'ban':t.has('banderol')?'mix':'bal';})()};}
 function showBalRegion(){if(!BALM||!window.__OBLGJ)return;const fs=window.__OBLGJ.features.filter(f=>BALM.names.includes(f.properties.n)||f.properties.n===BALM.obl);if(!fs.length)return;
   let b=[180,90,-180,-90];const walk=c=>{if(typeof c[0]==='number'){b=[Math.min(b[0],c[0]),Math.min(b[1],c[1]),Math.max(b[2],c[0]),Math.max(b[3],c[1])];}else c.forEach(walk);};fs.forEach(f=>walk(f.geometry.coordinates));
   map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:{top:120,bottom:260,left:30,right:30},duration:800});}
@@ -760,7 +760,7 @@ function renderMe(threats){
     sub=offL+esc(TYPE_NAME[first.tr.type])+' · '+Math.round(first.r.d)+' км '+first.r.from+(byRoute?(first.r.eta!=null?' · ~'+Math.max(1,Math.round(e))+' хв':''):' · напрямок за оцінкою, може наблизитися');}
   BALM=(!isStale)?balMode(ob,OF):null;syncBalLayers();
   if(BALM){const now=Date.now()/1000+offset,L=BALM.last,ag=Math.max(0,Math.round(now-L.t));const nm=k=>esc(SNAP.sources[k]?.name||k);
-    cls='me danger bal';word=BALM.mig?'МіГ-31К у повітрі · загроза «Кинджала»':'Балістична загроза · '+(OBL_GEN[BALM.obl]||BALM.obl);
+    cls='me danger bal';word=BALM.mig?'МіГ-31К у повітрі · загроза «Кинджала»':(BALM.bw==='ban'?'Загроза бандеролей':BALM.bw==='mix'?'Загроза балістики й бандеролей':'Балістична загроза')+' · '+(OBL_GEN[BALM.obl]||BALM.obl);
     sub=offL+'<div class="bal-age">Повідомлення отримано '+(ag<60?ag+' с':Math.round(ag/60)+' хв')+' тому · '+nm(L.src)+(SNAP.sources[L.src]?.official?' (офіційне)':'')+'</div>'+
       '<div class="bal-go">Перейдіть в укриття</div>'+
       '<ol class="bal-log">'+BALM.items.map(e=>'<li><span>'+fmt(e.t)+'</span><b>'+nm(e.src)+'</b> '+esc(e.k==='mig'?(e.txt||'МіГ-31К').slice(0,70):e.pl.length?e.pl.join(', '):e.obl.map(o=>OBL_GEN[o]||o).slice(0,4).join(', ')+(e.obl.length>4?' +'+(e.obl.length-4):''))+(e.link?' <a href="'+esc(e.link)+'" target=_blank rel=noopener>↗</a>':'')+'</li>').join('')+'</ol>'+
