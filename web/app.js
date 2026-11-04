@@ -207,11 +207,15 @@ const ENEMY_TYPE={airfield:'enemy_airfield',hq:'enemy_hq'};
 function enemyLoad(){if(ENEMY!==null)return;ENEMY=[];loadApp06().then(A=>{if(!A)return;fetch('/data/enemy_objects.geojson',{cache:'no-cache'}).then(r=>r.json()).then(j=>{ENEMY=(j.features||[]);ENEMY_SET=false;}).catch(()=>{ENEMY=null;});});}
 async function afldIcon(){if(map.hasImage('afld'))return;try{const r=await fetch('/sprites/afld.png'),b=await createImageBitmap(await r.blob());if(!map.hasImage('afld'))map.addImage('afld',b,{pixelRatio:4});}catch(e){}}
 function enemyApply(){afldIcon();if(!window.App06||!ENEMY||!map.getSource('enemy'))return;
-  // аеродром поруч із активним ПУСКом (≤15 км): значок аеродрому приглушуємо, щоб не дублювати позначку пуску
   const nowS=Date.now()/1000+offset,Ls=(PREFL().launch?(SNAP&&SNAP.launches)||[]:[]).filter(L=>nowS-L.t<3*3600);
-  const near=f=>Ls.some(L=>hav([L.lon,L.lat],f.geometry.coordinates)<15);const key=ENEMY.map(f=>near(f)?1:0).join('');
+  const nearL=(f,sec)=>Ls.some(L=>nowS-L.t<sec&&hav([L.lon,L.lat],f.geometry.coordinates)<15);
+  let list,key;
+  if(TAC){// тактичний режим: усі ключові аеродроми; поруч із активним пуском приглушуємо значок, щоб не дублювати позначку пуску
+    list=ENEMY.map(f=>({f,dim:nearL(f,3*3600)?1:0,hot:0}));key='t'+list.map(x=>x.dim).join('');}
+  else{// звичайний режим: аеродроми приховані; підсвічуємо лише в момент пуску й 30 хвилин після
+    list=ENEMY.filter(f=>f.properties.c==='airfield'&&nearL(f,1800)).map(f=>({f,dim:0,hot:1}));key='n'+list.map(x=>x.f.properties.n).join('|');}
   if(ENEMY_SET&&enemyApply.k===key)return;enemyApply.k=key;
-  map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:(!TAC&&f.properties.c==='airfield')?'afld':tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'hostile'}),v:near(f)?'':f.properties.n,dim:near(f)?1:0})}))});ENEMY_SET=true;}
+  map.getSource('enemy').setData({type:'FeatureCollection',features:list.map(({f,dim,hot})=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:(!TAC&&f.properties.c==='airfield')?'afld':tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'hostile'}),v:dim?'':f.properties.n,dim,hot})}))});ENEMY_SET=true;}
 // тактичний режим тільки 2D: нахил вимкнено і заблоковано; після виходу повертаємо те, що було
 let TILT_BEFORE=null;
 function tac2d(on){try{if(on){if(!TACF.scale&&!TACF.obl)setTimeout(()=>tacScale('country'),500);if(TILT_BEFORE===null)TILT_BEFORE=tilt;if(tilt)set3d(false,true);map.setMaxPitch(0);map.easeTo({pitch:0,bearing:0,duration:400});}
@@ -431,7 +435,8 @@ function addOverlays(){
   map.addLayer({id:'reach-f',type:'fill',source:'reach',filter:['==',['get','k'],'f'],paint:{'fill-color':'#FFFFFF','fill-opacity':0.04}});
   map.addLayer({id:'reach-l',type:'line',source:'reach',filter:['==',['get','k'],'l'],paint:{'line-color':'#E6EBF2','line-width':1.2,'line-dasharray':[4,3],'line-opacity':0.7}});
   map.addLayer({id:'reach-t',type:'symbol',source:'reach',filter:['==',['get','k'],'t'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'bottom','text-allow-overlap':false},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5}});
-  map.addLayer({id:'enemy-sym',type:'symbol',source:'enemy',minzoom:4.5,layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],5,0.6,9,0.85],'icon-allow-overlap':false,'text-field':['step',['zoom'],'',5,['get','v']],'text-font':['Noto Sans Bold'],'text-size':10,'text-anchor':'top','text-offset':[0,1.3],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.4,'icon-opacity':['case',['==',['get','dim'],1],0.28,0.9]}});
+  map.addLayer({id:'enemy-sym',type:'symbol',source:'enemy',minzoom:4.5,layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],5,0.6,9,0.85],'icon-allow-overlap':false,'text-field':['step',['zoom'],'',5,['get','v']],'text-font':['Noto Sans Bold'],'text-size':10,'text-anchor':'top','text-offset':[0,1.3],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.4,'icon-opacity':['case',['==',['get','hot'],1],0,['==',['get','dim'],1],0.28,0.9]}});
+  map.addLayer({id:'enemy-hot',type:'circle',source:'enemy',filter:['==',['get','hot'],1],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,16,9,28],'circle-color':'rgba(255,59,59,.16)','circle-stroke-color':'#FF3B3B','circle-stroke-width':2,'circle-pitch-alignment':'map'}},'enemy-sym');
   map.addLayer({id:'meas-l',type:'line',source:'meas',filter:['==',['get','k'],'l'],paint:{'line-color':'#FFFFFF','line-width':2,'line-opacity':0.95}});
   map.addLayer({id:'meas-p',type:'circle',source:'meas',filter:['==',['get','k'],'p'],paint:{'circle-radius':5,'circle-color':'#14171C','circle-stroke-color':'#FFFFFF','circle-stroke-width':2}});
   map.addLayer({id:'meas-t',type:'symbol',source:'meas',filter:['==',['get','k'],'t'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11.5,'text-anchor':'bottom','text-offset':[0,-0.4],'text-allow-overlap':true},paint:{'text-color':'#FFFFFF','text-halo-color':'rgba(10,12,16,.95)','text-halo-width':2}});
@@ -1373,7 +1378,7 @@ function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))ma
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);
   if(TAC)vis(['holo','holo-top','ra-glow'],false);
   if(TAC)vis(['tg-n','strat-ring','strat-fxl','strat-fxp'],false);
-  vis(['enemy-sym'],TAC?TACF.enemy:true);vis(['reach-f','reach-l','reach-t'],TAC&&TACF.reach);vis(['meas-l','meas-p','meas-t'],TAC);
+  vis(['enemy-sym','enemy-hot'],TAC?TACF.enemy:true);vis(['reach-f','reach-l','reach-t'],TAC&&TACF.reach);vis(['meas-l','meas-p','meas-t'],TAC);
   if(TAC&&!TACF.alerts)vis(['hp-f','hp-l','hrom','hrom-t'],false);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setData(EMPTY);return;// заяви МО РФ «скільки збили над регіоном» прибрано з мапи: застарілі зведення без місця й часу удару нічого не дають людині
