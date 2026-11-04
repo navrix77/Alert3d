@@ -21,7 +21,7 @@ def test_compose_and_vocab():
     voc = set(v.vocabulary())
     # усе, крім назв місць, — із заготовленого словника (звучить без синтезу)
     assert all(x in voc for x in fr if not x.startswith(("Місце:", "Курс:")))
-    assert v.compose({"bal": [], "near": [], "n_near": 0, "alert": False})[-1] == "Поруч з вами цілей немає."
+    assert v.compose({"bal": [], "near": [], "n_near": 0, "alert": False})[-1] == "Повідомлень про цілі поруч немає."
 
 
 def test_alert_frags_and_budget():
@@ -56,3 +56,27 @@ def test_live_without_model():
     r = asyncio.run(live.narrate(m, d))
     assert m.n == 0 and r["steps"] and all(s["audio"].startswith("/api/voice/") for s in r["steps"])
     assert all("voice" not in s for s in r["steps"])
+
+
+def test_no_repeat_after_mode_switch():
+    import asyncio
+    import time as _t
+    from app import live
+    home = (36.23, 49.99)
+    st = {"now": _t.time(), "levels": {"Харківська": 2}, "official": {},
+          "tracks": [{"id": "Ш-7", "type": "shahed", "status": "active", "lon": 36.30, "lat": 49.90, "hd": 200, "speed": 170,
+                      "count": 1, "first": _t.time(), "at": ["Чугуїв", 0], "at_ll": [36.69, 49.84]}]}
+    a = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "sw1"))
+    assert a["text"]
+    b = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "oblast", "sw1"))
+    # ціль уже озвучена в «Поруч зі мною» і не змінилась — у «Моїй області» лише статус тривоги, без повтору цілі
+    assert "шахед" not in b["text"].lower()
+    c = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "sw1"))
+    assert c.get("quiet")
+
+
+def test_country_changes_only():
+    prev = {"al": ["Харківська"], "bal": [], "top": ["Харківська"]}
+    f = {"al": ["Харківська", "Сумська"], "bal": [], "top": [("Харківська", [("shahed", 3)])]}
+    assert v.compose_changes(f, prev) == ["Україна, зміни.", "Нові тривоги:", "Сумщина."]
+    assert v.compose_changes(dict(f, al=["Харківська"]), prev) == []

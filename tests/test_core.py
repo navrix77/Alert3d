@@ -1508,7 +1508,7 @@ def test_radio_fallback_texts():
     tr.ingest(o, "M", time.time() - 60, None)
     st = tr.snapshot(time.time())
     for sc in ("region", "neighbors", "country"):
-        r = asyncio.run(live.radio(None, st, [], tr, time.time() - 600, (36.25, 50.0), "Харківська", sc))
+        r = asyncio.run(live.radio(None, st, [], tr, time.time() - 600, (36.25, 50.0), "Харківська", sc, "fb-" + sc))  # різні слухачі
         assert r["text"] and "—" not in r["text"] and r["scope"] == sc
 
 

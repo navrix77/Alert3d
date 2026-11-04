@@ -555,12 +555,35 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
         # огляд України повторюється раз на 15 хв навіть без змін (заготовки, без витрат); область — лише при змінах
         if mem["said"] and fp == mem["fp"] and not out_ and (scope != "country" or now - mem["t"] < 840):
             return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
+        if KIT and out_:
+            return _kit_outage(mem, fp, now, scope)
         if KIT and not out_:
-            # 04.11 власник: «максимально з заготовок» — і область, і Україна без моделі
+            # 04.11 власник: «максимально з заготовок» — і область, і Україна без моделі.
+            # Пам'ять озвученого спільна для всіх режимів слухача: після перемикання не повторюємо незмінене
             from . import voicekit
-            fr = voicekit.compose_country(cf) if scope == "country" else voicekit.compose_oblast(cf)
-            if mem["said"]:
-                fr = fr[1:] if scope == "oblast" else fr  # назву регіону — лише в першому зведенні
+            seen = _seen(sid)
+            if scope == "country":
+                prev = seen.get("_country")
+                rep = prev is None or (mem["said"] and now - mem["t"] >= 840)  # перший огляд або плановий раз на 15 хв
+                fr = voicekit.compose_country(cf) if rep else voicekit.compose_changes(cf, prev)
+                seen["_country"] = {"al": list(cf["al"]), "bal": list(cf["bal"]), "top": [o for o, _ in cf["top"]]}
+            else:
+                st_sig = ("ost", obl, cf["whole"], tuple(cf["al_raions"]))
+                tsig = lambda x: ("ev", x["id"], x.get("next") or "")  # noqa: E731  — спільний підпис події для всіх режимів
+                groups = {r: [x for x in it if tsig(x) not in seen] for r, it in cf["groups"].items()}
+                groups = {r: it for r, it in groups.items() if it}
+                fr = voicekit.compose_oblast(dict(cf, groups=groups), status=st_sig not in seen, empty=not cf["groups"])
+                if mem["said"]:
+                    fr = fr[1:]  # назву регіону — лише в першому зведенні
+                if len(fr) <= (0 if mem["said"] else 1):
+                    fr = []
+                seen[st_sig] = now
+                for it in groups.values():
+                    for x in it:
+                        seen[tsig(x)] = now
+            if not fr:
+                mem.update(fp=fp, t=now if scope != "country" else mem["t"])
+                return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
             txt = " ".join(fr)
             mem.update(fp=fp, t=now, said=(mem["said"] + [txt])[-5:])
             return {"text": txt, "speech": txt, "kind": "summary", "by": "kit", "scope": scope, "level": level,
@@ -583,15 +606,26 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
             txt = ("Без змін. " + fb) if f["near"] or f["alert"] else "Без змін. Поруч з вами цілей немає."
             return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "rules"}
         if KIT and out_:
-            from . import voicekit
-            fr = ["Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."]
-            mem.update(fp=fp, t=now, said=(mem["said"] + [fr[0]])[-5:])
-            return {"text": fr[0], "speech": fr[0], "kind": "outage", "by": "kit", "scope": scope, "level": "outage",
-                    "audio": "/api/voice/" + voicekit.register(fr)}
+            return _kit_outage(mem, fp, now, scope)
         if KIT and not out_:
-            # 04.11 власник: «паузи шалені» → голосові заготовки: без моделі й без нового синтезу, звучить одразу
+            # 04.11 власник: «паузи шалені» → голосові заготовки: без моделі й без нового синтезу, звучить одразу.
+            # Уже озвучене (у будь-якому режимі) без змін не повторюємо; статус тривоги — лише коли змінився
             from . import voicekit
-            fr = voicekit.compose(f, first=not mem["said"], greeted=greeted)
+            seen = _seen(sid)
+            tsig = lambda x: ("t", x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "")  # noqa: E731
+            st_sig = ("st", obl, f["alert"], f.get("raion_alert"), bool(f["bal"]))
+            esig = lambda x: ("ev", x["id"], x["next"] or "")  # noqa: E731
+            # нове для слухача: не озвучене тут і не озвучене в іншому режимі (крім цілі, що наближається — це нова місцева обставина)
+            fresh = [x for x in f["near"] if tsig(x) not in seen and (esig(x) not in seen or x["appr"])]
+            if not fresh and st_sig in seen and not f["bal"]:
+                mem.update(fp=fp, t=now)
+                return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
+            fr = voicekit.compose(dict(f, near=fresh, n_near=len(fresh)), first=not mem["said"], greeted=greeted,
+                                  known=len(f["near"]) - len(fresh))
+            seen[st_sig] = now
+            if fresh:
+                seen[tsig(fresh[0])] = now
+                seen[esig(fresh[0])] = now
             txt = " ".join(fr)
             mem.update(fp=fp, t=now, said=(mem["said"] + [txt])[-5:])
             return {"text": txt, "speech": txt, "kind": "summary" if len(mem["said"]) == 1 else "update", "by": "kit", "scope": scope,
@@ -646,6 +680,23 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
 
 
 RADIO_STATE: dict = {}
+SEEN: dict = {}
+
+
+def _seen(sid: str) -> dict:
+    """Озвучені події слухача — спільні для всіх режимів (власник 04.11: після перемикання не повторювати незмінене)."""
+    if len(SEEN) > 3000:
+        for k in list(SEEN)[:1500]:
+            SEEN.pop(k, None)
+    return SEEN.setdefault(sid or "-", {})
+
+
+def _kit_outage(mem, fp, now, scope) -> dict:
+    from . import voicekit
+    fr = ["Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."]
+    mem.update(fp=fp, t=now, said=(mem["said"] + [fr[0]])[-5:])
+    return {"text": fr[0], "speech": fr[0], "kind": "outage", "by": "kit", "scope": scope, "level": "outage",
+            "audio": "/api/voice/" + voicekit.register(fr)}
 KIT = os.getenv("RADIO_KIT", "1") != "0"  # голосові заготовки для режиму «Поруч зі мною»
 
 RADIO_CACHE: dict = {}
