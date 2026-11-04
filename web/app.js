@@ -490,7 +490,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   if(skip){if(el)el.remove();document.body.classList.remove('intro');go();return;}
   // поки стоїмо й летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
-  const wait=(el&&INTRO)?Math.max(0,3500-(Date.now()-introT0)):0;   // логотип встигає зіграти (лише при першому запуску в сесії)
+  const wait=(el&&INTRO)?Math.max(0,3900-(Date.now()-introT0)):0;   // логотип встигає зіграти (лише при першому запуску в сесії)
   // без дому: за час паузи питаємо геопозицію (тихо, 4 с), щоб було куди наближатися
   if(!home&&navigator.geolocation){try{navigator.geolocation.getCurrentPosition(p=>{window.__GEOPOS=[p.coords.longitude,p.coords.latitude];},()=>{},{enableHighAccuracy:false,timeout:4000,maximumAge:600000});}catch(e){}}
   setTimeout(()=>{if(el){el.classList.add('out');setTimeout(()=>el.remove(),1400);}document.body.classList.remove('intro');
