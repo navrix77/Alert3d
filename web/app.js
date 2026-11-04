@@ -23,6 +23,7 @@ window.NX={snap:()=>SNAP,focusType:t=>focusType(t),toast:m=>toast(m),open:id=>op
 try{home=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
 const DISP=new Map();
 const PREFL=()=>{try{return Object.assign({launch:true},JSON.parse(localStorage.getItem('pref')||'{}'));}catch(e){return {launch:true};}};
+const isBal=tr=>tr.type==='ballistic'||tr.type==='banderol';// 04.11 власник: Бандероль веде себе як балістика (без траєкторії й відліку)
 const TYPES_KMH=t=>({shahed:170,jet:450,molniya:120,cruise:800,ballistic:2000,kab:600})[t]||200;
 
 /* ---------- карта ---------- */
@@ -378,7 +379,7 @@ function syncHromadas(H){
 // вибрана ціль: остання позиція з повідомлення і поточна оцінка (див. шари selrep-*)
 function selRep(serverT){const tr=sel&&SNAP.tracks.find(t=>t.id===sel),d=sel&&DISP.get(sel);
   if(!tr||!d||tr.status!=='active'||!tr.trail||!tr.trail.length)return EMPTY;
-  if(tr.type==='ballistic')return {type:'FeatureCollection',features:[{type:'Feature',properties:{k:'here',l:'Повідомлення · '+fmt(tr.last||tr.first)},geometry:{type:'Point',coordinates:d.p}}]};
+  if(isBal(tr))return {type:'FeatureCollection',features:[{type:'Feature',properties:{k:'here',l:'Повідомлення · '+fmt(tr.last||tr.first)},geometry:{type:'Point',coordinates:d.p}}]};
   const q=tr.trail[tr.trail.length-1],rp=[q[0],q[1]],age=Math.max(0,serverT-(q[2]||tr.last||serverT)),km=dist(xy(rp),xy(d.p));
   const mins=Math.round(age/60),ago=mins<2?'щойно':mins+' хв тому';
   // ціль не зрушила від названого місця: одна позначка під ціллю, без точки й пунктиру
@@ -392,7 +393,7 @@ function selRep(serverT){const tr=sel&&SNAP.tracks.find(t=>t.id===sel),d=sel&&DI
 function posAt(tr,serverT){
   // балістика: канали не дають координат, висоти й часу виявлення. Значок стоїть на території, яку назвали
   // («на Харків» = загроза Харкову, а не ракета над центром міста), без руху й домальованої траєкторії (03.11)
-  if(tr.type==='ballistic')return {p:(tr.nopos&&tr.route&&tr.route.length)?[tr.route[0][0],tr.route[0][1]]:[tr.lon,tr.lat],hd:tr.hd};
+  if(isBal(tr))return {p:(tr.nopos&&tr.route&&tr.route.length)?[tr.route[0][0],tr.route[0][1]]:[tr.lon,tr.lat],hd:tr.hd};
   if(tr.status!=='active')return {p:[tr.lon,tr.lat],hd:tr.hd};
   if(!tr.speed)return {p:[tr.lon,tr.lat],hd:tr.hd};// кадр машини часу: позиція вже на той момент
   // місце лише оцінене («курсом на X», і вже в X), а нового пункту немає: далі не «ведемо» ціль навмання
@@ -417,7 +418,7 @@ const HD_Q={channels:[0,0,0,0,0,5,7,10,14,19,22,28,32,42,50,56,63,82,93,145],lea
 // радіус «де може бути» (км, 68%): бектест 26.10–02.11, шахед ≈11 км одразу після названої позиції, +~1.1 км/хв;
 // реактивний ≈14 км, +~3 км/хв (похибка назв пунктів і затримка каналів)
 const UNC={shahed:[11,1.1,45],jet:[14,3,90],geran5:[14,3,90],molniya:[8,0.8,30],recon:[8,0.8,30],banderol:[14,3,90],cruise:[15,4,120]};
-function uncKm(tr,ageSec){const u=UNC[tr.type];if(!u||tr.type==='ballistic')return 0;return Math.min(u[2],u[0]+u[1]*Math.max(0,ageSec)/60);}
+function uncKm(tr,ageSec){const u=UNC[tr.type];if(!u||isBal(tr))return 0;return Math.min(u[2],u[0]+u[1]*Math.max(0,ageSec)/60);}
 function pToward(src,delta,dkm){const q=HD_Q[{from:'movement',course:'all'}[src]||src]||HD_Q.all;const w=Math.atan(15/Math.max(dkm,15))*180/Math.PI;
   let s=0;for(const e of q)s+=0.5*(Math.abs(delta-e)<=w)+0.5*(Math.abs(delta+e)<=w);return s/q.length;}
 function homeRel(tr,p){
@@ -433,7 +434,7 @@ function homeRel(tr,p){
   else if(tr.hd!=null&&pr>=0.4){rel='heading';eta=d/tr.speed*60;}
   else if(tr.hd!=null&&pr>=0.15&&d<=150&&d/tr.speed*60<=45)maybe=true;// «можлива загроза»: широке попередження, ще не тривога
   if(rel&&(d>150||eta>45)){rel=null;eta=null;}
-  if(tr.type==='ballistic'||tr.type==='rszv')eta=null;// без відстані й траєкторії пуску зворотного відліку для балістики немає
+  if(isBal(tr)||tr.type==='rszv')eta=null;// без відстані й траєкторії пуску зворотного відліку для балістики немає
   const away=tr.hd!=null&&angd(tr.hd,brg(P,H))>100;
   return {d,rel,eta,away,maybe,p:pr,side:SIDE[Math.round((brg(H,P))/45)%8],from:FROM[Math.round((brg(H,P))/45)%8]};
 }
@@ -460,7 +461,7 @@ function frame(now){
       const uk=active?uncKm(tr,((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now)):0;
       feats.push({type:'Feature',properties:{id:tr.id,type:tr.type,est:!!(tr.pos_est||tr.nopos),hd:d.hd,sa,unk,active,weak,thr:!!(rel&&rel.rel),c:TYPE_COLOR[tr.type],count:tr.count||1,next:(tr.next||'').trim()||undefined,pair:tr.pair||undefined,sk:active?(sel===tr.id?0:1):2,
         u0:uk?uk*1000/(78271.517*Math.cos(d.p[1]*D2R)):undefined},geometry:{type:'Point',coordinates:d.p}});
-      const BAL=tr.type==='ballistic';
+      const BAL=isBal(tr);
       if(active){const tail=[d.p];let P=xy(d.p),left=Math.max(14,TYPES_KMH(tr.type)*0.09);
         if(!BAL)for(const q of tr.trail.slice().reverse()){const Q=xy([q[0],q[1]]),dd=dist(P,Q);if(dd<0.5)continue;if(dd>=left){const f=left/dd;tail.push(ll([P[0]+(Q[0]-P[0])*f,P[1]+(Q[1]-P[1])*f]));left=0;break;}tail.push([q[0],q[1]]);left-=dd;P=Q;}
         if(left>0&&tr.hd!=null&&!BAL){const r=(d.hd+180)*D2R;tail.push(ll([P[0]+Math.sin(r)*left,P[1]+Math.cos(r)*left]));}
@@ -808,7 +809,7 @@ function fillSheet(first){
   const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr){$('#sheet').hidden=true;sel=null;return;}
   if(first||!fillSheet.icon||fillSheet.icon!==tr.type){const c=drawTarget(tr.type,40);$('#sh-icon').innerHTML='';$('#sh-icon').appendChild(c);fillSheet.icon=tr.type;}
   $('#sh-name').textContent=TYPE_NAME[tr.type]+(tr.count>1?' ×'+tr.count:'');
-  const BAL=tr.type==='ballistic';
+  const BAL=isBal(tr);
   $('#sh-course').innerHTML=tr.status!=='active'?(tr.status==='lost'?'Втрачено':'Більше не фіксується'):BAL?(tr.next?'Загроза: <b>'+esc(tr.next)+'</b>':'Загроза, місце не назване'):(tr.next?'Курс → <b>'+esc(tr.next)+'</b>':tr.hd!=null?'Ймовірно '+SIDE[Math.round(tr.hd/45)%8]+' <small>(оцінка SKY)</small>':'Курс невідомий');
   const d=DISP.get(tr.id);const r=d&&homeRel(tr,d.p);const nowT=Date.now()/1000+offset;const mago=t=>Math.max(0,Math.round((nowT-t)/60));
   // 1) для вас: відстань і що ціль робить відносно дому, одним рядком

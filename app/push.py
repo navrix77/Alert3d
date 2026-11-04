@@ -333,14 +333,14 @@ class Push:
             return {"d": d, "eta": None, "side": side, "p": 1.0, "stage": "threat"}
         base = Push.threat(tr, H)
         if base and base[1] is not None and tr.get("route"):
-            return {"d": d, "eta": None if tr.get("type") in ("ballistic", "rszv") else base[1], "side": side, "p": 1.0, "stage": "threat"}
+            return {"d": d, "eta": None if tr.get("type") in ("ballistic", "banderol", "rszv") else base[1], "side": side, "p": 1.0, "stage": "threat"}
         hd = tr.get("hd")
         if hd is None:
             return None
         delta = abs((bearing(P, H) - hd + 180) % 360 - 180)
         p = p_toward(tr.get("hd_src"), delta, d)
         # балістика й РСЗВ: «балістика» без відстані й траєкторії пуску не дає підстав для зворотного відліку
-        eta = None if tr.get("type") in ("ballistic", "rszv") else d / max(30, tr["speed"]) * 60
+        eta = None if tr.get("type") in ("ballistic", "banderol", "rszv") else d / max(30, tr["speed"]) * 60
         if eta is not None and eta > 45:
             return None
         stage = "threat" if p >= P_THREAT else ("pre" if p >= P_PRE else None)
