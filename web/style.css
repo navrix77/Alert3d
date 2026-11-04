@@ -737,3 +737,8 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .tac-lg .lg-r b{display:block;font-size:12.5px;color:#e6ebf2}.tac-lg .lg-r small{display:block;color:#8d97a6;font-size:11px;line-height:1.3}
 .tac-lg .lg-n{font-size:11.5px;line-height:1.4;color:#9aa4b2;margin:3px 0}
 .tac-lg .lg-r{flex-wrap:nowrap}
+
+/* тактична панель стоїть у колонці .top під лічильниками й «Наживо», нічого не перекриває */
+.top .tac-bar{position:static;pointer-events:auto;max-width:calc(100vw - 24px)}
+.tac-flt{top:var(--tac-top,170px)!important}
+.tac-bar[hidden],.tac-flt[hidden]{display:none!important}

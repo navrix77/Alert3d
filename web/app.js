@@ -118,7 +118,8 @@ function tacScale(v){TACF.scale=v;tacSave();const H=home||[31.5,49];
   tacBarSync();}
 function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
   const n=TACF.hide.length+(TACF.fresh?1:0)+(TACF.src?1:0)+(TACF.alerts?0:1);const f=$('#tac-f');if(f)f.textContent='Фільтри'+(n?' · '+n:'');}
-function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;if(!pn.hidden){pn.hidden=true;return;}
+function tacPanelTop(){const b=$('#tac-bar');if(b)document.documentElement.style.setProperty('--tac-top',Math.round(b.getBoundingClientRect().bottom+6)+'px');}
+function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;tacPanelTop();if(!pn.hidden){pn.hidden=true;return;}
   const types=[...new Set((SNAP&&SNAP.tracks||[]).filter(t=>t.status==='active').map(t=>t.type))];const srcs=new Map();
   for(const t of (SNAP&&SNAP.tracks||[]).filter(t=>t.status==='active'))for(const k of ((t.ev&&t.ev.prim&&t.ev.prim.length?t.ev.prim:t.srcs)||[]))srcs.set(k,(SNAP.sources[k]&&SNAP.sources[k].name)||k);
   const chip=(a,on,l)=>'<button class="tc'+(on?' on':'')+'" '+a+'>'+esc(l)+'</button>';
@@ -144,7 +145,7 @@ function tacImg(spec){const A=window.App06;if(!A)return null;const b=A.build(spe
   return b.key;}
 // належність цілі за даними (кількість незалежних джерел, достовірність, ШІ), не за виглядом
 function tacAff(tr){const A=window.App06;return A?A.affiliationOf({indep:tr.n_indep!=null?tr.n_indep:((tr.ev&&tr.ev.prim)||[]).length,idLvl:tr.id_lvl,ai:tr.ai}):'suspect';}
-function tacLegend(){const pn=$('#tac-legend'),A=window.App06;if(!pn)return;if(!pn.hidden){pn.hidden=true;return;}
+function tacLegend(){const pn=$('#tac-legend'),A=window.App06;if(!pn)return;tacPanelTop();if(!pn.hidden){pn.hidden=true;return;}
   if(!A){pn.innerHTML='<p>Бібліотеку символів ще не завантажено. Спробуйте за мить.</p>';pn.hidden=false;loadApp06().then(()=>{if(!pn.hidden){pn.hidden=true;tacLegend();}});return;}
   const sv=(spec,m)=>{try{return A.svg(Object.assign({size:26,mono:m},spec));}catch(e){return '';}};
   const row=(spec,t,d)=>'<div class="lg-r"><span class="lg-s">'+sv(spec,false)+'</span><span class="lg-s">'+sv(spec,true)+'</span><span><b>'+esc(t)+'</b><small>'+esc(d)+'</small></span></div>';
