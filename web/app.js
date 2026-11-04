@@ -441,6 +441,7 @@ function addOverlays(){
   map.addLayer({id:'meas-p',type:'circle',source:'meas',filter:['==',['get','k'],'p'],paint:{'circle-radius':5,'circle-color':'#14171C','circle-stroke-color':'#FFFFFF','circle-stroke-width':2}});
   map.addLayer({id:'meas-t',type:'symbol',source:'meas',filter:['==',['get','k'],'t'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11.5,'text-anchor':'bottom','text-offset':[0,-0.4],'text-allow-overlap':true},paint:{'text-color':'#FFFFFF','text-halo-color':'rgba(10,12,16,.95)','text-halo-width':2}});
   tacPaint();
+  map.addLayer({id:'tac-hl2',type:'circle',source:'tac',filter:['==',['get','k'],'hl2'],paint:{'circle-radius':16,'circle-color':'rgba(255,59,59,0)','circle-stroke-color':'#FF4A4A','circle-stroke-width':2.4,'circle-stroke-opacity':0,'circle-opacity':0,'circle-pitch-alignment':'viewport'}});
   map.addLayer({id:'tac-hl',type:'circle',source:'tac',filter:['==',['get','k'],'hl'],paint:{'circle-radius':18,'circle-color':'rgba(255,255,255,0.10)','circle-stroke-color':'#FFFFFF','circle-stroke-width':2.4,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'tac-sel',type:'circle',source:'tac',filter:['==',['get','k'],'sel'],paint:{'circle-radius':22,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6,'circle-stroke-opacity':0.9,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'tac-sym',type:'symbol',source:'tac',filter:['==',['get','k'],'sym'],layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],4,0.72,8,0.9,11,1.1],'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','text-field':['get','v'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'top','text-offset':[0,1.5],'text-optional':true},paint:{'icon-opacity':['get','o'],'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
@@ -473,6 +474,9 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
   if(TAC&&el&&INTRO){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
   const flyHome=()=>{const t0=Date.now(),tr=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;if(tg){map.flyTo({center:tg,zoom:7.4,duration:3000,essential:true,curve:1.3,easing:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2});return;}if(Date.now()-t0<4500)setTimeout(tr,300);};tr();};
+  // огляд: мапа стоїть на всій країні, усі цілі пульсують кільцями, щоб користувач охопив ситуацію, і лише потім переліт на «Дім»
+  const tacSurvey=ms=>{const t0=performance.now(),id='tac-hl2';const step=now=>{if(!map.getLayer(id))return;const e=now-t0;if(e>=ms){map.setPaintProperty(id,'circle-stroke-opacity',0);return;}
+    const ph=(e%1100)/1100,fade=Math.min(1,e/300)*Math.min(1,(ms-e)/400);map.setPaintProperty(id,'circle-radius',14+22*ph);map.setPaintProperty(id,'circle-stroke-opacity',(1-ph)*0.95*fade);requestAnimationFrame(step);};requestAnimationFrame(step);};
   const finish=()=>{tacPad(false);document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
@@ -492,7 +496,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   setTimeout(()=>{if(el){el.classList.add('out');setTimeout(()=>el.remove(),1400);}document.body.classList.remove('intro');
     // поки мапа стоїть у 2D, усі цілі пульсують кільцями кольору свого типу: за 5 с видно, що де летить
     window.FXHLALL={t0:performance.now(),until:performance.now()+5000};map.triggerRepaint();
-    if(TAC){window.__introAt=Date.now();tilt=false;finish();flyHome();}else setTimeout(go,5000);},wait);}
+    if(TAC){window.__introAt=Date.now();tilt=false;finish();tacSurvey(3600);setTimeout(flyHome,3700);}else setTimeout(go,5000);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;// так само, як лічильники вгорі: треки, без ×N
@@ -665,6 +669,7 @@ function frame(now){
         if(A6){const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next);// напрямок у символі лише коли він відомий
           const key=tacImg({type:A6.MAP[tr.type]?tr.type:'unknown',affiliation:tacAff(tr),hd:(f.properties.unk||tr.hd==null||still)?null:f.properties.sa,count:f.properties.count});
           TF.push({type:'Feature',properties:{k:'sym',img:key,v:(sel===tr.id||map.getZoom()>=6.5)?(A6.MODEL[tr.type]||''):'',o},geometry:{type:'Point',coordinates:P}});
+          if(f.properties.active&&o>=1)TF.push({type:'Feature',properties:{k:'hl2'},geometry:{type:'Point',coordinates:P}});// пульсація «огляд ситуації» на старті (шар прозорий, поки не запущена)
           if(sel===tr.id)TF.push({type:'Feature',properties:{k:'sel'},geometry:{type:'Point',coordinates:P}});}
         const q=tr.trail&&tr.trail.length&&tr.trail[tr.trail.length-1];
         if(q&&!isBal(tr)&&dist(xy([q[0],q[1]]),xy(P))>=1.5){TF.push({type:'Feature',properties:{k:'fact',o,c},geometry:{type:'Point',coordinates:[q[0],q[1]]}});
