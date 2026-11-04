@@ -817,7 +817,7 @@ async def api_voice_alert(text: str, voice: str = "lada", rate: float = 1.0):
     LLMX.count("tts:alert-" + why)
     if not data:
         return JSONResponse({"ok": False, "why": why}, status_code=503)
-    return Response(data, media_type="audio/mpeg", headers={"Cache-Control": "max-age=86400", "X-TTS": why})
+    return Response(data, media_type="audio/wav" if data[:4] == b"RIFF" else "audio/mpeg", headers={"Cache-Control": "max-age=86400", "X-TTS": why})
 
 
 @app.get("/api/voice/{sid}")
@@ -832,7 +832,7 @@ async def api_voice(sid: str):
     LLMX.count("tts:" + why)
     if not data:
         return JSONResponse({"ok": False, "why": why}, status_code=503)
-    return Response(data, media_type="audio/mpeg", headers={"Cache-Control": "max-age=86400", "X-TTS": why})
+    return Response(data, media_type="audio/wav" if data[:4] == b"RIFF" else "audio/mpeg", headers={"Cache-Control": "max-age=86400", "X-TTS": why})
 
 
 @app.get("/api/tts")
@@ -887,7 +887,7 @@ def api_tts_status(request: Request):
     if _is_admin(request):
         return st
     # публічно — без назв сторонніх провайдерів: лише чи є природний голос і чи готовий запасний
-    return {"neural": bool(st.get("openai") or st.get("gemini") or st.get("google")), "ready": bool(st.get("piper")),
+    return {"neural": bool(st.get("openai") or st.get("gemini") or st.get("google")), "ready": bool(st.get("piper")), "last_codes": tts.codes(),
             "voices": [{"key": v["key"], "name": v["name"]} for v in st.get("voices", [])]}
 
 

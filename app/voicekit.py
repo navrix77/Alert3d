@@ -696,13 +696,32 @@ async def render(frags: list[str], say) -> tuple[bytes | None, str]:
             return r
     parts = await asyncio.gather(*(one(x) for x in frags))
     out = []
+    wavs = 0
     for data, _by in parts:
         if not data:
             return None, "missing"
         if data[:4] == b"RIFF":
-            return None, "wav"
-        out.append(_strip_id3(data))
-    return b"".join(out), "kit"
+            wavs += 1
+        out.append(data)
+    if wavs == len(out):  # усі фрази озвучені запасним голосом (WAV): склеюємо в один WAV, якщо формат однаковий
+        try:
+            import io
+            import wave
+            ws = [wave.open(io.BytesIO(d)) for d in out]
+            prm = ws[0].getparams()[:3]
+            if all(w.getparams()[:3] == prm for w in ws):
+                buf = io.BytesIO()
+                with wave.open(buf, "wb") as o:
+                    o.setparams(ws[0].getparams())
+                    for w in ws:
+                        o.writeframes(w.readframes(w.getnframes()))
+                return buf.getvalue(), "kit-wav"
+        except Exception:  # noqa: BLE001
+            pass
+        return None, "wav"
+    if wavs:
+        return None, "wav"
+    return b"".join(_strip_id3(d) for d in out), "kit"
 
 
 _WARM = {"state": "idle", "done": 0, "total": 0}

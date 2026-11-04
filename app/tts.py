@@ -293,7 +293,7 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
-LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
+LAST = {"openai": "", "gemini": "", "google": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
 VOICE_V = "r9"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
 OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
@@ -384,7 +384,7 @@ async def _cached(prov: str, ext: str, fn, text: str, key: str, rate: float, tag
     try:
         data = await fn(text, key, rate)
     except Exception as e:  # noqa: BLE001
-        LAST[prov] = f"{type(e).__name__}: {str(e)[:160]}"
+        LAST[prov] = re.sub(r"(key|token|api_key)=[^&\s'\"]+", r"\1=***", f"{type(e).__name__}: {str(e)[:160]}")
         log.warning("%s tts: %s", prov, e)
         return None, ""
     if data:
@@ -531,6 +531,15 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     except Exception as e:  # noqa: BLE001
         log.warning("tts: %s", e)
         return None, f"error:{str(e)[:120]}"
+
+
+def codes() -> dict:
+    """Лише коди HTTP останніх помилок провайдерів (без тексту й ключів): для публічної діагностики."""
+    out = {}
+    for k, v in LAST.items():
+        m = re.search(r"\b([1-5]\d\d)\b", v or "")
+        out[k] = (m.group(1) if m else (type(v).__name__ if False else ("err" if v else "")))
+    return out
 
 
 def status() -> dict:
