@@ -64,12 +64,8 @@
 
   const pad = (s, n) => String(s).padStart(n, '0');
   function affiliationOf(d) {
-    // належність тільки за даними (не за виглядом): d = {official, indep, idLvl, ai}
-    d = d || {};
-    if (d.official) return 'hostile';
-    if ((d.indep || 0) >= 2 || d.idLvl === 'висока') return 'hostile';
-    if (d.ai && (d.indep || 0) < 2) return 'unknown';
-    return 'suspect';
+    // рішення власника: усі цілі над Україною (БпЛА, ракети, КАБ, авіація) за визначенням ворожі, незалежно від кількості джерел
+    return 'hostile';
   }
   function entryOf(type) { return MAP[type] || MAP.unknown; }
   const q15 = h => ((Math.round(h / 15) * 15) % 360 + 360) % 360;

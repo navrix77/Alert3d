@@ -34,7 +34,7 @@ for (const r of A.table()) { if (r.sidc[6] !== '0') fail('статус ≠ 0: ' 
   if (m('unknown') === m('hostile') || m('suspect') === m('hostile') || m('unknown') === m('suspect')) fail('чорно-білі рамки не відрізняються'); }
 // належність лише за даними
 const T = (d, w) => { if (A.affiliationOf(d) !== w) fail('належність ' + JSON.stringify(d) + ' → ' + A.affiliationOf(d) + ', очікувалось ' + w); };
-T({}, 'suspect'); T({ indep: 1 }, 'suspect'); T({ indep: 2 }, 'hostile'); T({ idLvl: 'висока' }, 'hostile'); T({ official: true }, 'hostile'); T({ ai: true, indep: 1 }, 'unknown'); T({ ai: true, indep: 2 }, 'hostile');
+T({}, 'hostile'); T({ indep: 1 }, 'hostile'); T({ indep: 2 }, 'hostile'); T({ ai: true, indep: 1 }, 'hostile'); T({ official: true }, 'hostile');
 // таблиця відповідності: кожному типу SKY є запис, відомі типи SKY покриті
 for (const t of ['shahed', 'jet', 'molniya', 'cruise', 'ballistic', 'kab', 'geran5', 'banderol', 'rszv', 'fpv', 'fpvf', 'lancet', 'recon', 'tu95', 'tu160', 'tu22', 'mig31'])
   if (!A.MAP[t]) fail('немає відповідності для типу ' + t);
