@@ -858,3 +858,4 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 #intro .lg .gl{position:absolute;left:50%;top:0;width:96%;height:96%;margin-left:-48%;border-radius:50%;pointer-events:none;background:radial-gradient(circle at 50% 38%,rgba(70,140,255,.32) 0,rgba(70,140,255,.12) 34%,rgba(70,140,255,0) 64%);animation:glPulse 3.4s ease-in-out .7s infinite}
 @keyframes lgBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
 @keyframes glPulse{0%,100%{opacity:.55}50%{opacity:1}}
+#intro .lg .gl{display:none!important}
