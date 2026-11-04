@@ -93,6 +93,8 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     trk.prefer = last[2] if cont and last and ts - last[0] < 420 else None
     for seg in segs:
         obs = parser.parse(seg, key, ctx)
+        if obs.type and not obs.close and parser_mod.is_junk(seg):
+            obs.type, obs.no_target = None, True  # довгий текст без ознак руху: новина, підсумок, реклама
         if obs.type is None and msg_type and obs.places and not obs.close and not obs.no_target and (len(segs) > 1 or typ_hint):
             obs.type = msg_type
         if obs.type is None and obs.places and not obs.close and not obs.no_target and trk.prefer and last:

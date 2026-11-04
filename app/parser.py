@@ -401,6 +401,25 @@ def _obl_list(m: "re.Match") -> str:
     return ", ".join(re.sub(r"(ої|ій)$", "а", n) + " область" for n in names)
 
 
+# Загальний «антисміттєвий» фільтр (власник 04.11): повідомлення про ціль — коротке й має ознаку руху чи місця. Довгий розповідний
+# текст без них (новини, підсумки, зведення збитків, заяви, біографії) не є ціллю, навіть якщо в ньому є «шахед» і назва села.
+# Перевірено на журналі: з 22 997 повідомлень про цілі відсіюється 53, усі 53 — новини/підсумки/реклама.
+JUNK_MOVE = re.compile(r"курс|→|летить|летят|летит|рухає|рухаю|в бік|в сторону|у бік|повз|заліт|залет|заходить|заходять|заходит|маневр|кружля|барраж|висить|"
+                       r"напрям\w*\s+на\s|направлени\w*\s+на\s|\b\d+\s*[xх×]\s|\b[xх×]\s*\d+|поблизу|біля|возле|над\s|через\s|"
+                       r"\bз\s+[а-яіїє]\w+\s+(?:на|у|в)\s")
+JUNK_COUNT_ON = re.compile(r"\b\d+\s*[xх×]?\s*(?:р\.\s*)?[А-Яа-яІіЇїЄєҐґA-Za-z]{4,}\s+на\s+[А-ЯІЇЄҐ]")
+
+
+def is_junk(text: str) -> bool:
+    n = len(text or "")
+    t = norm(text or "")
+    if JUNK_MOVE.search(t) or JUNK_COUNT_ON.search(text or ""):
+        return False
+    if n > 200:
+        return True
+    return sum(1 for x in re.split(r"[.!?]\s+", text) if len(x.split()) >= 5) >= 3
+
+
 class Parser:
     def __init__(self, gaz: Gazetteer | None = None) -> None:
         self.gaz = gaz or Gazetteer.load()

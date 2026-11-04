@@ -1768,3 +1768,13 @@ def test_memorial_post_is_not_a_target():
         o = p.parse(t, "BrigadeNGU11")
         assert o.type is None and o.no_target
     assert p.parse("Шахед курсом на Запоріжжя", "x").type == "shahed"
+
+
+def test_junk_filter_drops_prose_keeps_real_reports():
+    from app.parser import is_junk
+    prose = ("Внаслідок ракетної атаки в селищі Нова Водолага були зафіксовані руйнування – пошкоджено промислову і адміністративну "
+             "будівлі, в приватних житлових будинках знищено дахи та вікна, постраждалих немає, роботи з ліквідації триває.")
+    assert is_junk(prose)
+    for ok in ("Шахед курсом на Салтівку", "2 шаболды на Первомайский ⚠️ 2 шаболды на Близнюки/Лозовую ⚠️ 1 Р. Шаболда на Шевченково",
+               "БпЛА на Запоріжжя", "Група 4х БпЛА з Сумщини на Охтирку"):
+        assert not is_junk(ok)
