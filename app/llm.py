@@ -108,6 +108,9 @@ def _others() -> list[tuple[str, str, str, str]]:
     return out
 
 
+# моделі з міркуванням (у OpenAI-сумісних API міркування входять у max_tokens)
+THINKING = re.compile(r"(?i)gpt-oss|grok-\d+-mini|(?:^|/)o[1-9](?:-|$)|gpt-5|-thinking|deepseek-r|qwq")
+
 MOVE = re.compile(r"(?i)курс|на\s|над\s|в\s+район|біля|около|повз|мимо|от\s|від\s|через|вектор|напрям|направлен")
 WORD_AFTER = re.compile(r"(?:на|над|курс(?:ом)?(?:\s+на)?|в\s+район[еі]|біля|около|от|від|через|повз|мимо|/)\s*([А-ЯІЇЄҐ][\w'’\-]+)")
 
@@ -293,7 +296,10 @@ class LLM:
                 body |= {"tools": [tool], "tool_choice": {"type": "tool", "name": tool["name"]}}
             r = await cli.post(API, json=body, headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"}, timeout=40)
             r.raise_for_status()
-            for c in r.json().get("content", []):
+            j = r.json()
+            if not tool and j.get("stop_reason") == "max_tokens":
+                raise RuntimeError("відповідь обрізано (max_tokens) — пробуємо іншу модель")
+            for c in j.get("content", []):
                 if tool and c.get("type") == "tool_use":
                     return c.get("input") or {}
                 if not tool and c.get("type") == "text":
@@ -302,14 +308,21 @@ class LLM:
         content = [{"type": "text", "text": user}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
         body = {"model": model, "max_tokens": max_tokens, "temperature": 0,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": content if image else user}]}
+        if THINKING.search(model):  # «думаючі» моделі: міркування рахуються в max_tokens — просимо думати мінімально
+            body["reasoning_effort"] = "low"
         if tool:
             body |= {"tools": [{"type": "function", "function": {"name": tool["name"], "description": tool["description"], "parameters": tool["input_schema"]}}],
                      "tool_choice": {"type": "function", "function": {"name": tool["name"]}}}
         r = await cli.post(base + "/chat/completions", json=body, headers={"Authorization": f"Bearer {key}", "content-type": "application/json"}, timeout=40)
         r.raise_for_status()
-        msg = (r.json().get("choices") or [{}])[0].get("message") or {}
+        ch = (r.json().get("choices") or [{}])[0]
+        msg = ch.get("message") or {}
         if not tool:
-            return msg.get("content") or ""
+            txt = msg.get("content") or ""
+            # обрізана текстова відповідь (ліміт токенів з'їли міркування) гірша за відсутню: хай спробує наступний провайдер
+            if ch.get("finish_reason") == "length" and (not txt or not txt.rstrip().endswith((".", "!", "?", "…"))):
+                raise RuntimeError(f"відповідь обрізано (finish_reason=length, {len(txt)} зн.) — пробуємо іншу модель")
+            return txt
         for tc in msg.get("tool_calls") or []:
             try:
                 return json.loads(tc["function"]["arguments"])

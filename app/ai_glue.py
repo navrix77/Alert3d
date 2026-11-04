@@ -144,11 +144,15 @@ class AI:
         alert = obl in (s.get("levels") or {}) or obl in (off.get("alert_obl") or [])
         bal = [e for e in s.get("bal", []) if (obl in e.get("obl", []) or "*" in e.get("obl", [])) and not e.get("close") and time.time() - e["t"] < 1800]
         kab = [z for z in s.get("zones", []) if z.get("obl") == obl]
-        ctx = (f"Область: {obl}. Зараз {time.strftime('%H:%M')}.\nОфіційна тривога в області: {'так' if alert else 'ні'}.\n"
+        from zoneinfo import ZoneInfo
+        import datetime as _dt
+        now_kyiv = _dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%H:%M")  # сервер живе в UTC — моделі даємо київський час
+        ctx = (f"Область: {obl}. Зараз {now_kyiv} (київський час).\nОфіційна тривога в області: {'так' if alert else 'ні'}.\n"
                f"Цілей в області (за повідомленнями каналів): {len(tr)}\n" + "\n".join(lines) +
                (f"\nПовідомлень про балістику/МіГ-31К/«Бандероль» за 30 хв: {len(bal)}" if bal else "") +
                (f"\nЗон загрози КАБ: {len(kab)}" if kab else ""))
-        txt, by = await self.llm.call(EXPLAIN_SYSTEM, ctx, None, max_tokens=350)
+        # 900, а не 350: у «думаючих» моделей (gpt-oss на Groq, grok-mini) ліміт з'їдали міркування, і відповідь обривалась на пів слові
+        txt, by = await self.llm.call(EXPLAIN_SYSTEM, ctx, None, max_tokens=900)
         if not txt:  # усі моделі недоступні — чесне зведення з даних SKY, без вигадок
             txt = (f"Офіційна тривога в області: {'є' if alert else 'немає'}. "
                    + (f"За повідомленнями каналів цілей в області: {len(tr)}. " + "; ".join(lines[:5]) + "." if tr else "Цілей в області за повідомленнями каналів зараз немає.")
