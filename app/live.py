@@ -416,11 +416,11 @@ def oblast_facts(state: dict, obl: str) -> dict:
             r = R.of(ll[0], ll[1]) or "район не визначено"
             n = t.get("count") or 1
             w = TWORD.get(t["type"], (t.get("name") or "ціль",) * 2)
-            groups.setdefault(r, []).append({"id": t["id"], "txt": ((f"{n} " + w[1]) if n > 1 else w[0]) +
+            groups.setdefault(r, []).append({"id": t["id"], "type": t["type"], "n": n, "at": (t.get("at") or [None])[0], "txt": ((f"{n} " + w[1]) if n > 1 else w[0]) +
                                              (f" біля {t['at'][0]}" if t.get("at") else " (місце не назване, оцінка Скай)") +
                                              (f", курс на {t['next']}" if t.get("next") else "") + f"; джерело: {_src_phrase(state, t)}"})
         elif t.get("pred") == "channels" and t.get("route") and O.of(t["route"][0][0], t["route"][0][1]) == obl:
-            groups.setdefault("з сусідніх областей", []).append({"id": t["id"], "txt": f"{TWORD.get(t['type'], ('ціль',))[0]} прямує в область, "
+            groups.setdefault("з сусідніх областей", []).append({"id": t["id"], "type": t["type"], "n": t.get("count") or 1, "at": None, "txt": f"{TWORD.get(t['type'], ('ціль',))[0]} прямує в область, "
                                                                 f"курс на {t.get('next')}; джерело: {_src_phrase(state, t)}"})
     al_raions = sorted(r for r in rl if O.of(*_rc(R, r)) == obl)
     fp = (whole, tuple(al_raions), tuple(sorted((k, tuple(sorted(x["id"] for x in v))) for k, v in groups.items())))
@@ -547,6 +547,16 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
         fp = cf["fp"]
         if mem["said"] and fp == mem["fp"] and not out_:
             return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
+        if KIT and not out_:
+            # 04.11 власник: «максимально з заготовок» — і область, і Україна без моделі
+            from . import voicekit
+            fr = voicekit.compose_country(cf) if scope == "country" else voicekit.compose_oblast(cf)
+            if mem["said"]:
+                fr = fr[1:] if scope == "oblast" else fr  # назву регіону — лише в першому зведенні
+            txt = " ".join(fr)
+            mem.update(fp=fp, t=now, said=(mem["said"] + [txt])[-5:])
+            return {"text": txt, "speech": txt, "kind": "summary", "by": "kit", "scope": scope, "level": level,
+                    "audio": "/api/voice/" + voicekit.register(fr)}
     else:
         f = fh or near_facts(state, home, obl, since, radius)
         ctx, fb = region_text(f, obl)
@@ -564,6 +574,12 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
                 return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "kit", "audio": "/api/voice/" + voicekit.register(fr)}
             txt = ("Без змін. " + fb) if f["near"] or f["alert"] else "Без змін. Поруч з вами цілей немає."
             return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "rules"}
+        if KIT and out_:
+            from . import voicekit
+            fr = ["Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."]
+            mem.update(fp=fp, t=now, said=(mem["said"] + [fr[0]])[-5:])
+            return {"text": fr[0], "speech": fr[0], "kind": "outage", "by": "kit", "scope": scope, "level": "outage",
+                    "audio": "/api/voice/" + voicekit.register(fr)}
         if KIT and not out_:
             # 04.11 власник: «паузи шалені» → голосові заготовки: без моделі й без нового синтезу, звучить одразу
             from . import voicekit

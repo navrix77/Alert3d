@@ -69,9 +69,13 @@ def km_round(km: float) -> int:
     return km if km <= 10 else int(5 * round(km / 5))
 
 
-def side_dist(side: str, km: float) -> str:
+def dist(km: float) -> str:
     k = km_round(km)
-    return f"{side}, за {num(k)} {plural(k, 'кілометр', 'кілометри', 'кілометрів')} від вас."
+    return f"за {num(k)} {plural(k, 'кілометр', 'кілометри', 'кілометрів')} від вас."
+
+
+def side_dist(side: str, km: float) -> str:  # текст для екрана; у голосі — дві заготовки: сторона + відстань
+    return f"{side}, {dist(km)}"
 
 
 def eta(m: int) -> str:
@@ -90,6 +94,27 @@ FIXED = ["Увага!", "Оновлення.", "Ви слухаєте Скай �
 SIDES = ["на півночі", "на північному сході", "на сході", "на південному сході", "на півдні", "на південному заході", "на заході", "на північному заході"]
 
 
+REG = {"Вінницька": "Вінниччина", "Волинська": "Волинь", "Луганська": "Луганщина", "Дніпропетровська": "Дніпропетровщина",
+       "Донецька": "Донеччина", "Житомирська": "Житомирщина", "Закарпатська": "Закарпаття", "Запорізька": "Запоріжжя",
+       "Івано-Франківська": "Івано-Франківщина", "Київська": "Київщина", "Кіровоградська": "Кіровоградщина", "Крим": "Крим",
+       "Львівська": "Львівщина", "Миколаївська": "Миколаївщина", "Одеська": "Одещина", "Полтавська": "Полтавщина",
+       "Рівненська": "Рівненщина", "Сумська": "Сумщина", "Тернопільська": "Тернопільщина", "Харківська": "Харківщина",
+       "Херсонська": "Херсонщина", "Хмельницька": "Хмельниччина", "Черкаська": "Черкащина", "Чернігівська": "Чернігівщина",
+       "Чернівецька": "Буковина", "Київ": "Київ"}
+OBL_FIXED = ["Повітряна тривога на всю область.", "Тривога в районах:", "Офіційної тривоги в області немає.",
+             "Повідомлень про цілі в області немає.", "З сусідніх областей:", "Огляд по Україні.", "Офіційних тривог зараз немає.",
+             "Загроза балістики:", "Найбільше повідомлень про цілі:", "Більше змін немає."]
+TOPW = {k: v[1] for k, v in TYPES.items()}
+
+
+def reg(o: str) -> str:
+    return REG.get(o, o)
+
+
+def alerts_n(n: int) -> str:
+    return f"Областей з тривогою: {num(n, 'f')}."
+
+
 def vocabulary() -> list[str]:
     """Закритий словник заготовок: синтезується наперед, щоб перше ж оновлення звучало без очікування."""
     v = list(FIXED)
@@ -99,9 +124,57 @@ def vocabulary() -> list[str]:
         if typ not in ("shahed", "jet", "cruise", "ballistic", "kab"):
             v += [count_type(n, typ) for n in (1, 2, 3)]
     kms = list(range(1, 11)) + list(range(15, 205, 5))
-    v += [side_dist(s, k) for s in SIDES for k in kms]
+    v += [s + "," for s in SIDES] + [dist(k) for k in kms]
     v += [eta(m) for m in range(1, 31)] + [more(n) for n in range(1, 11)]
+    # «Моя область» і «Вся Україна»
+    v += OBL_FIXED + [reg(o) + "." for o in REG] + [reg(o) + "," for o in REG] + [alerts_n(n) for n in range(1, 26)]
+    v += [f"переважно {w}." for w in TOPW.values()]
+    for typ in ("shahed", "jet", "cruise", "ballistic", "kab"):
+        v += [count_type(n, typ) + "." for n in range(1, 11)]
     return v
+
+
+def compose_oblast(f: dict) -> list[str]:
+    """«Моя область»: назва регіону, статус тривоги (по районах, без узагальнення), цілі за районами (до трьох)."""
+    out = [reg(f["obl"]) + "."]
+    if f.get("whole"):
+        out.append("Повітряна тривога на всю область.")
+    elif f.get("al_raions"):
+        out.append("Тривога в районах:")
+        out += [f"{r} район." for r in f["al_raions"][:6]]
+    else:
+        out.append("Офіційної тривоги в області немає.")
+    groups = [(r, it) for r, it in (f.get("groups") or {}).items()]
+    groups.sort(key=lambda g: (g[0].startswith("з "), -len(g[1])))
+    for r, items in groups[:3]:
+        out.append("З сусідніх областей:" if r.startswith("з ") else f"{r} район." if r != "район не визначено" else "Оновлення.")
+        by: dict = {}
+        for x in items:
+            by[x.get("type", "shahed")] = by.get(x.get("type", "shahed"), 0) + (x.get("n") or 1)
+        for typ, n in sorted(by.items(), key=lambda kv: -kv[1])[:2]:
+            out.append(count_type(n, typ) + ".")
+        at = next((x["at"] for x in items if x.get("at")), None)
+        if at:
+            out.append(f"Місце: {at}.")
+    if not groups:
+        out.append("Повідомлень про цілі в області немає.")
+    return out
+
+
+def compose_country(f: dict) -> list[str]:
+    out = ["Огляд по Україні."]
+    out.append(alerts_n(len(f["al"])) if f.get("al") else "Офіційних тривог зараз немає.")
+    if f.get("bal"):
+        out.append("Загроза балістики:")
+        out += [reg(o) + "." for o in f["bal"][:4]]
+    if f.get("top"):
+        out.append("Найбільше повідомлень про цілі:")
+        for o, ty in f["top"][:3]:
+            if ty:
+                out += [reg(o) + ",", f"переважно {TOPW.get(ty[0][0], 'цілі')}."]
+            else:
+                out.append(reg(o) + ".")
+    return out
 
 
 def compose(f: dict, first: bool = False, greeted: bool = True) -> list[str]:
@@ -120,11 +193,9 @@ def compose(f: dict, first: bool = False, greeted: bool = True) -> list[str]:
         n = int(str(x.get("word", "1")).split()[0]) if str(x.get("word", "")).split()[0].isdigit() else 1
         out.append(count_type(n, x["type"]))
         if x.get("at") and x.get("named_km") is not None:
-            out.append(side_dist(x["side"], x["named_km"]))
-            out.append(f"Місце: {x['at']}.")
+            out += [x["side"] + ",", dist(x["named_km"]), f"Місце: {x['at']}."]
         else:
-            out.append(side_dist(x["side"], x["km"]))
-            out.append("Точне місце не назване.")
+            out += [x["side"] + ",", dist(x["km"]), "Точне місце не назване."]
         if x.get("appr"):
             out.append("Наближається.")
             if x.get("eta") and x["eta"] <= 30:
@@ -142,6 +213,33 @@ def compose(f: dict, first: bool = False, greeted: bool = True) -> list[str]:
             out.append("Тривога в області триває.")
         out.append("Поруч з вами цілей немає.")
     return out
+
+
+# ---------- голосові сповіщення: текст картки → заготовки (числа округлені, щоб фраз було мало й вони повторювались)
+def _km_words(n: int) -> str:
+    k = km_round(n)
+    return f"{num(k)} {plural(k, 'кілометр', 'кілометри', 'кілометрів')}"
+
+
+def alert_frags(text: str) -> list[str]:
+    """«Шахед ×2, курс на ваш район. 24 км з півдня, ~8 хв» → ["Шахед.", "Дві цілі.", "Курс на ваш район.",
+    "Двадцять п'ять кілометрів з півдня.", "Приблизно вісім хвилин."]. Кожна фраза озвучується один раз на голос і далі з кешу."""
+    import re
+    t = " ".join(str(text or "").split())
+    t = re.sub(r"^[^\wА-Яа-яІіЇїЄєҐґ«]+", "", t)
+    t = t.replace("~", "приблизно ").replace("·", ",").replace("→", "на").replace("—", ",")
+    t = re.sub(r"(\w+)\s+обл\.?(?=$|[\s,.])", r"\1 область", t)
+    t = re.sub(r"\s*×\s*(\d+)", lambda m: ", " + num(int(m[1]), "f") + " " + plural(int(m[1]), "ціль", "цілі", "цілей"), t)
+    t = re.sub(r"(\d+)\s*км\b", lambda m: _km_words(int(m[1])), t)
+    t = re.sub(r"(?:приблизно\s+)?(\d+)\s*хв\b", lambda m: "приблизно " + num(max(1, int(m[1])), "f") + " " +
+               plural(max(1, int(m[1])), "хвилина", "хвилини", "хвилин"), t)
+    t = re.sub(r"\b(\d{1,3})\b", lambda m: num(int(m[1])), t)
+    out = []
+    for p in re.split(r"[.,;:!?]+\s*", t):
+        p = p.strip(" -")
+        if p:
+            out.append(cap(p) + ".")
+    return out[:10]
 
 
 # ---------- синтез і склейка

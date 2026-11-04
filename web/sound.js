@@ -38,7 +38,9 @@
   let curA=null;
   // speak повертає Promise, що завершується, коли голос договорив (потрібно, щоб знати, коли продовжити радіо)
   function speak(text){if(!text)return Promise.resolve(false);
-    if(S.voice&&S.voice!=='device'){try{return vaPlay('/api/tts?v=3&voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text),S.vol).then(ok=>ok||sysSpeak(text));}catch(e){}}
+    // 04.11: спершу із заготовок (фрази з кешу, без нових витрат), якщо ні — озвучка цілим текстом, далі голос пристрою
+    if(S.voice&&S.voice!=='device'){try{const q='voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text);
+      return vaPlay('/api/voice/alert?'+q,S.vol).then(ok=>ok||vaPlay('/api/tts?v=3&'+q,S.vol)).then(ok=>ok||sysSpeak(text));}catch(e){}}
     return sysSpeak(text);}
   function sysSpeak(text){return new Promise(res=>{if(!text||!('speechSynthesis' in window))return res(false);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
     const v=voices.find(x=>/^uk/i.test(x.lang))||voices.find(x=>/^ru/i.test(x.lang)&&false);if(v)u.voice=v;u.lang='uk-UA';u.rate=S.rate;u.volume=S.vol;

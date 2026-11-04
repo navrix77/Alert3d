@@ -782,13 +782,31 @@ def _paid_ok() -> bool:
     return sum(v for k, v in day.items() if k.startswith("tts_chars:")) < cap
 
 
-async def _say(text: str, voice: str = "radio"):
+async def _say(text: str, voice: str = "radio", rate: float = 1.0):
     """Озвучка з обліком: нові (не з кешу) символи платного голосу йдуть у денний ліміт."""
     from . import tts
-    data, why = await tts.speak(text, voice, 1.0, paid=_paid_ok())
+    data, why = await tts.speak(text, voice, rate, paid=_paid_ok())
     if data and why in ("openai", "gemini", "google"):
         LLMX.count("tts_chars:" + why, len(text))
     return data, why
+
+
+@app.get("/api/voice/alert")
+async def api_voice_alert(text: str, voice: str = "lada", rate: float = 1.0):
+    """Голосове сповіщення із заготовок: картка розбивається на короткі фрази з округленими числами; кожна фраза озвучується
+    один раз на голос, далі — з кешу, без витрат (04.11, власник: «коштів не вистачить озвучувати все»)."""
+    from fastapi import Response
+    from . import voicekit
+    fr = voicekit.alert_frags(text[:300])
+    if not fr:
+        return JSONResponse({"ok": False, "why": "empty"}, status_code=400)
+    v = voice if voice in ("lada", "tetiana", "mykyta", "oleksa", "radio") else "lada"
+    r = max(0.7, min(1.5, rate))
+    data, why = await voicekit.render(fr, lambda x: _say(x, v, r))
+    LLMX.count("tts:alert-" + why)
+    if not data:
+        return JSONResponse({"ok": False, "why": why}, status_code=503)
+    return Response(data, media_type="audio/mpeg", headers={"Cache-Control": "max-age=86400", "X-TTS": why})
 
 
 @app.get("/api/voice/{sid}")

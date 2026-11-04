@@ -1730,7 +1730,7 @@ def test_radio_modes(monkeypatch):
     ob = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "oblast", "m1"))
     assert "Чугуївський район" in ob["text"] and "всю область" not in ob["text"]  # тривога по району, не на всю область
     ct = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "country", "m1"))
-    assert ct["text"].startswith("Скай. Огляд по Україні")
+    assert ct["text"].startswith(("Скай. Огляд по Україні", "Огляд по Україні"))
     nr = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "m2", 50))
     assert "Чугуїв" in nr["speech"] and "Ви слухаєте Скай" in nr["speech"]
     nr10 = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "m3", 10))
