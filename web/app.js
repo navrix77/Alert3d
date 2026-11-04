@@ -122,8 +122,13 @@ function tacScale(v){TACF.scale=v;if(v!=='oblast')TACF.obl='';tacSave();const H=
   if(v==='oblast'&&TACF.obl&&oblBox(TACF.obl)){const b=oblBox(TACF.obl);map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:{top:170,bottom:120,left:30,right:60},duration:700,maxZoom:9});}else if(v==='near')map.flyTo({center:H,zoom:9.6,duration:700});else if(v==='oblast')map.flyTo({center:H,zoom:7.2,duration:700});else map.flyTo({center:[31.5,48.8],zoom:5.4,duration:700});
   const b=document.querySelector('#rad-scope button[data-v="'+({near:'near',oblast:'oblast',country:'country'}[v])+'"]');if(b)b.click();// озвучення радіо змінюється разом із масштабом
   tacBarSync();}
-function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;tacOblFill();const so=$('#tac-ob');if(so)so.value=TACF.obl||'';bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
+function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;setTimeout(()=>tacPad(true),60);tacOblFill();const so=$('#tac-ob');if(so)so.value=TACF.obl||'';bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
   const n=TACF.hide.length+(TACF.fresh?1:0)+(TACF.src?1:0)+(TACF.alerts?0:1)+(TACF.enemy?0:1)+(TACF.reach?0:1);const f=$('#tac-f');if(f)f.textContent='Фільтри'+(n?' · '+n:'');}
+// у тактичному режимі центр мапи — вільна зона між верхньою панеллю й нижньою докою
+function tacPad(anim){try{let t=0,b=0;if(TAC){const bar=$('#tac-bar');if(bar&&!bar.hidden)t=Math.max(0,Math.round(bar.getBoundingClientRect().bottom-(map.getContainer().getBoundingClientRect().top||0)));b=96;}
+  const o={top:t,bottom:b,left:0,right:0},c=map.getPadding();if(Math.abs(c.top-o.top)<2&&Math.abs(c.bottom-o.bottom)<2)return;
+  if(anim)map.easeTo({padding:o,duration:450});else map.setPadding(o);}catch(e){}}
+window.addEventListener('resize',()=>tacPad(false));
 function tacPanelTop(){const b=$('#tac-bar');if(b)document.documentElement.style.setProperty('--tac-top',Math.round(b.getBoundingClientRect().bottom+6)+'px');}
 function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;tacPanelTop();if(!pn.hidden){pn.hidden=true;return;}
   const types=[...new Set((SNAP&&SNAP.tracks||[]).filter(t=>t.status==='active').map(t=>t.type))];const srcs=new Map();
