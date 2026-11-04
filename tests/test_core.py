@@ -1839,3 +1839,11 @@ def test_count_estimate_chains_and_live():
           {"status": "lost", "type": "shahed", "count": 1, "ev": {"age": 10}}]
     lv = live(tr, 100.0, 100.0)
     assert lv["total"] == 1 and lv["by_type"] == {"shahed": 1} and lv["units_max"] == 3
+
+
+def test_count_acc_reads_daily():
+    from app import analyst
+    r = analyst.count_acc()
+    assert isinstance(r, dict)
+    if r:
+        assert r["n"] >= 1 and 0 <= r["inside"] <= r["n"]

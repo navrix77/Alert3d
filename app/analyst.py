@@ -332,10 +332,40 @@ def analyze(snap: dict, hist: list[dict], brain=None, now: float | None = None) 
     jd = jr[1] if jr else {"sources": [], "nights": None}
     res["sources"] = jd["sources"][:24]
     res["nights"] = jd["nights"]
-    res["self"] = {"pred_acc": brain.pred_acc() if brain is not None and hasattr(brain, "pred_acc") else {},
+    res["self"] = {"count_acc": count_acc(),
+                   "pred_acc": brain.pred_acc() if brain is not None and hasattr(brain, "pred_acc") else {},
                    "hd_acc": brain.hd_acc() if brain is not None and hasattr(brain, "hd_acc") else {}}
     res["summary"] = summary(res)
     return res
+
+
+def count_acc(limit: int = 14) -> dict:
+    """Самоперевірка підрахунку цілей: оцінка за добу (data/daily/*.json, поле uniq) проти офіційного «збито/подавлено» зі ранкового допису.
+    Запущено ≈ збито / 0.88 (припущення), тому порівнюємо з цим значенням і показуємо діапазон low-high."""
+    import json
+    from pathlib import Path
+    d = Path(__file__).resolve().parent.parent / "data" / "daily"
+    rows = []
+    try:
+        for f in sorted(d.glob("*.json"))[-limit * 2:]:
+            try:
+                j = json.loads(f.read_text())
+            except Exception:  # noqa: BLE001
+                continue
+            sh = ((j.get("official") or {}).get("shot"))
+            u = ((j.get("uniq") or {}).get("total"))
+            if not sh or not u or not j.get("final"):
+                continue
+            exp = sh / 0.88
+            rows.append({"day": j.get("day") or f.stem, "official": sh, "expected": round(exp), "low": u["low"], "mid": u["mid"], "high": u["high"],
+                         "err": round((u["mid"] - exp) / exp, 2), "inside": u["low"] <= exp <= u["high"]})
+    except Exception:  # noqa: BLE001
+        return {}
+    rows = rows[-limit:]
+    if not rows:
+        return {}
+    return {"n": len(rows), "mae": round(sum(abs(x["err"]) for x in rows) / len(rows), 2),
+            "inside": sum(1 for x in rows if x["inside"]), "rows": rows}
 
 
 def summary(r: dict) -> list[str]:
@@ -400,6 +430,10 @@ def summary(r: dict) -> list[str]:
         cp = [x for x in r["sources"] if x["copy_share"] >= 0.5]
         if cp:
             out.append("Переважно дублюють інших (не незалежні підтвердження): " + ", ".join(f"{x['src']} ({round(x['copy_share'] * 100)}% перепостів)" for x in cp[:4]) + ".")
+    ca = r["self"].get("count_acc") or {}
+    if ca:
+        out.append(f"Самоперевірка підрахунку цілей за добу: у {ca['inside']} з {ca['n']} діб очікуване число (збито ÷ 0,88) потрапило в наш діапазон, "
+                   f"середня похибка оцінки {round(ca['mae'] * 100)}%. Це оцінка з діапазоном, а не точне число.")
     ha = r["self"].get("hd_acc") or {}
     if ha:
         out.append("Самоперевірка напрямку (курс на мапі збігся з наступною названою позицією в межах 45°): " + ", ".join(
