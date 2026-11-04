@@ -296,7 +296,7 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
-LAST = {"openai": "", "gemini": "", "google": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
+LAST = {"openai": "", "gemini": "", "google": "", "gemini_cloud": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
 VOICE_V = "r9"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
 OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
@@ -372,6 +372,33 @@ async def _gemini(text: str, key: str, rate: float) -> bytes | None:
             if r.status_code == 429:
                 _off["gemini"] = time.time() + 600
                 return None
+    return None
+
+
+# Gemini-TTS через Google Cloud (той самий GOOGLE_TTS_KEY, окремого ключа немає): голос слухається текстового промпту стилю
+# (баритон, енергія радіо). Платний за токени, тому лише для 9 заставок: озвучуються один раз і кешуються назавжди.
+GCLOUD_GEMINI_VOICE = os.getenv("TTS_GEMINI_CLOUD_VOICE") or "Algenib"
+GCLOUD_GEMINI_MODEL = os.getenv("TTS_GEMINI_CLOUD_MODEL") or "gemini-2.5-flash-tts"
+
+
+def _is_ident(text: str) -> bool:
+    return " ".join((text or "").split()) in set(_spec.IDENTS.values())
+
+
+async def _gemini_cloud(text: str, key: str, rate: float) -> bytes | None:
+    import base64
+    if not GKEY or _off.get("gcloud_gemini", 0) > time.time():
+        return None
+    async with httpx.AsyncClient(timeout=40) as cli:
+        r = await cli.post("https://texttospeech.googleapis.com/v1/text:synthesize", params={"key": GKEY},
+                           json={"input": {"text": text, "prompt": _spec.VOICE_STYLE},
+                                 "voice": {"languageCode": "uk-UA", "name": GCLOUD_GEMINI_VOICE, "modelName": GCLOUD_GEMINI_MODEL},
+                                 "audioConfig": {"audioEncoding": "MP3"}})
+    if r.status_code == 200 and r.json().get("audioContent"):
+        return base64.b64decode(r.json()["audioContent"])
+    LAST["gemini_cloud"] = f"HTTP {r.status_code} {r.text[:160]}"
+    log.warning("gemini-tts cloud: %s %s", r.status_code, r.text[:160])
+    _off["gcloud_gemini"] = time.time() + (600 if r.status_code == 429 else 3600)  # не мучимо API, поки немає доступу
     return None
 
 
@@ -479,9 +506,15 @@ _PIPER_SEM = asyncio.Semaphore(1)
 
 
 async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True, google: bool = True) -> tuple[bytes | None, str]:
-    text = say_form(_spec.brand_say(" ".join((text or "").split())[:600]))
+    ident = key == "radio" and _is_ident(text)
+    text0 = " ".join((text or "").split())[:600]
+    text = say_form(_spec.brand_say(text0))
     if not text:
         return None, "empty"
+    if ident and os.getenv("TTS_GEMINI_IDENTS", "1") != "0":  # заставка: кращий голос один раз, далі лише кеш
+        data, by = await _cached("gemcloud", "mp3", _gemini_cloud, text0, key, 1.0, "gc1")
+        if data:
+            return data, "gemini-cloud"
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
     if key == "radio":
         rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо швидше; додатково +12% відтворенням на клієнті (кеш озвучки не чіпаємо)
@@ -553,5 +586,5 @@ def codes() -> dict:
 
 
 def status() -> dict:
-    return {"openai": bool(os.getenv("OPENAI_API_KEY")), "openai_error": LAST["openai"], "gemini": bool(_gkey()), "gemini_error": LAST["gemini"], "google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
+    return {"openai": bool(os.getenv("OPENAI_API_KEY")), "openai_error": LAST["openai"], "gemini": bool(_gkey()), "gemini_error": LAST["gemini"], "gemini_cloud_error": LAST["gemini_cloud"], "google": bool(GKEY), "google_voices": _gvoices, "piper": piper_ok(), "install": _install, "voices": [{"key": k, "name": NAMES[k],
             "ready": bool(list((BASE / VOICES[k][0]).glob('*.onnx')))} for k in VOICES]}
