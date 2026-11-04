@@ -59,13 +59,13 @@
 
   // спільне: шапка з лого
   function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
-  function brand(g, x, y, s) {// лого + NAVRYX SKY + слоган; s — висота лого
-    if (LOGO) g.drawImage(LOGO, x, y, s, s);
-    const tx = x + s + s * 0.18;
+  function brand(g, x, y, s) {// єдине лого (з назвою) + слоган; s — висота лого
+    if (LOGO) g.drawImage(LOGO, x, y, s * 1.3, s * 1.3);
     g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-    g.font = '800 ' + Math.round(s * 0.36) + 'px ' + FONT; g.fillStyle = '#F2F5FA'; g.fillText('NAVRYX', tx, y + s * 0.5);
-    const w = g.measureText('NAVRYX ').width; g.fillStyle = BLUE; g.fillText('SKY', tx + w, y + s * 0.5);
-    g.font = '600 ' + Math.round(s * 0.17) + 'px ' + FONT; g.fillStyle = MUTE; g.fillText('Розумій, що відбувається в небі', tx, y + s * 0.8);
+    g.font = '600 ' + Math.round(s * 0.2) + 'px ' + FONT; g.fillStyle = MUTE; g.fillText('Розумій, що відбувається в небі', x + s * 1.45, y + s * 0.78);
+  }
+  function wmark(g, x, y, w, h) {// водяний знак на знімку мапи
+    if (!LOGO) return; const s = Math.round(Math.min(w, h) * 0.13); g.save(); g.globalAlpha = 0.6; g.drawImage(LOGO, x + 12, y + 12, s, s); g.restore();
   }
   function grad(g, x, y, w, h) { const l = g.createLinearGradient(x, 0, x + w, 0); l.addColorStop(0, GOLD); l.addColorStop(1, BLUE); g.fillStyle = l; g.fillRect(x, y, w, h); }
   function cover(g, src, x, y, w, h) {// map canvas → прямокутник з обрізанням по центру
@@ -97,7 +97,7 @@
       grad(g, M, 162, W - 2 * M, 3);
       // мапа
       const my = 190;
-      g.save(); rr(g, M, my, MW, MH, 22); g.clip(); cover(g, map.getCanvas(), M, my, MW, MH);
+      g.save(); rr(g, M, my, MW, MH, 22); g.clip(); cover(g, map.getCanvas(), M, my, MW, MH); wmark(g, M, my, MW, MH);
       g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(M, my + MH - 30, MW, 30);
       g.font = '500 14px ' + FONT; g.fillStyle = 'rgba(255,255,255,.7)'; g.textAlign = 'left';
       g.fillText('© Esri, Maxar · © OpenStreetMap · OpenFreeMap · зона контролю: відкриті джерела', M + 14, my + MH - 10);
@@ -175,7 +175,7 @@
       const frame = (t) => {
         const f = Math.max(0, Math.min(1, (t - INTRO) / PLAY));
         g.fillStyle = '#070A10'; g.fillRect(0, 0, W, H);
-        g.drawImage(mc, 0, 0, mc.width, mc.height, 0, MY, W, MH);
+        g.drawImage(mc, 0, 0, mc.width, mc.height, 0, MY, W, MH); wmark(g, 0, MY, W, MH);
         // верх
         const tg = g.createLinearGradient(0, MY, 0, MY + 120); tg.addColorStop(0, '#070A10'); tg.addColorStop(1, 'rgba(7,10,16,0)'); g.fillStyle = tg; g.fillRect(0, MY, W, 120);
         brand(g, 48, 34, 96);

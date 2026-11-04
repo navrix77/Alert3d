@@ -1355,7 +1355,7 @@ setInterval(()=>{if(ws&&ws.readyState===1)ws.send('ping');},20000);
 document.addEventListener('visibilitychange',()=>{if(ws&&ws.readyState===1)ws.send(document.hidden?'hidden':'visible');});
 
 /* ---------- налаштування, теми, шари ---------- */
-const PREF=Object.assign({theme:'night',base:null,sound:false,ru:true,launch:true,zones:true},(()=>{try{return JSON.parse(localStorage.getItem('pref')||'{}');}catch(e){return {};}})());
+const PREF=Object.assign({theme:'night',base:null,sound:false,ru:true,launch:true,zones:true,wm:true},(()=>{try{return JSON.parse(localStorage.getItem('pref')||'{}');}catch(e){return {};}})());
 // темна тема за замовчуванням (02.11): збережене раніше «Авто» переводимо в «Ніч» один раз; свідомий вибір після цього не чіпаємо
 if(!PREF.darkV2){if(PREF.theme==='auto')PREF.theme='night';PREF.darkV2=1;try{localStorage.setItem('pref',JSON.stringify(PREF));}catch(e){}}
 const savePref=()=>{try{localStorage.setItem('pref',JSON.stringify(PREF));}catch(e){}};
@@ -1367,7 +1367,7 @@ function applyTheme(force){const th=effTheme();document.documentElement.dataset.
   const want=wantBase(th);if(force||want!==base)setBase(want);
   $('#st-theme-note').textContent=PREF.theme==='auto'?('Зараз: '+(th==='night'?'ніч':'день')+', перемикається само за сходом і заходом сонця над вашим домом.'):'';syncSettingsUI();}
 function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='mode'?(TAC?'tac':'norm'):k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
-  $('#st-3d').checked=tilt;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
+  $('#st-3d').checked=tilt;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;$('#st-wm').checked=PREF.wm!==false;document.body.classList.toggle('wm',PREF.wm!==false);}
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);
   if(TAC)vis(['holo','holo-top','ra-glow'],false);
@@ -1472,6 +1472,7 @@ try{if(matchMedia('(display-mode: standalone)').matches||navigator.standalone)fe
 $('#st-ru').onchange=e=>{PREF.ru=e.target.checked;savePref();applyLayers();};
 $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers();};
 $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};
+$('#st-wm').onchange=e=>{PREF.wm=e.target.checked;savePref();syncSettingsUI();};
 $('#st-geo').onclick=()=>{$('#b-locate').click();};
 $('#st-pick').onclick=()=>{$('#settings').hidden=true;armHome();};
 $('#st-clear').onclick=()=>{if(FOLHOME)homeSaved=null;H0=null;localStorage.removeItem('H0');syncHome();toast('Дім прибрано');};
