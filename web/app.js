@@ -72,11 +72,22 @@ try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo
   setTimeout(()=>{try{const el=pp.getElement();if(!el)return;const b=el.getBoundingClientRect(),pad=10,top=(document.querySelector('header.top')||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom+6;
     let dx=0,dy=0;if(b.right>innerWidth-pad)dx=b.right-innerWidth+pad;if(b.left-dx<pad)dx=b.left-pad;if(b.top<top)dy=b.top-top;
     if(dx||dy)m.panBy([dx,dy],{duration:350});}catch(e){}},60);return r;};}catch(e){}
+let TAC=false;try{TAC=localStorage.getItem('mode_tac')==='1';}catch(e){}window.FXTAC=TAC;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
   const UK=['coalesce',['get','name:uk'],['get','name']];
   vec.layers.forEach(l=>{if(l.type==='symbol'&&l.layout&&l.layout['text-field']&&JSON.stringify(l.layout['text-field']).includes('name'))l.layout['text-field']=UK;});
+  if(kind==='tac'){// тактична основа: плоский графіт, приглушені дороги й рельєф, чіткі назви населених пунктів
+    const L=[];for(const l0 of vec.layers){const l=JSON.parse(JSON.stringify(l0));l.paint=l.paint||{};
+      if(l.type==='background'){l.paint['background-color']='#14171C';L.push(l);}
+      else if(l.type==='fill'){if(/building|housenumber/.test(l.id))continue;const w=/water/.test(l.id);l.paint['fill-color']=w?'#0E1318':/park|wood|forest|grass|landcover|landuse/.test(l.id)?'#181C21':'#171A1F';delete l.paint['fill-pattern'];l.paint['fill-opacity']=1;L.push(l);}
+      else if(l.type==='line'){if(/bridge_|tunnel_|aeroway|rail|ferry|path|track|service|minor/.test(l.id)&&!/major|trunk|motorway|primary/.test(l.id))continue;
+        const b=/boundary/.test(l.id),w=/waterway|river|stream/.test(l.id);l.paint['line-color']=b?'#3A4350':w?'#10161C':'#2A313A';l.paint['line-opacity']=b?0.8:0.9;delete l.paint['line-dasharray'];if(b)l.paint['line-dasharray']=[3,2];L.push(l);}
+      else if(l.type==='symbol'){if(!/place|city|town|village|suburb|state|country|island/.test(l.id)||/road|poi|housenumber|ref/.test(l.id))continue;
+        l.paint['text-color']=/state|country/.test(l.id)?'#7C8796':'#D5DBE4';l.paint['text-halo-color']='#0C0E12';l.paint['text-halo-width']=1.6;L.push(l);}
+    }
+    vec.layers=L;return vec;}
   if(kind==='map')return vec;
   const NIGHT=kind==='night';
   // супутник + підписи й дороги з векторної карти
@@ -93,6 +104,9 @@ async function styleFor(kind){
   out.sky={'sky-color':'#04060C','horizon-color':'#1B2A4A','fog-color':'#04060C','sky-horizon-blend':0.7,'horizon-fog-blend':0.85,'fog-ground-blend':0.35,'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,0.75,8,0.2]};
   if(vec.sprite)out.sprite=vec.sprite;return out;
 }
+function wantBase(th){return TAC?(PREF.tacSat?'sat':'tac'):(PREF.base&&PREF.base!=='tac'?PREF.base:(th==='night'?'night':'map'));}
+function setTac(on){TAC=!!on;window.FXTAC=TAC;try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);
+  setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();},80);toast(TAC?'Тактична мапа':'Звичайна мапа');}
 async function setBase(kind){base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
 function addImages(){
@@ -275,11 +289,12 @@ function addOverlays(){
   // вибрана ціль: де її бачили востаннє за повідомленням (нерухома точка з часом) і де вона за розрахунком SKY, з'єднані пунктиром.
   // Так видно, що відомо з повідомлення, а що домалювала система (03.11)
   if(!map.getSource('selrep'))map.addSource('selrep',{type:'geojson',data:EMPTY});
+  if(!map.getSource('tac'))map.addSource('tac',{type:'geojson',data:EMPTY});
   map.addLayer({id:'selrep-l',type:'line',source:'selrep',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round'},paint:{'line-color':'#fff','line-width':1.4,'line-opacity':0.85,'line-dasharray':[1,2.2]}});
   map.addLayer({id:'selrep-p',type:'circle',source:'selrep',filter:['==',['get','k'],'rep'],paint:{'circle-radius':4.5,'circle-color':'#fff','circle-stroke-color':'#0B0F17','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'selrep-t',type:'symbol',source:'selrep',filter:['==',['geometry-type'],'Point'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':['case',['==',['get','k'],'rep'],['literal',[0,-1.3]],['literal',[0,2.9]]],'text-max-width':30,'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6,'text-halo-blur':0.4}});
   map.addLayer({id:'home',type:'symbol',source:'home',layout:{'icon-image':'home','icon-size':['interpolate',['linear'],['zoom'],4,0.38,6,0.55,8,0.85,10,1],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',7,'Дім'],'text-font':['Noto Sans Bold'],'text-size':13,'text-offset':[0,1.7],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
-  map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['!=',['get','next'],null],['!=',['get','next'],''],['==',['get','active'],true],['any',['get','thr'],['==',['get','sk'],0],['>=',['zoom'],7]]],layout:{'text-field':['concat',['case',['>',['get','count'],1],['concat','×',['to-string',['get','count']],'  '],''],['case',['==',['get','type'],'ballistic'],'загроза: ','→ '],['get','next'],['case',['all',['get','est'],['==',['get','sk'],0]],' · місце не названо',''],['case',['==',['get','pair'],'lancet'],' · загроза Ланцет','']],'text-font':['Noto Sans Bold'],'text-size':['interpolate',['linear'],['zoom'],6,11,10,12.5],'text-max-width':40,'text-variable-anchor':['left','right','bottom','top'],'text-radial-offset':['interpolate',['linear'],['zoom'],2,1.9,5,2.3,7,2.8,9.5,3.4,12,3.8],'text-justify':'auto','icon-allow-overlap':false,'text-allow-overlap':false,'text-optional':false,'symbol-sort-key':['get','sk']},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6,'text-halo-blur':0.4}});
+  map.addLayer({id:'tg-course',type:'symbol',source:'targets',filter:['all',['!=',['get','next'],null],['!=',['get','next'],''],['==',['get','active'],true],['any',['get','thr'],['==',['get','sk'],0],['all',['>=',['zoom'],7],!TAC]]],layout:{'text-field':['concat',['case',['>',['get','count'],1],['concat','×',['to-string',['get','count']],'  '],''],['case',['==',['get','type'],'ballistic'],'загроза: ','→ '],['get','next'],['case',['all',['get','est'],['==',['get','sk'],0]],' · місце не названо',''],['case',['==',['get','pair'],'lancet'],' · загроза Ланцет','']],'text-font':['Noto Sans Bold'],'text-size':['interpolate',['linear'],['zoom'],6,11,10,12.5],'text-max-width':40,'text-variable-anchor':['left','right','bottom','top'],'text-radial-offset':['interpolate',['linear'],['zoom'],2,1.9,5,2.3,7,2.8,9.5,3.4,12,3.8],'text-justify':'auto','icon-allow-overlap':false,'text-allow-overlap':false,'text-optional':false,'symbol-sort-key':['get','sk']},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6,'text-halo-blur':0.4}});
   const TGS=['interpolate',['linear'],['zoom'],4,0.55,7,0.85,9,1.15,12,1.55];
   // голограма тривоги: об'єми над районами (червоні вищі), «дихають»
   const firstLbl=(map.getStyle().layers.find(l=>l.type==='symbol')||{}).id;
@@ -298,6 +313,10 @@ function addOverlays(){
       'circle-stroke-color':['get','c'],'circle-stroke-width':1,'circle-stroke-opacity':0.45,'circle-pitch-alignment':'map'}},firstLbl);
   map.addLayer({id:'tg-hit',type:'circle',source:'targets',filter:['==',['get','active'],true],paint:{'circle-radius':22,'circle-opacity':0,'circle-stroke-opacity':0}});
   try{if(window.FxLayer&&!map.getLayer('fx'))map.addLayer(window.FxLayer);}catch(e){console.warn('fx',e);}
+  // тактичний режим: факт (назване місце, суцільна точка) окремо від оцінки SKY (значок, пунктир), вік повідомлення біля цілі
+  map.addLayer({id:'tac-ln',type:'line',source:'tac',filter:['==',['get','k'],'ln'],layout:{'line-cap':'butt'},paint:{'line-color':['get','c'],'line-width':1.4,'line-dasharray':[2,2],'line-opacity':['*',0.8,['get','o']]}});
+  map.addLayer({id:'tac-fact',type:'circle',source:'tac',filter:['==',['get','k'],'fact'],paint:{'circle-radius':4.5,'circle-color':['get','c'],'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6,'circle-opacity':['get','o'],'circle-stroke-opacity':['get','o']}});
+  map.addLayer({id:'tac-age',type:'symbol',source:'tac',filter:['==',['get','k'],'age'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-anchor':'left','text-offset':['interpolate',['linear'],['zoom'],4,['literal',[0.9,0]],8,['literal',[1.4,0]],11,['literal',[1.9,0]]],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['all',['>',['get','count'],1],['!',['!=',['get','next'],null]]],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-anchor':'top','text-offset':['interpolate',['linear'],['zoom'],2,['literal',[0,1.30]],5,['literal',[0,1.68]],7,['literal',[0,2.04]],9.5,['literal',[0,2.48]]],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
   if(map.getLayer('tg-course'))map.moveLayer('tg-course');
   map.on('click','tg-hit',e=>{const f=e.features[0];openSheet(f.properties.id);});
@@ -499,6 +518,14 @@ function frame(now){
     window.FXHOME=home?{p:home,state:$('#me').classList.contains('danger')?'danger':$('#me').classList.contains('watch')?'watch':'calm'}:null;
     if(slow)window.FXBEACONS=PREFL().launch?(SNAP.launches||[]).filter(L=>serverT-L.t<3*3600).map(L=>({p:[L.lon,L.lat]})):[];
     if(slow)map.getSource('targets').setData({type:'FeatureCollection',features:feats});
+    if(slow&&map.getSource('tac')){const TF=[];
+      if(TAC)for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
+        const ageS=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),mins=Math.floor(ageS/60),o=ageS<300?1:Math.max(0.4,1-(ageS-300)/1500),c=f.properties.c,P=f.geometry.coordinates;
+        TF.push({type:'Feature',properties:{k:'age',l:mins<1?'<1 хв':mins+' хв',o,c},geometry:{type:'Point',coordinates:P}});
+        const q=tr.trail&&tr.trail.length&&tr.trail[tr.trail.length-1];
+        if(q&&!isBal(tr)&&dist(xy([q[0],q[1]]),xy(P))>=1.5){TF.push({type:'Feature',properties:{k:'fact',o,c},geometry:{type:'Point',coordinates:[q[0],q[1]]}});
+          TF.push({type:'Feature',properties:{k:'ln',o,c},geometry:{type:'LineString',coordinates:[[q[0],q[1]],P]}});}}
+      map.getSource('tac').setData({type:'FeatureCollection',features:TF});}
     try{if(slow&&map.getSource('flow')){const FL=[],PU=[];const sT=serverT;
       for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
         const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next)||(tr.hd==null&&!tr.route.length);
@@ -1013,7 +1040,8 @@ map.on('click','home',e=>{const home=realHome();if(!home)return;const pp=new map
 $('#b-home').onclick=()=>{if(setHomeMode){disarmHome();toast('Скасовано');return;}if(home){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Торкніться значка «Дім», щоб перемістити або видалити');return;}armHome();};
 // довге натискання на «Дім» прибрано: на телефоні воно спрацьовувало випадково й наступний дотик переносив дім
 $('#b-locate').onclick=()=>{if(!navigator.geolocation)return toast('Геолокація недоступна');navigator.geolocation.getCurrentPosition(p=>{const c=[p.coords.longitude,p.coords.latitude];map.flyTo({center:c,zoom:10});if(!home){home=c;localStorage.setItem('home',JSON.stringify(home));syncHome();toast('Дім = ваше місце');}},()=>toast('Не вдалося визначити місце'),{enableHighAccuracy:true,timeout:8000});};
-$('#b-layers').onclick=()=>{const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
+$('#b-layers').onclick=()=>{if(TAC){PREF.tacSat=base!=='sat';savePref();setBase(PREF.tacSat?'sat':'tac');toast(PREF.tacSat?'Супутник':'Графіт');return;}
+  const nx={night:'sat',sat:'map',map:'night'}[base]||'night';try{const p=JSON.parse(localStorage.getItem('pref')||'{}');p.base=nx;localStorage.setItem('pref',JSON.stringify(p));}catch(e){}setBase(nx);toast({night:'Ніч',sat:'Супутник',map:'Карта'}[nx]);};
 function flat3d(on){// значок завжди «дивиться» на екран (як у 2D), без перспективних спотворень; у 3D лише коротша тінь
   if(map.getLayer('tg-sh')){map.setPaintProperty('tg-sh','icon-translate',on?[8,12]:[14,22]);map.setPaintProperty('tg-sh','icon-opacity',on?0.6:0.9);}}
 function set3d(on,anim){tilt=on;flat3d(on);localStorage.setItem('t3d',on?'1':'0');$('#b-3d').classList.toggle('on',on);if(anim!=='keep')map.easeTo({pitch:on?55:0,bearing:0,duration:anim?700:0});}
@@ -1186,12 +1214,13 @@ function sunNight(){const p=home||[31.5,49];const d=new Date();const doy=Math.fl
   const noonUTC=12-p[0]/15;const rise=noonUTC-h0/15,set=noonUTC+h0/15;const u=d.getUTCHours()+d.getUTCMinutes()/60;return !(u>rise&&u<set);}
 function effTheme(){return PREF.theme==='auto'?(sunNight()?'night':'day'):PREF.theme;}
 function applyTheme(force){const th=effTheme();document.documentElement.dataset.theme=th;window.FXDAY=th==='day';
-  const want=PREF.base||(th==='night'?'night':'map');if(force||want!==base)setBase(want);
+  const want=wantBase(th);if(force||want!==base)setBase(want);
   $('#st-theme-note').textContent=PREF.theme==='auto'?('Зараз: '+(th==='night'?'ніч':'день')+', перемикається само за сходом і заходом сонця над вашим домом.'):'';syncSettingsUI();}
-function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
+function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g=>{const k=g.dataset.pref;const v=k==='mode'?(TAC?'tac':'norm'):k==='base'?base:k==='shelter'?String(SHELTER):PREF[k];g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===String(v)));});
   $('#st-3d').checked=tilt;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
-  vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);}
+  vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);
+  if(TAC)vis(['holo','holo-top','ra-glow'],false);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setData(EMPTY);return;// заяви МО РФ «скільки збили над регіоном» прибрано з мапи: застарілі зведення без місця й часу удару нічого не дають людині
 
@@ -1216,8 +1245,9 @@ $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
 document.querySelectorAll('.seg[data-pref]').forEach(g=>g.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.pref,v=b.dataset.v;
-  if(k==='theme'){PREF.theme=v;PREF.base=null;savePref();applyTheme(true);}
-  else if(k==='base'){PREF.base=v;savePref();setBase(v);setTimeout(syncSettingsUI,50);}
+  if(k==='mode'){setTac(v==='tac');}
+  else if(k==='theme'){PREF.theme=v;PREF.base=null;savePref();applyTheme(true);}
+  else if(k==='base'){PREF.base=v;if(TAC){PREF.tacSat=v==='sat';}savePref();if(!TAC)setBase(v);else if(v==='sat'||PREF.tacSat===false)setBase(wantBase(effTheme()));setTimeout(syncSettingsUI,50);}
   else if(k==='shelter'){SHELTER=+v;localStorage.setItem('shelter',SHELTER);if($('#me-sh'))$('#me-sh').textContent=SHELTER;syncSettingsUI();}}));
 $('#st-3d').onchange=e=>set3d(e.target.checked,true);
 (function(){const S=window.NXSound;if(!S)return;const g=S.get();
@@ -1301,7 +1331,7 @@ let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.we
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
 window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
-applyTheme(false);
+applyTheme(false);document.body.classList.toggle('tac',TAC);
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 
 /* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */

@@ -160,7 +160,9 @@
       const map = this.map, z = map.getZoom();
       const M = (args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix) || args;
       const mc = p => { const m = maplibregl.MercatorCoordinate.fromLngLat({ lng: p[0], lat: p[1] }, 0); return [m.x, m.y]; };
-      const spr = z < 6 ? Math.max(8, z * 2.2 - 0.5) : Math.min(38, 9 + z * 2.6);  // країна: компактно (z4 ≈ 23 px), область і місто: крупно (z7 ≈ 54 px)  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
+      const tac = !!window.FXTAC;
+      const spr0 = z < 6 ? Math.max(8, z * 2.2 - 0.5) : Math.min(38, 9 + z * 2.6);  // країна: компактно (z4 ≈ 23 px), область і місто: крупно (z7 ≈ 54 px)  // більші при наближенні: на масштабі міста силует ~60 px  // крупніше на масштабі країни, цілі читаються одразу       // напіврозмір спрайта, px (менші, як на радарі)
+      const spr = tac ? spr0 * 0.72 : spr0;  // тактичний режим: компактні символи
       const glow = [], top = [];
       const day = !!window.FXDAY;
       if (H) { // радар дому: радіус ~25 км у пікселях поточного масштабу
@@ -193,6 +195,7 @@
         // нове повідомлення (давність скинулась): одна біла хвиля «підтверджено щойно»
         { const pv = this.seen.get(f.id); if (pv != null && age < 90 && age + 30 < pv) this.ping.set(f.id, performance.now()); this.seen.set(f.id, age); }
       }
+      if (tac) glow.length = 0;  // тактичний режим: без декоративного світіння, радара дому й потоків
       gl.useProgram(this.p);
       gl.uniformMatrix4fv(this.u.m, false, M);
       { const pr = (this.map.getPixelRatio && this.map.getPixelRatio()) || devicePixelRatio; gl.uniform2f(this.u.vp, gl.drawingBufferWidth / pr, gl.drawingBufferHeight / pr); }
@@ -247,7 +250,7 @@
         gl.bindTexture(gl.TEXTURE_2D, tx);
         // ціль «планує»: легке погойдування курсу з креном у бік повороту і повільна зміна висоти
         const ph = ((f.p[0] * 131.7 + f.p[1] * 71.3) % 6.283 + 6.283) % 6.283, tt = (performance.now() - this.t0) / 1000;
-        const sw = Math.sin(tt * 0.55 + ph), alt = Math.sin(tt * 0.37 + ph * 1.7);
+        const sw = tac ? 0 : Math.sin(tt * 0.55 + ph), alt = tac ? 0 : Math.sin(tt * 0.37 + ph * 1.7);
         const fast = f.type === 'ballistic' || f.type === 'cruise';
         const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.78 : f.weak ? 0.85 : 1) * ((f.age || 0) > 600 ? Math.max(0.4, 1 - ((f.age || 0) - 600) / 1200) : 1) * (HL && f.type !== HL.type ? 0.22 : 1) * (LV && LV.dim && !LV.ids.has(f.id) ? 0.25 : 1), c = f.col;  // 04.11: давня ціль (10+ хв) напівпрозора, у лічильник не входить
         const bank = Math.max(-1, Math.min(1, Math.cos(tt * 0.55 + ph) * 0.9));
