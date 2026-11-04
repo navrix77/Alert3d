@@ -33,6 +33,10 @@ HORIZONS = (10, 20, 30)
 
 
 def load(path: str) -> list[tuple]:
+    if path.endswith(".json.gz"):  # вивантаження сервера з гілки ops-data (journal-72h.json.gz)
+        import gzip
+        with gzip.open(path, "rt", encoding="utf-8") as f:
+            return [tuple(r) for r in json.load(f)]
     if path.endswith(".json"):
         return [tuple(r) for r in json.loads(Path(path).read_text(encoding="utf-8"))]
     db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)

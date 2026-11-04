@@ -461,6 +461,9 @@ async def lifespan(app: FastAPI):
             except Exception:  # noqa: BLE001
                 log.exception("calib")
     tasks.append(asyncio.create_task(_calib_nightly()))
+    if os.getenv("REPLAY") != "1":  # дані сервера → гілка ops-data на GitHub для сесій аналізу (вмикає OPS_GIT_TOKEN)
+        from . import ops_export
+        tasks.append(asyncio.create_task(ops_export.run(brain)))
 
     async def _tts_warm():  # українська озвучка: рушій і голос «Лада» готуються у фоні одразу після старту
         from . import tts

@@ -1798,3 +1798,27 @@ def test_junk_filter_drops_prose_keeps_real_reports():
     for ok in ("Шахед курсом на Салтівку", "2 шаболды на Первомайский ⚠️ 2 шаболды на Близнюки/Лозовую ⚠️ 1 Р. Шаболда на Шевченково",
                "БпЛА на Запоріжжя", "Група 4х БпЛА з Сумщини на Охтирку"):
         assert not is_junk(ok)
+
+
+def test_ops_export_collect(tmp_path):
+    """Вивантаження для ops-data: лише журнал каналів у форматі backtest.load + status; токен не потрапляє в аргументи git."""
+    import gzip
+    import sqlite3
+    import threading
+    from app import ops_export
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE msg(t REAL, src TEXT, link TEXT, kind TEXT, type TEXT, cnt INT, places TEXT, track TEXT, text TEXT)")
+    now = 1_800_000_000
+    db.executemany("INSERT INTO msg VALUES(?,?,?,?,?,?,?,?,?)", [
+        (now - 100, "M", "1", "track", "shahed", 1, "[]", "Ш-1", "Шахед на Чугуїв"),
+        (now - 80 * 3600, "M", "2", "track", "shahed", 1, "[]", "Ш-2", "старе")])
+    st = ops_export.collect(db, threading.Lock(), tmp_path, 72, now)
+    rows = json.loads(gzip.open(tmp_path / "journal-72h.json.gz", "rt", encoding="utf-8").read())
+    assert st["rows"] == 1 and rows[0][-1] == "Шахед на Чугуїв" and len(rows[0]) == 8
+    assert st["targets_last_hour"] == 1 and st["massive"] is False
+    env = ops_export._git_env("SECRET")
+    assert "SECRET" not in env["GIT_CONFIG_VALUE_0"] and env["GIT_TERMINAL_PROMPT"] == "0"
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import backtest
+    assert backtest.load(str(tmp_path / "journal-72h.json.gz"))[0][1] == "M"
