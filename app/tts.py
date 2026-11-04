@@ -525,13 +525,14 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     # однакового формату (WAV 24 кГц), тож склеюються в один відрізок. Нові фрази лише в межах денного ліміту (paid).
     if os.getenv("TTS_GEMINI_ALL", "1") != "0" and _gkey() and not ident:
         gt = _spec.brand_say(text0)
-        gp = BASE / "cache" / f"g-{hashlib.sha1(f'{VOICE_V}gv1|{key}|1.0|{gt}'.encode()).hexdigest()}.wav"
+        gk = "radio"  # один голос SKY у всіх режимах (специфікація): спільний кеш для радіо й сповіщень
+        gp = BASE / "cache" / f"g-{hashlib.sha1(f'{VOICE_V}gv1|{gk}|1.0|{gt}'.encode()).hexdigest()}.wav"
         if gp.exists():
             return gp.read_bytes(), "gemini-cache"
         if paid and _off.get("gemini", 0) <= time.time():
             async def _fr(t, k, r):
                 return await _gemini(t, k, r, _spec.FRAG_STYLE)
-            data, by = await _cached("gemini", "wav", _fr, gt, key, 1.0, "gv1")
+            data, by = await _cached("gemini", "wav", _fr, gt, gk, 1.0, "gv1")
             if data:
                 return data, "gemini"
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
