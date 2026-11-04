@@ -769,3 +769,20 @@ body.tac .counters .cnt:hover{background:rgba(255,255,255,.08)!important}
 .tac-bar select{flex:1 1 auto;min-width:0;min-height:34px;border:1px solid rgba(255,255,255,.14);border-radius:9px;background:#1b212b;color:#e6ebf2;font:600 12px/1 inherit;padding:0 8px}
 .top .tac-bar{width:min(420px,calc(100vw - 24px))}
 
+
+/* тактичний режим, світла тема (варіант «01 світла»): світлі панелі й темний текст */
+:root[data-theme="day"] body.tac .tac-bar,:root[data-theme="day"] body.tac .tac-flt{background:rgba(255,255,255,.94)!important;border-color:rgba(20,30,50,.14)}
+:root[data-theme="day"] body.tac .tac-bar button{color:#33425A}
+:root[data-theme="day"] body.tac .tac-bar button.on{background:#1B2433;color:#fff}
+:root[data-theme="day"] body.tac .tac-bar .tb-seg{background:rgba(20,30,50,.07)}
+:root[data-theme="day"] body.tac .tac-bar .tb-row:not(.tb-seg) button{border-color:rgba(20,30,50,.16)}
+:root[data-theme="day"] body.tac .tac-bar select{background:#fff;color:#1B2433;border-color:rgba(20,30,50,.16)}
+:root[data-theme="day"] body.tac .tac-flt h5{color:#5B6678}
+:root[data-theme="day"] body.tac .tac-flt,:root[data-theme="day"] body.tac .tac-flt p,:root[data-theme="day"] body.tac .tac-flt div{color:#1B2433}
+:root[data-theme="day"] body.tac .tac-flt .tc{color:#33425A;border-color:rgba(20,30,50,.2)}
+:root[data-theme="day"] body.tac .tac-flt .tc.on{background:#1B2433;color:#fff;border-color:#1B2433}
+:root[data-theme="day"] body.tac .counters{background:rgba(255,255,255,.94)!important;border-color:rgba(20,30,50,.16)!important}
+:root[data-theme="day"] body.tac .counters .cnt{border-bottom-color:rgba(20,30,50,.1)!important;color:#1B2433}
+:root[data-theme="day"] body.tac .counters .cnt b{color:#1B2433!important}
+:root[data-theme="day"] body.tac .counters .cnt small{color:#33425A!important}
+:root[data-theme="day"] body.tac .maplibregl-ctrl-scale{background:rgba(255,255,255,.88);color:#1B2433;border-color:#1B2433}
