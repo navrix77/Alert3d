@@ -12,11 +12,19 @@
   const VA=new Audio();VA.setAttribute('playsinline','');VA.preload='auto';let vaOk=false;
   function vaUnlock(){if(vaOk)return;try{VA.src=SILENT;const p=VA.play();p&&p.then(()=>{vaOk=true;}).catch(()=>{});}catch(e){}}
   ['touchend','click','keydown'].forEach(ev=>{document.addEventListener(ev,unlock,{passive:true});document.addEventListener(ev,vaUnlock,{passive:true});});
-  let vaEnd=null;
-  function vaPlay(url,vol){return new Promise(res=>{let done=false;const fin=ok=>{if(done)return;done=true;VA.onended=VA.onerror=null;res(ok);};
+  let vaEnd=null,held=null,alerting=0;
+  function vaPlay(url,vol){return new Promise(res=>{let done=false;const fin=ok=>{if(done)return;done=true;if(VA.onended&&vaEnd===fin){VA.onended=VA.onerror=null;}res(ok);};
     if(vaEnd)vaEnd(true);vaEnd=fin;try{VA.pause();}catch(e){}VA.onended=()=>fin(true);VA.onerror=()=>fin(false);VA.src=url;VA.volume=vol==null?1:vol;
-    const p=VA.play();if(p)p.catch(()=>fin(false));setTimeout(()=>fin(true),30000);});}
-  window.SKYVOICE={play:vaPlay,stop:()=>{try{VA.pause();}catch(e){}if(vaEnd)vaEnd(true);}};
+    const p=VA.play();if(p)p.catch(()=>fin(false));
+    const dog=()=>{if(done)return;if(held&&held.fin===fin){setTimeout(dog,5000);return;}fin(true);};setTimeout(dog,30000);});}
+  // 04.11 власник: сповіщення важливіше за радіо й ефір: їхній голос ставиться на паузу, звучить сповіщення, потім продовжується з того ж місця
+  function hold(){if(held||alerting>1)return;try{if(vaEnd&&!VA.paused&&!VA.ended){held={src:VA.src,t:VA.currentTime,fin:vaEnd,vol:VA.volume};vaEnd=null;VA.onended=VA.onerror=null;VA.pause();}}catch(e){held=null;}}
+  function unhold(){const h=held;held=null;if(!h)return;vaEnd=h.fin;VA.onended=()=>h.fin(true);VA.onerror=()=>h.fin(false);
+    try{VA.src=h.src;VA.volume=h.vol;const go=()=>{try{VA.currentTime=Math.max(0,h.t-0.5);}catch(e){}const p=VA.play();if(p)p.catch(()=>h.fin(false));};
+      if(VA.readyState>=1)go();else VA.addEventListener('loadedmetadata',go,{once:true});}catch(e){h.fin(false);}}
+  const fire=on=>{try{window.dispatchEvent(new CustomEvent('sky-alert',{detail:{on}}));}catch(e){}};
+  const afterAlert=()=>new Promise(r=>{if(!alerting)return r();const f=e=>{if(!e.detail.on){removeEventListener('sky-alert',f);r();}};addEventListener('sky-alert',f);});
+  window.SKYVOICE={play:(url,vol)=>alerting?afterAlert().then(()=>vaPlay(url,vol)):vaPlay(url,vol),stop:()=>{try{VA.pause();}catch(e){}if(vaEnd)vaEnd(true);},get alerting(){return alerting>0;}};
   function env(g,t,a,d,v){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(0.001,v),t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d);}
   function osc(type,f,t,dur,v,f2){const a=ctx(),o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.linearRampToValueAtTime(f2,t+dur);o.connect(g);g.connect(a.destination);env(g,t,0.02,dur,v);o.start(t);o.stop(t+dur+0.05);}
   const TONES={
@@ -28,14 +36,20 @@
   let voices=[];const loadV=()=>{try{voices=speechSynthesis.getVoices();}catch(e){}};if('speechSynthesis' in window){loadV();speechSynthesis.onvoiceschanged=loadV;}
   // голос: серверна українська озвучка (Piper: Лада/Микита/Тетяна/Олекса), а якщо сервер ще не готовий, голос пристрою
   let curA=null;
-  function speak(text){if(!text)return false;
-    if(S.voice&&S.voice!=='device'){try{vaPlay('/api/tts?v=3&voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text),S.vol).then(ok=>{if(!ok)sysSpeak(text);});return true;}catch(e){}}
+  // speak повертає Promise, що завершується, коли голос договорив (потрібно, щоб знати, коли продовжити радіо)
+  function speak(text){if(!text)return Promise.resolve(false);
+    if(S.voice&&S.voice!=='device'){try{return vaPlay('/api/tts?v=3&voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text),S.vol).then(ok=>ok||sysSpeak(text));}catch(e){}}
     return sysSpeak(text);}
-  function sysSpeak(text){if(!text||!('speechSynthesis' in window))return false;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
-    const v=voices.find(x=>/^uk/i.test(x.lang))||voices.find(x=>/^ru/i.test(x.lang)&&false);if(v)u.voice=v;u.lang='uk-UA';u.rate=S.rate;u.volume=S.vol;speechSynthesis.speak(u);return true;}catch(e){return false;}}
-  function play(text,force){const m=S.mode;if(m==='off'&&!force)return;let wait=0;
-    if(m==='tone'||m==='both'||(force&&m==='off'))try{wait=TONES[S.tone](S.vol);}catch(e){}
-    if((m==='voice'||m==='both')&&text)setTimeout(()=>speak(text),m==='both'?wait*1000:0);}
+  function sysSpeak(text){return new Promise(res=>{if(!text||!('speechSynthesis' in window))return res(false);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
+    const v=voices.find(x=>/^uk/i.test(x.lang))||voices.find(x=>/^ru/i.test(x.lang)&&false);if(v)u.voice=v;u.lang='uk-UA';u.rate=S.rate;u.volume=S.vol;
+    u.onend=u.onerror=()=>res(true);speechSynthesis.speak(u);setTimeout(()=>res(true),20000);}catch(e){res(false);}});}
+  async function play(text,force){const m=S.mode;if(m==='off'&&!force)return;let wait=0;
+    alerting++;fire(true);hold();
+    try{if(m==='tone'||m==='both'||(force&&m==='off'))try{wait=TONES[S.tone](S.vol);}catch(e){}
+      if(wait)await new Promise(r=>setTimeout(r,wait*1000));
+      if((m==='voice'||m==='both')&&text)await speak(text);
+      await new Promise(r=>setTimeout(r,400));}
+    finally{alerting--;if(!alerting){fire(false);unhold();}}}
   // анти-спам: не частіше ніж раз на 8 с, той самий текст, не частіше ніж раз на 2 хв
   let lastT=0;const said=new Map();
   window.NXSound={get:()=>Object.assign({},S),set(k,v){S[k]=v;save();},hasUkVoice:()=>voices.some(x=>/^uk/i.test(x.lang)),

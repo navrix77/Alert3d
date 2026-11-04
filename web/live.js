@@ -77,10 +77,13 @@
   $('#lv-audio').classList.toggle('on', audioOn);
 
   // ---------- голос
-  async function speak(text, voice) {
+  const ttsUrl = (text, voice) => '/api/tts?v=4&text=' + encodeURIComponent(text.slice(0, 600)) + '&voice=' + (voice || 'radio');
+  // голос наперед: поки звучить позивний чи попередня фраза, наступна вже генерується й завантажується
+  const preVoice = (text, voice) => fetch(ttsUrl(text, voice)).then(r => r.ok ? r.blob() : null).then(b => b && b.size > 500 ? URL.createObjectURL(b) : null).catch(() => null);
+  async function speak(text, voice, pre) {
     if (!audioOn || !text) return;
     try {
-      const url = '/api/tts?v=4&text=' + encodeURIComponent(text.slice(0, 600)) + '&voice=' + (voice || 'radio');
+      const url = (pre && await pre) || ttsUrl(text, voice);
       if (window.SKYVOICE) { abortAudio = () => window.SKYVOICE.stop(); await window.SKYVOICE.play(url, 1); return; }
       const a = new Audio(url);
       await new Promise(res => { abortAudio = () => { try { a.pause(); } catch (e) {} res(); }; a.onended = res; a.onerror = res; a.play().catch(res); setTimeout(res, 20000); });
@@ -90,9 +93,14 @@
 
   // ---------- дії мапи
   function bboxOf(pts) { let b = [180, 90, -180, -90]; for (const p of pts) if (p) b = [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])]; return b[0] <= b[2] ? b : null; }
-  function fit(pts, maxZoom) { const m = NX().map(), b = bboxOf(pts); if (!m || !b) return;
-    if (b[2] - b[0] < 0.02 && b[3] - b[1] < 0.02) { m.flyTo({ center: [b[0], b[1]], zoom: Math.min(maxZoom || 10, 10), duration: 900 }); return; }
-    m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: { top: 110, bottom: Math.min(innerHeight * 0.45, (box.hidden ? 0 : box.offsetHeight) + 40), left: 40, right: 40 }, maxZoom: maxZoom || 10, duration: 900 }); }
+  // 04.11 власник: озвучена ціль — у центрі видимої частини мапи (смуга ефіру її не закриває), з наближенням
+  function pad() { const r = box.hidden ? null : box.getBoundingClientRect(); let top = 80, bottom = 60;
+    if (r && r.height) { if (r.top < innerHeight / 2) top = Math.max(top, r.bottom + 24); else bottom = Math.max(bottom, innerHeight - r.top + 24); }
+    return { top: Math.min(top, innerHeight * 0.5), bottom: Math.min(bottom, innerHeight * 0.5), left: 40, right: 40 }; }
+  function fit(pts, maxZoom) { const m = NX().map(), b = bboxOf(pts); if (!m || !b) return; const p = pad();
+    if (b[2] - b[0] < 0.03 && b[3] - b[1] < 0.03) { m.flyTo({ center: [b[0], b[1]], zoom: Math.min(maxZoom || 10, 9.5), offset: [0, (p.top - p.bottom) / 2], duration: 1000, essential: true }); return; }
+    m.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: p, maxZoom: maxZoom || 10, duration: 1000 }); }
+  const posOf = ids => ids.map(i => NX().pos(i) || (item(i) && [item(i).lon, item(i).lat]));
   const item = id => curDiff && curDiff.items.find(i => i.id === id);
   function hl(ids, dim) { window.FXLIVE = { ids: new Set(ids || []), dim: !!dim, t0: performance.now() }; const m = NX().map(); m && m.triggerRepaint(); }
   function mentions(it) {
@@ -109,14 +117,15 @@
     xtra.innerHTML = '';
     switch (s.action) {
       case 'overview': { const pts = (curDiff.items || []).map(i => [i.lon, i.lat]); const h = NX().home(); if (h) pts.push(h); hl([], false); fit(pts, 9); break; }
-      case 'focus': hl(ids, true); fit(ids.map(i => NX().pos(i) || (item(i) && [item(i).lon, item(i).lat])), 10); break;
-      case 'highlight': hl(ids, false); break;
+      case 'focus': hl(ids, true); fit(posOf(ids), 10); break;
+      case 'highlight': hl(ids, false); fit(posOf(ids), 10); break;
       case 'dim': hl(window.FXLIVE ? [...window.FXLIVE.ids] : [], s.value !== false); break;
       case 'only_new': { const n = curDiff.items.filter(i => i.status === 'new' || i.status === 'changed').map(i => i.id); hl(n, true);
         fit(n.map(i => NX().pos(i)), 10); xtra.innerHTML = n.length ? n.map(i => mentions(item(i))).join('<hr style="opacity:.15">') : 'Нового з того часу немає'; break; }
       case 'breakdown': case 'sources': hl(ids, true); fit(ids.map(i => NX().pos(i)), 10); xtra.innerHTML = ids.map(i => mentions(item(i))).join('<hr style="opacity:.15">'); break;
       case 'region': if (s.bbox) { fit([[s.bbox[0], s.bbox[1]], [s.bbox[2], s.bbox[3]]], 11); } break;
       case 'replay': hl(curDiff.items.filter(i => i.status !== 'same').map(i => i.id), true); break;
+      default: if (ids.length) { hl(ids, false); fit(posOf(ids), 10); }
     }
   }
   async function run(steps) {
@@ -138,7 +147,8 @@
   function autoClose() {
     clearTimeout(acT);
     const c = curDiff && curDiff.counts, quiet = !c || (!c.new && !c.changed && !c.gone && !(curDiff.bal || []).length);
-    acT = setTimeout(() => { if (!playing && !box.hidden && !box.classList.contains('full') && !shelter) $('#lv-close').click(); }, quiet ? 6000 : 30000);
+    // 04.11 власник: «після фрази відключай ефір» — остання репліка прозвучала, ефір закривається (якщо людина не читає подробиці)
+    acT = setTimeout(() => { if (!playing && !box.hidden && !box.classList.contains('full') && !shelter && document.activeElement !== $('#lv-in')) $('#lv-close').click(); }, quiet ? 1500 : 2500);
   }
   box.addEventListener('pointerdown', () => clearTimeout(acT));
   let paused = false;
@@ -280,14 +290,18 @@
     o.type = 'triangle'; o.frequency.value = freq; lp.type = 'lowpass'; lp.frequency.value = 700;
     g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(lp).connect(g).connect(RA.master); o.start(t0); o.stop(t0 + dur + 0.05); }
-  const SND = {
-    ident() { try { const t = raCtx().currentTime + 0.05; warm(196, t, 1.6, 0.06); glass(783.99, t, 0.7, 0.12); glass(1046.5, t + 0.2, 0.7, 0.11); glass(1318.5, t + 0.42, 1.0, 0.11); } catch (e) {} return wait(1300); },
-    outro() { try { const t = raCtx().currentTime + 0.05; glass(1046.5, t, 0.5, 0.08); glass(783.99, t + 0.18, 0.8, 0.08); } catch (e) {} return wait(800); },
-    news() { try { glass(1174.66, raCtx().currentTime + 0.03, 0.45, 0.09); } catch (e) {} return wait(420); },
-    calm() { try { glass(987.77, raCtx().currentTime + 0.03, 0.35, 0.05); } catch (e) {} return wait(320); },
-    urgent() { try { const t = raCtx().currentTime + 0.03; glass(1396.9, t, 0.18, 0.12); glass(1396.9, t + 0.22, 0.28, 0.12); } catch (e) {} return wait(600); },
-    outage() { try { const t = raCtx().currentTime + 0.03; warm(330, t, 0.5, 0.07); warm(294, t + 0.25, 0.6, 0.06); } catch (e) {} return wait(800); },
-  };
+  // 04.11 власник: «звуки жахливі, потрібно щось приємне мелодійне» — короткі мелодійні джингли (живі інструменти: steel-drum
+  // і піцикато, ліцензія CC0, Kenney), зведені за гучністю; тональність фа мажор для позивного й новин, мінор для важливого
+  const SURL = { ident: 'snd/ident.mp3', news: 'snd/news.mp3', calm: 'snd/calm.mp3', urgent: 'snd/urgent.mp3', outro: 'snd/outro.mp3', outage: 'snd/outage.mp3' }, SB = {};
+  function sLoad() { const c = raCtx(); return Promise.all(Object.keys(SURL).map(k => SB[k] ? 0 : fetch(SURL[k]).then(r => r.arrayBuffer())
+    .then(ab => new Promise((ok, no) => c.decodeAudioData(ab, ok, no))).then(b => { SB[k] = b; }).catch(() => {}))); }
+  function sPlay(k, vol) { const b = SB[k]; if (!b || (window.SKYVOICE && window.SKYVOICE.alerting)) return wait(0);
+    try { const c = raCtx(), src = c.createBufferSource(), g = c.createGain(); g.gain.value = vol; src.buffer = b; src.connect(g).connect(RA.master); src.start(); } catch (e) {}
+    return wait(Math.max(0, Math.round(b.duration * 1000) - 120)); }
+  const SND = { ident: () => sPlay('ident', 0.6), outro: () => sPlay('outro', 0.45), news: () => sPlay('news', 0.42), calm: () => sPlay('calm', 0.3),
+    urgent: () => sPlay('urgent', 0.55), outage: () => sPlay('outage', 0.4) };
+  // сповіщення поверх радіо: фон приглушується, голос радіо ставить на паузу sound.js
+  addEventListener('sky-alert', e => duck(e.detail.on));
   // «Атмосфера ефіру» (налаштування): тиха синтезаторна підкладка між повідомленнями, без мелодії, пульсацій і наростання;
   // під голосом стихає приблизно на 20+ дБ; для важливого, виправлення й збою вимикається. За замовчуванням — «Лише повідомлення»
   function bedStart() {
@@ -319,7 +333,10 @@
     sc && sc.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_scope', b.dataset.v); syncS(); if (radioOn) { window.SKYVOICE && window.SKYVOICE.stop(); radioIssue(); } });
     rr && rr.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_radius', b.dataset.v); syncS(); });
     syncS(); })();
-  async function radioIssue(force) {
+  const radioReq = (scope, greeted) => { const w = where(), now = NX().now();
+    return fetch('/api/radio?scope=' + scope + '&radius=' + (LS.get('radio_radius') || 25) + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (now - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
+      (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : '') + (greeted ? '&g=1' : '')).then(r => r.json()); };
+  async function radioIssue(force, pre) {
     if (!radioOn || playing || radioBusy) return;
     const w = where();
     const now = NX().now();
@@ -327,8 +344,7 @@
     const scope = force === 'country' ? 'country' : mode;
     radioBusy = true;
     try {
-      const r = await (await fetch('/api/radio?scope=' + scope + '&radius=' + (LS.get('radio_radius') || 25) + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (now - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
-        (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : ''))).json();
+      const r = pre ? await pre : await radioReq(scope);
       if (scope === 'country') lastCountry = now;
       if (!radioOn) return;
       // 04.11 власник: новин і змін немає — радіо, як і ефір, вимикається само (через 10 хв без жодного оновлення)
@@ -344,8 +360,9 @@
       const hard = r.level === 'urgent' || r.level === 'outage' || r.kind === 'correction';
       if (hard) bedStop(); else bedStart();  // важливе, виправлення, збій — без фону
       if (r.level === 'urgent' && window.SKYVOICE) window.SKYVOICE.stop();  // важливе перериває поточне
+      const sp = r.speech || r.text || '', vp = r.voice || preVoice(sp, 'radio');  // голос генерується, поки грає сигнал
       await (r.level === 'urgent' ? SND.urgent() : r.level === 'outage' ? SND.outage() : r.level === 'calm' ? SND.calm() : SND.news());
-      duck(true); await speak(r.speech || r.text || '', 'radio'); duck(false);
+      duck(true); await speak(sp, 'radio', vp); duck(false);
       if (scope === 'country' && !hard) await SND.outro();
     } catch (e) { duck(false); } finally { radioBusy = false; }
   }
@@ -375,8 +392,14 @@
     raCtx();  // звук розблоковується саме цим дотиком (iPhone)
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
     radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0; radioLast = NX().now();
-    bedStart(); await SND.ident();
-    await radioIssue();                  // зведення в обраному режимі охоплення
+    // швидкий старт (04.11): випуск і його голос замовляються одразу; позивний і привітання (готовий записаний голос) грають, поки вони готуються
+    const sc0 = LS.get('radio_scope') || 'near';
+    const pre = radioReq(sc0, true).then(r => { if (r && (r.speech || r.text) && r.level !== 'calm') r.voice = preVoice(r.speech || r.text, 'radio'); return r; }).catch(() => ({}));
+    await Promise.race([sLoad(), wait(900)]);
+    bedStart(); const id = SND.ident();
+    const hi = preVoice('Ви слухаєте Скай Радіо.', 'radio');
+    await id; await speak('Ви слухаєте Скай Радіо.', 'radio', hi);
+    await radioIssue(null, pre);         // зведення в обраному режимі охоплення
     radioT = setInterval(radioIssue, 40000);
   };
 

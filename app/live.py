@@ -6,6 +6,7 @@
 ідентифікатори з цієї різниці. Без моделі працює детермінований сценарій. Відліку до удару немає ніколи."""
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import re
@@ -27,6 +28,9 @@ replay(from) — програти відрізок від часу; region(bbox)
 і зібрано, коли наближається; без паніки й без вигадок. Усі цілі ворожі: ніколи не співчувай їм, «на жаль» про
 ціль неприпустимо. Зникнення з мапи подавай зі стриманим полегшенням («зник з мапи, нових повідомлень про нього немає»), але
 не як збиття й не як відбій; «збито» — лише якщо джерело прямо так повідомило.
+«На щастя», «добра новина» — лише перед справді доброю новиною (ціль зникла з мапи, віддаляється, відбій);
+не кажи, чого НЕ сталося («жодна ціль не зникла»). Без порожніх фраз-заспокоювань і закликів наприкінці («ситуація під контролем», «слідкуйте за оновленнями», «залишайтеся
+в безпеці»): SKY не знає, що ситуація під контролем. Останній крок — останній факт; ефір після нього закривається сам.
 Пиши без довгих тире."""
 
 LIVE_TOOL = {
@@ -150,6 +154,20 @@ def scrub(text: str, names: dict | None = None) -> str:
     t = ID_RX.sub(lambda m: "", t)
     # емоційні оцінки зникнення (04.11: «Дрон-розвідник, на жаль, зник») — зникнення з мапи нейтральне
     t = re.sub(r"(?i),?\s*на жаль,?\s*", " ", t)
+    # порожні заспокоювання й заклики (04.11 власник): «Ситуація під контролем, слідкуйте за оновленнями!» — SKY цього не знає
+    t = re.sub(r"(?i)(?:^|(?<=[.!?…]))\s*[^.!?…]*(?:під контролем|слідкуйте за оновленнями|стежте за оновленнями|залишайтес[ья] в безпеці|бережіть себе)[^.!?…]*[.!?…]*", "", t)
+    t0 = t
+    # 04.11 власник («На щастя, жодна ціль не зникла з мапи»): речення про те, що НІЧОГО не зникло, нічого не повідомляє — геть;
+    # «на щастя / добра новина» лише перед справді доброю новиною (зникла, віддаляється, відбій), інакше слово прибираємо
+    t = re.sub(r"(?i)(?:^|(?<=[.!?…]))\s*[^.!?…]*(?:жодн\w*|ні одн\w*)\s+(?:\w+\s+){0,2}не\s+(?:зник|збит|зн)[^.!?…]*[.!?…]*", "", t)
+    def _joy(m):
+        sent = m.group(0)
+        good = re.search(r"(?i)(?<!не )(?:зник|віддаля|відбій|збит|поверта\w* назад|вийш\w* з|покину)", sent) and not re.search(r"(?i)\bне\s+(?:зник|віддаля|збит)", sent)
+        return sent if good else re.sub(r"(?i)(?:на щастя|добра новина|на радість)\s*[,:]?\s*", "", sent)
+    t = re.sub(r"[^.!?…]*(?:[Нн]а щастя|[Дд]обра новина|[Нн]а радість)[^.!?…]*[.!?…]*", _joy, t)
+    if t != t0:  # щось вирізали — речення може почнатись з малої літери
+        t = re.sub(r"(?<=[.!?…]\s)([а-яіїєґ])", lambda m: m.group(1).upper(), t)
+        t = re.sub(r"^\s*([а-яіїєґ])", lambda m: m.group(1).upper(), t)
     t = re.sub(r"\(\s*[,;]?\s*\)", "", t)
     t = re.sub(r"\s+([,.;:])", r"\1", t)
     return re.sub(r"\s{2,}", " ", t).strip()
@@ -173,6 +191,8 @@ def validate(steps: list, d: dict) -> list[dict]:
             st["value"] = bool(s.get("value", True))
         if a == "replay":
             st["value"] = max(d["since"], min(d["now"], float(s.get("value") or d["since"])))
+        if not st["say"] and not st["ids"]:
+            continue  # порожня після чистки репліка (напр., «ситуація під контролем») — кроку немає
         out.append(st)
     return out
 
@@ -502,12 +522,12 @@ RADIO_SYSTEM = RADIO_SYSTEM + """
 віддаляється. Усі цілі ворожі: жодного співчуття до них («на жаль» про ціль неприпустимо).
 Зникнення з мапи — зі стриманим полегшенням («зник з мапи, нових повідомлень немає»), але не як збиття і не як відбій;
 «збито» — лише якщо джерело прямо повідомило. Без паніки,
-без вигаданих деталей і без «все чисто».
+без вигаданих деталей і без «все чисто». Без порожніх завершень («ситуація під контролем», «слідкуйте за оновленнями»).
 РАДІО ДЛЯ ОДНІЄЇ ЛЮДИНИ: говори так, ніби звертаєшся до слухача: «біля вас», «на південь від вас». Головне — що поруч і чи
 наближається. Не перелічуй статистику повідомлень. Для всієї України — щонайбільше два речення."""
 
 
-async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25) -> dict:
+async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False) -> dict:
     """Ефір для одного слухача. Регіон: говоримо, коли щось змінилось (нова ціль, наближення, тривога, балістика);
     без змін — мовчимо, а раз на 8 хв коротко нагадуємо обстановку без запиту до моделі. Україна — коротко."""
     key = (sid or "-", scope, obl)
@@ -554,7 +574,12 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
             llm.count("saved:radio") if hasattr(llm, "count") else None
             res, by = hit[1], hit[2]
         else:
-            res, by = await llm.call(RADIO_SYSTEM, ctx, RADIO_TOOL, max_tokens=500)
+            # 04.11 власник: «при старті пауза велика» — перше зведення не чекає модель довше 5 с, інакше говоримо з даних
+            try:
+                res, by = await (asyncio.wait_for(llm.call(RADIO_SYSTEM, ctx, RADIO_TOOL, max_tokens=500), 5.0) if not said
+                                 else llm.call(RADIO_SYSTEM, ctx, RADIO_TOOL, max_tokens=500))
+            except asyncio.TimeoutError:
+                res, by = None, None
             if res:
                 RADIO_CACHE[ck] = (now, res, by)
                 if len(RADIO_CACHE) > 500:
@@ -570,7 +595,9 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
     else:
         disp = speech = fb
         kind, by = ("outage" if out_ else "summary" if not said else "update"), "rules"
-    if not said and scope == "near" and not speech.lower().startswith("ви слухаєте"):
+    if greeted and speech.lower().startswith("ви слухаєте"):
+        speech = re.sub(r"^ви слухаєте ска[йи][^.!]*[.!]\s*", "", speech, flags=re.I) or speech
+    if not said and not greeted and scope == "near" and not speech.lower().startswith("ви слухаєте"):
         speech = "Ви слухаєте Скай. " + speech  # перше звучання для нового слухача
     mem.update(fp=fp, t=now, said=(said + [disp])[-5:])
     if len(RADIO_STATE) > 3000:
