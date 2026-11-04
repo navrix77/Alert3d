@@ -1,0 +1,19 @@
+name: Знімок журналу щогодини (автозапуск night-data)
+# Хмарні сесії аналізу не мають доступу до sky.navryx.com.ua, а GitHub Actions має. Цей розклад щогодини запускає
+# night-data.yml (публічні дані сайту → гілка night-data), щоб нічна, ранкова й денна сесії завжди мали свіжий журнал
+# без ручного запуску. Ключів не потрібно: вбудований GITHUB_TOKEN з правом запускати workflow цього репозиторію.
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+permissions:
+  actions: write
+  contents: read
+jobs:
+  kick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Запуск night-data.yml
+        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}" }
+        run: gh workflow run night-data.yml --ref "${{ github.event.repository.default_branch }}" -f hours=72
