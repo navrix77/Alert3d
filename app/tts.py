@@ -329,7 +329,7 @@ async def _openai(text: str, key: str, rate: float) -> bytes | None:
 
 
 # Gemini TTS (ключ GEMINI_API_KEY): нейромережевий голос, добре читає українські назви. 03.11: OpenAI без кредитів (429).
-GEM_VOICES = {"lada": "Kore", "tetiana": "Aoede", "mykyta": "Charon", "oleksa": "Orus"}
+GEM_VOICES = {"lada": "Kore", "tetiana": "Aoede", "mykyta": "Charon", "oleksa": "Orus", "radio": "Algenib"}
 GEM_STYLE = "Прочитай українською спокійно й чітко, як диктор новин, з правильними наголосами в назвах міст і сіл: "
 _off: dict = {}  # провайдер → до якого часу не пробувати (немає кредитів / ліміт)
 
@@ -344,13 +344,13 @@ def _wav(pcm: bytes, sr: int = 24000) -> bytes:
             + b"data" + struct.pack("<I", len(pcm)) + pcm)
 
 
-async def _gemini(text: str, key: str, rate: float) -> bytes | None:
+async def _gemini(text: str, key: str, rate: float, style: str | None = None) -> bytes | None:
     import base64
     k = _gkey()
     if not k:
         return None
     voice = os.getenv("TTS_GEMINI_VOICE") or GEM_VOICES.get(key, "Kore")
-    pre = GEM_STYLE + ("трохи швидше: " if rate > 1.1 else "")
+    pre = (style + "\n\nТекст для озвучення: ") if style else GEM_STYLE + ("трохи швидше: " if rate > 1.1 else "")
     async with httpx.AsyncClient(timeout=40) as cli:
         for model in [m for m in (os.getenv("TTS_GEMINI_MODEL"), "gemini-2.5-flash-preview-tts", "gemini-2.5-flash-tts",
                                   "gemini-2.5-pro-preview-tts") if m]:
@@ -512,6 +512,12 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     if not text:
         return None, "empty"
     if ident and os.getenv("TTS_GEMINI_IDENTS", "1") != "0":  # заставка: кращий голос один раз, далі лише кеш
+        if _gkey():  # ключ Gemini API (AI Studio): працює з текстовим промптом голосу
+            async def _ai(t, k, r):
+                return await _gemini(t, k, r, _spec.VOICE_STYLE)
+            data, by = await _cached("gemini", "wav", _ai, text0, key, 1.0, "gi1")
+            if data:
+                return data, "gemini-ident"
         data, by = await _cached("gemcloud", "mp3", _gemini_cloud, text0, key, 1.0, "gc1")
         if data:
             return data, "gemini-cloud"

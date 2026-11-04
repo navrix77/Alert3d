@@ -20,9 +20,11 @@ jobs:
         env:
           SKY_ENV: ${{ secrets.SKY_ENV }}
           GOOGLE_TTS_KEY: ${{ secrets.GOOGLE_TTS_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           # окремий секрет GOOGLE_TTS_KEY дописується до SKY_ENV (сервер лише додає/оновлює змінні, решту не чіпає)
           if [ -n "$GOOGLE_TTS_KEY" ]; then SKY_ENV="$(printf '%s\nGOOGLE_TTS_KEY=%s\n' "$SKY_ENV" "$GOOGLE_TTS_KEY")"; export SKY_ENV; fi
+          if [ -n "$GEMINI_API_KEY" ]; then SKY_ENV="$(printf '%s\nGEMINI_API_KEY=%s\n' "$SKY_ENV" "$GEMINI_API_KEY")"; export SKY_ENV; fi
           test -n "$SKY_ENV" || { echo "Немає секрету SKY_ENV чи GOOGLE_TTS_KEY"; exit 1; }
           curl -sf https://sky.navryx.com.ua/api/admin/envkey -o pub.pem
           grep -q "BEGIN PUBLIC KEY" pub.pem
