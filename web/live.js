@@ -267,7 +267,7 @@
   // ---------- Sky Radio (04.11, переробка): говорить, коли біля вас щось змінилось; без змін мовчить (раз на 8 хв коротко
   // нагадує обстановку); уся Україна — на початку й раз на 15 хв. Звуки як на радіо: позивний, сигнал новин, тривожний сигнал,
   // тиха фонова підкладка, що стихає під голос. Усе синтезовано тут же (власні звуки, не чужа музика).
-  let radioLast = 0, radioBusy2 = false, radioSid = '', radioOn = false, radioT = null, radioSeen = 0, radioBusy = false, lastCountry = 0;
+  let idleSince = 0, radioLast = 0, radioBusy2 = false, radioSid = '', radioOn = false, radioT = null, radioSeen = 0, radioBusy = false, lastCountry = 0;
   const RA = { ctx: null, bed: null, bedGain: null, master: null };
   function raCtx() {
     if (!RA.ctx) { const C = window.AudioContext || window.webkitAudioContext; RA.ctx = new C(); RA.master = RA.ctx.createGain(); RA.master.gain.value = 0.9; RA.master.connect(RA.ctx.destination); }
@@ -351,8 +351,10 @@
       if (scope === 'country') lastCountry = now;
       if (!radioOn) return;
       // 04.11 власник: новин і змін немає — радіо, як і ефір, вимикається само (через 10 хв без жодного оновлення)
+      // 04.11 власник: радіо не вимикається, поки є тривога в області або цілі до 300 км; лише 15 хв повного затишшя → вимкнення
+      if (!r.idle) idleSince = 0; else if (!idleSince) idleSince = NX().now();
       if (!r.text || r.level === 'calm') {
-        if (radioLast && NX().now() - radioLast > 600 && !radioBusy2) {
+        if (idleSince && NX().now() - idleSince > 900 && !radioBusy2) {
           radioBusy2 = true; await SND.outro(); await speak('Нових змін біля вас немає. Вимикаю Скай Радіо.', 'radio'); radioBusy2 = false;
           if (radioOn) rbtn.click();
           return;
@@ -394,7 +396,7 @@
     audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on');
     raCtx();  // звук розблоковується саме цим дотиком (iPhone)
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
-    radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0; radioLast = NX().now();
+    radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0; idleSince = 0; radioLast = NX().now();
     // швидкий старт (04.11): випуск і його голос замовляються одразу; позивний і привітання (готовий записаний голос) грають, поки вони готуються
     const sc0 = LS.get('radio_scope') || 'near';
     const pre = radioReq(sc0, true).then(r => { if (r && (r.speech || r.text) && r.level !== 'calm') r.voice = r.audio ? preUrl(r.audio) : preVoice(r.speech || r.text, 'radio'); return r; }).catch(() => ({}));

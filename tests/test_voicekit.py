@@ -87,3 +87,13 @@ def test_far_target_when_nothing_near():
                     "far": {"type": "shahed", "n": 2, "km": 63, "side": "на сході", "at": "Чугуїв", "appr": True}})
     assert fr == ["Тривога в області триває.", "У радіусі двадцяти п'яти кілометрів повідомлень про цілі немає.", "Найближча ціль:",
                   "Два шахеди", "на сході,", "за шістдесят п'ять кілометрів від вас.", "Місце: Чугуїв.", "Рухається у ваш бік."]
+
+
+def test_rich_summary():
+    assert v.dur(4800) == "одну годину двадцять хвилин" and v.dur(7300) == "дві години"
+    f = {"bal": [], "near": [{"type": "shahed", "word": "2 шахеди", "km": 12, "side": "на сході", "appr": True, "eta": 4, "next": None,
+                              "at": "Безлюдівка", "named_km": 11}], "n_near": 1, "urgent": True, "alert": True, "raion_alert": False,
+         "alert_for": 4800, "obl_types": ["shahed"]}
+    fr = v.compose(f, status=True, summary=True)
+    assert fr[:2] == ["Тривога в області триває.", "Триває вже одну годину двадцять хвилин."]
+    assert "Перейдіть в укриття." in fr and fr[-2:] == ["В області за повідомленнями:", "Шахеди."]

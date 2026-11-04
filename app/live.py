@@ -496,8 +496,13 @@ def country_facts(state: dict) -> dict:
     now = time.time()
     bal = sorted({o for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") for o in e.get("obl", []) if o != "*"})
     top = sorted(by, key=lambda o: -sum(by[o].values()))[:4]
+    allt = Counter()
+    for c in by.values():
+        allt.update(c)
+    pri = ["ballistic", "cruise", "kab", "geran5", "jet", "shahed"]
     fp = (tuple(al), tuple(bal), tuple(top))
-    return {"al": al, "bal": bal, "top": [(o, by[o].most_common(2)) for o in top], "fp": fp}
+    types = sorted(allt, key=lambda k: (pri.index(k) if k in pri else 99, -allt[k]))  # спершу найнебезпечніші
+    return {"al": al, "bal": bal, "top": [(o, by[o].most_common(2)) for o in top], "types": types, "fp": fp}
 
 
 def country_text(state: dict, f: dict | None = None) -> tuple[str, str]:
@@ -547,6 +552,15 @@ RADIO_SYSTEM = RADIO_SYSTEM + """
 
 
 async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False) -> dict:
+    """Обгортка: прапорець idle для автовимкнення радіо — лише коли немає ні тривоги в області, ні цілей до 300 км."""
+    r = await _radio(llm, state, hist, tracker, since, home, obl, scope, sid, radius, greeted)
+    f = near_facts(state, home, obl, since, radius) if home else None
+    al = bool(obl) and (obl in (state.get("levels") or {}) or obl in ((state.get("official") or {}).get("alert_obl") or []))
+    r["idle"] = not al and not (f and (f["near"] or f.get("far")))
+    return r
+
+
+async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False) -> dict:
     """Ефір для одного слухача. Регіон: говоримо, коли щось змінилось (нова ціль, наближення, тривога, балістика);
     без змін — мовчимо, а раз на 8 хв коротко нагадуємо обстановку без запиту до моделі. Україна — коротко."""
     key = (sid or "-", scope, obl)
@@ -611,7 +625,8 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
             mem["t"] = now
             if KIT:
                 from . import voicekit
-                fr = ["Без змін."] + [x for x in voicekit.compose(f) if x not in ("Оновлення.", "Увага!")]
+                _enrich(f, state, hist, obl)
+                fr = ["Без змін."] + [x for x in voicekit.compose(f, status=True, summary=True) if x not in ("Оновлення.", "Увага!")]
                 txt = " ".join(fr)
                 return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "kit", "audio": "/api/voice/" + voicekit.register(fr)}
             txt = ("Без змін. " + fb) if f["near"] or f["alert"] else "Без змін. Поруч з вами цілей немає."
@@ -623,6 +638,7 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
             # Уже озвучене (у будь-якому режимі) без змін не повторюємо; статус тривоги — лише коли змінився
             from . import voicekit
             seen = _seen(sid)
+            _enrich(f, state, hist, obl)
             tsig = lambda x: ("t", x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "")  # noqa: E731
             st_sig = ("st", obl, f["alert"], f.get("raion_alert"), bool(f["bal"]))
             esig = lambda x: ("ev", x["id"], x["next"] or "")  # noqa: E731
@@ -632,7 +648,7 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
                 mem.update(fp=fp, t=now)
                 return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
             fr = voicekit.compose(dict(f, near=fresh, n_near=len(fresh)), first=not mem["said"], greeted=greeted,
-                                  known=len(f["near"]) - len(fresh))
+                                  known=len(f["near"]) - len(fresh), status=st_sig not in seen, summary=not mem["said"])
             seen[st_sig] = now
             if fresh:
                 seen[tsig(fresh[0])] = now
@@ -700,6 +716,32 @@ def _seen(sid: str) -> dict:
         for k in list(SEEN)[:1500]:
             SEEN.pop(k, None)
     return SEEN.setdefault(sid or "-", {})
+
+
+def _alert_for(hist: list, obl: str, state: dict) -> float | None:
+    """Скільки вже триває тривога в області — за кадрами машини часу (до 12 год)."""
+    lv = state.get("levels") or {}
+    off = state.get("official") or {}
+    if not obl or not (obl in lv or obl in (off.get("alert_obl") or [])):
+        return None
+    start = state.get("now") or time.time()
+    for fr in reversed(hist or []):
+        if obl in (fr.get("levels") or {}):
+            start = fr["t"]
+        else:
+            break
+    return (state.get("now") or time.time()) - start
+
+
+def _enrich(f: dict, state: dict, hist: list, obl: str) -> None:
+    from collections import Counter
+    from .geo import oblasts
+    f["alert_for"] = _alert_for(hist, obl, state)
+    if obl:
+        O = oblasts()
+        c = Counter(t["type"] for t in state.get("tracks", []) if t.get("status") == "active" and O.of(t["lon"], t["lat"]) == obl)
+        pri = ["ballistic", "cruise", "kab", "geran5", "jet", "shahed"]
+        f["obl_types"] = sorted(c, key=lambda k: (pri.index(k) if k in pri else 99, -c[k]))
 
 
 def _kit_outage(mem, fp, now, scope) -> dict:

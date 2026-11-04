@@ -81,6 +81,18 @@ def side_dist(side: str, km: float) -> str:  # текст для екрана; �
 RGEN = {10: "десяти", 25: "двадцяти п'яти", 50: "п'ятдесяти", 100: "ста"}  # родовий відмінок: «у радіусі двадцяти п'яти кілометрів»
 
 
+def dur(sec: float) -> str:
+    """Тривалість у знахідному відмінку, округлена до 5 хв: «одну годину двадцять хвилин»."""
+    m = max(5, int(5 * round(sec / 300)))
+    h, mm = divmod(m, 60)
+    out = []
+    if h:
+        out.append(f"{num(h, 'f').replace('одна', 'одну')} {plural(h, 'годину', 'години', 'годин')}")
+    if mm:
+        out.append(f"{num(mm, 'f').replace('одна', 'одну')} {plural(mm, 'хвилину', 'хвилини', 'хвилин')}")
+    return " ".join(out)
+
+
 def radius_none(r: int) -> str:
     return f"У радіусі {RGEN.get(r, num(r))} кілометрів повідомлень про цілі немає."
 
@@ -94,7 +106,8 @@ def more(n: int) -> str:
     return f"Поруч ще {num(n, 'f')} {plural(n, 'ціль', 'цілі', 'цілей')}."
 
 
-FIXED = ["Найближча ціль:", "Рухається у ваш бік.", "Увага!", "Оновлення.", "Ви слухаєте Скай Радіо.", "Наближається.", "Рухається не до вас.", "Напрямок невідомий.",
+FIXED = ["Найближча ціль:", "Рухається у ваш бік.", "Також:", "Перейдіть в укриття.", "Офіційної тривоги в області немає.",
+         "В області за повідомленнями:", "У повітрі за повідомленнями:", "Увага!", "Оновлення.", "Ви слухаєте Скай Радіо.", "Наближається.", "Рухається не до вас.", "Напрямок невідомий.",
          "Точне місце не назване.", "Повідомлення про загрозу балістики для вашої області. Будьте в укритті.",
          "Тривога в області триває.", "У вашому районі повітряна тривога.", "Повідомлень про цілі поруч немає.", "Без змін.",
          "Добра новина: ціль віддаляється.", "Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."]
@@ -135,7 +148,7 @@ def vocabulary() -> list[str]:
     v += [eta(m) for m in range(1, 31)] + [more(n) for n in range(1, 11)]
     # «Моя область» і «Вся Україна»
     v += OBL_FIXED + [reg(o) + "." for o in REG] + [reg(o) + "," for o in REG] + [alerts_n(n) for n in range(1, 26)]
-    v += [f"переважно {w}." for w in TOPW.values()]
+    v += [f"переважно {w}." for w in TOPW.values()] + [cap(w) + "." for w in TOPW.values()]
     v += LIVE_FIXED + [_cnt(l, n) for l in ("Нових цілей", "Змінилось", "Зникли з мапи") for n in range(1, 11)]
     for typ in ("shahed", "jet", "cruise", "ballistic", "kab"):
         v += [count_type(n, typ) + "." for n in range(1, 11)]
@@ -197,6 +210,9 @@ def compose_changes(f: dict, prev: dict) -> list[str]:
 def compose_country(f: dict) -> list[str]:
     out = ["Огляд по Україні."]
     out.append(alerts_n(len(f["al"])) if f.get("al") else "Офіційних тривог зараз немає.")
+    if f.get("types"):
+        out.append("У повітрі за повідомленнями:")
+        out += [cap(TOPW.get(t, "цілі")) + "." for t in f["types"][:5]]
     if f.get("bal"):
         out.append("Загроза балістики:")
         out += [reg(o) + "." for o in f["bal"][:4]]
@@ -210,9 +226,23 @@ def compose_country(f: dict) -> list[str]:
     return out
 
 
-def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0) -> list[str]:
-    """known — скільки цілей поруч уже озвучено раніше (в іншому режимі): тоді не кажемо «повідомлень немає»."""
-    """Факти near_facts → послідовність заготовок. Лише те, що людині треба почути зараз: найважливіша ціль, де, чи летить сюди."""
+def _status(f: dict) -> list[str]:
+    out = []
+    if f.get("raion_alert"):
+        out.append("У вашому районі повітряна тривога.")
+    elif f.get("alert"):
+        out.append("Тривога в області триває.")
+    else:
+        out.append("Офіційної тривоги в області немає.")
+    if (f.get("raion_alert") or f.get("alert")) and f.get("alert_for") and f["alert_for"] >= 300:
+        out.append(f"Триває вже {dur(f['alert_for'])}.")
+    return out
+
+
+def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0, status: bool = False, summary: bool = False) -> list[str]:
+    """known — скільки цілей поруч уже озвучено раніше (в іншому режимі): тоді не кажемо «повідомлень немає».
+    status — назвати статус тривоги (на початку і коли змінився); summary — повне зведення (новий слухач, нагадування):
+    додає ще дві цілі поруч і що летить в області."""
     out: list[str] = []
     if first and not greeted:
         out.append("Ви слухаєте Скай Радіо.")
@@ -220,6 +250,8 @@ def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0) 
         out.append("Увага!")
         out.append("Повідомлення про загрозу балістики для вашої області. Будьте в укритті.")
     near = f.get("near") or []
+    if near and (status or summary):
+        out += _status(f)
     if near:
         x = near[0]
         if not f.get("bal"):
@@ -234,17 +266,22 @@ def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0) 
             out.append("Наближається.")
             if x.get("eta") and x["eta"] <= 30:
                 out.append(eta(x["eta"]))
+            if x["km"] <= 15:
+                out.append("Перейдіть в укриття.")
         elif x.get("appr") is False:
             out.append("Рухається не до вас.")
         if x.get("next"):
             out.append(f"Курс: {x['next']}.")
-        if (f.get("n_near") or 0) > 1:
-            out.append(more(min(10, f["n_near"] - 1)))
+        rest = near[1:3] if summary or f.get("urgent") else []
+        for y in rest:  # ще до двох цілей поруч — коротко: що, де, як далеко
+            n2 = int(str(y.get("word", "1")).split()[0]) if str(y.get("word", "")).split()[0].isdigit() else 1
+            out += ["Також:", count_type(n2, y["type"]), y["side"] + ",", dist(y["named_km"] if y.get("named_km") is not None else y["km"])]
+            if y.get("appr"):
+                out.append("Наближається.")
+        if (f.get("n_near") or 0) > 1 + len(rest):
+            out.append(more(min(10, f["n_near"] - 1 - len(rest))))
     else:
-        if f.get("raion_alert"):
-            out.append("У вашому районі повітряна тривога.")
-        elif f.get("alert"):
-            out.append("Тривога в області триває.")
+        out += _status(f)
         if not known:
             r = int(f.get("radius") or 0)
             out.append(radius_none(r) if r in (10, 25, 50, 100) else "Повідомлень про цілі поруч немає.")
@@ -255,6 +292,9 @@ def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0) 
                     out.append(f"Місце: {x['at']}.")
                 if x.get("appr"):
                     out.append("Рухається у ваш бік.")
+    if summary and f.get("obl_types"):
+        out.append("В області за повідомленнями:")
+        out += [cap(TOPW.get(t, "цілі")) + "." for t in f["obl_types"][:4]]
     return out
 
 
