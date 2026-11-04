@@ -475,6 +475,9 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   if(TAC&&el&&INTRO){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
   const flyHome=()=>{const t0=Date.now(),tr=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;if(tg){window.__padLock=1;map.once('moveend',()=>{window.__padLock=0;});
       map.easeTo({center:tg,zoom:7.4,duration:4500,essential:true,easing:t=>-(Math.cos(Math.PI*t)-1)/2});return;}if(Date.now()-t0<4500)setTimeout(tr,300);};tr();};
+  // огляд: мапа стоїть на всій країні, усі цілі пульсують кільцями, щоб користувач охопив ситуацію, і лише потім переліт на «Дім»
+  const tacSurvey=ms=>{const t0=performance.now(),id='tac-hl2';const step=now=>{if(!map.getLayer(id))return;const e=now-t0;if(e>=ms){map.setPaintProperty(id,'circle-stroke-opacity',0);return;}
+    const ph=(e%1100)/1100,fade=Math.min(1,e/300)*Math.min(1,(ms-e)/400);map.setPaintProperty(id,'circle-radius',14+22*ph);map.setPaintProperty(id,'circle-stroke-opacity',(1-ph)*0.95*fade);requestAnimationFrame(step);};requestAnimationFrame(step);};
   const finish=()=>{tacPad(false);document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
