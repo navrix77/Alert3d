@@ -142,7 +142,7 @@ function loadApp06(){return window.__a6||(window.__a6=new Promise(res=>{const a=
   a.onload=()=>{const b=document.createElement('script');b.src='/app06.js';b.onload=()=>res(window.App06||null);b.onerror=()=>res(null);document.head.appendChild(b);};a.onerror=()=>res(null);document.head.appendChild(a);}));}
 const SYMP=new Set();
 // вертикальна колонка значків цілей справа (замість блоку «Мій дім»): щільно, найновіші зверху
-function tacRail(L){const el=$('#tac-rail');if(!el)return;const A=window.App06;if(!TAC||!A||!L.length){el.hidden=true;return;}
+function tacRail(L){return;const el=$('#tac-rail');if(!el)return;const A=window.App06;if(!TAC||!A||!L.length){el.hidden=true;return;}
   L=L.sort((a,b)=>a.m-b.m).slice(0,14);const k=L.map(x=>x.id+x.aff+x.type+x.n+x.m+(sel===x.id?'*':'')).join('|');if(el.dataset.k===k)return;el.dataset.k=k;
   el.innerHTML=L.map(x=>{let v='';try{v=A.svg({type:x.type,affiliation:x.aff,hd:null,count:x.n>1?x.n:undefined,size:30});}catch(e){}return '<button data-id="'+x.id+'"'+(sel===x.id?' class="on"':'')+' aria-label="Ціль">'+v+'<i>'+(x.m<1?'<1':x.m)+'</i></button>';}).join('');el.hidden=false;}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('#tac-rail button');if(b)openSheet(b.dataset.id);});
@@ -193,7 +193,7 @@ const ENEMY_TYPE={airfield:'enemy_airfield',hq:'enemy_hq'};
 function enemyLoad(){if(ENEMY!==null||!TAC)return;ENEMY=[];loadApp06().then(A=>{if(!A)return;fetch('/data/enemy_objects.geojson',{cache:'no-cache'}).then(r=>r.json()).then(j=>{ENEMY=(j.features||[]);ENEMY_SET=false;}).catch(()=>{ENEMY=null;});});}
 function enemyApply(){if(!TAC||!window.App06||!ENEMY||ENEMY_SET||!map.getSource('enemy'))return;
   map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'suspect'}),v:f.properties.n})}))});ENEMY_SET=true;}
-function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC){loadApp06();enemyLoad();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+function setTac(on){TAC=!!on;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC){loadApp06();enemyLoad();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
 async function setBase(kind){SYMP.clear();ENEMY_SET=false;base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
@@ -852,7 +852,7 @@ function renderCounters(){
   const act=SNAP.tracks.filter(t=>t.status==='active'&&fresh(t));const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+1);
   const order=['shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','lancet','fpv','fpvf'];
   $('#counters').innerHTML='';
-  order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];const c=(CNTI[t]&&CNTI[t]._sprite?CNTI[t]:(CNTI[t]=drawTarget(t,28)));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);const w=document.createElement('div');w.className='cw';const b=document.createElement('b');b.textContent=by[t];if(renderCounters.prev&&renderCounters.prev[t]!==by[t])b.className='pop';
+  order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];if(TAC&&window.App06){const sv=document.createElement('span');sv.className='cs';try{sv.innerHTML=window.App06.svg({type:window.App06.MAP[t]?t:'unknown',affiliation:'suspect',hd:null,size:26});}catch(e){}d.appendChild(sv);}else{const c=(CNTI[t]&&CNTI[t]._sprite?CNTI[t]:(CNTI[t]=drawTarget(t,28)));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);}const w=document.createElement('div');w.className='cw';const b=document.createElement('b');b.textContent=by[t];if(renderCounters.prev&&renderCounters.prev[t]!==by[t])b.className='pop';
     const l=document.createElement('small');l.textContent=CNT_LBL[t]||TYPE_NAME[t];w.appendChild(b);w.appendChild(l);d.appendChild(w);d.style.setProperty('--tc',TYPE_COLOR[t]);d.onclick=()=>focusType(t);$('#counters').appendChild(d);});
   renderCounters.prev=by;
   if(!act.length){const d=document.createElement('div');d.className='cnt';d.innerHTML='<b style="font-size:16px">Цілей не видно</b>';$('#counters').appendChild(d);}

@@ -750,13 +750,15 @@ body.tac .maplibregl-ctrl-scale{background:rgba(14,17,22,.8);color:#cfd6e0;borde
 .tac-bar{flex-wrap:wrap;justify-content:flex-end}
 
 body.tac .me{display:none!important}
-.tac-rail{position:fixed;right:max(6px,env(safe-area-inset-right));top:max(120px,calc(env(safe-area-inset-top) + 112px));z-index:5;display:flex;flex-direction:column;gap:2px;max-height:calc(100% - 260px);overflow-y:auto;padding:3px;background:rgba(14,17,22,.78);border:1px solid #3a424f;border-radius:10px;scrollbar-width:none}
-.tac-rail[hidden]{display:none!important}
-.tac-rail button{position:relative;display:block;width:38px;height:34px;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}
-.tac-rail button svg{display:block;margin:auto;max-width:34px;max-height:30px}
-.tac-rail button i{position:absolute;right:1px;bottom:0;font:700 9px/1 -apple-system,system-ui,sans-serif;color:#cfd6e0;font-style:normal}
-.tac-rail button.on{background:rgba(255,255,255,.16);outline:1px solid #fff}
-
+body.tac .counters{position:fixed;right:max(6px,env(safe-area-inset-right));top:max(150px,calc(env(safe-area-inset-top) + 142px));flex-direction:column;flex-wrap:nowrap;gap:0;width:auto;max-height:calc(100% - 300px);overflow-y:auto;scrollbar-width:none;border-radius:12px;background:rgba(14,17,22,.82);border:1px solid #3a424f;box-shadow:none;z-index:5}
+body.tac .counters .cnt{display:flex;align-items:center;gap:4px;padding:3px 7px 3px 4px!important;border-right:0!important;border-bottom:1px solid rgba(255,255,255,.1)!important;min-height:0;color:#e6ebf2}
+body.tac .counters .cnt:last-child{border-bottom:0!important}
+body.tac .counters .cnt .cs{display:block;line-height:0}
+body.tac .counters .cnt .cs svg{display:block;max-width:34px;max-height:30px}
+body.tac .counters .cnt .cw{display:block}
+body.tac .counters .cnt b{font:800 15px/1 -apple-system,system-ui,sans-serif;color:#fff;margin:0}
+body.tac .counters .cnt small{display:none}
+body.tac .counters .cnt:hover{background:rgba(255,255,255,.08)!important}
 .tac-bar{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:4px;padding:5px;border-radius:14px}
 .tac-bar .tb-row{display:flex;gap:4px;align-items:center}
 .tac-bar .tb-seg{background:rgba(255,255,255,.07);border-radius:10px;padding:2px}
@@ -765,3 +767,4 @@ body.tac .me{display:none!important}
 .tac-bar #tac-f{border-left:1px solid rgba(255,255,255,.14);border-radius:9px;margin-left:0}
 .tac-bar select{flex:1 1 auto;min-width:0;min-height:34px;border:1px solid rgba(255,255,255,.14);border-radius:9px;background:#1b212b;color:#e6ebf2;font:600 12px/1 inherit;padding:0 8px}
 .top .tac-bar{width:min(420px,calc(100vw - 24px))}
+
