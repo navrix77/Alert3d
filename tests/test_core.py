@@ -1756,3 +1756,15 @@ def test_threat_level_post_is_not_a_target():
         o = p.parse(t, "cxidua")
         assert o.type is None and o.no_target
     assert Parser().parse("Шахед курсом на Салтівку", "cxidua").type == "shahed"
+
+
+def test_memorial_post_is_not_a_target():
+    """11 бригада НГУ 04.11: пост пам'яті військового з «пілот ударних БпАК… на Запорізькому напрямку» не є ціллю."""
+    from app.parser import Parser
+    p = Parser()
+    for t in ("Молодший сержант Чернецький виконував бойові та спеціальні задачі на посаді майстра та другого пілота екіпажів "
+              "ударних БпАК мультироторного типу батальйону безпілотних систем на Запорізькому напр",
+              "Вадим Чернецький (2.06.1998 – 27.07.2026) народився 2 червня 1998 року на Одещині"):
+        o = p.parse(t, "BrigadeNGU11")
+        assert o.type is None and o.no_target
+    assert p.parse("Шахед курсом на Запоріжжя", "x").type == "shahed"
