@@ -14,8 +14,10 @@ html,body{margin:0;height:100%;background:#05070B;color:var(--fg);font-family:In
 .head h1{margin:0;font-size:22px;line-height:1.15;font-weight:800;letter-spacing:-.01em;text-transform:uppercase}
 .head .sub{margin-top:4px;color:var(--mute);font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .head .nav{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-#osel{border:0;border-radius:11px;padding:7px 28px 7px 11px;font:600 13px inherit;font-family:inherit;color:var(--fg);background:rgba(255,255,255,.1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c9d2e3'/%3E%3C/svg%3E") no-repeat right 10px center;-webkit-appearance:none;appearance:none;cursor:pointer}
-#osel.on{background-color:rgba(242,169,59,.28);color:#fff}
+.ib{display:inline-flex;align-items:center;gap:6px;position:relative}.ib svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+label.ib{border-radius:11px;padding:7px 11px;font-size:13px;font-weight:600;background:rgba(255,255,255,.1);cursor:pointer}label.ib:hover{background:rgba(255,255,255,.18)}
+#osel{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+label.ob.on{background:rgba(242,169,59,.28);color:#fff}label.ob.on svg{stroke:#F2A93B}
 #osel option{color:#000}
 .head{padding-right:58px!important}.head .x{position:absolute;right:10px;top:10px;width:38px;height:38px;border-radius:50%;padding:0;font-size:16px;background:rgba(255,255,255,.14)}
 .sm{display:none}.credit{display:none;font-size:9.5px;color:var(--mute);margin-top:3px}
@@ -42,7 +44,10 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 .wm{position:fixed;z-index:2;right:18px;bottom:76px;color:rgba(255,255,255,.55);font-weight:800;font-size:15px;pointer-events:none}
 .loading[hidden]{display:none}.loading{position:fixed;inset:0;display:grid;place-items:center;z-index:5;background:rgba(5,7,11,.6);font-weight:700}
 @media (max-width:700px){
-  #osel{padding:6px 24px 6px 9px;font-size:12px;flex:none}
+  .head .nav{display:grid!important;grid-template-columns:repeat(6,1fr);gap:4px!important;margin-top:8px}
+  .ib{flex-direction:column;gap:2px;padding:6px 2px!important;font-size:10.5px!important;font-weight:600;border-radius:12px!important;min-width:0}
+  .ib svg{width:20px;height:20px}.ib span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .head .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.credit{font-size:8.5px!important;margin-top:1px!important}
   .head{left:10px;right:10px;top:max(10px,env(safe-area-inset-top));max-width:none;padding:10px 12px;border-radius:16px}
   .head h1{font-size:15px}.head .sub{font-size:11px;margin-top:2px}
   .head .nav{gap:5px;margin-top:8px;flex-wrap:wrap}.head .nav::-webkit-scrollbar{display:none}.head .nav button{padding:6px 9px;font-size:12px;white-space:nowrap;flex:none}
@@ -59,7 +64,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 <body>
 <div id="map"></div>
 <div class="panel head"><button id="back" class="x" aria-label="Закрити й повернутися до карти" title="До карти">✕</button><h1>Мапа маршрутів БпЛА та ракет</h1><div class="sub" id="sub">…</div><div class="credit">© Esri, Maxar · © OpenStreetMap · OpenFreeMap</div>
-  <div class="nav"><button id="prev">◀ <span class="lg">Попередня доба</span><span class="sm">Попередня</span></button><button id="next"><span class="lg">Наступна</span><span class="sm">Наступна</span> ▶</button><select id="osel" aria-label="Область"><option value="">Уся Україна</option></select><button id="png">⤓ <span class="lg">Зображення</span><span class="sm">Фото</span></button><button id="pdf">PDF</button><button id="vid">▶ Відео</button></div></div>
+  <div class="nav"><button id="prev" class="ib" title="Попередня доба"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>Раніше</span></button><button id="next" class="ib" title="Наступна доба"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg><span>Далі</span></button><label class="ib ob" title="Обрати область"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21zM12 12.2a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2z"/></svg><span id="olab">Україна</span><select id="osel" aria-label="Область"><option value="">Уся Україна</option></select></label><button id="png" class="ib" title="Зберегти зображення"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15.5 9.5h.01"/></svg><span>Фото</span></button><button id="pdf" class="ib" title="Звіт PDF з лого"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5M9.5 13h5M9.5 17h5"/></svg><span>PDF</span></button><button id="vid" class="ib" title="Коротке відео з лого"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h11v12H4zM15 10l5-3v10l-5-3"/></svg><span>Відео</span></button></div></div>
 <div class="panel stats" id="stats"></div>
 <div class="panel legend" id="legend"></div>
 <div class="panel play"><button id="pl">▶</button><button id="spd" title="Швидкість відтворення: скільки секунд триває одна година доби">5 с/год</button><input type="range" id="tt" min="0" max="1000" value="1000"><span id="tl">09:00</span></div>
@@ -68,7 +73,9 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script>
 'use strict';
-const T={shahed:['Шахеди / Герані','#F2A93B'],jet:['Реактивні БпЛА','#FF6B3D'],geran5:['«Герань-5»','#FFD27A'],banderol:['«Бандеролі»','#E8875A'],lancet:['«Ланцети»','#D9B25F'],molniya:['«Молнії»','#C7A35A'],cruise:['Крилаті ракети','#4FA8FF'],ballistic:['Балістичні ракети','#FF3D55'],kab:['КАБи','#7FE3F0'],rszv:['РСЗВ','#9FB3C8'],fpv:['FPV-дрони','#8A93A3'],fpvf:['FPV на оптоволокні','#8A93A3'],recon:['Дрони-розвідники','#77808F']};
+// 04.11 власник: балістика зелена, крилаті червоні пунктиром, реактивні жовті, шахеди блакитні; решта тонше й приглушено
+const T={ballistic:['Балістичні ракети','#35E07A'],cruise:['Крилаті ракети','#FF3B4E'],jet:['Реактивні БпЛА','#FFD43B'],shahed:['Шахеди / Герані','#4FC3FF'],kab:['КАБи','#B48CFF'],geran5:['«Герань-5»','#FF9F43'],banderol:['«Бандеролі»','#E58FD0'],rszv:['РСЗВ','#A9B4C2'],lancet:['«Ланцети»','#A0927E'],molniya:['«Молнії»','#8E9A80'],fpv:['FPV-дрони','#8A93A3'],fpvf:['FPV на оптоволокні','#8A93A3'],recon:['Дрони-розвідники','#77808F']};
+const MAIN=new Set(['ballistic','cruise','jet','shahed']),DASH=new Set(['cruise']);
 const $=s=>document.querySelector(s);
 const q=new URLSearchParams(location.search);let DAY=q.get('d')||null,D=null,CUR=1,playing=false;
 let OBL=q.get('o')||null,OP=null,VB=[],VS=[];if(OBL===null){try{OBL=localStorage.getItem('dobl')||null;}catch(e){}}
@@ -83,7 +90,7 @@ function inO(x,y){const o=OBL&&OP&&OP[OBL];if(!o)return true;const b=o.bb;if(x<b
 function applyObl(){if(!D)return;for(const t of D.tracks)t.inO=!OBL||t.pts.some(p=>inO(p[0],p[1]));const L=new Set(D.tracks.filter(t=>t.inO).map(t=>t.launch));
   VB=OBL?D.booms.filter(b=>inO(b.lon,b.lat)):D.booms;VS=OBL?D.sites.filter(s=>L.has(s.n)):D.sites;
   if(map.getLayer('obl-sel')){map.setFilter('obl-sel',['==',['get','n'],OBL||'—']);map.setFilter('obl-dim',OBL?['!=',['get','n'],OBL]:['==',['get','n'],'—']);}
-  $('#osel').classList.toggle('on',!!OBL);}
+  $('.ob').classList.toggle('on',!!OBL);$('#olab').textContent=OBL?(OBL==='Крим'?'Крим':OBL.replace(/ська$/,'.').replace(/цька$/,'ц.')):'Україна';}
 const OBLN=()=>OBL?(OBL==='Крим'?'Крим':OBL+' область'):'Уся Україна';
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const map=new maplibregl.Map({container:'map',center:[31.6,48.6],zoom:mobile()?4.6:5.55,attributionControl:{compact:true},canvasContextAttributes:{preserveDrawingBuffer:true},
@@ -119,7 +126,7 @@ map.on('load',async()=>{
       paint:{'line-width':['case',['==',['get','g'],1],7,0],'line-blur':5,'line-gradient':['interpolate',['linear'],['line-progress'],0,'rgba(0,0,0,0)',1,hexA(c,.35)]}});
     map.addLayer({id:'tr-'+k,type:'line',source:'tr',filter:['==',['get','k'],k],layout:{'line-cap':'round','line-join':'round','line-sort-key':['get','z']},
       paint:{'line-width':['interpolate',['linear'],['zoom'],5,['get','w'],8,['*',1.7,['get','w']]],'line-opacity':['get','o'],
-        'line-gradient':['interpolate',['linear'],['line-progress'],0,hexA(c,.25),0.5,hexA(c,.8),1,c]}});}
+        ...(DASH.has(k)?{'line-color':c,'line-dasharray':[2.2,1.6]}:{'line-gradient':['interpolate',['linear'],['line-progress'],0,hexA(c,.25),0.5,hexA(c,.8),1,c]})}});}
   // звідки летіло: дуга від місця пуску до першої фіксації, росте в реальному часі польоту; пуск спалахує кільцем
   map.addSource('links',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'links-glow',type:'line',source:'links',layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':6,'line-blur':5,'line-opacity':['*',0.35,['get','a']]}});
@@ -145,7 +152,9 @@ map.on('load',async()=>{
     layout:{'text-field':['coalesce',['get','name:uk'],['get','name']],'text-font':['Noto Sans Bold'],'text-size':['match',['get','class'],'city',13,11]},paint:{'text-color':'rgba(235,240,248,.92)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4}});
   await load(DAY);
 });
-function sub(){$('#sub').textContent=(OBL?OBLN()+' · ':'')+fd(D.t0)+' – '+fd(D.t1)+' '+new Date(D.t1*1000).getFullYear()+' · з 09:00 до 09:00'+(D.final?'':' · доба ще триває');}
+function sub(){const a=new Date(D.t0*1000),b=new Date(D.t1*1000);
+  const span=a.getMonth()===b.getMonth()?a.getDate()+'–'+fd(D.t1):fd(D.t0)+' – '+fd(D.t1);
+  $('#sub').textContent=mobile()?span+' · 09:00–09:00'+(D.final?'':' · триває'):(OBL?OBLN()+' · ':'')+fd(D.t0)+' – '+fd(D.t1)+' '+b.getFullYear()+' · з 09:00 до 09:00'+(D.final?'':' · доба ще триває');}
 async function load(day){
   if(!D||D.day!==day)$('#ld').hidden=false;
   for(let i=0;i<6;i++){try{const r=await fetch('/api/daily'+(day?'?d='+day:''));D=await r.json();break;}catch(e){$('#ld').textContent='Сервер перезапускається… повторюю';await new Promise(r=>setTimeout(r,4000));}}
@@ -178,7 +187,7 @@ function fit(){// уся Україна або обрана область в к
   const m=mobile(),hh=document.querySelector('.head').offsetHeight;
   const bot=m?(document.querySelector('.legend').offsetHeight+130):40;
   map.fitBounds(bounds(),{padding:{top:hh+(m?20:30),bottom:bot,left:m?6:40,right:m?6:(document.querySelector('.stats').offsetWidth+40)},duration:0});}
-addEventListener('resize',()=>{if(D)fit();});
+addEventListener('resize',()=>{if(D){fit();sub();}});
 // ієрархія: ракети, КАБи, «Герань-5» яскраво й поверх; масові дрони тонко й напівпрозоро (густина показує коридори)
 const MAJOR=new Set(['cruise','ballistic','kab','geran5','banderol','rszv']);let SEL=null,GRP=null;
 // режим за замовчуванням: «Ракети», якщо вони були, бо саме вони губилися серед сотень дронів
@@ -188,7 +197,9 @@ const THREAT={ballistic:1,cruise:1,kab:1,geran5:2,jet:2,banderol:2,rszv:2,shahed
 const ORDER=['ballistic','cruise','kab','geran5','jet','banderol','rszv','shahed','lancet','molniya','fpv','fpvf','recon'];
 const TW={1:1.25,2:1,3:0.85,4:0.7};
 let XB=0;// експорт: товстіші й насиченіші лінії, бо PDF/відео дивляться без збільшення
-function style(type){const s0=style0(type);if(!s0)return s0;const k=TW[THREAT[type]||3]*(XB?1.35:1);return {...s0,w:s0.w*k,o:XB?Math.min(1,s0.o*1.6):s0.o,z:s0.z*10+(5-(THREAT[type]||3))};}
+function style(type){const s0=style0(type);if(!s0)return s0;const thin=!MAIN.has(type)&&SEL!==type;
+  const k=(thin?0.55:type==='jet'?1.1:TW[THREAT[type]||3])*(XB?1.35:1),o=(thin?0.6:type==='jet'?1.2:type==='shahed'?1.25:1)*s0.o;
+  return {...s0,g:thin?0:s0.g,w:s0.w*k,o:Math.min(1,XB?o*1.6:o),z:s0.z*10+(5-(THREAT[type]||3))};}
 function style0(type){const maj=MAJOR.has(type);
   if(SEL)return SEL===type?{g:maj?1:0,w:maj?2.2:1.3,o:0.95,z:3}:null;
   if(GRP==='miss')return maj?{g:1,w:2.3,o:1,z:2}:null;
@@ -231,7 +242,7 @@ function links(f,T1){const L=[],Hh=[],Pu=[],fired={};
   map.getSource('links').setData({type:'FeatureCollection',features:L});map.getSource('lhead').setData({type:'FeatureCollection',features:Hh});map.getSource('spulse').setData({type:'FeatureCollection',features:Pu});}
 function legend(){const cnt={};for(const t of D.tracks)if(t.inO)cnt[t.type]=(cnt[t.type]||0)+1;
   const ord=ORDER.filter(k=>T[k]&&cnt[k]&&(GRP==='all'||(GRP==='miss')===MAJOR.has(k)));
-  $('#legend').innerHTML='<div class="grp">'+GRPS.map(([k,n])=>'<button data-g="'+k+'"'+(GRP===k?' class="on"':'')+'>'+n+'</button>').join('')+'</div>'+ord.map(k=>'<div class="r t'+(SEL===k?' on':SEL?' off':'')+' th'+(THREAT[k]||3)+'" data-k="'+k+'" role="button" tabindex="0"><i style="background:'+T[k][1]+';color:'+T[k][1]+'"></i>'+T[k][0]+'</div>').join('')+
+  $('#legend').innerHTML='<div class="grp">'+GRPS.map(([k,n])=>'<button data-g="'+k+'"'+(GRP===k?' class="on"':'')+'>'+n+'</button>').join('')+'</div>'+ord.map(k=>'<div class="r t'+(SEL===k?' on':SEL?' off':'')+' th'+(THREAT[k]||3)+'" data-k="'+k+'" role="button" tabindex="0"><i style="'+(DASH.has(k)?'background:repeating-linear-gradient(90deg,'+T[k][1]+' 0 6px,transparent 6px 10px)':'background:'+T[k][1])+';color:'+T[k][1]+(MAIN.has(k)?'':';height:2px;box-shadow:none;opacity:.8')+'"></i>'+T[k][0]+'</div>').join('')+
     '<div class="r"><span style="width:26px;text-align:center">🔥</span>Вибухи'+(D.crawling?' <small style="display:inline;margin:0">· збираю з історії каналів…</small>':'')+'<b>'+VB.length+'</b></div><div class="r"><span style="width:26px;text-align:center">🚀</span>Місця пусків<b>'+VS.length+'</b></div>'+
     '<small class="hint">'+(SEL?'Показано лише: '+T[SEL][0]+'. Торкніться ще раз, щоб повернути все.':'Торкніться типу, щоб побачити лише його. Лінії умовні: з\'єднують місця, які назвали канали.')+'</small>'+
     '<small>Маршрути відтворено з повідомлень моніторів і приблизні; кількість цілей дивіться в підсумку Повітряних сил. Вибухи, з точністю до населеного пункту.</small>';
@@ -260,6 +271,6 @@ $('#png').onclick=()=>{const mc=map.getCanvas(),c=document.createElement('canvas
   g.textAlign='right';g.fillStyle='rgba(255,255,255,.6)';g.font='800 '+Math.round(15*k)+'px Inter,system-ui,sans-serif';g.fillText('NAVRYX SKY',c.width-24*k,c.height-24*k);
   const a=document.createElement('a');a.download='tryvoga-doba-'+DAY+'.png';a.href=c.toDataURL('image/png');a.click();};
 </script>
-<script src="dexport.js?v=1"></script>
+<script src="dexport.js?v=2"></script>
 </body>
 </html>

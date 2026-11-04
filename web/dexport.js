@@ -116,7 +116,7 @@
       y += 2 * (ch + 16) + 18;
       g.fillStyle = '#F2F5FA'; g.font = '800 17px ' + FONT; g.fillText('ЗА ТИПАМИ', rx, y); y += 14;
       for (const [k, n] of counts().slice(0, 9)) {
-        y += 32; g.fillStyle = T[k][1]; rr(g, rx, y - 11, 34, 6, 3); g.fill();
+        y += 32; g.fillStyle = T[k][1]; if (DASH.has(k)) for (let d = 0; d < 34; d += 12) { rr(g, rx + d, y - 11, 7, 6, 2); g.fill(); } else { rr(g, rx, y - 11 + (MAIN.has(k) ? 0 : 2), 34, MAIN.has(k) ? 6 : 3, 2); g.fill(); }
         g.fillStyle = '#DDE3EE'; g.font = '600 18px ' + FONT; g.textAlign = 'left'; g.fillText(T[k][0], rx + 48, y - 2);
         g.textAlign = 'right'; g.font = '700 18px ' + FONT; g.fillText(String(n), rx + rw, y - 2);
       }
@@ -191,7 +191,7 @@
         grad(g, 48, by + 66, (W - 96) * f, 4); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(48 + (W - 96) * f, by + 66, (W - 96) * (1 - f), 4);
         let x = 48, yy = by + 108; g.font = '600 19px ' + FONT;
         for (const [k] of cnt.slice(0, 6)) { const w = g.measureText(T[k][0]).width; if (x + w + 40 > W - 48) { x = 48; yy += 30; if (yy > H - 10) break; }
-          g.fillStyle = T[k][1]; rr(g, x, yy - 9, 22, 5, 2.5); g.fill(); g.fillStyle = '#DDE3EE'; g.textAlign = 'left'; g.fillText(T[k][0], x + 30, yy); x += w + 58; }
+          g.fillStyle = T[k][1]; if (DASH.has(k)) for (let d = 0; d < 22; d += 9) { rr(g, x + d, yy - 9, 5, 5, 2); g.fill(); } else { rr(g, x, yy - 9, 22, 5, 2.5); g.fill(); } g.fillStyle = '#DDE3EE'; g.textAlign = 'left'; g.fillText(T[k][0], x + 30, yy); x += w + 58; }
         g.textAlign = 'right'; g.fillStyle = 'rgba(255,255,255,.75)'; g.font = '700 20px ' + FONT; g.fillText(SITE, W - 48, by + 20);
         if (D.official) { g.fillStyle = BLUE; g.font = '800 34px ' + FONT; g.fillText(String(D.official.shot), W - 48, by + 62 - 4);
           g.fillStyle = MUTE; g.font = '600 15px ' + FONT; g.fillText('збито / подавлено (ПС ЗСУ)', W - 48 - 0, by + 62 + 16); }
