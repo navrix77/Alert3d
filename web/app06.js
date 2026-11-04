@@ -29,16 +29,19 @@
   // Відповідність типів SKY стандартним кодам: набір (symbol set), сутність (6 цифр), модифікатор 1 і 2.
   // exact=false: у стандарті немає точнішої сутності, взято найближчу батьківську, а конкретика йде текстовим полем.
   const E = (set, ent, m1, m2, std, exact, note) => ({ set, entity: ent, m1: m1 || '00', m2: m2 || '00', std, exact, note: note || '' });
-  const UAV = (note, m1, std) => E('01', '110300', m1, '00', std || 'Air / Military / Unmanned aerial vehicle (UAV)', true, note);
+  // БпЛА: клас «Unmanned aerial vehicle» + модифікатор 1 (призначення) + модифікатор 2 (клас дальності/ваги).
+  // Позначки в самому символі (видно літерами): A = Attack, R = Reconnaissance; M2: CR/SR/MR/LR = близька/мала/середня/велика дальність, H = важкий.
+  // Віднесення типів SKY до класів дальності/ваги: класифікація SKY за відкритими довідниками, не вимога стандарту.
+  const UAV = (note, m1, m2, std) => E('01', '110300', m1 || '01', m2 || '00', std || 'Air / Military / Unmanned aerial vehicle (UAV) / Attack', true, note);
   const MAP = {
-    shahed: UAV('Дрон-камікадзе: у стандарті окремої сутності немає, це клас БпЛА; модель у текстовому полі'),
-    geran5: UAV('Реактивний ударний БпЛА: клас БпЛА; модель у полі'),
-    jet: UAV('Реактивний БпЛА: клас БпЛА; модель у полі'),
-    molniya: UAV('Малий ударний БпЛА: клас БпЛА; модель у полі'),
-    fpv: UAV('FPV-дрон: клас БпЛА'),
-    fpvf: UAV('FPV на оптоволокні: клас БпЛА; спосіб керування в полі'),
-    lancet: UAV('Дрон-камікадзе «Ланцет»: клас БпЛА; модель у полі'),
-    recon: UAV('Розвідувальний БпЛА', '18', 'Air / Military / Unmanned aerial vehicle (UAV) / Reconnaissance'),
+    shahed: UAV('Дрон-камікадзе далекої дії: UAV · Attack (A) · Long range (LR); модель у полі', '01', '10'),
+    geran5: UAV('Реактивний ударний БпЛА: UAV · Attack (A) · Heavy (H); модель у полі', '01', '01'),
+    jet: UAV('Реактивний БпЛА: UAV · Attack (A) · Heavy (H); модель у полі', '01', '01'),
+    molniya: UAV('Малий ударний БпЛА: UAV · Attack (A) · Short range (SR); модель у полі', '01', '08'),
+    fpv: UAV('FPV-дрон: UAV · Attack (A) · Close range (CR)', '01', '07'),
+    fpvf: UAV('FPV на оптоволокні: UAV · Attack (A) · Close range (CR); спосіб керування в полі', '01', '07'),
+    lancet: UAV('Дрон-камікадзе «Ланцет»: UAV · Attack (A) · Medium range (MR); модель у полі', '01', '09'),
+    recon: UAV('Розвідувальний БпЛА: UAV · Reconnaissance (R)', '18', '00', 'Air / Military / Unmanned aerial vehicle (UAV) / Reconnaissance'),
     cruise: E('02', '110000', '07', '00', 'Air missile / Missile / Cruise', true, 'Крилата ракета'),
     banderol: E('02', '110000', '07', '00', 'Air missile / Missile / Cruise', true, 'Крилата ракета «Бандероль»: той самий символ, назва в полі'),
     ballistic: E('02', '110000', '06', '00', 'Air missile / Missile / Ballistic', true, 'Балістична ракета'),
