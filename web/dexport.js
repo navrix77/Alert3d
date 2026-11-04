@@ -100,7 +100,7 @@
       g.save(); rr(g, M, my, MW, MH, 22); g.clip(); cover(g, map.getCanvas(), M, my, MW, MH);
       g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(M, my + MH - 30, MW, 30);
       g.font = '500 14px ' + FONT; g.fillStyle = 'rgba(255,255,255,.7)'; g.textAlign = 'left';
-      g.fillText('© Esri, Maxar · © OpenStreetMap · OpenFreeMap · окуповані території: DeepStateMap', M + 14, my + MH - 10);
+      g.fillText('© Esri, Maxar · © OpenStreetMap · OpenFreeMap · зона контролю: відкриті джерела', M + 14, my + MH - 10);
       g.restore(); g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 1.5; rr(g, M, my, MW, MH, 22); g.stroke();
       // права колонка
       const rx = M + MW + 36, rw = W - M - rx; let y = my;

@@ -50,9 +50,9 @@
     tu22: E('01', '110100', '02', '00', 'Air / Military / Fixed-wing / Bomber', true, 'Ту-22М3'),
     mig31: E('01', '110100', '00', '00', 'Air / Military / Fixed-wing', false, 'МіГ-31К: роль у повідомленнях не названа, тому загальний «Fixed-wing» без ролі'),
     // об'єкти ворога з DeepState (наземні): установка або підрозділ; сутність лише там, де є точний код, інакше загальний знак
-    enemy_airfield: E('20', '120803', '00', '00', 'Land installation / Infrastructure / Military / Airport', true, 'Аеродром (DeepState)'),
-    enemy_hq: Object.assign(E('10', '000000', '00', '00', 'Land unit / Unspecified (HQ indicator)', false, 'Штаб (DeepState): рід військ не відомий, тому загальний підрозділ зі знаком штабу'), { hq: true }),
-    enemy_object: E('20', '110000', '00', '00', 'Land installation / Military', false, 'Об\'єкт ворога (DeepState): загальна військова установка; назва в полі'),
+    enemy_airfield: E('20', '120803', '00', '00', 'Land installation / Infrastructure / Military / Airport', true, 'Аеродром (OSM)'),
+    enemy_hq: Object.assign(E('10', '000000', '00', '00', 'Land unit / Unspecified (HQ indicator)', false, 'Штаб (OSM): рід військ не відомий, тому загальний підрозділ зі знаком штабу'), { hq: true }),
+    enemy_object: E('20', '110000', '00', '00', 'Land installation / Military', false, 'Об\'єкт ворога (OSM): загальна військова установка; назва в полі'),
     // тип невстановлений: загальний повітряний об'єкт; належність при цьому лишається за даними
     unknown: E('01', '000000', '00', '00', 'Air (unspecified)', true, 'Тип не встановлено: порожній внутрішній знак, рамка за належністю'),
   };

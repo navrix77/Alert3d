@@ -86,6 +86,9 @@ def objects(doc: dict) -> tuple[dict, dict]:
 
 
 async def run() -> None:
+    if os.environ.get("DEEPSTATE_TERRITORY") != "1":
+        log.info("DeepState вимкнено (немає дозволу); джерела — app/open_front.py")
+        return
     async with httpx.AsyncClient(timeout=40, headers={"User-Agent": "tryvoga/1.0 (civil-defence aggregator)"}) as cli:
         while True:
             fresh = False

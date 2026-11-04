@@ -2007,3 +2007,12 @@ def test_deepstate_enemy_objects_extraction():
     assert summ["categories"]["airfield"] == 1 and summ["categories"]["hq"] == 1
     assert summ["geometry_types"]["Point"] == 3
     assert fc["features"][0]["properties"]["n"] == "Аеродром Бельбек"
+
+
+def test_open_front_extractors():
+    from app import open_front as of
+    fc = of.poly_extract({"features": [{"geometry": {"type": "Polygon", "coordinates": [[[35, 48, 0], [36, 48, 0], [36, 49, 0], [35, 48, 0]]]}}, {"geometry": {"type": "Point", "coordinates": [1, 1]}}]}, "ISW")
+    assert len(fc["features"]) == 1 and fc["features"][0]["geometry"]["coordinates"][0][0] == [35, 48]
+    af = of.af_extract({"elements": [{"type": "way", "id": 1, "center": {"lat": 45.0, "lon": 34.0}, "tags": {"name:uk": "Бельбек"}}, {"type": "way", "id": 1, "center": {"lat": 45.0, "lon": 34.0}}, {"type": "node", "id": 2}]})
+    assert len(af["features"]) == 1 and af["features"][0]["properties"]["c"] == "airfield"
+    assert "military" in of.af_query()

@@ -33,7 +33,7 @@ from .push import Push
 from .ru_strikes import RuStrikes
 from .strikes_ua import UaStrikes
 from .forecast import forecast as make_forecast
-from . import lan_tls, occupied
+from . import lan_tls, occupied, open_front
 from .llm import LLM
 
 brain = Brain()
@@ -430,6 +430,7 @@ async def lifespan(app: FastAPI):
     tasks.append(asyncio.create_task(pushsvc.run(state)))
     tasks.append(asyncio.create_task(ru.run()))
     tasks.append(asyncio.create_task(occupied.run()))
+    tasks.append(asyncio.create_task(open_front.run()))
     tasks.append(asyncio.create_task(hits.run()))
     if os.getenv("REPLAY") != "1":
         tasks.append(asyncio.create_task(daily.run()))
