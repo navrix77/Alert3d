@@ -859,3 +859,4 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 @keyframes lgBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
 @keyframes glPulse{0%,100%{opacity:.55}50%{opacity:1}}
 #intro .lg .gl{display:none!important}
+#intro .lg::before{left:50%!important;margin-left:-36%!important;top:-1%!important;width:72%!important;height:72%!important;right:auto!important;bottom:auto!important;transform-origin:50% 50%!important}
