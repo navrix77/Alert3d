@@ -131,7 +131,7 @@ def alerts_n(n: int) -> str:
 
 def vocabulary() -> list[str]:
     """Закритий словник заготовок: синтезується наперед, щоб перше ж оновлення звучало без очікування."""
-    v = list(FIXED) + LIB + [radius_none(r) for r in (10, 25, 50, 100)] + [ago(m) for m in range(3, 61)]
+    v = list(FIXED) + LIB + [radius_none(r) for r in (10, 25, 50, 100)] + [ago(m) for m in range(3, 61)] + [ago(m, "Останнє повідомлення") for m in range(3, 31)]
     for typ in ("shahed", "jet", "cruise", "ballistic", "kab"):
         v += [count_type(n, typ) + "." for n in range(1, 21)]
     for typ in TYPES:
@@ -523,51 +523,80 @@ def _cnt(label: str, n: int) -> str:
     return f"{label}: {num(min(int(n), 60), 'f')}."
 
 
-LIVE_FIXED = ["Що змінилось біля вас.", "Суттєвих змін у вашому районі немає.", "Оголошено повітряну тривогу.", "Тривогу знято.",
-              "Повідомлення про балістику.", "Відбій балістики.", "Нова ціль.", "Кількість змінилась.", "Курс змінився.",
-              "Нових повідомлень з того часу немає."]
+LIVE_FIXED = ["Що змінилось біля вас.", "Суттєвих змін у вашому районі немає.", "Відбій балістики.", "Нова ціль.",
+              "Кількість змінилась."]
 
 
 def live_steps(d: dict) -> list[dict]:
-    """Детермінований сценарій Ефіру: say — для екрана, voice — заготовки для голосу (жодних нових витрат на кожен показ)."""
+    """Ефір «що змінилось» за бібліотекою сценаріїв: кожен крок — say (розширений текст для екрана) і voice (заготовки).
+    Без моделі й без нового синтезу. Зникнення з мапи — нейтрально, не як збиття й не як відбій."""
     c = d["counts"]
     steps = []
-    v = ["Що змінилось біля вас."]
-    parts = []
-    if c["new"]:
-        v.append(_cnt("Нових цілей", c["new"])); parts.append(f"нових цілей {c['new']}")
-    if c["changed"]:
-        v.append(_cnt("Змінилось", c["changed"])); parts.append(f"змінилось {c['changed']}")
-    if c["gone"]:
-        v.append(_cnt("Зникли з мапи", c["gone"])); parts.append(f"зникли з мапи {c['gone']}")
+    m = Msg()
+    mins = d.get("minutes") or 0
+    m("Що змінилось біля вас.", f"Що змінилось біля вас{f' за {mins} хв' if mins else ''} (станом на {kyiv(d.get('now'))}).")
     al = d.get("alert")
     if al and al["now"] != al["was"]:
-        v.append("Оголошено повітряну тривогу." if al["now"] else "Тривогу знято.")
-        parts.append("оголошено тривогу" if al["now"] else "тривогу знято")
-    if len(v) == 1:
-        v.append("Суттєвих змін у вашому районі немає.")
-    m = d.get("minutes")
-    steps.append({"say": (f"За {m} хв: " if m else "Зараз: ") + (", ".join(parts) if parts else "суттєвих змін у вашому районі немає") + ".",
-                  "action": "overview", "voice": v})
+        status_block(m, {"alert": al["now"]}, al["was"])
+    parts = []
+    if c["new"]:
+        m(_cnt("Нових цілей", c["new"]), f"Нових цілей: {c['new']}."); parts.append(1)
+    if c["changed"]:
+        m(_cnt("Змінилось", c["changed"]), f"Змінилось: {c['changed']}."); parts.append(1)
+    if c["gone"]:
+        m(_cnt("Зникли з мапи", c["gone"]), f"Зникли з мапи: {c['gone']}. Нових повідомлень про них немає; це не означає збиття.")
+        parts.append(1)
+    if not parts and not (al and al["now"] != al["was"]):
+        m("Суттєвих змін у вашому районі немає.", "Суттєвих змін у вашому районі немає. Це не означає, що загрози немає.")
+    o = m.out()
+    steps.append({"say": o["text"], "action": "overview", "voice": o["voice"]})
     if d.get("bal"):
         b = d["bal"][-1]
-        ph = "Відбій балістики." if b.get("close") else "Повідомлення про балістику."
-        steps.append({"say": ph[:-1] + f" о {time.strftime('%H:%M', time.localtime(b['t']))}.", "action": "dim", "value": True, "voice": [ph]})
+        m = Msg()
+        if b.get("close"):
+            m("Відбій балістики.", f"Відбій загрози балістики о {kyiv(b['t'])}.")
+        else:
+            m(["Увага!", "Повідомлення про загрозу балістики для вашої області. Будьте в укритті."],
+              f"Увага! Повідомлення про загрозу балістики о {kyiv(b['t'])}. Будьте в укритті.")
+        o = m.out()
+        steps.append({"say": o["text"], "action": "dim", "value": True, "voice": o["voice"]})
     for it in [i for i in d["items"] if i["status"] in ("new", "changed")][:5]:
-        v = [count_type(it["count"], it["type"]) + "."]
-        say = it["name"] + (f" ×{it['count']}" if it["count"] > 1 else "")
+        m = Msg()
+        n = it["count"]
         if it["status"] == "new":
-            v.append("Нова ціль."); say += ", нова ціль"
-        elif it.get("count_was") and it["count_was"] != it["count"]:
-            v.append("Кількість змінилась."); say += f": було {it['count_was']}, стало {it['count']}"
-        elif it.get("next") and it["next"] != it.get("next_was"):
-            v.append("Курс змінився."); say += ": курс змінився"
-        if it.get("next"):
-            v.append(f"Курс: {it['next']}."); say += f", курс на {it['next']}"
+            m([count_type(n, it["type"]) + ".", "Нова ціль."], f"{count_type(n, it['type'])}: нова ціль.")
+        elif it.get("count_was") and it["count_was"] != n:
+            m(["Кількість змінилась.", count_type(n, it["type"]) + "."],
+              f"Кількість змінилась: було {it['count_was']}, стало {n} ({TOPW.get(it['type'], 'цілі')}).")
+        else:
+            m(count_type(n, it["type"]) + ".", f"{count_type(n, it['type'])}: оновлення.")
+        if it.get("next") and it.get("next_was") and it["next"] != it["next_was"]:
+            m(["Напрямок змінився.", "Раніше джерела вказували:", f"{it['next_was']}.", "У новому повідомленні:", f"{it['next']}."],
+              f"Напрямок змінився: раніше джерела вказували {it['next_was']}, у новому повідомленні: {it['next']}.")
+        elif it.get("next"):
+            m(["У повідомленні зазначено рух у напрямку:", f"{it['next']}."], f"Напрямок у повідомленні: {it['next']}.")
         if it.get("km") is not None:
-            v.append(dist(it["km"])); say += f", {it['km']} км від вас"
-        act = "breakdown" if it.get("count_was") and it["count_was"] != it["count"] else "focus"
-        steps.append({"say": say + ".", "action": act, "ids": [it["id"]], "voice": v})
+            m(dist(it["km"]), f"Приблизно {it['km']} км від вашої геомітки.")
+        ms = it.get("mentions") or []
+        if ms:
+            last = ms[-1]
+            mm = max(1, round(((d.get("now") or time.time()) - last["t"]) / 60))
+            if mm >= 3:
+                m(ago(mm, "Останнє повідомлення"), f"Останнє повідомлення о {kyiv(last['t'])}, {last.get('name') or last['src']}.")
+            else:
+                m([], f"Останнє повідомлення о {kyiv(last['t'])}, {last.get('name') or last['src']}.")
+            prim = list(dict.fromkeys(e.get("name") or e["src"] for e in ms if not e.get("copy")))
+            copies = sum(1 for e in ms if e.get("copy"))
+            if len(prim) >= 2:
+                m(pick(it["id"], ["Про це повідомляють кілька незалежних джерел.", "Повідомлення підтверджують кілька незалежних джерел."]),
+                  "Про це повідомляють кілька незалежних джерел: " + ", ".join(prim[:4]) + ".")
+            elif len(prim) == 1:
+                m(["Поки про це повідомив один моніторинговий канал.", "Незалежного підтвердження поки немає."],
+                  f"Наразі про це повідомив один моніторинговий канал, {prim[0]}. Незалежного підтвердження поки немає."
+                  + (f" Ще {copies} {plural(copies, 'канал лише поширив', 'канали лише поширили', 'каналів лише поширили')} це повідомлення." if copies else ""))
+        act = "breakdown" if it.get("count_was") and it["count_was"] != n else "focus"
+        o = m.out()
+        steps.append({"say": o["text"], "action": act, "ids": [it["id"]], "voice": o["voice"]})
     return steps
 
 

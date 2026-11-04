@@ -108,3 +108,15 @@ def test_rich_summary():
     assert "Тепер коротко по області." in fr
     # екран: точний час і назва джерела; голос: без часу публікації
     assert "один моніторинговий канал, X" in r["text"] and "офіційного відбою немає" in r["text"]
+
+
+def test_live_steps_library():
+    import time as _t
+    now = _t.time()
+    d = {"now": now, "counts": {"new": 1, "changed": 0, "gone": 1}, "minutes": 20, "alert": {"now": True, "was": False}, "bal": [],
+         "items": [{"id": "Ш-1", "type": "shahed", "name": "Шахед", "status": "new", "count": 2, "count_was": None, "next": "Чугуїв",
+                    "next_was": None, "km": 23, "mentions": [{"t": now - 420, "src": "a", "name": "Канал А"}]}]}
+    st = v.live_steps(d)
+    assert "Прямуйте в укриття." in st[0]["voice"] and "не означає збиття" in st[0]["say"]
+    assert st[1]["voice"][:2] == ["Два шахеди.", "Нова ціль."] and "Канал А" in st[1]["say"]
+    assert "Останнє повідомлення сім хвилин тому." in st[1]["voice"]
