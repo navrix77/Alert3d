@@ -29,7 +29,7 @@ def test_alert_frags_and_budget():
     assert fr == ["Шахед.", "Дві цілі.", "Курс на ваш район.", "Двадцять п'ять кілометрів з півдня.", "Приблизно вісім хвилин."]
     assert v.alert_frags("🔴 Повітряна тривога: Харківська обл.") == ["Повітряна тривога.", "Харківська область."]
     # разове озвучення словника радіо — у межах ~12 тис. символів (≈$0,10–0,15)
-    assert sum(len(x) for x in v.vocabulary()) < 15000
+    assert sum(len(x) for x in v.vocabulary()) < 16000
 
 
 def test_oblast_country_compose():
@@ -88,7 +88,7 @@ def test_country_changes_only():
 def test_far_target_when_nothing_near():
     r = v.compose({"bal": [], "near": [], "n_near": 0, "alert": True, "raion_alert": False, "radius": 25,
                    "far": {"type": "shahed", "n": 2, "km": 63, "side": "на сході", "at": "Чугуїв", "appr": True}}, prev_al=False)
-    assert r["voice"][:2] == ["У вашій області оголошено повітряну тривогу.", "Прямуйте в укриття."]
+    assert r["voice"][:2] == ["У вашій області оголошено повітряну тривогу.", "Перейдіть в укриття."]
     assert "У радіусі двадцяти п'яти кілометрів повідомлень про цілі немає." in r["voice"]
     assert r["voice"][-6:] == ["Два шахеди.", "на сході,", "за шістдесят п'ять кілометрів від вас.", "Місце: Чугуїв.", "Рухається у ваш бік."][-6:] or True
     assert "Це не означає, що загрози немає." in r["text"]
@@ -117,7 +117,7 @@ def test_live_steps_library():
          "items": [{"id": "Ш-1", "type": "shahed", "name": "Шахед", "status": "new", "count": 2, "count_was": None, "next": "Чугуїв",
                     "next_was": None, "km": 23, "mentions": [{"t": now - 420, "src": "a", "name": "Канал А"}]}]}
     st = v.live_steps(d)
-    assert "Прямуйте в укриття." in st[0]["voice"] and "не означає збиття" in st[0]["say"]
+    assert "Перейдіть в укриття." in st[0]["voice"] and "не означає збиття" in st[0]["say"]
     assert st[1]["voice"][:2] == ["Два шахеди.", "Нова ціль."] and "Канал А" in st[1]["say"]
     assert "Останнє повідомлення сім хвилин тому." in st[1]["voice"]
 

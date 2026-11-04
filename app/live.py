@@ -808,3 +808,9 @@ KIT = os.getenv("RADIO_KIT", "1") != "0"  # голосові заготовки 
 
 RADIO_CACHE: dict = {}
 RADIO_MEM: dict = {}  # що «Радіо SKY» вже сказало для (охоплення, області): не повторювати незмінну обстановку
+
+
+from .radio_spec import EDITOR_RULES as _ED  # noqa: E402
+
+RADIO_SYSTEM = RADIO_SYSTEM + "\n" + _ED
+LIVE_SYSTEM = LIVE_SYSTEM + "\n" + _ED

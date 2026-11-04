@@ -230,6 +230,9 @@ def _synth(path: Path, text: str, rate: float) -> bytes:
     return buf.getvalue()
 
 
+from . import radio_spec as _spec  # noqa: E402
+
+
 # ---- Google Cloud Text-to-Speech (якщо задано GOOGLE_TTS_KEY): нейромережеві голоси uk-UA з правильними наголосами.
 GKEY = os.getenv("GOOGLE_TTS_KEY") or os.getenv("GOOGLE_TILES_KEY_TTS") or ""
 _gvoices: dict = {}
@@ -297,14 +300,11 @@ LAST = {"openai": "", "gemini": "", "google": ""}  # остання помилк
 VOICE_V = "r9"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
 OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
-OAI_STYLE = ("Читай українською як носій мови, чітко й природно, у звичайному темпі. У тексті стоять знаки наголосу (´): "
-             "наголошуй саме ці склади. Не змінюй і не пропускай слова.")
+OAI_STYLE = _spec.ALERT_STYLE  # сповіщення (специфікація власника 04.11)
 
 
 # SKY Radio (04.11, концепція власника): один основний чоловічий голос, теплий середньо-низький баритон, радійна подача
-RADIO_STYLE = ("Ти ведучий українського радіо. Читай українською як носій мови: чітко, живо, з енергією й природною інтонацією, "
-               "у звичайному темпі. У тексті стоять знаки наголосу (´): наголошуй саме ці склади. Не змінюй і не пропускай слова. "
-               "Скай вимовляй «Скай».")
+RADIO_STYLE = _spec.VOICE_STYLE  # постійний промпт голосу радіо (app/radio_spec.py)
 
 
 async def _openai(text: str, key: str, rate: float) -> bytes | None:
@@ -479,7 +479,7 @@ _PIPER_SEM = asyncio.Semaphore(1)
 
 
 async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True, google: bool = True) -> tuple[bytes | None, str]:
-    text = say_form(" ".join((text or "").split())[:600])
+    text = say_form(_spec.brand_say(" ".join((text or "").split())[:600]))
     if not text:
         return None, "empty"
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ

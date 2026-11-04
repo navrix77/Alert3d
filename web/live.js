@@ -90,8 +90,8 @@
     if (!ready && text.length > 450) { for (const c of chunks(text)) { if (!audioOn) return; await speak(c, voice); } return; }
     try {
       const url = ready || ttsUrl(text, voice);
-      if (window.SKYVOICE) { abortAudio = () => window.SKYVOICE.stop(); await window.SKYVOICE.play(url, 1, 1.12); return; }
-      const a = new Audio(url);try{a.preservesPitch=true;a.defaultPlaybackRate=a.playbackRate=1.12;}catch(e){}
+      if (window.SKYVOICE) { abortAudio = () => window.SKYVOICE.stop(); await window.SKYVOICE.play(url, Math.max(0.1, Math.min(1, +(LS.get('radio_voice_vol') || 1))), 1.12); return; }
+      const a = new Audio(url);try{a.volume=Math.max(0.1,Math.min(1,+(LS.get('radio_voice_vol')||1)));}catch(e){}try{a.preservesPitch=true;a.defaultPlaybackRate=a.playbackRate=1.12;}catch(e){}
       await new Promise(res => { abortAudio = () => { try { a.pause(); } catch (e) {} res(); }; a.onended = res; a.onerror = res; a.play().catch(res); setTimeout(res, 20000); });
     } catch (e) {}
   }
@@ -303,7 +303,7 @@
   const SURL = { ident: 'snd/ident.mp3', news: 'snd/news.mp3', calm: 'snd/calm.mp3', urgent: 'snd/urgent.mp3', outro: 'snd/outro.mp3', outage: 'snd/outage.mp3' }, SB = {};
   function sLoad() { const c = raCtx(); return Promise.all(Object.keys(SURL).map(k => SB[k] ? 0 : fetch(SURL[k]).then(r => r.arrayBuffer())
     .then(ab => new Promise((ok, no) => c.decodeAudioData(ab, ok, no))).then(b => { SB[k] = b; }).catch(() => {}))); }
-  function sPlay(k, vol) { const b = SB[k]; if (!b || (window.SKYVOICE && window.SKYVOICE.alerting)) return wait(0);
+  function sPlay(k, vol) { const b = SB[k]; if (LS.get('radio_sig') === '0') return wait(0); if (!b || (window.SKYVOICE && window.SKYVOICE.alerting)) return wait(0);
     try { const c = raCtx(), src = c.createBufferSource(), g = c.createGain(); g.gain.value = vol; src.buffer = b; src.connect(g).connect(RA.master); src.start(); } catch (e) {}
     return wait(Math.max(0, Math.round(b.duration * 1000) - 120)); }
   const SND = { ident: () => sPlay('ident', 0.6), outro: () => sPlay('outro', 0.45), news: () => sPlay('news', 0.42), calm: () => sPlay('calm', 0.3),
@@ -332,6 +332,9 @@
     const mode = () => LS.get('radio_mode') || 'msgs';
     const sync = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === mode()));
     seg.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_mode', b.dataset.v); sync(); if (radioOn) { if (b.dataset.v === 'atmo') bedStart(); else bedStop(); } });
+    const vv = document.getElementById('rad-voice'), sg = document.getElementById('rad-sig');
+    if (vv) { vv.value = Math.round((+(LS.get('radio_voice_vol') || 1)) * 10); vv.oninput = () => LS.set('radio_voice_vol', String(vv.value / 10)); }
+    if (sg) { sg.checked = LS.get('radio_sig') !== '0'; sg.onchange = () => LS.set('radio_sig', sg.checked ? '1' : '0'); }
     if (vol) { vol.value = Math.round((+(LS.get('radio_atmo_vol') || 0.04)) * 100); vol.oninput = () => { LS.set('radio_atmo_vol', String(vol.value / 100)); duck(false); }; }
     sync();
     // охоплення: «Поруч зі мною» (радіус) / «Моя область» / «Вся Україна»; перемикання — нове зведення в новому режимі

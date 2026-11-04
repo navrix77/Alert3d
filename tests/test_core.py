@@ -1847,3 +1847,13 @@ def test_count_acc_reads_daily():
     assert isinstance(r, dict)
     if r:
         assert r["n"] >= 1 and 0 <= r["inside"] <= r["n"]
+
+
+def test_radio_spec_templates_and_brand():
+    from app import radio_spec as rs
+    assert rs.render("alert", obl="Харківська область") == "Харківська область. Оголошено повітряну тривогу. Перейдіть в укриття."
+    assert rs.render("clear") == ""  # без області шаблон не вигадує дані
+    assert rs.render("outage").startswith("Оновлення даних SKY")
+    assert rs.brand_say("NAVRYX SKY і SKY") == "Наврікс Скай і Скай"
+    from app import voicekit
+    assert all(t in voicekit.vocab_lib() for t in rs.IDENTS.values())
