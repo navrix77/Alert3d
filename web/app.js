@@ -100,7 +100,7 @@ function addImages(){
   for(const t of Object.keys(TYPE_COLOR))for(const v of ['','-d','-sh']){const id='t-'+t+v;if(map.hasImage(id))continue;
     map.loadImage('sprites/t-'+t+v+'.png?v=ref17').then(r=>{if(!map.hasImage(id))map.addImage(id,r.data,{pixelRatio:Math.max(1,r.data.width/80)});})/*розмір ~80 px незалежно від файлу*/.catch(()=>{const c=drawTarget(t,44,{dim:v==='-d'});if(!map.hasImage(id))map.addImage(id,c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});});}
   if(!map.hasImage('home')){const c=drawHome(40);map.addImage('home',c.getContext('2d').getImageData(0,0,c.width,c.height),{pixelRatio:2});}
-  if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.88)';x.beginPath();x.roundRect(2,2,s-4,s-4,14);x.fill();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
+  if(!map.hasImage('chip')){const s=48,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');x.fillStyle='rgba(12,15,22,.9)';x.beginPath();x.roundRect(2,2,s-4,s-4,22);x.fill();x.lineWidth=2;x.strokeStyle='rgba(255,255,255,.35)';x.stroke();map.addImage('chip',x.getImageData(0,0,s,s),{pixelRatio:2,stretchX:[[14,34]],stretchY:[[14,34]],content:[10,8,38,40]});}
 }
 const EMPTY={type:'FeatureCollection',features:[]};
 // біжучі штрихи (ant path): зсув візерунка кроками, бо MapLibre не має dash-offset
@@ -157,18 +157,18 @@ function addOverlays(){
   map.addLayer({id:'bal-dim',type:'fill',source:'obl',layout:{visibility:'none'},paint:{'fill-color':'#000','fill-opacity':0.38}});
   map.addLayer({id:'bal-hl',type:'line',source:'obl',layout:{visibility:'none','line-join':'round'},paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1.6,8,3],'line-opacity':0.95}});syncBalLayers.k=null;
   map.addLayer({id:'occ-fill',type:'fill',source:'occ',paint:{'fill-color':['match',['get','k'],'occupied','#2A0710','#3A3A3A'],'fill-opacity':['match',['get','k'],'occupied',0.5,0.3]}});
-  map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.45}});
+  map.addLayer({id:'occ-hatch',type:'fill',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'fill-pattern':'hatch','fill-opacity':0.3}});
   map.addLayer({id:'occ-line',type:'line',source:'occ',filter:['==',['get','k'],'occupied'],paint:{'line-color':'#B24A5C','line-width':['interpolate',['linear'],['zoom'],5,1,9,2],'line-opacity':0.7}});
   map.addSource('outside',{type:'geojson',data:'/data/outside.geojson',tolerance:0.2,buffer:256});
   // напис навскіс, напівпрозоро, над територією РФ (у площині карти)
   map.addSource('rf-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[39.2,53.6],[44.5,50.4],[36.2,56.9],[46.5,55.4]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});map.addLayer({id:'outside',type:'fill',source:'outside',paint:{'fill-color':'#02040a','fill-opacity':['interpolate',['linear'],['zoom'],4,0.55,8,0.6]}});
   map.addLayer({id:'rf-mark',type:'symbol',source:'rf-mark',maxzoom:7.5,layout:{'text-field':'ДЕРЖАВА-ТЕРОРИСТ','text-font':['Noto Sans Bold'],
-    'text-size':['interpolate',['exponential',1.6],['zoom'],3,13,5,26,7,46],'text-letter-spacing':0.18,'text-max-width':40,'text-rotate':-22,'text-rotation-alignment':'map','text-pitch-alignment':'map',
-    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,90,90,0.22)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});
+    'text-size':['interpolate',['exponential',1.6],['zoom'],3,11,5,22,7,38],'text-letter-spacing':0.18,'text-max-width':40,'text-rotate':-22,'text-rotation-alignment':'map','text-pitch-alignment':'map',
+    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,90,90,0.12)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});
   map.addSource('by-mark',{type:'geojson',data:{type:'FeatureCollection',features:[[27.6,53.4],[29.4,52.2]].map(c=>({type:'Feature',properties:{},geometry:{type:'Point',coordinates:c}}))}});
   map.addLayer({id:'by-mark',type:'symbol',source:'by-mark',maxzoom:7.5,layout:{'text-field':'ПОСІПАКИ ТЕРОРИСТІВ','text-font':['Noto Sans Bold'],
     'text-size':['interpolate',['exponential',1.6],['zoom'],3,9,5,18,7,32],'text-letter-spacing':0.16,'text-max-width':40,'text-rotate':-18,'text-rotation-alignment':'map','text-pitch-alignment':'map',
-    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,150,90,0.2)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});syncOutside();
+    'text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'rgba(255,150,90,0.11)','text-halo-color':'rgba(0,0,0,0.15)','text-halo-width':1}});syncOutside();
   map.addLayer({id:'obl-line',type:'line',source:'obl',paint:{'line-color':'#fff','line-width':['interpolate',['linear'],['zoom'],4,1,9,2.2],'line-opacity':0.9}});
   // «пам'ятні місця»: крейсер «Москва» на дні та Кримський міст
   if(!map.hasImage('moskva')){const c=document.createElement('canvas');c.width=120;c.height=60;const x=c.getContext('2d');
@@ -766,7 +766,7 @@ function renderMe(threats){
       '<ol class="bal-log">'+BALM.items.map(e=>'<li><span>'+fmt(e.t)+'</span><b>'+nm(e.src)+'</b> '+esc(e.k==='mig'?(e.txt||'МіГ-31К').slice(0,70):e.pl.length?e.pl.join(', '):e.obl.map(o=>OBL_GEN[o]||o).slice(0,4).join(', ')+(e.obl.length>4?' +'+(e.obl.length-4):''))+(e.link?' <a href="'+esc(e.link)+'" target=_blank rel=noopener>↗</a>':'')+'</li>').join('')+'</ol>'+
       (BALM.mig?'<small class="bal-note">Зліт носія ще не пуск: на нього Повітряні сили зазвичай оголошують тривогу по всій Україні. Кількість бортів не дорівнює кількості ракет</small>':'<small class="bal-note">Це вік повідомлення, а не час до удару. Де ракета, канали не знають</small>')+
       (BALM.mig?'':'<button class="bal-btn" id="bal-show">Показати регіон загрози</button>');}
-  box.className=cls+(box.classList.contains('open')?' open':'')+(box.classList.contains('fold')?' fold':'');$('#me-word').textContent=word;{const fb=$('#me-fold');if(fb){fb.hidden=!BALM;fb.setAttribute('aria-label',box.classList.contains('fold')?'Розгорнути':'Згорнути');}}
+  box.className=cls+(box.classList.contains('open')?' open':'')+(box.classList.contains('fold')?' fold':'');$('#me-word').textContent=word;box.classList.toggle('off-on',OF.on===1);box.classList.toggle('off-part',OF.on===2);{const fb=$('#me-fold');if(fb){fb.hidden=!BALM;fb.setAttribute('aria-label',box.classList.contains('fold')?'Розгорнути':'Згорнути');}}
   // великі хвилини, лише коли маршрут названо каналами (обґрунтована оцінка), а не з напрямку
   if(first&&!isStale&&!BALM&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
     sub=offL+'<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
@@ -777,7 +777,7 @@ function renderMe(threats){
   (thr.length?thr:closeAsNear.concat(near)).slice(0,3).forEach(x=>{const t=x.tr,r=x.r;const li=document.createElement('li');
     const c=(MEI[t.type]&&MEI[t.type]._sprite?MEI[t.type]:(MEI[t.type]=drawTarget(t.type,22)));const cv=document.createElement('canvas');cv.width=c.width;cv.height=c.height;cv.getContext('2d').drawImage(c,0,0);
     const eta=r.eta!=null?Math.max(1,Math.round(r.eta)):null;
-    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t">'+(eta?'~'+eta+' хв':r.near?(t.next?'курс → '+esc(t.next):'поруч'):(r.away?'віддаляється':t.hd==null?'курс невідомий':r.maybe?'можливо у ваш бік · '+Math.round(r.p*100)+'%':'летить повз'))+'</span></div>'+
+    li.innerHTML='<div class="me-row"><span class="n">'+esc(TYPE_NAME[t.type])+(t.count>1?' ×'+t.count:'')+' · '+Math.round(r.d)+' км '+r.from+'</span><span class="t '+(eta?(eta<=5&&r.rel==='route'?'go':'eta'):r.near?'near':r.away?'away':r.maybe?'maybe':'')+'">'+(eta?'~'+eta+' хв':r.near?(t.next?'курс → '+esc(t.next):'поруч'):(r.away?'віддаляється':t.hd==null?'курс невідомий':r.maybe?'можливо у ваш бік · '+Math.round(r.p*100)+'%':'летить повз'))+'</span></div>'+
       (eta?'<div class="me-act '+(eta<=5&&r.rel==='route'?'go':'ok')+'">'+(r.rel==='route'?'маршрут проходить поруч':'напрямок за оцінкою, може наблизитися')+'</div>':'');
     li.querySelector('.me-row').prepend(cv);li.onclick=()=>openSheet(t.id);$('#me-list').appendChild(li);});
 }

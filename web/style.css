@@ -666,3 +666,38 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .me-fold{border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--fg);border-radius:50%;width:34px;height:34px;font:700 16px var(--f);cursor:pointer;flex:none}
 .me.bal.fold .bal-log,.me.bal.fold .bal-note,.me.bal.fold .bal-btn,.me.bal.fold .ai-box,.me.bal.fold .me-fresh,.me.bal.fold .fc,.me.bal.fold .me-list{display:none!important}
 .me.bal.fold .me-fold{transform:rotate(180deg)}
+
+/* ===================== Редизайн 04.11: ієрархія картки, лічильники одним блоком =====================
+   Відкат: видалити цей блок і повернути 4 рядки в app.js (гілка backup/ui-before-redesign-2026-11-04) */
+/* офіційна тривога керує карткою: смуга стану на всю ширину над заголовком */
+.me{position:fixed}body.pip .me{position:relative!important}
+.me.off-on .me-off.on,.me.off-part .me-off.part{position:absolute;top:0;left:0;right:0;margin:0;padding:8px 20px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;opacity:1;color:#0B0F17;background:var(--red);border-radius:25px 25px 0 0}
+.me.off-part .me-off.part{background:var(--yellow)}
+.me.off-on .me-off.on i,.me.off-part .me-off.part i{background:#0B0F17!important;box-shadow:none!important;opacity:.8}
+.me.off-on,.me.off-part{padding-top:50px!important}
+.me.off-on::after,.me.off-part::after{background:rgba(0,0,0,.35)}
+@media (max-width:640px){.me.off-on .me-off.on,.me.off-part .me-off.part{border-radius:19px 19px 0 0;padding:7px 14px;font-size:11px}.me.off-on,.me.off-part{padding-top:40px!important}}
+.me-off:not(.on):not(.part){font-size:12.5px;color:var(--mute)}
+/* найближчі цілі: окремі блоки, повний текст, статус кольоровим бейджем */
+.me-list{gap:6px;margin-top:10px}
+.me-list li{background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:14px;padding:9px 11px;transition:background .25s}
+.me-list li:hover{background:rgba(255,255,255,.06)}
+.me-row{gap:10px;font-size:15px;align-items:center}
+.me-row canvas{width:34px!important;height:34px!important;padding:6px;border-radius:10px;background:rgba(255,255,255,.07)}
+.me-row .n{white-space:normal;overflow:visible;text-overflow:clip;font-weight:700;line-height:1.2}
+.me-row .t{font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--fg);white-space:nowrap;flex:none}
+.me-row .t.away{background:rgba(61,220,132,.16);color:#3DDC84}
+.me-row .t.maybe,.me-row .t.near,.me-row .t.eta{background:rgba(245,184,61,.18);color:#FFC65C}
+.me-row .t.go{background:rgba(229,72,77,.22);color:#FF8A8A}
+.me-act{margin:6px 0 0 44px}
+/* лічильники: один контейнер, тип позначає лише іконка й колір підпису */
+.counters{gap:0;border-radius:18px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(255,255,255,.02) 38%,rgba(0,0,0,.08)),var(--glass);backdrop-filter:var(--glass-fx);-webkit-backdrop-filter:var(--glass-fx);border:1px solid var(--rim);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 18px 50px rgba(0,0,0,.45)}
+.counters .cnt{background:none!important;backdrop-filter:none;-webkit-backdrop-filter:none;border:0!important;border-right:1px solid var(--line)!important;border-radius:0!important;box-shadow:none!important;padding:8px 14px 8px 10px!important}
+.counters .cnt:last-child{border-right:0!important}
+.counters .cnt:hover{background:rgba(255,255,255,.06)!important}
+.cnt b.pop{animation:pop .6s var(--spring)}
+.asof{border-radius:14px}
+:root[data-theme="day"] .counters{background:rgba(255,255,255,.72);border-color:rgba(10,20,40,.1);box-shadow:0 10px 30px rgba(20,30,60,.15)}
+:root[data-theme="day"] .me-list li{background:rgba(10,20,40,.05);border-color:rgba(10,20,40,.08)}
+:root[data-theme="day"] .me-row canvas{background:rgba(10,20,40,.07)}
+:root[data-theme="day"] .me-row .t{background:rgba(10,20,40,.08);color:#0B1220}
