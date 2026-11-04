@@ -475,6 +475,9 @@ def _say_form(text: str) -> str:
     return t
 
 
+_PIPER_SEM = asyncio.Semaphore(1)
+
+
 async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True, google: bool = True) -> tuple[bytes | None, str]:
     text = say_form(" ".join((text or "").split())[:600])
     if not text:
@@ -524,7 +527,8 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
         path = await _ensure_model(key)
         if not path:
             return None, "no-model"
-        data = await asyncio.to_thread(_synth, path, text, rate)
+        async with _PIPER_SEM:  # 04.11: локальний синтез — по одному, щоб не гальмував сайт
+            data = await asyncio.to_thread(_synth, path, text, rate)
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_bytes(data)
         return data, "ok"

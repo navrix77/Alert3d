@@ -475,7 +475,7 @@ async def lifespan(app: FastAPI):
         # голосові заготовки Sky Radio: озвучуються разово у фоні, далі радіо говорить без очікування (04.11)
         if not os.getenv("REPLAY") and (os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_TTS_KEY")):
             from . import voicekit
-            asyncio.create_task(voicekit.warm(_say, _paid_ok))
+            (asyncio.create_task(voicekit.warm(_say, _paid_ok)) if (_paid_ok() or (os.getenv('GOOGLE_TTS_KEY') and _google_ok())) else None)
         for _ in range(60):  # рушій міг ще ставитися — чекаємо й «розігріваємо» голос, щоб перше сповіщення звучало одразу
             if tts.piper_ok():
                 await tts.speak("Готово", "lada")
