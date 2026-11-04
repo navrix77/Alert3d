@@ -701,3 +701,12 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 :root[data-theme="day"] .me-list li{background:rgba(10,20,40,.05);border-color:rgba(10,20,40,.08)}
 :root[data-theme="day"] .me-row canvas{background:rgba(10,20,40,.07)}
 :root[data-theme="day"] .me-row .t{background:rgba(10,20,40,.08);color:#0B1220}
+
+/* вікна КАБ/авіації/РФ на телефоні (04.11 власник: «вікно зависає»): MapLibre ставить його біля цілі, і воно вилазить за край екрана,
+   кнопка закриття недосяжна. На вузькому екрані вікно — прикріплена картка вгорі на всю ширину з власним прокручуванням. */
+@media (max-width:760px){
+  .maplibregl-popup.kab-pop{position:fixed!important;left:10px!important;right:10px!important;top:calc(108px + env(safe-area-inset-top))!important;bottom:auto!important;transform:none!important;max-width:none!important;width:auto!important;z-index:30}
+  .maplibregl-popup.kab-pop .maplibregl-popup-content{max-width:none;width:100%;max-height:min(46vh,380px);overflow:auto;-webkit-overflow-scrolling:touch;padding-right:44px}
+  .maplibregl-popup.kab-pop .maplibregl-popup-tip{display:none}
+  .maplibregl-popup.kab-pop .maplibregl-popup-close-button{width:40px;height:40px;font-size:26px;right:2px;top:2px;line-height:40px}
+}

@@ -109,8 +109,13 @@ class UaStrikes:
         if not re.search(r"беспилотн|бпла|дрон", low):
             return []  # лише атаки дронів (не артобстріли)
         seen, out = set(), []
-        for w in re.findall(r"(?<![а-яё])([А-ЯЁ][а-яё]+(?:-[а-яА-ЯЁё]+){0,2})", text.replace("ё", "е")):
+        tx = text.replace("ё", "е")
+        for wm in re.finditer(r"(?<![а-яё])([А-ЯЁ][а-яё]+(?:-[а-яА-ЯЁё]+){0,2})", tx):
+            w = wm.group(1)
             lw = w.lower()
+            # «в Белгородской области», «Ракитянского округа»: це назва регіону, а не міста; крапку на місто не ставимо (ASTRA 04.11)
+            if re.match(r"\s+(?:област|округ|район|край|республик)", tx[wm.end():wm.end() + 12].lower()) or re.search(r"(?:ой|ого|ому|ая|ую|ское|ского|ских|ские)$", lw):
+                continue
             hit = None
             for form, key in RU_FORMS.items():
                 if lw.startswith(form):
@@ -120,7 +125,7 @@ class UaStrikes:
                 hit = next((v for k, v in RU_EXTRA.items() if lw.startswith(k)), None)
             if hit and hit[0] not in seen:
                 seen.add(hit[0])
-                what = next((lab for k, lab in WHAT_RU if k in low), "Атака дронів")
+                what = next((lab for k, lab in WHAT_RU if re.search(r"(?<![а-яе])" + re.escape(k), low)), "Атака дронів")  # з початку слова: «транспортное» не «порт»
                 out.append({"what": what, "detail": text.strip().split("\n")[0][:160], "place": hit[0], "lat": hit[1], "lon": hit[2], "src": "ASTRA"})
             if len(out) >= 3:
                 break
