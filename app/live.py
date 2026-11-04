@@ -353,7 +353,7 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
         near.append({"id": t["id"], "type": t["type"], "word": (f"{n} " + w[1]) if n > 1 else w[0], "km": round(km), "side": side,
                      "appr": appr, "eta": eta, "next": t.get("next"), "pos": t.get("pos_lvl"), "new": (t.get("first") or 0) > since,
                      "src": src_txt, "fix_min": round(fix / 60) if fix is not None else None, "at": (t.get("at") or [None])[0],
-                     "named_km": named_km})
+                     "named_km": named_km, "src_names": [names.get(k, k) for k in srcs[:4]], "contra": bool(t.get("contra"))})
     near.sort(key=lambda x: (not x["appr"], x["km"]))
     bal = [e for e in state.get("bal", []) if now - e["t"] < 900 and not e.get("close") and (obl in e.get("obl", []) or "*" in e.get("obl", []))]
     urgent = bool(bal) or any(x["appr"] and x["km"] <= 30 for x in near)
@@ -366,7 +366,8 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
     fp = tuple(sorted((x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "") for x in near[:6])) + (alert, raion_alert, bool(bal))
     if not near and far:
         fp = fp + (("far", far["id"], far["km"] // 25, bool(far["appr"])),)
-    return {"alert": alert, "raion": home_raion, "raion_alert": raion_alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:],
+    partial = alert and not raion_alert and bool(home_raion) and levels.get(obl, 0) < 2 and bool(off.get("raion_levels"))
+    return {"alert": alert, "partial": partial, "raion": home_raion, "raion_alert": raion_alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:],
             "urgent": urgent, "fp": fp, "radius": radius, "far": far if not near else None}
 
 
@@ -554,16 +555,16 @@ RADIO_SYSTEM = RADIO_SYSTEM + """
 наближається. Не перелічуй статистику повідомлень. Для всієї України — щонайбільше два речення."""
 
 
-async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False) -> dict:
+async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False, after: bool = False) -> dict:
     """Обгортка: прапорець idle для автовимкнення радіо — лише коли немає ні тривоги в області, ні цілей до 300 км."""
-    r = await _radio(llm, state, hist, tracker, since, home, obl, scope, sid, radius, greeted)
+    r = await _radio(llm, state, hist, tracker, since, home, obl, scope, sid, radius, greeted, after)
     f = near_facts(state, home, obl, since, radius) if home else None
     al = bool(obl) and (obl in (state.get("levels") or {}) or obl in ((state.get("official") or {}).get("alert_obl") or []))
     r["idle"] = not al and not (f and (f["near"] or f.get("far")))
     return r
 
 
-async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False) -> dict:
+async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False, after: bool = False) -> dict:
     """Ефір для одного слухача. Регіон: говоримо, коли щось змінилось (нова ціль, наближення, тривога, балістика);
     без змін — мовчимо, а раз на 8 хв коротко нагадуємо обстановку без запиту до моделі. Україна — коротко."""
     key = (sid or "-", scope, obl)
@@ -584,7 +585,7 @@ async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = 
         if mem["said"] and fp == mem["fp"] and not out_ and (scope != "country" or now - mem["t"] < 840):
             return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
         if KIT and out_:
-            return _kit_outage(mem, fp, now, scope)
+            return _kit_outage(mem, fp, now, scope, sid, bool((state.get("health") or {}).get("alerts", True)))
         if KIT and not out_:
             # 04.11 власник: «максимально з заготовок» — і область, і Україна без моделі.
             # Пам'ять озвученого спільна для всіх режимів слухача: після перемикання не повторюємо незмінене
@@ -593,30 +594,28 @@ async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = 
             if scope == "country":
                 prev = seen.get("_country")
                 rep = prev is None or (mem["said"] and now - mem["t"] >= 840)  # перший огляд або плановий раз на 15 хв
-                fr = voicekit.compose_country(cf) if rep else voicekit.compose_changes(cf, prev)
+                res = voicekit.compose_country(cf, after_local=after) if rep else voicekit.compose_changes(cf, prev)
                 seen["_country"] = {"al": list(cf["al"]), "bal": list(cf["bal"]), "top": [o for o, _ in cf["top"]],
                                     "la": [(x.get("type"), x.get("site"), x.get("stage")) for x in cf["launches"]], "kab": list(cf["kab_obl"])}
             else:
                 st_sig = ("ost", obl, cf["whole"], tuple(cf["al_raions"]))
                 tsig = lambda x: ("ev", x["id"], x.get("next") or "")  # noqa: E731  — спільний підпис події для всіх режимів
                 groups = {r: [x for x in it if tsig(x) not in seen] for r, it in cf["groups"].items()}
+                skipped = sum(len(it) for it in cf["groups"].values()) - sum(len(it) for it in groups.values())
                 groups = {r: it for r, it in groups.items() if it}
-                fr = voicekit.compose_oblast(dict(cf, groups=groups), status=st_sig not in seen, empty=not cf["groups"])
-                if mem["said"]:
-                    fr = fr[1:]  # назву регіону — лише в першому зведенні
-                if len(fr) <= (0 if mem["said"] else 1):
-                    fr = []
+                stat = st_sig not in seen
+                res = voicekit.compose_oblast(dict(cf, groups=groups), status=stat, empty=not cf["groups"], first=not mem["said"],
+                                              skipped=skipped if groups else 0)
+                if not groups and not stat and (mem["said"] or skipped):
+                    res = {"voice": [], "text": ""}  # нового в області немає — не повторюємо
                 seen[st_sig] = now
                 for it in groups.values():
                     for x in it:
                         seen[tsig(x)] = now
-            if not fr:
+            if not res["voice"]:
                 mem.update(fp=fp, t=now if scope != "country" else mem["t"])
                 return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
-            txt = " ".join(fr)
-            mem.update(fp=fp, t=now, said=(mem["said"] + [txt])[-5:])
-            return {"text": txt, "speech": txt, "kind": "summary", "by": "kit", "scope": scope, "level": level,
-                    "audio": "/api/voice/" + voicekit.register(fr)}
+            return _kit_reply(mem, fp, now, scope, res, "summary", level)
     else:
         f = fh or near_facts(state, home, obl, since, radius)
         ctx, fb = region_text(f, obl)
@@ -630,13 +629,14 @@ async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = 
             if KIT:
                 from . import voicekit
                 _enrich(f, state, hist, obl)
-                fr = ["Без змін."] + [x for x in voicekit.compose(f, status=True, summary=True) if x not in ("Оновлення.", "Увага!")]
-                txt = " ".join(fr)
-                return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "kit", "audio": "/api/voice/" + voicekit.register(fr)}
+                res = voicekit.compose(f, status=True, summary=True)
+                res = {"voice": ["Без змін."] + [x for x in res["voice"] if x != "Увага!"], "text": "Без змін. " + res["text"]}
+                return {"text": res["text"], "speech": " ".join(res["voice"]), "scope": scope, "level": "calm", "by": "kit",
+                        "audio": "/api/voice/" + voicekit.register(res["voice"])}
             txt = ("Без змін. " + fb) if f["near"] or f["alert"] else "Без змін. Поруч з вами цілей немає."
             return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "rules"}
         if KIT and out_:
-            return _kit_outage(mem, fp, now, scope)
+            return _kit_outage(mem, fp, now, scope, sid, bool((state.get("health") or {}).get("alerts", True)))
         if KIT and not out_:
             # 04.11 власник: «паузи шалені» → голосові заготовки: без моделі й без нового синтезу, звучить одразу.
             # Уже озвучене (у будь-якому режимі) без змін не повторюємо; статус тривоги — лише коли змінився
@@ -651,16 +651,21 @@ async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = 
             if not fresh and st_sig in seen and not f["bal"]:
                 mem.update(fp=fp, t=now)
                 return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
-            fr = voicekit.compose(dict(f, near=fresh, n_near=len(fresh)), first=not mem["said"], greeted=greeted,
-                                  known=len(f["near"]) - len(fresh), status=st_sig not in seen, summary=not mem["said"])
+            al_now = bool(f["alert"] or f.get("raion_alert"))
+            prev_al = seen.get("_al")
+            nxt = seen.setdefault("_next", {})
+            res = voicekit.compose(dict(f, near=fresh, n_near=len(fresh)), first=not mem["said"], greeted=greeted,
+                                   known=len(f["near"]) - len(fresh), status=st_sig not in seen, summary=not mem["said"],
+                                   prev_al=prev_al, prev_next=dict(nxt), recovered=bool(seen.pop("_out", False)))
             seen[st_sig] = now
+            seen["_al"] = al_now
+            for x in f["near"]:
+                if x.get("next"):
+                    nxt[x["id"]] = x["next"]
             if fresh:
                 seen[tsig(fresh[0])] = now
                 seen[esig(fresh[0])] = now
-            txt = " ".join(fr)
-            mem.update(fp=fp, t=now, said=(mem["said"] + [txt])[-5:])
-            return {"text": txt, "speech": txt, "kind": "summary" if len(mem["said"]) == 1 else "update", "by": "kit", "scope": scope,
-                    "level": level, "audio": "/api/voice/" + voicekit.register(fr)}
+            return _kit_reply(mem, fp, now, scope, res, "summary" if not mem["said"] else "update", level)
     if out_:
         ctx = f"ЗБІЙ ДЖЕРЕЛ: {out_}.\n" + ctx
         fb = "Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."
@@ -768,12 +773,18 @@ def _enrich(f: dict, state: dict, hist: list, obl: str) -> None:
     f["launches"] = _launches(state)
 
 
-def _kit_outage(mem, fp, now, scope) -> dict:
+def _kit_reply(mem, fp, now, scope, res: dict, kind: str, level: str) -> dict:
+    """Відповідь радіо: text — розширена версія для екрана, speech — що звучить, audio — склейка заготовок."""
     from . import voicekit
-    fr = ["Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."]
-    mem.update(fp=fp, t=now, said=(mem["said"] + [fr[0]])[-5:])
-    return {"text": fr[0], "speech": fr[0], "kind": "outage", "by": "kit", "scope": scope, "level": "outage",
-            "audio": "/api/voice/" + voicekit.register(fr)}
+    mem.update(fp=fp, t=now, said=(mem["said"] + [res["text"]])[-5:])
+    return {"text": res["text"], "speech": " ".join(res["voice"]), "kind": kind, "by": "kit", "scope": scope, "level": level,
+            "audio": "/api/voice/" + voicekit.register(res["voice"])}
+
+
+def _kit_outage(mem, fp, now, scope, sid: str = "", official_ok: bool = True) -> dict:
+    from . import voicekit
+    _seen(sid)["_out"] = True  # після відновлення скажемо «Отримання повідомлень відновлено»
+    return _kit_reply(mem, fp, now, scope, voicekit.compose_outage(official_ok), "outage", "outage")
 KIT = os.getenv("RADIO_KIT", "1") != "0"  # голосові заготовки для режиму «Поруч зі мною»
 
 RADIO_CACHE: dict = {}

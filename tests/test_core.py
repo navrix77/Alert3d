@@ -1579,7 +1579,7 @@ def test_say_form_and_radio_memory(monkeypatch):
     r4 = asyncio.run(live.radio(m, st, [], None, 0, home, "Харківська", "region", "s2"))
     assert r4["text"]  # новий слухач — своє зведення
     out = asyncio.run(live.radio(None, {"health": {"telegram": False, "alerts": True}}, [], None, 0, home, "Харківська", "region", "s3"))
-    assert out["level"] == "outage" and "недоступні" in out["text"]
+    assert out["level"] == "outage" and "недоступн" in out["text"]
 
 def test_scrub_track_ids():
     from app.live import scrub
@@ -1730,7 +1730,7 @@ def test_radio_modes(monkeypatch):
     ob = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "oblast", "m1"))
     assert "Чугуївський район" in ob["text"] and "всю область" not in ob["text"]  # тривога по району, не на всю область
     ct = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "country", "m1"))
-    assert ct["text"].startswith(("Скай. Огляд по Україні", "Огляд по Україні"))
+    assert ct["text"].startswith(("Скай. Огляд", "Огляд по Україні"))
     nr = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "m2", 50))
     assert "Чугуїв" in nr["speech"] and "Ви слухаєте Скай" in nr["speech"]
     nr10 = asyncio.run(live.radio(None, st, [], None, 0, home, "Харківська", "near", "m3", 10))
