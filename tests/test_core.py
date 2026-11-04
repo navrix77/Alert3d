@@ -2051,3 +2051,11 @@ def test_ds_archive_extract_and_off_by_default():
     assert os.environ.get("DEEPSTATE_ARCHIVE") != "1"
     fc = ds_archive.extract({"features": [{"geometry": {"type": "MultiPolygon", "coordinates": [[[[35.1234567, 45.1], [35.2, 45.1], [35.2, 45.2], [35.1234567, 45.1]]]]}}, {"geometry": {"type": "Point", "coordinates": [1, 1]}}]}, "20261104")
     assert len(fc["features"]) == 1 and fc["features"][0]["geometry"]["coordinates"][0][0][0][0] == 35.12346
+
+
+def test_key_airfields_only():
+    from app import open_front as of
+    fc = of.key_airfields()
+    names = {f["properties"]["n"] for f in fc["features"]}
+    assert {"Енгельс-2", "Шаталово", "Приморсько-Ахтарськ"} <= names and all(f["properties"]["c"] == "airfield" for f in fc["features"])
+    assert all(20 < f["geometry"]["coordinates"][0] < 135 and 40 < f["geometry"]["coordinates"][1] < 70 for f in fc["features"])

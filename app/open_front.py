@@ -57,6 +57,31 @@ MIL_TAGS = {"airfield": "airfield", "naval_base": "naval", "base": "object", "ba
 WD_URL = os.environ.get("WIKIDATA_URL", "https://query.wikidata.org/sparql")
 
 
+# Лише ключові аеродроми: звідки злітає стратегічна авіація і запускають шахеди (довідково, з відкритих джерел).
+# Координати аеродромів наближені (±3 км); тип/роль: strat = Ту-95МС / Ту-160 / Ту-22М3 / МіГ-31К, shahed = відомі райони запуску «шахедів».
+KEY_AIRFIELDS = (
+    ("Енгельс-2", 51.4833, 46.2000, "Ту-95МС, Ту-160"),
+    ("Шайківка", 54.2267, 34.3547, "Ту-22М3"),
+    ("Оленья", 68.1517, 33.4633, "Ту-95МС, Ту-22М3"),
+    ("Сольці-2", 58.1400, 30.3300, "Ту-22М3"),
+    ("Моздок", 43.7906, 44.5906, "Ту-22М3"),
+    ("Бєлая", 53.1128, 103.5764, "Ту-22М3"),
+    ("Українка", 51.1694, 128.4458, "Ту-95МС"),
+    ("Савасліка", 55.4388, 42.3125, "МіГ-31К"),
+    ("Шаталово", 54.1708, 32.1783, "запуски шахедів"),
+    ("Приморсько-Ахтарськ", 46.0386, 38.2442, "запуски шахедів"),
+    ("Навля", 52.8300, 34.5300, "запуски шахедів"),
+    ("Гвардійське (Крим)", 45.1167, 34.0167, "запуски шахедів"),
+)
+
+
+def key_airfields() -> dict:
+    feats = [{"type": "Feature", "properties": {"n": n, "d": d, "c": "airfield"}, "geometry": {"type": "Point", "coordinates": [lon, lat]}}
+             for n, lat, lon, d in KEY_AIRFIELDS]
+    return {"type": "FeatureCollection", "features": feats,
+            "properties": {"source": "Довідник SKY: аеродроми стратегічної авіації та запусків шахедів", "fetched": int(time.time()), "v": 1}}
+
+
 def af_query() -> str:
     parts = "".join(f'nwr["military"~"^({"|".join(MIL_TAGS)})$"]({b});' for b in AF_BOXES)
     return f"[out:json][timeout:90];({parts});out center;"
@@ -108,7 +133,10 @@ async def _stale(p: Path, hours: int = 12) -> bool:
 
 async def run() -> None:
     front, attr = os.environ.get("FRONT_URL", "").strip(), os.environ.get("FRONT_ATTR", "")
-    airf = os.environ.get("OSM_AIRFIELDS", "1") == "1"
+    mode = os.environ.get("OSM_AIRFIELDS", "key")  # key: лише ключові аеродроми (типово); 1/all: усі військові об'єкти OSM + Wikidata
+    airf = mode in ("1", "all")
+    if mode == "key":
+        OBJ.write_text(json.dumps(key_airfields(), ensure_ascii=False), encoding="utf-8")
     if not front and not airf:
         return
     async with httpx.AsyncClient(timeout=70, headers={"User-Agent": "navryx-sky/1.0 (civil air-alert aggregator)"}) as cli:
