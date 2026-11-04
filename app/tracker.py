@@ -942,6 +942,12 @@ class Tracker:
                 elif {a.type, b.type} == {"jet", "shahed"}:
                     # «реактивний» і «шахед» в одній точці одним курсом — найчастіше той самий об'єкт, різні канали
                     lim = 8
+                elif self._rare_echo(a, b, d):
+                    # 04.11 власник: «Молнія курсом на Циркуни» від одного каналу о 03:30, а кілька каналів тієї ж хвилини
+                    # пишуть про ударний БпЛА з північного сходу на Салтівку через Циркуни — це та сама ціль, не дві.
+                    # Рідкісний тип від ОДНОГО джерела поруч (≤15 км, ≤6 хв) із підтвердженою кількома джерелами ціллю
+                    # того ж напрямку вливається в неї; тип лишається за більшістю джерел
+                    lim = 15
                 elif ai_same:
                     lim = 12
                 else:
@@ -969,6 +975,18 @@ class Tracker:
                     keep.count = drop.count
                 if drop is a:
                     break
+
+    RARE = {"molniya", "lancet", "recon", "geran5", "banderol"}
+
+    def _rare_echo(self, a: "Track", b: "Track", d: float) -> bool:
+        """Рідкісний тип з одного джерела — відлуння підтвердженої цілі поруч (див. _dedup)."""
+        for rare, main in ((a, b), (b, a)):
+            if rare.type in self.RARE and main.type in ("shahed", "jet") and len(rare.srcs) == 1 and len(main.srcs) >= 2 \
+                    and not (rare.srcs & main.srcs) and (rare.count or 1) <= 1 and abs(rare.obs[0].t - main.last.t) <= 360 and d <= 15:
+                named = [o for o in rare.obs if not o.est]
+                if not named or d <= 8:  # «лише курс» або дуже близько до названого місця
+                    return True
+        return False
 
     def life(self, tr: Track) -> float:
         """Скільки ціль лишається «активною» без нових повідомлень. Долетіла до названого пункту і мовчить,

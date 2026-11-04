@@ -167,3 +167,16 @@ def test_channel_fast_signal_city_and_oblast():
     a.fast_signal("🟢 Харків — відбій тривоги", _t.time())
     assert 1174 not in a.state()["hromadas"]
     assert a.fast_signal("Увага — повітряна тривога", _t.time()) == 0
+
+
+def test_single_source_rare_type_is_echo_of_confirmed_target():
+    from types import SimpleNamespace as N
+    from app.tracker import Tracker
+    tr = Tracker.__new__(Tracker)
+    o = lambda t, est: N(t=t, est=est)  # noqa: E731
+    shahed = N(type="shahed", srcs={"TLK", "CXID", "AIU"}, count=1, obs=[o(100, False)], last=o(300, False))
+    molniya = N(type="molniya", srcs={"m1654"}, count=1, obs=[o(200, True)], last=o(200, True))
+    assert tr._rare_echo(molniya, shahed, 10)       # «Молнія курсом на Циркуни» від одного каналу = той самий ударний БпЛА
+    assert not tr._rare_echo(molniya, shahed, 25)   # далеко — окремі
+    molniya2 = N(type="molniya", srcs={"m1654", "x"}, count=1, obs=[o(200, True)], last=o(200, True))
+    assert not tr._rare_echo(molniya2, shahed, 10)  # «Молнію» підтвердили два джерела — не зливаємо
