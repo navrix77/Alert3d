@@ -95,5 +95,5 @@ def test_rich_summary():
                               "at": "Безлюдівка", "named_km": 11}], "n_near": 1, "urgent": True, "alert": True, "raion_alert": False,
          "alert_for": 4800, "obl_types": ["shahed"]}
     fr = v.compose(f, status=True, summary=True)
-    assert fr[:2] == ["Тривога в області триває.", "Триває вже одну годину двадцять хвилин."]
+    assert fr[:2] == ["Повітряна тривога в області.", "Триває вже одну годину двадцять хвилин."]
     assert "Перейдіть в укриття." in fr and fr[-2:] == ["В області за повідомленнями:", "Шахеди."]

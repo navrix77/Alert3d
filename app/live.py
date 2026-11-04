@@ -500,9 +500,12 @@ def country_facts(state: dict) -> dict:
     for c in by.values():
         allt.update(c)
     pri = ["ballistic", "cruise", "kab", "geran5", "jet", "shahed"]
-    fp = (tuple(al), tuple(bal), tuple(top))
+    fp = (tuple(al), tuple(bal), tuple(top), tuple((x.get("type"), x.get("site")) for x in _launches(state)),
+          tuple(sorted({z["obl"] for z in state.get("zones", []) if z.get("obl") and now - (z.get("last") or z["t"]) < 1800})))
     types = sorted(allt, key=lambda k: (pri.index(k) if k in pri else 99, -allt[k]))  # спершу найнебезпечніші
-    return {"al": al, "bal": bal, "top": [(o, by[o].most_common(2)) for o in top], "types": types, "fp": fp}
+    kab_obl = sorted({z["obl"] for z in state.get("zones", []) if z.get("obl") and now - (z.get("last") or z["t"]) < 1800})
+    return {"al": al, "bal": bal, "top": [(o, by[o].most_common(2)) for o in top], "types": types, "fp": fp,
+            "launches": _launches(state), "kab_obl": kab_obl}
 
 
 def country_text(state: dict, f: dict | None = None) -> tuple[str, str]:
@@ -591,7 +594,8 @@ async def _radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = 
                 prev = seen.get("_country")
                 rep = prev is None or (mem["said"] and now - mem["t"] >= 840)  # перший огляд або плановий раз на 15 хв
                 fr = voicekit.compose_country(cf) if rep else voicekit.compose_changes(cf, prev)
-                seen["_country"] = {"al": list(cf["al"]), "bal": list(cf["bal"]), "top": [o for o, _ in cf["top"]]}
+                seen["_country"] = {"al": list(cf["al"]), "bal": list(cf["bal"]), "top": [o for o, _ in cf["top"]],
+                                    "la": [(x.get("type"), x.get("site"), x.get("stage")) for x in cf["launches"]], "kab": list(cf["kab_obl"])}
             else:
                 st_sig = ("ost", obl, cf["whole"], tuple(cf["al_raions"]))
                 tsig = lambda x: ("ev", x["id"], x.get("next") or "")  # noqa: E731  — спільний підпис події для всіх режимів
@@ -733,6 +737,21 @@ def _alert_for(hist: list, obl: str, state: dict) -> float | None:
     return (state.get("now") or time.time()) - start
 
 
+def _launches(state: dict) -> list[dict]:
+    """Свіжі пуски й зльоти носіїв (≤40 хв), найнебезпечніші першими."""
+    now = state.get("now") or time.time()
+    pri = {"ballistic": 0, "cruise": 1, "kab": 2, "jet": 3, "shahed": 4}
+    L = [x for x in state.get("launches", []) if now - x["t"] < 2400]
+    L.sort(key=lambda x: (pri.get(x.get("type") or "", 9), -x["t"]))
+    seen, out = set(), []
+    for x in L:
+        k = (x.get("type"), x.get("site"), x.get("stage"))
+        if k not in seen:
+            seen.add(k)
+            out.append({"type": x.get("type"), "site": x.get("site"), "stage": x.get("stage"), "carrier": x.get("carrier")})
+    return out
+
+
 def _enrich(f: dict, state: dict, hist: list, obl: str) -> None:
     from collections import Counter
     from .geo import oblasts
@@ -742,6 +761,11 @@ def _enrich(f: dict, state: dict, hist: list, obl: str) -> None:
         c = Counter(t["type"] for t in state.get("tracks", []) if t.get("status") == "active" and O.of(t["lon"], t["lat"]) == obl)
         pri = ["ballistic", "cruise", "kab", "geran5", "jet", "shahed"]
         f["obl_types"] = sorted(c, key=lambda k: (pri.index(k) if k in pri else 99, -c[k]))
+        now = state.get("now") or time.time()
+        f["kab"] = list(dict.fromkeys(p[2] for z in state.get("zones", []) if z.get("obl") == obl and now - (z.get("last") or z["t"]) < 1800
+                                      for p in z.get("places", [])[:2] if len(p) > 2 and p[2]))[:4]
+        f["avia"] = any(a.get("obl") == obl and now - a["t"] < 1200 for a in state.get("avia", []))
+    f["launches"] = _launches(state)
 
 
 def _kit_outage(mem, fp, now, scope) -> dict:

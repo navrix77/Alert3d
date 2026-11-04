@@ -106,7 +106,9 @@ def more(n: int) -> str:
     return f"Поруч ще {num(n, 'f')} {plural(n, 'ціль', 'цілі', 'цілей')}."
 
 
-FIXED = ["Найближча ціль:", "Рухається у ваш бік.", "Також:", "Перейдіть в укриття.", "Офіційної тривоги в області немає.",
+FIXED = ["Повітряна тривога в області.", "За даними Повітряних сил.", "За офіційними даними.", "Підтверджують кілька джерел.", "Поки повідомив один канал.",
+         "Повідомлення про КАБи:", "Біля вашої області активність тактичної авіації.", "Пуски:", "Носії в повітрі:", "КАБи:",
+         "Найближча ціль:", "Рухається у ваш бік.", "Також:", "Перейдіть в укриття.", "Офіційної тривоги в області немає.",
          "В області за повідомленнями:", "У повітрі за повідомленнями:", "Увага!", "Оновлення.", "Ви слухаєте Скай Радіо.", "Наближається.", "Рухається не до вас.", "Напрямок невідомий.",
          "Точне місце не назване.", "Повідомлення про загрозу балістики для вашої області. Будьте в укритті.",
          "Тривога в області триває.", "У вашому районі повітряна тривога.", "Повідомлень про цілі поруч немає.", "Без змін.",
@@ -204,6 +206,12 @@ def compose_changes(f: dict, prev: dict) -> list[str]:
         out.append("Найбільше повідомлень про цілі:")
         for o, ty in nt:
             out += [reg(o) + ",", f"переважно {TOPW.get(ty[0][0], 'цілі')}."] if ty else [reg(o) + "."]
+    pk = set(map(tuple, prev.get("la", [])))
+    nl = [x for x in f.get("launches") or [] if (x.get("type"), x.get("site"), x.get("stage")) not in pk]
+    out += extras({"launches": nl}, local=False)
+    nk = [o for o in f.get("kab_obl") or [] if o not in prev.get("kab", [])]
+    if nk:
+        out += ["КАБи:"] + [reg(o) + "." for o in nk[:4]]
     return (["Україна, зміни."] + out) if out else []
 
 
@@ -213,6 +221,10 @@ def compose_country(f: dict) -> list[str]:
     if f.get("types"):
         out.append("У повітрі за повідомленнями:")
         out += [cap(TOPW.get(t, "цілі")) + "." for t in f["types"][:5]]
+    out += extras(f, local=False)
+    if f.get("kab_obl"):
+        out.append("КАБи:")
+        out += [reg(o) + "." for o in f["kab_obl"][:4]]
     if f.get("bal"):
         out.append("Загроза балістики:")
         out += [reg(o) + "." for o in f["bal"][:4]]
@@ -226,12 +238,52 @@ def compose_country(f: dict) -> list[str]:
     return out
 
 
+def src_phrase(src: str) -> str | None:
+    """Наскільки вірити: хто повідомив про ціль (з near_facts.src)."""
+    if not src:
+        return None
+    if src.startswith("Повітряні сили"):
+        return "За даними Повітряних сил."
+    if src.startswith("офіційне"):
+        return "За офіційними даними."
+    if src.startswith("кілька"):
+        return "Підтверджують кілька джерел."
+    if src.startswith("моніторинговий"):
+        return "Поки повідомив один канал."
+    return None
+
+
+def ago(m: int) -> str:
+    m = max(1, min(int(m), 90))
+    return f"Місце названо {num(m, 'f').replace('одна', 'одну')} {plural(m, 'хвилину', 'хвилини', 'хвилин')} тому."
+
+
+def extras(f: dict, local: bool = True) -> list[str]:
+    """Обстановка навколо: КАБи й авіація біля області, пуски, носії в повітрі. Порядок: що ближче й небезпечніше — першим."""
+    out = []
+    if local and f.get("kab"):
+        out.append("Повідомлення про КАБи:")
+        out += [f"{x}." for x in f["kab"][:4]]
+    if local and f.get("avia") and not f.get("kab"):
+        out.append("Біля вашої області активність тактичної авіації.")
+    la = [x for x in (f.get("launches") or []) if x.get("stage") != "takeoff"]
+    if la:
+        out.append("Пуски:")
+        for x in la[:3]:
+            out.append(f"{cap(TOPW.get(x.get('type') or '', 'цілі'))}, район пуску: {x['site']}." if x.get("type") else f"Район пуску: {x['site']}.")
+    to = [x for x in (f.get("launches") or []) if x.get("stage") == "takeoff"]
+    if to:
+        out.append("Носії в повітрі:")
+        out += [f"{x.get('carrier') or x['site']}." for x in to[:3]]
+    return out
+
+
 def _status(f: dict) -> list[str]:
     out = []
     if f.get("raion_alert"):
         out.append("У вашому районі повітряна тривога.")
     elif f.get("alert"):
-        out.append("Тривога в області триває.")
+        out.append("Повітряна тривога в області." if f.get("alert_for") and f["alert_for"] >= 300 else "Тривога в області триває.")
     else:
         out.append("Офіційної тривоги в області немає.")
     if (f.get("raion_alert") or f.get("alert")) and f.get("alert_for") and f["alert_for"] >= 300:
@@ -260,6 +312,8 @@ def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0, 
         out.append(count_type(n, x["type"]))
         if x.get("at") and x.get("named_km") is not None:
             out += [x["side"] + ",", dist(x["named_km"]), f"Місце: {x['at']}."]
+            if x.get("fix_min") is not None and x["fix_min"] >= 3:
+                out.append(ago(x["fix_min"]))
         else:
             out += [x["side"] + ",", dist(x["km"]), "Точне місце не назване."]
         if x.get("appr"):
@@ -272,6 +326,9 @@ def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0, 
             out.append("Рухається не до вас.")
         if x.get("next"):
             out.append(f"Курс: {x['next']}.")
+        sp = src_phrase(x.get("src") or "")
+        if sp:
+            out.append(sp)
         rest = near[1:3] if summary or f.get("urgent") else []
         for y in rest:  # ще до двох цілей поруч — коротко: що, де, як далеко
             n2 = int(str(y.get("word", "1")).split()[0]) if str(y.get("word", "")).split()[0].isdigit() else 1
@@ -295,6 +352,8 @@ def compose(f: dict, first: bool = False, greeted: bool = True, known: int = 0, 
     if summary and f.get("obl_types"):
         out.append("В області за повідомленнями:")
         out += [cap(TOPW.get(t, "цілі")) + "." for t in f["obl_types"][:4]]
+    if summary or f.get("urgent"):
+        out += extras(f)
     return out
 
 
