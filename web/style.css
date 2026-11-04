@@ -786,3 +786,6 @@ body.tac .counters .cnt:hover{background:rgba(255,255,255,.08)!important}
 :root[data-theme="day"] body.tac .counters .cnt b{color:#1B2433!important}
 :root[data-theme="day"] body.tac .counters .cnt small{color:#33425A!important}
 :root[data-theme="day"] body.tac .maplibregl-ctrl-scale{background:rgba(255,255,255,.88);color:#1B2433;border-color:#1B2433}
+
+body.tac .maplibregl-ctrl-bottom-left{margin-bottom:calc(env(safe-area-inset-bottom) + 86px);margin-left:max(8px,env(safe-area-inset-left))}
+body.tac .maplibregl-ctrl-bottom-left .maplibregl-ctrl-scale{margin:0 0 4px}
