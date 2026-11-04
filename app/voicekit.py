@@ -640,17 +640,57 @@ def register(frags: list[str]) -> str:
     return sid
 
 
+_BR = {1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320], 2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160]}
+_SR = {3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000]}
+
+
+def _frame_len(h: bytes) -> int:
+    """Довжина кадру MPEG Layer III за заголовком (0 — не кадр)."""
+    if len(h) < 4 or h[0] != 0xFF or (h[1] & 0xE0) != 0xE0:
+        return 0
+    ver = (h[1] >> 3) & 3
+    if ver == 1 or ((h[1] >> 1) & 3) != 1:
+        return 0
+    bi, si, pad = h[2] >> 4, (h[2] >> 2) & 3, (h[2] >> 1) & 1
+    if bi in (0, 15) or si == 3:
+        return 0
+    br = _BR[1 if ver == 3 else 2][bi] * 1000
+    sr = _SR[ver][si]
+    return (144 if ver == 3 else 72) * br // sr + pad
+
+
 def _strip_id3(b: bytes) -> bytes:
+    """Прибирає ID3 і службовий кадр Xing/Info: інакше телефон бере тривалість першої фрази за тривалість усієї склейки
+    і обриває звук (04.11: «обриває текст не доказавши речення»)."""
     if b[:3] == b"ID3" and len(b) > 10:
         size = (b[6] << 21) | (b[7] << 14) | (b[8] << 7) | b[9]
-        return b[10 + size:]
-    return b
+        b = b[10 + size:]
+    i = 0
+    while i < min(len(b), 4096) and _frame_len(b[i:i + 4]) == 0:
+        i += 1
+    n = _frame_len(b[i:i + 4])
+    if n and (b"Xing" in b[i:i + n] or b"Info" in b[i:i + n] or b"VBRI" in b[i:i + n]):
+        return b[i + n:]
+    return b[i:] if n else b
 
 
 async def render(frags: list[str], say) -> tuple[bytes | None, str]:
     """Склеює озвучені заготовки в одне mp3. Якщо хоч одна фраза не mp3 (запасний голос) — None, клієнт озвучить текст цілком.
     say(text) -> (bytes, by): озвучка з обліком символів (main._say)."""
-    parts = await asyncio.gather(*(say(x) for x in frags))
+    sem = asyncio.Semaphore(4)  # не більше 4 нових синтезів водночас: 40 паралельних запитів провайдер відкидає (429)
+
+    async def one(x):
+        async with sem:
+            for k in range(3):
+                try:
+                    r = await say(x)
+                except Exception:  # noqa: BLE001
+                    r = (None, "error")
+                if r[0]:
+                    return r
+                await asyncio.sleep(0.6 * (k + 1))
+            return r
+    parts = await asyncio.gather(*(one(x) for x in frags))
     out = []
     for data, _by in parts:
         if not data:

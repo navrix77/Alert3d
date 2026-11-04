@@ -120,3 +120,23 @@ def test_live_steps_library():
     assert "Прямуйте в укриття." in st[0]["voice"] and "не означає збиття" in st[0]["say"]
     assert st[1]["voice"][:2] == ["Два шахеди.", "Нова ціль."] and "Канал А" in st[1]["say"]
     assert "Останнє повідомлення сім хвилин тому." in st[1]["voice"]
+
+
+def test_mp3_frame_and_info_strip():
+    assert v._frame_len(bytes([0xFF, 0xFB, 0x90, 0x64])) == 417  # MPEG-1 L3, 128 кбіт/с, 44,1 кГц
+    fr = bytes([0xFF, 0xFB, 0x90, 0x64]) + b"\x00" * 32 + b"Info" + b"\x00" * (417 - 40)
+    audio = bytes([0xFF, 0xFB, 0x90, 0x64]) + b"\x01" * 413
+    assert v._strip_id3(fr + audio) == audio  # службовий кадр із тривалістю першої фрази прибрано
+
+
+def test_render_survives_flaky_provider():
+    import asyncio
+    calls = {}
+
+    async def say(x):
+        calls[x] = calls.get(x, 0) + 1
+        if calls[x] == 1 and x == "b":
+            return None, "429"
+        return bytes([0xFF, 0xFB, 0x90, 0x64]) + b"\x01" * 413, "openai"
+    data, why = asyncio.run(v.render(["a", "b", "c"], say))
+    assert why == "kit" and data and calls["b"] == 2

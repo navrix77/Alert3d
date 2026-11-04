@@ -16,7 +16,8 @@
   function vaPlay(url,vol){return new Promise(res=>{let done=false;const fin=ok=>{if(done)return;done=true;if(VA.onended&&vaEnd===fin){VA.onended=VA.onerror=null;}res(ok);};
     if(vaEnd)vaEnd(true);vaEnd=fin;try{VA.pause();}catch(e){}VA.onended=()=>fin(true);VA.onerror=()=>fin(false);VA.src=url;VA.volume=vol==null?1:vol;
     const p=VA.play();if(p)p.catch(()=>fin(false));
-    const dog=()=>{if(done)return;if(held&&held.fin===fin){setTimeout(dog,5000);return;}fin(true);};setTimeout(dog,30000);});}
+    // сторож від зависання: лише якщо звук справді не грає (довге зведення радіо триває й 60+ с — не обриваємо)
+    const dog=()=>{if(done)return;if((held&&held.fin===fin)||(vaEnd===fin&&!VA.paused&&!VA.ended)){setTimeout(dog,5000);return;}fin(true);};setTimeout(dog,30000);});}
   // 04.11 власник: сповіщення важливіше за радіо й ефір: їхній голос ставиться на паузу, звучить сповіщення, потім продовжується з того ж місця
   function hold(){if(held||alerting>1)return;try{if(vaEnd&&!VA.paused&&!VA.ended){held={src:VA.src,t:VA.currentTime,fin:vaEnd,vol:VA.volume};vaEnd=null;VA.onended=VA.onerror=null;VA.pause();}}catch(e){held=null;}}
   function unhold(){const h=held;held=null;if(!h)return;vaEnd=h.fin;VA.onended=()=>h.fin(true);VA.onerror=()=>h.fin(false);

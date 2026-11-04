@@ -81,10 +81,15 @@
   // голос наперед: поки звучить позивний чи попередня фраза, наступна вже генерується й завантажується
   const preVoice = (text, voice) => fetch(ttsUrl(text, voice)).then(r => r.ok ? r.blob() : null).then(b => b && b.size > 500 ? URL.createObjectURL(b) : null).catch(() => null);
   const preUrl = url => fetch(url).then(r => r.ok ? r.blob() : null).then(b => b && b.size > 500 ? URL.createObjectURL(b) : null).catch(() => null);
+  // запасний голос цілим текстом: сервер приймає до 600 символів, тож довге ділимо на межах речень, а не посеред слова
+  const chunks = t => { const out = []; let cur = ''; for (const sn of String(t).match(/[^.!?…]+[.!?…]*\s*/g) || [t]) {
+    if ((cur + sn).length > 450 && cur) { out.push(cur.trim()); cur = ''; } cur += sn; } if (cur.trim()) out.push(cur.trim()); return out; };
   async function speak(text, voice, pre) {
     if (!audioOn || !text) return;
+    const ready = pre && await pre;
+    if (!ready && text.length > 450) { for (const c of chunks(text)) { if (!audioOn) return; await speak(c, voice); } return; }
     try {
-      const url = (pre && await pre) || ttsUrl(text, voice);
+      const url = ready || ttsUrl(text, voice);
       if (window.SKYVOICE) { abortAudio = () => window.SKYVOICE.stop(); await window.SKYVOICE.play(url, 1); return; }
       const a = new Audio(url);
       await new Promise(res => { abortAudio = () => { try { a.pause(); } catch (e) {} res(); }; a.onended = res; a.onerror = res; a.play().catch(res); setTimeout(res, 20000); });
