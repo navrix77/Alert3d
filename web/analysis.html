@@ -73,7 +73,7 @@ const hm=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'
 function table(head,rows){if(!rows.length)return '<div class="empty">Немає даних</div>';
   return '<div class="tw"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map((c,i)=>'<td'+(i&&typeof c==='number'?' class="n"':'')+'>'+c+'</td>').join('')+'</tr>').join('')+'</table></div>';}
 function render(a){
-  $('asof').innerHTML='станом на '+hm(a.t)+' · <button id="refresh" class="btn-s">Оновити</button>';$('refresh').onclick=()=>{$('refresh').textContent='…';load();};
+  $('asof').innerHTML='станом на '+hm(a.t)+' · <button id="refresh" class="btn-s">Оновити</button>';$('refresh').onclick=()=>{$('refresh').textContent='…';load();loadArea();};
   $('summary').innerHTML=(a.summary||[]).map(s=>'<li>'+esc(s)+'</li>').join('')||'<li class="mute">Немає даних</li>';
   const w=a.wave||{};const k=[[a.active_n,'у повітрі зараз',''],[w.new30,'нових за 30 хв',w.trend==='наростає'?'up':(w.trend==='спадає'?'down':'')],[w.prev30,'за попередні 30 хв',''],[w.peak12h,'пік за 12 год','']];
   if(a.nights)k.push([a.nights.tonight_n,(a.nights.period==='ніч'?'треків від 18:00':'треків від 09:00'),'']);
@@ -113,11 +113,11 @@ async function loadArea(){
       :'<div class="empty">За цей період поруч з домом цілей не було.</div>';
   }catch(e){}
 }
-loadArea();setInterval(()=>{if(!document.hidden)loadArea();},600000);
+loadArea();
 let VIS=null;
 async function loadVis(){try{VIS=await (await fetch('/api/visits?days=30',{cache:'no-store'})).json();}catch(e){VIS=null;}}
 async function load(){window.__lt=Date.now();await loadVis();try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}
-load();document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-(window.__lt||0)>120000)load();});
+load();
 </script>
 </body>
 </html>
