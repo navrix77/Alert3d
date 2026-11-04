@@ -1746,3 +1746,13 @@ def test_stress_marks_for_tts():
     from app.tts import stress_marks, words_numbers
     t = stress_marks(words_numbers("Шахед на Чугуїв, 12 км"))
     assert "Чугу́їв" in t and "Шахе́д" in t and "12" not in t
+
+
+def test_threat_level_post_is_not_a_target():
+    """CXID 04.11: «🟡 Харків та передмістя - дронова загроза (жовтий рівень)» — рівень для міста, а не шахед у центрі Харкова."""
+    from app.parser import Parser
+    p = Parser()
+    for t in ("🟡 Харків та передмістя - дронова загроза (жовтий рівень)", "Жовтий рівень небезпеки в Харкові"):
+        o = p.parse(t, "cxidua")
+        assert o.type is None and o.no_target
+    assert Parser().parse("Шахед курсом на Салтівку", "cxidua").type == "shahed"

@@ -29,6 +29,9 @@ LANCET_THREAT = re.compile(r"(?:угроз\w*|загроз\w*|можлив\w*|й
                            r"|ланцет\w*\s+(?:не\s+)?(?:виключ\w*|исключ\w*)|(?:в\s+)?пар\w*\s+[зс]\s+ланцет\w*")
 # статус офіційної тривоги («Сумський район — повітряна тривога / відбій») — не ціль: тривоги беремо з офіційного API
 ALERT_STATUS = re.compile(r"повітряна тривога|воздушная тревога|тривога скасована|відбій (повітряної )?тривоги|рівень:|жовтий рівень|червоний рівень|тривога продовжує")
+# рівень загрози для міста («🟡 Харків та передмістя - дронова загроза (жовтий рівень)», CXID 04.11): не ціль.
+# Перевіряємо за вихідним текстом: слово кольору далі прибирається, щоб не стати селом Жовте
+LEVEL_STATUS = re.compile(r"(?:жовт|червон|помаранч|жовтогаряч|зелен|желт|красн|оранжев)\w*\s+(?:рівен|уровен)\w*|(?:рівен|уровен)\w*\s+(?:загроз|небезпек|угроз|опасност)\w*")
 # рядок офіційної тривоги по громаді: «🛸 Ворожба (Сумська обл.)», «🟢 Берегове (Закарпатська обл.)», «◻️ 00:10 Нікополь»
 # «🟡 Харків та передмістя» (CXID 03.11): рівень тривоги для міста, а не ціль у центрі Харкова
 ALERT_LINE = re.compile(r"^\W*(?:🛸|🟢|◻|⚪|⬜|🔴|🟠|🟡)\W*(?:\d{1,2}:\d{2},?\s+[А-ЯІЇЄҐ][\w'’\- ]{2,30}$|[А-ЯІЇЄҐ][\w'’\-]{2,30}\s+(?:та|і|и)\s+(?:передм|пригород|околиц)\w*\s*[.!]*$|[А-ЯІЇЄҐ][\w'’\- ]{2,30}\s*\([А-ЯІЇЄҐ][\w'’\-]+ обл\.?\))", re.M)
@@ -458,6 +461,7 @@ class Parser:
         return out or [text]
 
     def parse(self, text: str, channel: str | None = None, ctx: tuple[float, float] | None = None) -> Observation:
+        level_status = bool(LEVEL_STATUS.search(norm(text)))
         # «Новий реактивний…», «Нові шахеди…» — прикметник, а не село Нове
         text = NEW_ADJ.sub(" ", text)
         # «з акваторії Чорного моря» — не село Чорне під Черніговом
@@ -491,7 +495,7 @@ class Parser:
         typ = next((k for k, rx in TYPES if rx.search(t)), None)
         self._typ = typ
         m = COUNT.search(t) or COUNT_PAREN.search(t)
-        alert_status = bool(ALERT_STATUS.search(t)) or bool(ALERT_LINE.search(text))
+        alert_status = bool(ALERT_STATUS.search(t)) or bool(ALERT_LINE.search(text)) or level_status
         nonstrat = bool(NONSTRAT.search(t)) or bool(EXPECT.search(t)) or bool(AFTERMATH.search(t)) or bool(NEWS.search(t))
         if nonstrat:
             alert_status = True
