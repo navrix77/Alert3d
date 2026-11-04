@@ -2029,3 +2029,17 @@ def test_open_front_wikidata_merge():
     m = of.merge(osm, wd)
     assert len(m["features"]) == 3 and "Wikidata" in m["properties"]["source"]
     assert "SERVICE wikibase:box" in of.wd_query()
+
+
+def test_viina_control_layer():
+    import io, zipfile
+    from app import viina
+    csv_ = "geonameid,date,status_wiki,status_boost,status_dsm,status\n1,20261103,UA,UA,UA,UA\n1,20261104,UA,RU,UA,UA\n2,20261104,UA,CONTESTED,UA,UA\n3,20261104,RU,,RU,RU\n4,20261104,UA,UA,RU,RU\n"
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("control_2026.csv", csv_)
+    day, st = viina.latest_status(b.getvalue())
+    assert day == "20261104" and st == {1: "RU", 2: "CONTESTED", 3: "RU", 4: "UA"}  # голос DeepState (dsm/status) не використовується
+    sq = lambda i, x: {"type": "Feature", "properties": {"geonameid": i}, "geometry": {"type": "Polygon", "coordinates": [[[x, 48], [x + 1, 48], [x + 1, 49], [x, 49], [x, 48]]]}}
+    fc = viina.build({"features": [sq(1, 30), sq(2, 32), sq(3, 31), sq(4, 34)]}, st, day)
+    assert sorted(f["properties"]["k"] for f in fc["features"]) == ["occupied", "unknown"] and "VIINA" in fc["properties"]["source"]

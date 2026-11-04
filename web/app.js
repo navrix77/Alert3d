@@ -246,7 +246,7 @@ function addOverlays(){
   const LV=['coalesce',['feature-state','lvl'],0];
   map.addSource('obl',{type:'geojson',data:'/data/oblasts.geojson',promoteId:'n'});
   map.addSource('ra',{type:'geojson',data:'/data/raions.geojson',generateId:true});
-  map.addSource('occ',{type:'geojson',data:'/data/occupied.geojson'});
+  map.addSource('occ',{type:'geojson',data:'/data/occupied.geojson',attribution:'Зона контролю: VIINA 2.0 (ODbL)'});
   if(!map.hasImage('hatch')){const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');x.strokeStyle='rgba(20,0,6,.55)';x.lineWidth=3;x.beginPath();x.moveTo(-4,20);x.lineTo(20,-4);x.moveTo(-4,4);x.lineTo(4,-4);x.moveTo(12,20);x.lineTo(20,12);x.stroke();map.addImage('hatch',x.getImageData(0,0,16,16),{pixelRatio:2});}
   map.addSource('sel',{type:'geojson',data:EMPTY});map.addSource('mepos',{type:'geojson',data:EMPTY});map.addSource('lpred',{type:'geojson',data:EMPTY});map.addSource('myplaces',{type:'geojson',data:EMPTY});
   map.addSource('ticks',{type:'geojson',data:EMPTY});
