@@ -64,7 +64,7 @@ let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.d
 let START_CAM=null,introDone=false;
 // Україна у верхній половині екрана (відступ знизу більший: там панель дому й док); перераховуємо після load/resize,
 // бо на телефоні розмір вікна в момент створення мапи ще не остаточний (03.11: мапа сиділа внизу)
-function fitStart(){if(introDone)return;try{const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.09),bottom:Math.round(innerHeight*0.33),left:10,right:10}});if(c){START_CAM={center:c.center,zoom:c.zoom};map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}}catch(e){}}
+function fitStart(){if(introDone)return;try{if(localStorage.getItem('mode_tac')==='1'){const cm={center:[31.5,48.8],zoom:innerWidth<640?5.4:5.6};START_CAM=cm;map.jumpTo({...cm,pitch:0,bearing:0});return;}const c=map.cameraForBounds(UA_BOUNDS,{padding:{top:Math.round(innerHeight*0.09),bottom:Math.round(innerHeight*0.33),left:10,right:10}});if(c){START_CAM={center:c.center,zoom:c.zoom};map.jumpTo({center:c.center,zoom:c.zoom,pitch:0,bearing:0});}}catch(e){}}
 fitStart();map.once('load',fitStart);window.addEventListener('resize',fitStart);
 map.on('moveend',()=>{try{const c=map.getCenter();localStorage.setItem('cam_last',JSON.stringify({c:[c.lng,c.lat],z:map.getZoom(),p:map.getPitch(),t:Date.now()}));}catch(e){}});
 // спливаючі вікна на мапі завжди цілком на екрані: після відкриття зсуваємо мапу, якщо вікно вилазить за край (03.11: «обрізає вікно»)
@@ -472,7 +472,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
   const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.4:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
-  if(TAC&&el&&INTRO){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
+  if(TAC){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
   const flyHome=()=>{const t0=Date.now(),tr=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;if(tg){window.__padLock=1;map.once('moveend',()=>{window.__padLock=0;});
       map.easeTo({center:tg,zoom:7.4,duration:4500,essential:true,easing:t=>-(Math.cos(Math.PI*t)-1)/2});return;}if(Date.now()-t0<4500)setTimeout(tr,300);};tr();};
   // огляд: мапа стоїть на всій країні, усі цілі пульсують кільцями, щоб користувач охопив ситуацію, і лише потім переліт на «Дім»
