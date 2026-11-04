@@ -742,3 +742,7 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .top .tac-bar{position:static;pointer-events:auto;max-width:calc(100vw - 24px)}
 .tac-flt{top:var(--tac-top,170px)!important}
 .tac-bar[hidden],.tac-flt[hidden]{display:none!important}
+
+.sh-split .sp-m{font:600 11.5px/1.3 ui-monospace,Menlo,monospace;color:#cfd6e0;opacity:.9}
+body.tac .maplibregl-ctrl-top-left{margin-top:max(8px,env(safe-area-inset-top))}
+body.tac .maplibregl-ctrl-scale{background:rgba(14,17,22,.8);color:#cfd6e0;border-color:#cfd6e0;font-size:10px}

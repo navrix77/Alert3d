@@ -1978,3 +1978,17 @@ def test_absence_of_missile_carriers_is_not_a_cruise_missile():
     assert P.parse(txt, "x").type != "cruise"
     assert P.parse("Крилата ракета курсом на Житомир", "x").type == "cruise"
     assert P.parse("Ракети на Київ", "x").type == "cruise"
+
+
+def test_mgrs_matches_reference():
+    """Система цілевказання НАТО (MGRS): web/mgrs.js проти еталонних векторів."""
+    import shutil
+    import subprocess
+    import pathlib
+    node = shutil.which("node")
+    if not node:
+        import pytest
+        pytest.skip("node недоступний")
+    root = pathlib.Path(__file__).resolve().parent.parent
+    r = subprocess.run([node, "tests/mgrs_check.js"], cwd=root, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-2000:] + r.stdout[-500:]

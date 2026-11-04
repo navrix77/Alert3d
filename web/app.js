@@ -155,8 +155,11 @@ function tacLegend(){const pn=$('#tac-legend'),A=window.App06;if(!pn)return;tacP
   h+='<h5>Типи на мапі зараз</h5>'+([...used].length?[...used].map(([t,a])=>{const e=A.entryOf(t);return row({type:t,affiliation:a},(A.MODEL[t]||t),e.std+(e.exact?'':' (найближча сутність)'));}).join(''):'<p class="lg-n">Активних цілей немає.</p>');
   h+='<h5>Поля символу</h5>'+row({type:'tu95',affiliation:'hostile',hd:60,count:4},'Напрямок і кількість','лінія від рамки: напрямок руху, лише коли відомий; число: кількість');
   h+='<h5>Поля SKY (не частина символу)</h5><p class="lg-n">«N хв»: вік повідомлення. Біла точка: назване місце. Пунктир і коло: оцінка SKY. Блідість: давність, а не знищення. Рамка й знак не змінюються від давності, оцінки чи невідомого типу.</p>';
-  h+='<p class="lg-n">Символіка за NATO APP-6(E) Version 1 (milsymbol 3.0.5). Це не сертифікація НАТО.</p>';pn.innerHTML=h;pn.hidden=false;}
-function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC)loadApp06();if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+  h+='<p class="lg-n">Координати: WGS-84, система цілевказання НАТО MGRS (сітка UTM). Масштабні лінійки в км і морських милях (NM). Точність MGRS відповідає точності місця: ≥10 км — 10 км, ≥1 км — 1 км, краще — 100 м.</p><p class="lg-n">Символіка за NATO APP-6(E) Version 1 (milsymbol 3.0.5). Це не сертифікація НАТО.</p>';pn.innerHTML=h;pn.hidden=false;}
+// лінійний масштаб у кілометрах і морських милях (як у зарамковому оформленні карт НАТО)
+function tacScaleBars(){try{if(TAC&&!map._tacScale){map._tacScale=[new maplibregl.ScaleControl({unit:'metric',maxWidth:90}),new maplibregl.ScaleControl({unit:'nautical',maxWidth:90})];map._tacScale.forEach(c=>map.addControl(c,'top-left'));}
+  else if(!TAC&&map._tacScale){map._tacScale.forEach(c=>map.removeControl(c));map._tacScale=null;}}catch(e){}}
+function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC)loadApp06();if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
 async function setBase(kind){SYMP.clear();base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
@@ -1044,10 +1047,10 @@ function fillSheet(first){
     const lt=(q&&q[2])||(tr.at&&tr.at[1])||tr.last,mins=lt?Math.max(0,Math.round((serverT-lt)/60)):null,ago=mins==null?'':mins<1?'щойно':mins+' хв тому';
     const items=(E.items||EVC.get(tr.id)?.items||[]).slice().sort((a,b)=>b.t-a.t),last=items.find(i=>!i.copy)||items[0];
     const place=tr.nopos?'місце не назване, лише курс'+(tr.next?' на '+esc(tr.next):''):tr.at?esc(tr.at[0]):q?'точка за повідомленнями':'місце не назване';
-    const fact='<div class="sp-c fact"'+(q&&!tr.nopos?' data-ll="'+q[0]+','+q[1]+'"':'')+'><h5>Що повідомили</h5><p><b>'+place+'</b></p>'+(lt?'<p>'+fmt(lt)+' · '+ago+'</p>':'')+(P.length?'<p>'+P.map(nm).join(', ')+'</p>':'')+(last&&last.text?'<q>'+esc(last.text.slice(0,140))+'</q>':'')+'</div>';
+    const fact='<div class="sp-c fact"'+(q&&!tr.nopos?' data-ll="'+q[0]+','+q[1]+'"':'')+'><h5>Що повідомили</h5><p><b>'+place+'</b></p>'+(lt?'<p>'+fmt(lt)+' · '+ago+'</p>':'')+(q&&window.MGRS&&!tr.nopos?'<p class="sp-m">MGRS '+MGRS.toMGRS(q[1],q[0],2)+'</p>':'')+(P.length?'<p>'+P.map(nm).join(', ')+'</p>':'')+(last&&last.text?'<q>'+esc(last.text.slice(0,140))+'</q>':'')+'</div>';
     const km=pos&&q?Math.round(dist(xy([q[0],q[1]]),xy(pos.p))):null;
     const est='<div class="sp-c est"'+(pos?' data-ll="'+pos.p[0]+','+pos.p[1]+'"':'')+'><h5>Що оцінив SKY</h5><p><b>'+(tr.pos_est||tr.nopos||(km!=null&&km>=2)?'позиція за курсом і швидкістю':'місце збігається з повідомленням')+'</b></p>'+(km!=null&&km>=2?'<p>≈ '+km+' км від названого місця</p>':'')+
-      (tr.hd!=null?'<p>напрямок: '+SIDE[Math.round(tr.hd/45)%8]+(tr.next?' · на '+esc(tr.next):'')+'</p>':tr.next?'<p>на '+esc(tr.next)+'</p>':'<p>напрямок невідомий</p>')+(tr.pos_km!=null?'<p>точність: ±'+tr.pos_km+' км</p>':'')+'<p class="sp-n">Це розрахунок, а не повідомлення</p></div>';
+      (tr.hd!=null?'<p>напрямок: '+SIDE[Math.round(tr.hd/45)%8]+(tr.next?' · на '+esc(tr.next):'')+'</p>':tr.next?'<p>на '+esc(tr.next)+'</p>':'<p>напрямок невідомий</p>')+(tr.pos_km!=null?'<p>точність: ±'+tr.pos_km+' км</p>':'')+(pos&&window.MGRS?'<p class="sp-m">MGRS ≈ '+MGRS.toMGRS(pos.p[1],pos.p[0],MGRS.digitsFor(tr.pos_km))+'</p>':'')+'<p class="sp-n">Це розрахунок, а не повідомлення</p></div>';
     box.innerHTML=fact+est;}}}
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }
@@ -1410,7 +1413,7 @@ let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.we
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
 window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
-applyTheme(false);document.body.classList.toggle('tac',TAC);if(TAC)loadApp06();tacBarSync();
+applyTheme(false);document.body.classList.toggle('tac',TAC);tacScaleBars();if(TAC)loadApp06();tacBarSync();
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 
 /* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */
