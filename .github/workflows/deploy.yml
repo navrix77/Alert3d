@@ -1,0 +1,55 @@
+name: Сервер ← main (Cloud Run)
+# Автоматичне розгортання sky.navryx.com.ua з гілки main — те саме, що робить deploy.bat, але з GitHub.
+# Власнику один раз (у Google Cloud Shell або з gcloud на комп'ютері; PROJECT — id проєкту з «gcloud config get-value project»):
+#   gcloud iam service-accounts create sky-deploy --project $PROJECT
+#   for r in roles/run.admin roles/cloudbuild.builds.editor roles/artifactregistry.writer roles/storage.admin roles/iam.serviceAccountUser roles/serviceusage.serviceUsageConsumer; do
+#     gcloud projects add-iam-policy-binding $PROJECT --member serviceAccount:sky-deploy@$PROJECT.iam.gserviceaccount.com --role $r; done
+#   gcloud iam service-accounts keys create sky-deploy.json --iam-account sky-deploy@$PROJECT.iam.gserviceaccount.com
+# Потім GitHub → Settings → Secrets and variables → Actions → New repository secret:
+#   GCP_PROJECT = <id проєкту>      GCP_SA_KEY = увесь вміст sky-deploy.json (після цього файл видалити)
+# Далі кожен push у main (крім mobile/, widget/, capacitor/) сам потрапляє на сервер за 5–10 хв.
+# 04.11: sky.navryx.com.ua зараз працює на ВМ, яка сама оновлюється з main кожні 5 хв (deploy/vm-setup.sh → update.sh,
+# лише після тестів). Тому автозапуск на кожен push вимкнено: без секретів він щоразу падав, а Cloud Run для сайту не потрібен.
+# Запуск лише вручну, якщо колись повернемося на Cloud Run.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency: { group: deploy, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SERVICE: navryx-sky
+      REGION: europe-north1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Перевірка секретів
+        run: |
+          test -n "${{ secrets.GCP_PROJECT }}" || { echo "Немає секрету GCP_PROJECT (див. коментар угорі deploy.yml)"; exit 1; }
+          test -n "${{ secrets.GCP_SA_KEY }}" || { echo "Немає секрету GCP_SA_KEY (див. коментар угорі deploy.yml)"; exit 1; }
+      - uses: google-github-actions/auth@v2
+        with: { credentials_json: '${{ secrets.GCP_SA_KEY }}' }
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Тести
+        run: |
+          pip install -q -r requirements.txt pytest
+          python -m pytest -q
+      - name: Розгортання (як deploy.bat)
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT }}
+        run: |
+          BUCKET=$PROJECT-navryx-sky-data
+          gcloud run deploy $SERVICE --project $PROJECT --region $REGION --source . \
+            --allow-unauthenticated --min-instances 1 --max-instances 1 --no-cpu-throttling \
+            --cpu 1 --memory 1Gi --timeout 3600 --session-affinity --execution-environment gen2 \
+            --set-env-vars LAN_TLS=0,PERSIST_DIR=/persist \
+            --add-volume name=persist,type=cloud-storage,bucket=$BUCKET --add-volume-mount volume=persist,mount-path=/persist --quiet
+      - name: Перевірка, що сервер віддає нову версію
+        run: |
+          sleep 20
+          want=$(grep -o "tryvoga-v[0-9]*" web/sw.js | head -1)
+          got=$(curl -s "https://sky.navryx.com.ua/sw.js?nocache=$RANDOM" | grep -o "tryvoga-v[0-9]*" | head -1)
+          echo "очікую $want, сервер віддає $got"
+          test "$want" = "$got"

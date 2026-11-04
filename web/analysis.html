@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Аналітика · NAVRYX SKY</title>
+<link rel="icon" href="brand/icon-192.png">
+<style>
+.btn-s{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:inherit;border-radius:10px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer}
+:root{--bg:#05070B;--card:rgba(255,255,255,.045);--rim:rgba(255,255,255,.10);--fg:#F2F5FA;--mute:#9AA4B6;--blue:#4C8DFF;--red:#E5484D;--yellow:#F5B83D;--green:#3DD68C}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:980px;margin:0 auto;padding:max(16px,env(safe-area-inset-top)) 16px 40px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+header h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-.01em;text-transform:uppercase}
+header .sub{color:var(--mute);font-size:13px;font-weight:600}
+header a{margin-left:auto;color:var(--fg);text-decoration:none;border:1px solid var(--rim);border-radius:12px;padding:8px 12px;font-weight:700;font-size:13px}
+.brief{background:var(--card);border:1px solid var(--rim);border-radius:18px;padding:16px 18px;margin-bottom:14px}
+.brief h2,.card h2{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+.brief ol{margin:0;padding-left:20px;line-height:1.5;font-size:15px}
+.brief li{margin:4px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--rim);border-radius:16px;padding:12px 14px}
+.kpi b{display:block;font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi span{color:var(--mute);font-size:12px;font-weight:600}
+.kpi.up b{color:var(--red)}.kpi.down b{color:var(--green)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--rim);border-radius:16px;padding:14px 16px;min-width:0}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.grid{grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;color:var(--mute);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:4px 6px 6px 0}
+td{padding:5px 6px 5px 0;border-top:1px solid var(--rim);vertical-align:top}
+td.n{text-align:right}
+.bar{height:6px;border-radius:3px;background:var(--blue);min-width:2px}
+.mute{color:var(--mute)}.empty{color:var(--mute);font-size:13px}
+.ids{color:var(--mute);font-size:11px}
+.hrs{display:flex;align-items:flex-end;gap:2px;height:70px;margin:8px 0 2px}.hrs i{flex:1;background:var(--blue);border-radius:2px 2px 0 0;min-height:1px;opacity:.85}
+.hrl{display:flex;justify-content:space-between;color:var(--mute);font-size:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chips span{border:1px solid var(--rim);border-radius:10px;padding:3px 8px;font-size:12px}
+footer{color:var(--mute);font-size:12px;margin-top:16px;line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div><h1>Аналітика</h1><div class="sub" id="asof">завантаження…</div></div>
+  <a href="/">← Мапа</a>
+</header>
+<section class="brief"><h2>Аналітична довідка</h2><ol id="summary"><li class="mute">…</li></ol></section>
+<section class="kpis" id="kpis"></section>
+<section class="card" id="area-card" style="margin-bottom:12px" hidden><h2>Ваш район · <span id="area-h"></span></h2><div id="area"></div></section>
+<section class="grid">
+  <div class="card"><h2>Напрямки атаки</h2><div id="corr"></div></div>
+  <div class="card"><h2>Куди летять (за каналами)</h2><div id="tg"></div></div>
+  <div class="card"><h2>Ймовірно далі (навчені маршрути)</h2><div id="ln"></div></div>
+  <div class="card"><h2>Звідки відомий напрямок</h2><div id="dq"></div></div>
+  <div class="card"><h2>Прогноз на годину</h2><div id="fc"></div></div>
+  <div class="card"><h2>Ця ніч проти попередніх</h2><div id="nights"></div></div>
+  <div class="card"><h2>Швидкість і незалежність джерел · доба</h2><div id="src"></div></div>
+  <div class="card"><h2>Самоперевірка прогнозу</h2><div id="self"></div></div>
+</section>
+<footer>Кожен висновок зроблено з повідомлень каналів і треків на мапі, у таблицях вказано, з яких саме цілей.
+«Першим», частка спільних цілей, про які джерело написало раніше за інших (серед тих, хто написав протягом 15 хв).
+Перепости (той самий текст за 5 хв) не вважаються незалежним підтвердженням.</footer>
+</main>
+<script>
+const TY={lancet:'«Ланцети»',shahed:'Шахеди',jet:'Реактивні',molniya:'«Молнія»',cruise:'Крилаті ракети',ballistic:'Балістика',geran5:'«Герань-5»',banderol:'«Бандероль»',rszv:'РСЗВ',fpv:'FPV',fpvf:'FPV'};
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=id=>document.getElementById(id);
+const pl=(n,f)=>{n=Math.abs(n);return n%10==1&&n%100!=11?f[0]:(n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?f[1]:f[2]);};
+const hm=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+function table(head,rows){if(!rows.length)return '<div class="empty">Немає даних</div>';
+  return '<div class="tw"><table><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map((c,i)=>'<td'+(i&&typeof c==='number'?' class="n"':'')+'>'+c+'</td>').join('')+'</tr>').join('')+'</table></div>';}
+function render(a){
+  $('asof').innerHTML='станом на '+hm(a.t)+' · <button id="refresh" class="btn-s">Оновити</button>';$('refresh').onclick=()=>{$('refresh').textContent='…';load();};
+  $('summary').innerHTML=(a.summary||[]).map(s=>'<li>'+esc(s)+'</li>').join('')||'<li class="mute">Немає даних</li>';
+  const w=a.wave||{};const k=[[a.active_n,'у повітрі зараз',''],[w.new30,'нових за 30 хв',w.trend==='наростає'?'up':(w.trend==='спадає'?'down':'')],[w.prev30,'за попередні 30 хв',''],[w.peak12h,'пік за 12 год','']];
+  if(a.nights)k.push([a.nights.tonight_n,(a.nights.period==='ніч'?'треків від 18:00':'треків від 09:00'),'']);
+  if(VIS)k.push([VIS.today,'відвідувачів сьогодні · онлайн '+VIS.online,'']);
+  $('kpis').innerHTML=k.map(([v,l,c])=>'<div class="kpi '+c+'"><b>'+(v??'-')+'</b><span>'+l+'</span></div>').join('');
+  $('corr').innerHTML=table(['Що й де','Курс · далі','К-сть'],(a.corridors||[]).slice(0,8).map(c=>[esc(TY[c.type]||c.type)+'<div class="mute">'+esc(c.obl)+'</div>',(c.dir?esc(c.dir)+(c.spread!=null?' <span class="mute">±'+c.spread+'°</span>':''):'<span class="mute">курс невідомий</span>')+(c.next&&c.next.length?'<div>→ '+esc(c.next.join(', '))+'</div>':'')+'<div class="ids">'+esc(c.ids.join(' '))+'</div>',c.n]));
+  $('tg').innerHTML=table(['Пункт','Типи','Підліт','Цілей'],(a.targets||[]).slice(0,10).map(x=>[esc(x.name)+'<div class="ids">'+esc(x.ids.join(' '))+'</div>',esc(Object.keys(x.types).map(t=>TY[t]||t).join(', ')),x.eta_min!=null?'≈'+x.eta_min+' хв':'-',x.n]));
+  $('ln').innerHTML=table(['Пункт','Типи','Ймовірність','Цілей'],(a.likely_next||[]).slice(0,8).map(x=>[esc(x.name)+'<div class="ids">'+esc(x.ids.join(' '))+'</div>',esc(Object.keys(x.types).map(t=>TY[t]||t).join(', ')),Math.round((x.p||0)*100)+'%',x.n]))+
+    '<p class="mute" style="font-size:12px;margin:8px 0 0">Лише для цілей, про пункт призначення яких канали мовчать. Наступний пункт, з переходів, які ціль цього типу робила з цього місця в попередні ночі.</p>';
+  const DQ={channels:'Названий каналами пункт',course:'Курс, названий каналом',learned:'Навчені маршрути',movement:'Рух між позиціями',from:'Звідки летить',none:'Курс невідомий'};
+  const dq=a.direction||{},dqt=Object.values(dq).reduce((x,y)=>x+y,0)||1;
+  $('dq').innerHTML=table(['Джерело курсу','Цілей','Частка'],Object.entries(dq).sort((x,y)=>y[1]-x[1]).map(([k,v])=>[esc(DQ[k]||k)+'<div class="bar" style="width:'+Math.round(v/dqt*100)+'%"></div>',v,Math.round(v/dqt*100)+'%']))+
+    '<p class="mute" style="font-size:12px;margin:8px 0 0">Бектест тижня: курс за названим пунктом, медіанна похибка ~19°, за навченими маршрутами ~16–25°, «від попередньої точки», ~46° (канали з різною затримкою називають сусідні села).</p>';
+  $('fc').innerHTML=table(['Область','Ймовірність','Очік. цілей'],(a.oblast_p60||[]).map(o=>[esc(o.obl)+'<div class="bar" style="width:'+Math.round((o.p60||0)*100)+'%"></div>',Math.round((o.p60||0)*100)+'%',o.n60??'-']));
+  const n=a.nights;
+  $('nights').innerHTML=!n?'<div class="empty">Журнал ще збирається</div>':(
+    '<p style="margin:0 0 8px;font-size:13px">Зараз: <b>'+n.tonight_n+'</b> треків, '+n.channels_now+' каналів. '+(n.avg_same_time!=null?'Схожі за охопленням періоди на цю годину: в середньому <b>'+n.avg_same_time+'</b>.':'<span class="mute">Попередні періоди мали значно менше каналів ('+(n.past_channels||[]).join(', ')+'), пряме порівняння було б нечесним.</span>')+'</p>'+
+    table(['Період','На цю годину','За весь','Каналів'],(n.past_same_time||[]).map((v,i)=>[(i+1)+' '+(n.period==='ніч'?pl(i+1,['ніч','ночі','ночей']):pl(i+1,['день','дні','днів']))+' тому',v,(n.past_full||[])[i],(n.past_channels||[])[i]])));
+  $('src').innerHTML=table(['Канал','Першим','Відстає','Перепости','Спільних'],(a.sources||[]).map(s=>[esc(s.src),Math.round(s.first_share*100)+'%',s.lag_med_s?(s.lag_med_s/60).toFixed(1)+' хв':'-',Math.round(s.copy_share*100)+'%',s.shared]));
+  const pa=(a.self||{}).pred_acc||{},ha=(a.self||{}).hd_acc||{};
+  $('self').innerHTML=table(['Тип','Напрямок ≤45°','«Ймовірно далі»','Наївний'],[...new Set([...Object.keys(ha),...Object.keys(pa)])].map(t=>[esc(TY[t]||t),ha[t]?Math.round(ha[t].acc*100)+'% <span class="mute">з '+ha[t].n+'</span>':'-',pa[t]?Math.round(pa[t].acc*100)+'% <span class="mute">з '+pa[t].n+'</span>':'-',pa[t]&&pa[t].naive!=null?Math.round(pa[t].naive*100)+'%':'-']))+
+    '<p class="mute" style="font-size:12px;margin:8px 0 0">Напрямок: курс, що показувала мапа після останньої названої позиції, проти того, куди ціль назвали далі (через 3–40 хв). </p>'+
+    '<p class="mute" style="font-size:12px;margin:8px 0 0">Влучання: ціль названо ≤15 км від передбаченого пункту протягом 40 хв. Наївний, «30 км тим самим курсом» на тих самих подіях.</p>';
+}
+async function loadArea(){
+  let h=null;try{h=JSON.parse(localStorage.getItem('home')||'null');}catch(e){}
+  if(!h){return;}
+  try{const r=await (await fetch('/api/area?lon='+h[0]+'&lat='+h[1]+'&r=25&days=14',{cache:'no-store'})).json();if(r.error)return;
+    $('area-card').hidden=false;$('area-h').textContent='≤'+r.r_km+' км від дому, '+r.days+' '+pl(r.days,['доба','доби','діб']);
+    const mx=Math.max(1,...r.hours);
+    $('area').innerHTML=r.total?('<p style="margin:0;font-size:14px">Поруч пройшло <b>'+r.total+'</b> '+pl(r.total,['ціль','цілі','цілей'])+' (≈'+r.avg_per_day+' на добу)'+
+      (r.peak_hours.length?'; найчастіше о '+r.peak_hours.map(x=>String(x).padStart(2,'0')+':00').join(', '):'')+'.</p>'+
+      '<div class="hrs">'+r.hours.map((v,i)=>'<i title="'+String(i).padStart(2,'0')+':00, '+v+'" style="height:'+Math.round(v/mx*100)+'%"></i>').join('')+'</div><div class="hrl"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>'+
+      '<div class="chips">'+Object.entries(r.sides).map(([k,v])=>'<span>з '+esc(k)+': '+v+'</span>').join('')+'</div>'+
+      '<div class="chips">'+Object.entries(r.types).map(([k,v])=>'<span>'+esc(TY[k]||k)+': '+v+'</span>').join('')+'</div>'+
+      '<p class="mute" style="font-size:12px;margin:8px 0 0">За мапами доби (треки системи; одна ціль іноді дає кілька треків). Дім береться з налаштувань мапи на цьому пристрої.</p>')
+      :'<div class="empty">За цей період поруч з домом цілей не було.</div>';
+  }catch(e){}
+}
+loadArea();setInterval(()=>{if(!document.hidden)loadArea();},600000);
+let VIS=null;
+async function loadVis(){try{VIS=await (await fetch('/api/visits?days=30',{cache:'no-store'})).json();}catch(e){VIS=null;}}
+async function load(){window.__lt=Date.now();await loadVis();try{const r=await fetch('/api/analysis',{cache:'no-store'});render(await r.json());}catch(e){$('asof').textContent='немає зв’язку з сервером';}}
+load();document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-(window.__lt||0)>120000)load();});
+</script>
+</body>
+</html>

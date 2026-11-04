@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="uk" data-theme="night">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0F17">
+<title>NAVRYX SKY · Розумій, що відбувається в небі</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="brand/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" sizes="180x180" href="brand/apple-touch-icon.png?v=2">
+<meta name="apple-mobile-web-app-title" content="NAVRYX SKY">
+<link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map"></div>
+<div id="intro">
+  <div class="radar"><i class="r1"></i><i class="sweep"></i><b class="bl b1"></b><b class="bl b2"></b><b class="bl b3"></b><img class="emb" src="brand/emblem.png" alt=""></div>
+  <div class="wm" aria-label="NAVRYX SKY"><div class="w1"><span>N</span><span>A</span><span>V</span><span>R</span><span>Y</span><span>X</span></div><div class="w2"><span>S</span><span>K</span><span>Y</span></div></div>
+  <p class="slogan"><span class="s1">Розумій,</span> <span class="s2">що відбувається</span> <em>в&nbsp;небі</em></p>
+  <div class="ld"><div class="bar"><i></i></div><small id="intro-st">Підключаюсь до джерел…</small></div>
+</div>
+
+<header class="top">
+  <div class="counters" id="counters"></div>
+  <div class="asof" id="asof"><i class="live-dot wait"></i>Підключення…</div>
+</header>
+
+<div class="banner" id="banner" hidden></div>
+<div class="follow-pill" id="follow-pill" hidden></div>
+
+<section class="me" id="me">
+  <div class="me-head"><span class="me-dot" id="me-dot"></span><b id="me-word">Мій дім</b><button class="me-share" id="me-share" title="Поділитись зведенням по вашій області" aria-label="Поділитись зведенням">↗</button></div>
+  <p class="me-sub" id="me-sub">Позначте своє місце кнопкою ⌂, і тут буде видно, що летить у ваш бік.</p>
+  <p class="me-fresh" id="me-fresh" hidden></p>
+  <ul class="me-list" id="me-list"></ul>
+  <div class="ai-box" id="ai-box"><div class="ai-row" id="ai-row"><button class="ai-ask" id="ai-ask" hidden>✦ Що зараз?</button></div><div class="ai-ans" id="ai-ans" hidden></div></div>
+  <div class="fc" id="fc"></div>
+</section>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="grip"></div>
+  <div class="sh-head">
+    <div class="sh-icon" id="sh-icon"></div>
+    <div class="sh-title"><h2 id="sh-name"></h2><p id="sh-course"></p></div>
+    <button class="round" id="sh-close" aria-label="Закрити">✕</button>
+  </div>
+  <div class="grid sh-g">
+    <div class="wide sh-me"><span>Для вас</span><b><span id="sh-dist"></span> <em id="sh-eta"></em></b></div>
+    <div class="wide"><span>Де зараз</span><b id="sh-now" class="conf3">-</b></div>
+    <div class="wide sh-dirbox"><span>Куди летить · прогноз SKY</span><b id="sh-dir" class="conf3">-</b></div>
+  </div>
+  <div class="route" id="sh-route"></div>
+  <div class="grid sh-g">
+    <div class="wide"><span>Звідки летить</span><b id="sh-from" class="conf3">-</b></div>
+    <div class="wide"><span>Хто повідомив</span><b id="sh-conf" class="conf3">-</b></div>
+  </div>
+  <div class="proof" id="sh-proof"></div>
+  <p class="hint">Ціль може змінити курс будь-якої миті. Прогноз будується за повідомленнями моніторів.</p>
+  <div class="sh-why">
+    <button class="pill" id="sh-why">Де ціль?</button>
+    <button class="pill" id="sh-then">Карта на момент першого повідомлення</button>
+  </div>
+  <div class="sh-actions">
+    <button class="primary" id="sh-follow">Стежити за ціллю</button>
+    <a class="round" id="sh-post" target="_blank" rel="noopener" aria-label="Відкрити пост">↗</a>
+  </div>
+</div>
+
+<div class="drawer" id="drawer" hidden>
+  <div class="dr-head"><h2>Стрічка</h2><small id="dr-tech"></small><button class="round" id="dr-close" aria-label="Закрити">✕</button></div>
+  <ul id="feed"></ul>
+</div>
+
+<nav class="dock">
+  <button id="b-home" data-l="Дім" title="Мій дім"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></button>
+  <button class="dx" id="b-locate" title="Де я"><svg viewBox="0 0 24 24"><path d="M12 2 4 21l8-4 8 4z"/></svg></button>
+  <button class="dx" id="b-layers" title="Підкладка"><svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg></button>
+  <button class="dx" id="b-3d" title="3D">3D</button>
+  <button id="b-feed" data-l="Стрічка" title="Стрічка"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  <button class="dx" id="b-time" title="Машина часу"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg></button>
+  <button id="b-ars" data-l="Арсенал" title="Арсенал ворога: що країна-терорист використовує проти українців"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.4 3.4 8 8 9 4.6-1 8-4.6 8-9V6z"/><path d="M12 7.5v9M9.2 10l2.8-2.5 2.8 2.5M9.5 16.5h5"/></svg></button>
+  <button id="b-daily" data-l="За добу" title="Мапа доби (09:00–09:00)"><svg viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M5 15c3-1 4-6 7-6s3 4 7 2" stroke-dasharray="0"/></svg></button>
+  <button id="b-an" data-l="Аналітика" title="Аналітика: хвиля, напрямки, цілі, джерела"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button>
+  <button class="dx" id="b-ar" title="Небо в камері"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg></button>
+  <button id="b-set" data-l="Ще" title="Налаштування та інструменти"><svg viewBox="0 0 24 24"><path d="M10.3 3.2h3.4l.5 2.3 1.6.9 2.2-.8 1.7 2.9-1.7 1.6v1.8l1.7 1.6-1.7 2.9-2.2-.8-1.6.9-.5 2.3h-3.4l-.5-2.3-1.6-.9-2.2.8-1.7-2.9 1.7-1.6v-1.8L4.3 8.5 6 5.6l2.2.8 1.6-.9z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+</nav>
+
+<aside class="settings arsenal" id="arsenal" hidden>
+  <div class="st-head"><h2>Арсенал ворога</h2><button class="round" id="ars-close" aria-label="Закрити">✕</button></div>
+  <p class="ars-lead">Що зазвичай країна-терорист використовує проти українців, і як це виглядає на мапі. ТТХ орієнтовні, з відкритих джерел.</p>
+  <section><h3>Засоби ураження</h3><div class="ars-list"></div></section>
+  <section><h3>Що є на мапі</h3><div class="ars-leg"></div></section>
+  <section><h3>Джерела</h3><p class="ars-src">ГУР МО України (через <a href="https://armyinform.com.ua/2026/01/19/gur-rozkrylo-harakterystyky-ta-komponentnu-bazu-novogo-rosijskogo-bpla-geran-5/" target="_blank" rel="noopener">АрміяInform</a>, <a href="https://fakty.com.ua/ua/ukraine/20260730-raketa-banderol-osoblyvosti-ta-tehnichni-harakterystyky-novoyi-rosijskoyi-zbroyi/amp/" target="_blank" rel="noopener">Факти ICTV</a>, <a href="https://fakty.com.ua/ua/ukraine/20260525-novyj-reaktyvnyj-dron-rf-geran-4-harakterystyky-ta-dalnist-polotu/amp/" target="_blank" rel="noopener">Факти ICTV</a>), Повітряні сили ЗСУ, Defense Express. Зображення, ілюстрації NAVRYX, не фото.</p></section>
+</aside>
+
+<aside class="settings" id="settings" hidden>
+  <div class="st-head"><h2>Налаштування</h2><button class="round" id="st-close" aria-label="Закрити">✕</button></div>
+  <section><h3>Інструменти</h3><div class="tools">
+    <button data-b="b-locate"><svg viewBox="0 0 24 24"><path d="M12 2 4 21l8-4 8 4z"/></svg>Де я</button>
+    <button data-b="b-3d"><b>3D</b>Об'єм</button>
+    <button data-b="b-layers"><svg viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5zm-10 9 10 5 10-5M2 16l10 5 10-5"/></svg>Підкладка</button>
+    <button data-b="b-time"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>Машина часу</button>
+    <button data-b="b-ar"><svg viewBox="0 0 24 24"><path d="M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3"/><circle cx="12" cy="12" r="3"/></svg>Небо в камері</button>
+  </div></section>
+  <section><h3>Тема</h3><div class="seg" data-pref="theme"><button data-v="auto">Авто</button><button data-v="day">День</button><button data-v="night">Ніч</button></div>
+    <p class="note" id="st-theme-note"></p></section>
+  <section><h3>Карта</h3><div class="seg" data-pref="base"><button data-v="night">Нічні вогні</button><button data-v="sat">Супутник</button><button data-v="map">Схема</button></div>
+    <label class="sw"><input type="checkbox" id="st-3d"><span>Об'ємний вигляд (3D)</span></label></section>
+  <section><h3>Мій дім</h3><div class="row"><button class="pill" id="st-geo">Визначити автоматично</button><button class="pill" id="st-pick">Поставити на карті</button><button class="pill ghost" id="st-clear">Прибрати</button></div>
+    </section>
+  <section><h3>Звукові сповіщення</h3>
+    <div class="snd-l">Режим</div><div class="seg snd-seg" id="snd-mode"><button data-v="off">Вимк</button><button data-v="tone">Сигнал</button><button data-v="voice">Голос</button><button data-v="both">Обидва</button></div>
+    <div class="snd-l">Звук сигналу</div><div class="seg snd-seg" id="snd-tone"><button data-v="siren">Сирена</button><button data-v="beep">Біп</button><button data-v="chime">Дзвін</button><button data-v="soft">Мʼякий</button></div>
+    <div class="snd-l">Голос</div><div class="seg snd-seg" id="snd-voice"><button data-v="lada">Лада</button><button data-v="tetiana">Тетяна</button><button data-v="mykyta">Микита</button><button data-v="oleksa">Олекса</button><button data-v="device">Пристрій</button></div>
+    <div class="snd-l">Гучність</div><input type="range" id="snd-vol" min="10" max="100" step="5" class="snd-vol">
+    <button class="pill snd-test" id="snd-test">▶ Перевірити звук</button><small id="snd-voice-hint" class="snd-hint"></small>
+    <p class="snd-hint">На iPhone вимкніть беззвучний режим (перемикач збоку), інакше браузер не відтворює звук.</p>
+    <div class="snd-l">Sky Radio: про що</div><div class="seg snd-seg" id="rad-scope"><button data-v="near">Поруч зі мною</button><button data-v="oblast">Моя область</button><button data-v="country">Вся Україна</button></div>
+    <div class="snd-l">Радіус «Поруч зі мною»</div><div class="seg snd-seg" id="rad-radius"><button data-v="10">10 км</button><button data-v="25">25 км</button><button data-v="50">50 км</button></div>
+    <div class="snd-l">Sky Radio між повідомленнями</div><div class="seg snd-seg" id="rad-mode"><button data-v="msgs">Тиша</button><button data-v="atmo">Атмосфера ефіру</button></div>
+    <div class="snd-l">Гучність атмосфери</div><input type="range" id="rad-atmo" min="1" max="10" step="1" class="snd-vol">
+    <p style="font-size:12.5px;opacity:.7;margin:6px 0 0">Голос озвучує текст сповіщення: що летить, звідки, скільки хвилин до вас. Спрацьовує для ваших громад і загроз вашому місцю.</p>
+    <label class="sw"><input type="checkbox" id="st-sys"><span>Сповіщення на заблокований екран, навіть коли сайт закритий</span></label>
+    <div class="row" id="st-wp-row"><span id="st-wp-st" class="note" style="margin:0">Перевіряю, чи доходять сповіщення на цей пристрій…</span><button class="pill" id="st-wp-test">Надіслати тестове</button></div>
+    <label class="sw" hidden><input type="checkbox" id="st-pre"><span>Ранні «можлива загроза»</span></label>
+    <p class="note" id="st-sys-note">Офіційна тривога й відбій для вашої громади (як «Повітряна тривога»), і лише реальна загроза від цілей: ближче 40 км і летить до вас (🟠) або вже поруч, до 15 км (🔴), потім «цілі віддалились» (🟢). Далекі цілі видно на мапі, телефон через них не турбуємо. Для цього на сервер передаються лише округлені до ~1 км координати вашого місця. На iPhone: спершу «Поділитися → На початковий екран», відкрийте NAVRYX SKY звідти й увімкніть тут.</p></section>
+  <section><h3>Сповіщення: мої громади й області</h3>
+    <p class="note">Про нові цілі, тривоги й відбої сповіщаю лише для обраних зон, і коли ціль за курсом увійде в них протягом 30 хв. Київ не турбуватиме, якщо ви в Харкові.</p>
+    <p class="note">Із закритим застосунком зведення по зонах приходять лише для громад і областей, які ви додали самі, не частіше ніж раз на 5 хв. Без доданих зон телефон попереджає лише про загрози вашому дому.</p>
+    <ul class="places" id="st-zones-list"></ul>
+    <div class="row"><input id="st-zone-in" list="st-zone-dl" placeholder="Почніть вводити: Харківська, Мерефʼянська…" style="flex:1;min-width:0;font:600 14px var(--f);padding:9px 11px;border-radius:12px;border:1px solid var(--line);background:rgba(0,0,0,.2);color:var(--fg)"><button class="pill" id="st-zone-add">Додати</button></div>
+    <datalist id="st-zone-dl"></datalist>
+    <label class="sw"><input type="checkbox" id="st-nlaunch"><span>Пуски, завжди (стосуються всієї країни)</span></label>
+    <label class="sw"><input type="checkbox" id="st-nall"><span>Нові ракети й реактивні по всій Україні</span></label></section>
+  <section><h3>Мої місця</h3>
+    <div class="row" id="st-home-row"><span id="st-home-l" style="flex:1">Дім не позначено</span><button class="pill" id="st-home-set">Змінити</button><button class="pill" id="st-home-del">Видалити</button></div>
+    <p class="note">Крім дому: дача, робота, батьки, школа дітей. Про загрози біля кожного місця, окреме попередження (радіус, як у «Стеж за мною»).</p>
+    <ul class="places" id="st-places"></ul>
+    <div class="row"><button class="pill" id="st-place-add">+ Додати місце на карті</button><button class="pill" id="st-place-here">+ Тут, де я зараз</button></div></section>
+  <section><h3>Стеж за мною</h3>
+    <label class="sw"><input type="checkbox" id="st-follow"><span>Попереджати про загрози біля того місця, де я зараз (за геолокацією пристрою)</span></label>
+    <div class="row"><span>Радіус</span><div class="seg small" id="st-radius"><button data-v="5">5</button><button data-v="10">10</button><button data-v="20">20</button><button data-v="30">30</button></div><span>км</span></div>
+    <p class="note">Працює, поки NAVRYX SKY відкритий (на телефоні, поки сторінка не закрита). Місце не надсилається на сервер: перевірка йде на самому пристрої.</p></section>
+  <section><h3>Що показувати</h3>
+    <label class="sw"><input type="checkbox" id="st-ru"><span>Наші влучання по РФ за останню добу <small>(місце й об'єкт, за ASTRA та Генштабом ЗСУ)</small></span></label>
+    <label class="sw"><input type="checkbox" id="st-launch"><span>Місця пусків і ланцюжок «звідки запущено»</span></label>
+    <label class="sw"><input type="checkbox" id="st-zones"><span>КАБ і ворожа авіація</span></label>
+    <label class="sw"><input type="checkbox" id="st-saver"><span>Економія батареї (менше анімації й рельєфу)</span></label>
+    <div id="st-real3d-row" hidden><label class="sw"><input type="checkbox" id="st-real3d"><span>Фотореалістичні 3D-моделі міст (Google)</span></label></div></section>
+  <section id="st-widget-sec" hidden><h3>SKY на комп'ютері</h3>
+    <p class="note">Встановіть SKY як програму Windows: невелике вікно з вашим станом («Над вами чисто» або скільки хвилин до загрози) поверх інших вікон, значок біля годинника, запуск разом із системою. Розмір, розташування, прозорість, тема й те, що саме показувати, налаштовуються в самому віджеті (⚙).</p>
+    <div class="row"><a class="pill" id="st-widget-dl" href="https://github.com/navrix77/Alert3d/releases/download/widget-latest/NAVRYX-SKY-Widget-Setup.exe" download>Встановити для Windows</a></div>
+    <p class="note" id="st-widget-store" hidden></p></section>
+  <section><h3>Про SKY</h3>
+    <p class="note"><b>SKY не є офіційною системою оповіщення.</b> Під час тривоги орієнтуйтеся на сирени та застосунок «Повітряна тривога».</p>
+    <p class="note" id="st-tech">SKY збирає повідомлення понад 140 моніторингових каналів і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.</p>
+    <div class="row"><a class="pill" href="/about.html">Як працює SKY і його точність</a><a class="pill" href="/privacy.html">Конфіденційність</a></div>
+    <p class="note ver" id="st-ver">Версія …</p>
+    <p class="note credits">Карта: © OpenStreetMap contributors, Esri та інші · <a href="/about.html#credits">повний перелік</a></p></section>
+</aside>
+
+<div class="timebar" id="timebar" hidden>
+  <button class="round" id="tb-back" aria-label="На 5 хв назад">−5</button>
+  <button class="round" id="tb-play" aria-label="Відтворити">▶</button>
+  <button class="round" id="tb-fwd" aria-label="На 5 хв вперед">+5</button>
+  <input type="range" id="tb-range" min="0" max="0" value="0">
+  <b id="tb-time">-</b><small class="tb-hint">що було відомо тоді</small>
+  <button class="pill" id="tb-live">Наживо</button>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div class="pl-ask" id="pl-ask" hidden><b>Назва місця</b><input id="pl-name" maxlength="40" placeholder="Напр.: Дача, Робота, Мама"><div class="row"><button class="pill" id="pl-cancel">Скасувати</button><button class="pill on" id="pl-ok">Зберегти</button></div></div>
+<div class="notes" id="notes" aria-live="assertive"></div>
+
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="perf.js"></script>
+<script src="sound.js"></script>
+<script src="icons.js"></script>
+<script src="models3d.js"></script>
+<script src="fx.js"></script>
+<script src="app.js"></script>
+<script src="arsenal.js"></script>
+<script src="live.js"></script>
+<script src="widget.js"></script>
+<script src="cine.js"></script>
+<script src="real3d.js"></script>
+<script>if('serviceWorker' in navigator){let had=!!navigator.serviceWorker.controller,done=false;navigator.serviceWorker.register('sw.js').then(r=>{try{r.update();}catch(e){}/* нова версія сайту підтягується сама: перевірка раз на 3 хв і при поверненні в застосунок */setInterval(()=>{try{r.update();}catch(e){}},180000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){try{r.update();}catch(e){}}});});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had&&!done){done=true;location.reload();}});}</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+name: Нічний знімок журналу (для аналізу)
+# Ручний запуск: забирає ПУБЛІЧНІ дані сайту (журнал повідомлень каналів, самоперевірку, мапу доби, журнал прогнозів)
+# і кладе їх окремим комітом у службову гілку night-data. Хмарні сесії аналізу не мають прямого доступу до сайту,
+# а гілку з GitHub можуть забрати. main не змінюється; ключів не потрібно (лише вбудований GITHUB_TOKEN).
+on:
+  workflow_dispatch:
+    inputs:
+      hours: { description: "Скільки годин журналу", default: "72" }
+permissions:
+  contents: write
+concurrency: { group: night-data, cancel-in-progress: false }
+jobs:
+  snap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - name: Знімок публічних адрес
+        shell: bash
+        env: { H: "${{ github.event.inputs.hours }}" }
+        run: |
+          mkdir -p /tmp/snap
+          U=https://sky.navryx.com.ua
+          for p in selfcheck daily fusion; do curl -s --max-time 120 "$U/api/$p" -o /tmp/snap/$p.json; done
+          # журнал: API віддає щонайбільше 5000 найновіших, тож беремо ще й вибірки за видом
+          curl -s --max-time 120 "$U/api/journal?hours=$H&limit=5000" -o /tmp/snap/journal.json
+          for k in track zone close filtered avia; do curl -s --max-time 120 "$U/api/journal?hours=$H&limit=5000&kind=$k" -o /tmp/snap/journal_$k.json; done
+          date -u +%FT%TZ > /tmp/snap/taken.txt
+          ls -la /tmp/snap
+      - name: Коміт у гілку night-data
+        shell: bash
+        run: |
+          git config user.name "sky-night-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if git ls-remote --exit-code origin night-data >/dev/null; then
+            git fetch --depth 1 origin night-data && git checkout -B night-data FETCH_HEAD
+          else
+            git checkout --orphan night-data && git rm -rq . && git clean -fdq
+          fi
+          find . -maxdepth 1 -name '*.json' -delete; rm -f taken.txt
+          cp /tmp/snap/* .
+          git add -A .
+          git commit -qm "Знімок журналу $(cat taken.txt)" || echo "без змін"
+          git push origin night-data

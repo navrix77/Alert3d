@@ -1,0 +1,53 @@
+name: Нагляд за SKY
+# Зовнішня перевірка кожні 5 хв (GitHub може запускати із запізненням): сайт відкривається, сервер відповідає,
+# офіційні тривоги й канали справді оновлюються. Збій → відкривається issue «SKY: збій» (GitHub сповіщає власника),
+# відновлення → issue закривається з часом простою. Нових ключів не потрібно: лише вбудований GITHUB_TOKEN.
+on:
+  schedule: [{ cron: '*/5 * * * *' }]
+  workflow_dispatch:
+permissions:
+  issues: write
+concurrency: { group: monitor, cancel-in-progress: false }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Перевірка
+        id: c
+        shell: bash
+        run: |
+          set +e
+          URL=https://sky.navryx.com.ua
+          page=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$URL/")
+          h=$(curl -s --max-time 20 "$URL/api/health")
+          ok=$(echo "$h" | jq -r '.ok // false' 2>/dev/null)
+          probs=$(echo "$h" | jq -r '(.problems // []) | join(", ")' 2>/dev/null)
+          msg=""
+          [ "$page" != "200" ] && msg="Сторінка не відкривається (HTTP $page)."
+          [ -z "$h" ] && msg="$msg Сервер не відповідає на /api/health."
+          [ -n "$h" ] && [ "$ok" != "true" ] && msg="$msg Дані не оновлюються: $probs."
+          echo "health=$h"
+          echo "msg=$msg" >> "$GITHUB_OUTPUT"
+      - name: Issue про збій / відновлення
+        uses: actions/github-script@v7
+        env: { MSG: '${{ steps.c.outputs.msg }}' }
+        with:
+          script: |
+            const msg = (process.env.MSG || '').trim();
+            const title = 'SKY: збій';
+            const { data: open } = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'monitor' });
+            const cur = open.find(i => i.title === title);
+            const now = new Date().toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv' });
+            if (msg && !cur) {
+              await github.rest.issues.create({ ...context.repo, title, labels: ['monitor'],
+                body: `Виявлено о ${now} (Київ).\n\n${msg}\n\nПеревірка: https://sky.navryx.com.ua/api/health` });
+            } else if (msg && cur) {
+              // уже відкрито: не спамимо коментарями частіше, ніж раз на годину
+              const age = (Date.now() - new Date(cur.updated_at).getTime()) / 60000;
+              if (age > 60) await github.rest.issues.createComment({ ...context.repo, issue_number: cur.number, body: `Досі триває (${now}): ${msg}` });
+            } else if (!msg && cur) {
+              const mins = Math.round((Date.now() - new Date(cur.created_at).getTime()) / 60000);
+              await github.rest.issues.createComment({ ...context.repo, issue_number: cur.number, body: `Відновлено о ${now}. Тривалість ≈ ${mins} хв.` });
+              await github.rest.issues.update({ ...context.repo, issue_number: cur.number, state: 'closed' });
+            }
