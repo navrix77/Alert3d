@@ -127,7 +127,7 @@ function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;set
 // у тактичному режимі центр мапи — вільна зона між верхньою панеллю й нижньою докою
 function tacPad(anim){try{let t=0,b=0;if(TAC){const bar=$('#tac-bar');if(bar&&!bar.hidden)t=Math.max(0,Math.round(bar.getBoundingClientRect().bottom-(map.getContainer().getBoundingClientRect().top||0)));b=96;}
   const o={top:t,bottom:b,left:0,right:0},c=map.getPadding();if(Math.abs(c.top-o.top)<2&&Math.abs(c.bottom-o.bottom)<2)return;
-  if(anim)map.easeTo({padding:o,duration:450});else map.setPadding(o);}catch(e){}}
+  if(anim&&window.__introAt&&Date.now()-window.__introAt>7000)map.easeTo({padding:o,duration:450});else map.setPadding(o);}catch(e){}}
 window.addEventListener('resize',()=>tacPad(false));
 function tacPanelTop(){const b=$('#tac-bar');if(b)document.documentElement.style.setProperty('--tac-top',Math.round(b.getBoundingClientRect().bottom+6)+'px');}
 function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;tacPanelTop();if(!pn.hidden){pn.hidden=true;return;}
@@ -471,16 +471,16 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
   const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.4:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
-  const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
+  const finish=()=>{tacPad(false);document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
   const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
     const c=camFor();map.jumpTo(c);window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,30);
     if(TAC){// огляд України, потім плавно на точку «Дім», а без неї на геопозицію
       const t0=Date.now(),tryZoom=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;
-        if(tg){map.flyTo({center:tg,zoom:7.4,duration:1800,essential:true});return;}
+        if(tg){const fly=()=>map.flyTo({center:tg,zoom:7.4,duration:2200,essential:true,curve:1.2});fly();setTimeout(()=>{if(Date.now()-(window.__touch||0)<5000)return;const c=map.getCenter();if(Math.abs(c.lng-tg[0])>0.8||Math.abs(c.lat-tg[1])>0.8||map.getZoom()<6.8)fly();},2800);return;}
         if(Date.now()-t0<4500)setTimeout(tryZoom,400);};
-      setTimeout(tryZoom,1500);}};
+      setTimeout(tryZoom,1200);}};
   if(skip){if(el)el.remove();document.body.classList.remove('intro');go();return;}
   // поки стоїмо й летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
