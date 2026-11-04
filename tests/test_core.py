@@ -1857,3 +1857,9 @@ def test_radio_spec_templates_and_brand():
     assert rs.brand_say("NAVRYX SKY і SKY") == "Наврікс Скай і Скай"
     from app import voicekit
     assert all(t in voicekit.vocab_lib() for t in rs.IDENTS.values())
+
+
+def test_push_official_bodies_use_templates():
+    from app import radio_spec as rs
+    assert rs.tail("alert") == "Оголошено повітряну тривогу. Перейдіть в укриття."
+    assert rs.tail("clear") == "Офіційно оголошено відбій повітряної тривоги."

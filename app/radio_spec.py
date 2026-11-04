@@ -112,3 +112,8 @@ def brand_say(text: str) -> str:
     """Вимова бренду для голосового рушія: NAVRYX SKY → «Наврікс Скай», SKY/Sky → «Скай». Лише для озвучення, не для екрана."""
     t = _BR1.sub("Наврікс Скай", text)
     return _BR2.sub("Скай", t)
+
+
+def tail(kind: str) -> str:
+    """Шаблон без початкового «{obl}. »: для пушів, де назва області вже стоїть у заголовку."""
+    return (TEMPLATES.get(kind) or "").replace("{obl}. ", "", 1)

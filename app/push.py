@@ -117,6 +117,8 @@ def official_home(area: tuple, off: dict, levels: dict) -> str | None:
     return None
 
 
+from . import radio_spec as _spec  # noqa: E402
+
 OFF_STABLE = 45  # с: тривога/відбій мають протриматися стільки, щоб «відбій і знову тривога за 20 с» не давали двох сповіщень
 
 
@@ -447,10 +449,10 @@ class Push:
                     st[2] = on
                     nm = st[3] or "ваш район"
                     if on:
-                        out.append({"to": token, "title": f"🔴 Повітряна тривога · {nm}", "body": "Офіційна тривога. Пройдіть в укриття.",
+                        out.append({"to": token, "title": f"🔴 Повітряна тривога · {nm}", "body": _spec.tail("alert"),
                                     "sound": "default", "priority": "high", "channelId": "threats", "data": {"track": f"alert-{int(now)}"}})
                     else:
-                        out.append({"to": token, "title": f"🟢 Відбій тривоги · {nm}", "body": "Офіційний відбій. Тривога може повторитися, стежте за сповіщеннями.",
+                        out.append({"to": token, "title": f"🟢 Відбій тривоги · {nm}", "body": _spec.tail("clear"),
                                     "sound": "default", "priority": "high", "channelId": "threats", "data": {"track": f"clear-{int(now)}"}})
             # обрані області й громади: нові цілі в зоні (або що увійдуть за ≤15 хв), одним зведенням не частіше разу на 5 хв
             zones = zmap.get(token)
