@@ -313,23 +313,31 @@
   // «Атмосфера ефіру» (налаштування): тиха синтезаторна підкладка між повідомленнями, без мелодії, пульсацій і наростання;
   // під голосом стихає приблизно на 20+ дБ; для важливого, виправлення й збою вимикається. За замовчуванням — «Лише повідомлення»
   function bedStart() {
-    if (RA.bed || LS.get('radio_mode') !== 'atmo') return;
+    if (RA.bed || (LS.get('radio_mode') || 'atmo') !== 'atmo') return;
     try {
       const c = raCtx(); RA.bedGain = c.createGain(); RA.bedGain.gain.value = 0.0001; RA.bedGain.connect(RA.master);
       const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650; lp.Q.value = 0.3; lp.connect(RA.bedGain);
       const chords = [[146.83, 220, 293.66], [130.81, 196, 261.63], [110, 164.81, 220], [123.47, 185, 246.94]];
       const oscs = [0, 1, 2].map(n => { const o = c.createOscillator(); o.type = 'sine'; o.detune.value = n * 4 - 4; const g = c.createGain(); g.gain.value = 0.3; o.connect(g).connect(lp); o.start(); return o; });
       let k = 0; const step = () => { const ch = chords[k++ % 4], t = c.currentTime; oscs.forEach((o, n) => o.frequency.setTargetAtTime(ch[n], t, 2.5)); };
-      step(); RA.bed = { oscs, timer: setInterval(step, 12000) };
+      step();
+      // рідкі м'які «дзвіночки» пентатоніки з довгим затуханням поверх підкладки: нейтральна фонова музика без ритму й мелодії
+      const lp2 = c.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 1800; lp2.connect(RA.bedGain);
+      const SC = [293.66, 329.63, 392, 440, 493.88, 587.33, 659.25]; let last = -1;
+      const bell = () => { try { let i; do { i = Math.floor(Math.random() * SC.length); } while (i === last); last = i; const t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.value = SC[i]; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.16, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + 5);
+        o.connect(g).connect(lp2); o.start(t); o.stop(t + 5.2); } catch (e) {} };
+      const bellT = setInterval(() => { if (Math.random() < 0.8) bell(); }, 6500); setTimeout(bell, 2500);
+      RA.bed = { oscs, timer: setInterval(step, 12000), bellT };
       RA.bedGain.gain.setTargetAtTime(+(LS.get('radio_atmo_vol') || 0.04), c.currentTime, 2);
     } catch (e) {}
   }
-  function bedStop() { if (!RA.bed) return; try { clearInterval(RA.bed.timer); RA.bedGain.gain.setTargetAtTime(0.0001, RA.ctx.currentTime, 0.5); const o = RA.bed.oscs; setTimeout(() => o.forEach(x => { try { x.stop(); } catch (e) {} }), 2000); } catch (e) {} RA.bed = null; }
+  function bedStop() { if (!RA.bed) return; try { clearInterval(RA.bed.timer); clearInterval(RA.bed.bellT); RA.bedGain.gain.setTargetAtTime(0.0001, RA.ctx.currentTime, 0.5); const o = RA.bed.oscs; setTimeout(() => o.forEach(x => { try { x.stop(); } catch (e) {} }), 2000); } catch (e) {} RA.bed = null; }
   function duck(on) { try { if (RA.bedGain && RA.bed) RA.bedGain.gain.setTargetAtTime(on ? (+(LS.get('radio_atmo_vol') || 0.04)) * 0.08 : +(LS.get('radio_atmo_vol') || 0.04), RA.ctx.currentTime, 0.3); } catch (e) {} }
 
   // налаштування Sky Radio в розділі «Звук»: тиша чи атмосфера між повідомленнями, гучність атмосфери
   (function () { const seg = document.getElementById('rad-mode'), vol = document.getElementById('rad-atmo'); if (!seg) return;
-    const mode = () => LS.get('radio_mode') || 'msgs';
+    const mode = () => LS.get('radio_mode') || 'atmo';
     const sync = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === mode()));
     seg.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_mode', b.dataset.v); sync(); if (radioOn) { if (b.dataset.v === 'atmo') bedStart(); else bedStop(); } });
     const vv = document.getElementById('rad-voice'), sg = document.getElementById('rad-sig');
