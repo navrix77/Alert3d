@@ -1899,3 +1899,28 @@ def test_gemini_all_caches_and_respects_budget(tmp_path, monkeypatch):
     assert by == "gemini-cache" and len(calls) == 1
     d, by = asyncio.run(tts.speak("Нова фраза.", "radio", paid=False))  # нове за межею ліміту — не Gemini
     assert by != "gemini" and len(calls) == 1
+
+
+def test_gemini_long_text_cached_by_sentence(tmp_path, monkeypatch):
+    import asyncio, io, wave
+    from app import tts
+    monkeypatch.setattr(tts, "BASE", tmp_path)
+    monkeypatch.setattr(tts, "_gkey", lambda: "k")
+    calls = []
+
+    def mk():
+        b = io.BytesIO()
+        with wave.open(b, "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(b"\x00\x00" * 100)
+        return b.getvalue()
+
+    async def fake(text, key, rate, style=None):
+        calls.append(text)
+        return mk()
+    monkeypatch.setattr(tts, "_gemini", fake)
+    t1 = "Харківська область, тривога триває вже годину. Шахед біля Чугуєва, курс на південь."
+    d, by = asyncio.run(tts.speak(t1, "radio", paid=True))
+    assert by == "gemini" and d[:4] == b"RIFF" and len(calls) == 2
+    t2 = "Харківська область, тривога триває вже годину. Нова ціль біля Балаклії, курс на захід."
+    asyncio.run(tts.speak(t2, "oleksa", paid=True))
+    assert len(calls) == 3  # повторене речення не озвучувалось вдруге, навіть для іншого ключа голосу

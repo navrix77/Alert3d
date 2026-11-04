@@ -402,6 +402,59 @@ async def _gemini_cloud(text: str, key: str, rate: float) -> bytes | None:
     return None
 
 
+def _wav_join(parts: list[bytes]) -> bytes | None:
+    import io
+    import wave
+    try:
+        ws = [wave.open(io.BytesIO(d)) for d in parts]
+        prm = ws[0].getparams()[:3]
+        if not all(w.getparams()[:3] == prm for w in ws):
+            return None
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as o:
+            o.setparams(ws[0].getparams())
+            for w in ws:
+                o.writeframes(w.readframes(w.getnframes()))
+        return buf.getvalue()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+async def _gemini_text(gt: str, paid: bool) -> tuple[bytes | None, str]:
+    """Gemini для всього тексту: довгий текст (Ефір, випуск радіо) ріжемо на речення й кешуємо кожне окремо, тож повторені
+    речення не коштують нічого. Одне речення = одна заготовка (спільний кеш радіо й сповіщень). Нові речення лише в межах
+    денного ліміту; якщо хоч одного не вистачає, повертаємо None (відповідає запасний голос)."""
+    gk = "radio"  # один голос SKY у всіх режимах (специфікація)
+    sents = [x.strip() for x in re.split(r"(?<=[.!?…])\s+", gt) if x.strip()] or [gt]
+    merged: list[str] = []
+    for x in sents:  # зовсім короткі шматки (наприклад «Так.») приклеюємо до сусіднього речення
+        if merged and len(merged[-1]) < 18:
+            merged[-1] += " " + x
+        else:
+            merged.append(x)
+    out: list[bytes] = []
+    spent = False
+
+    async def _fr(t, k, r):
+        return await _gemini(t, k, r, _spec.FRAG_STYLE)
+    for x in merged:
+        c = BASE / "cache" / f"g-{hashlib.sha1(f'{VOICE_V}gv1|{gk}|1.0|{x}'.encode()).hexdigest()}.wav"
+        if c.exists():
+            out.append(c.read_bytes())
+            continue
+        if not paid or _off.get("gemini", 0) > time.time():
+            return None, ""
+        d, _by = await _cached("gemini", "wav", _fr, x, gk, 1.0, "gv1")
+        if not d:
+            return None, ""
+        spent = True
+        out.append(d)
+    if len(out) == 1:
+        return out[0], ("gemini" if spent else "gemini-cache")
+    j = _wav_join(out)
+    return (j, "gemini" if spent else "gemini-cache") if j else (None, "")
+
+
 async def _cached(prov: str, ext: str, fn, text: str, key: str, rate: float, tag: str = ""):
     c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{VOICE_V}{tag}|{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
     if c.exists():
@@ -524,17 +577,9 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     # Gemini для всього ефіру (власник 04.11: Google «жахливий»): фраза озвучується один раз і кешується; усі фрази
     # однакового формату (WAV 24 кГц), тож склеюються в один відрізок. Нові фрази лише в межах денного ліміту (paid).
     if os.getenv("TTS_GEMINI_ALL", "1") != "0" and _gkey() and not ident:
-        gt = _spec.brand_say(text0)
-        gk = "radio"  # один голос SKY у всіх режимах (специфікація): спільний кеш для радіо й сповіщень
-        gp = BASE / "cache" / f"g-{hashlib.sha1(f'{VOICE_V}gv1|{gk}|1.0|{gt}'.encode()).hexdigest()}.wav"
-        if gp.exists():
-            return gp.read_bytes(), "gemini-cache"
-        if paid and _off.get("gemini", 0) <= time.time():
-            async def _fr(t, k, r):
-                return await _gemini(t, k, r, _spec.FRAG_STYLE)
-            data, by = await _cached("gemini", "wav", _fr, gt, gk, 1.0, "gv1")
-            if data:
-                return data, "gemini"
+        data, why = await _gemini_text(_spec.brand_say(text0), paid)
+        if data:
+            return data, why
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
     if key == "radio":
         rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо швидше; додатково +12% відтворенням на клієнті (кеш озвучки не чіпаємо)
