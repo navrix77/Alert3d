@@ -649,6 +649,10 @@ function homeOfficial(ob){const O=SNAP.official||{};const ra=homeObl.r;
   // офіційне зведення застаріло (джерело не відповідає): чесно кажемо, а не показуємо старий стан як поточний
   const age=O.updated?(Date.now()/1000+offset-O.updated)/60:999;const st=age>3?' · дані тривог '+(age>120?'недоступні':Math.round(age)+' хв тому'):'';
   if((SNAP.levels||{})[ob])return {on:1,t:'тривога в усій області'+st};
+  // 04.11: місто з власним офіційним статусом (м. Харків): для дому в ньому статус району не діє — лише статус міста
+  const hh=homeHrom(),sep=hh!=null&&(O.sep||[]).includes(hh);
+  if(sep){const H0=O.hromadas||{};if(H0[hh]||H0[String(hh)])return {on:1,t:'тривога у вашій громаді'+st};
+    if(ra&&(O.raion_levels||{})[ra])return {on:2,t:'тривога в районі, у вашій громаді тривоги немає'+st};}
   if(ra&&(O.raion_levels||{})[ra])return {on:1,t:'тривога у вашому районі'+st};
   // громада дому (м. Харків має власну тривогу, окремо від району): 03.11 карта показувала «тривога: м. Харків», а панель «у частині області»
   const H=O.hromadas||{};if(HPDATA&&home)for(const id in H){const f=HPDATA.features[+id];if(H[id]&&f&&geomIn(f.geometry,home[0],home[1]))return {on:1,t:'тривога у вашій громаді'+st};}
@@ -1236,6 +1240,9 @@ const TNAME_PL={lancet:'«Ланцети»',shahed:'Шахеди',jet:'Реак�
 const NZLV=new Map();
 function myZones(){const Z=PREF.nz||{obl:[],hrom:[]};if(!Z.obl.length&&!Z.hrom.length&&home&&window.OBLPOLY){const o=window.OBLPOLY(home[0],home[1]);if(o)return {obl:[o],hrom:[],auto:true};}return Z;}
 function ringIn(r,x,y){let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];if(((a[1]>y)!==(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/((b[1]-a[1])||1e-12)+a[0]))c=!c;}return c;}
+// громада дому (індекс у hromadas.geojson); null, доки межі не завантажені
+function homeHrom(){if(!HPDATA||!home){if(!HPDATA&&home)loadHP();return null;}if(homeHrom.k===home.join())return homeHrom.v;
+  homeHrom.k=home.join();const i=HPDATA.features.findIndex(f=>geomIn(f.geometry,home[0],home[1]));homeHrom.v=i<0?null:(HPDATA.features[i].id!=null?HPDATA.features[i].id:i);return homeHrom.v;}
 function geomIn(g,x,y){const P=g.type==='Polygon'?[g.coordinates]:g.coordinates;return P.some(p=>ringIn(p[0],x,y));}
 function zoneOf(p){const Z=myZones();if(Z.obl.length&&window.OBLPOLY){const o=window.OBLPOLY(p[0],p[1]);if(o&&Z.obl.includes(o))return o+' обл.';}
   if(Z.hrom.length&&HPDATA){for(const h of Z.hrom){const f=HPDATA.features[h.id];if(f&&geomIn(f.geometry,p[0],p[1]))return h.n;}}return null;}

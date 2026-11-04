@@ -140,3 +140,30 @@ def test_render_survives_flaky_provider():
         return bytes([0xFF, 0xFB, 0x90, 0x64]) + b"\x01" * 413, "openai"
     data, why = asyncio.run(v.render(["a", "b", "c"], say))
     assert why == "kit" and data and calls["b"] == 2
+
+
+def test_city_with_own_alert_status():
+    from app.push import home_area, official_home
+    area = home_area(36.23, 49.99)  # Харків
+    off = {"raion_levels": {"Харківський": 2}, "hromadas": {}, "sep": [1174]}
+    assert official_home(area, off, {}) is None  # район під тривогою, а місто з власним статусом — ні
+    off["hromadas"] = {"1174": 2}
+    assert official_home(area, off, {}) is not None
+    from app import live
+    st = {"now": 0, "levels": {}, "official": {"raion_levels": {"Харківський": 2}, "hromadas": {}, "sep": [1174], "alert_obl": ["Харківська"]},
+          "tracks": []}
+    f = live.near_facts(st, (36.23, 49.99), "Харківська", 0)
+    assert f["city_free"] and not f["raion_alert"]
+    r = v.compose(dict(f, radius=25))
+    assert "Тривога діє в районі, але не у вашій громаді." in r["voice"]
+
+
+def test_channel_fast_signal_city_and_oblast():
+    import time as _t
+    from app.alerts import OfficialAlerts
+    a = OfficialAlerts()
+    a.fast_signal("🔴 м. Харків та Харківська ТГ — повітряна тривога", _t.time())
+    assert a.state()["hromadas"].get(1174) == 1
+    a.fast_signal("🟢 Харків — відбій тривоги", _t.time())
+    assert 1174 not in a.state()["hromadas"]
+    assert a.fast_signal("Увага — повітряна тривога", _t.time()) == 0

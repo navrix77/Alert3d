@@ -16,6 +16,13 @@ UBILLING = "https://ubilling.net.ua/aerialalerts/"
 ACTIVE_MD = "https://api.alerts.in.ua/v3/alerts/active.md"  # відкрите зведення alerts.in.ua: райони/громади, червоний/жовтий  # без токена: стан областей (API В. Клименка)
 
 
+from pathlib import Path as _P
+SEP_FILE = _P(__file__).resolve().parent.parent / "data" / "sep_hromadas.json"
+SEP_SEED = {1174}
+OBLS = ["Вінницька", "Волинська", "Луганська", "Дніпропетровська", "Донецька", "Житомирська", "Закарпатська", "Запорізька",
+        "Івано-Франківська", "Київська", "Кіровоградська", "Львівська", "Миколаївська", "Одеська", "Полтавська", "Рівненська",
+        "Сумська", "Тернопільська", "Харківська", "Херсонська", "Хмельницька", "Черкаська", "Чернігівська", "Чернівецька"]  # м. Харків (Харківська громада): окремий статус в офіційних даних
+
 class OfficialAlerts:
     def __init__(self) -> None:
         self.oblast_levels: dict[str, int] = {}
@@ -27,6 +34,14 @@ class OfficialAlerts:
         self.hromada_levels: dict[int, int] = {}
         self.points: list[list] = []
         self.source = ""
+        # громади-міста з власним офіційним статусом, окремим від району (м. Харків тощо): для дому в такому місті діє статус міста,
+        # а не району (04.11: район під тривогою, а місто — ні; SKY писав «тривога у вашому районі»). Поповнюється з даних «м. …»
+        self.sep: set[int] = set(SEP_SEED)
+        try:
+            import json as _j
+            self.sep |= set(_j.loads(SEP_FILE.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            pass
 
     @staticmethod
     def short(name: str) -> str:
@@ -176,6 +191,14 @@ class OfficialAlerts:
                 key = uk.replace("м. ", "").strip()
                 # справжні межі громади (а не коло): назва громади або місто → його громада, у межах цієї області
                 ids = self.hromada_ids(key, area_obl.get(uk), uk.startswith("м. "))
+                if ids and uk.startswith("м. ") and not set(ids) <= self.sep:
+                    self.sep |= set(ids)
+                    try:
+                        import json as _j
+                        SEP_FILE.parent.mkdir(parents=True, exist_ok=True)
+                        SEP_FILE.write_text(_j.dumps(sorted(self.sep)), encoding="utf-8")
+                    except OSError:
+                        pass
                 if ids:
                     for i in ids:
                         hrom_poly[i] = max(hrom_poly.get(i, 0), lv)
@@ -362,6 +385,12 @@ class OfficialAlerts:
 
     FAST_RX = re.compile(r"([А-ЯІЇЄҐ][а-яіїєґ'’ʼ]+(?:ський|цький|зький))\s+(?:район|р-н)[^\n]{0,6}?[—–-]\s*(повітряна тривога|відбій|тривога скасована)([^\n]*)", re.I)
     overrides: dict = {}
+    # 04.11 власник: «у ТГ-каналах теж пишуть про початок і відбій» — міста/громади й області, не лише райони
+    CITY_RX = re.compile(r"(?:^|[\s🔴🟢🟡⚠️❗️]|м\.\s*)([А-ЯІЇЄҐ][а-яіїєґ'’ʼ-]{2,})(?:\s+(?:та|і)\s+[^\n—–-]{0,40}?(?:ТГ|громада))?\s*[—–-]\s*"
+                         r"(повітряна тривога|відбій(?:\s+(?:повітряної\s+)?тривоги)?|тривога скасована)(?![а-яіїєґ])", re.I)
+    OBL_RX = re.compile(r"([А-ЯІЇЄҐ][а-яіїєґ'’ʼ-]+(?:ська|цька|зька))\s+(?:область|обл\.?)[^\n]{0,6}?[—–-]\s*(повітряна тривога|відбій|тривога скасована)", re.I)
+    hoverrides: dict = {}
+    ooverrides: dict = {}
 
     def fast_signal(self, text: str, ts: float) -> int:
         """Канали ретранслюють «Сумський район — повітряна тривога / відбій» раніше, ніж оновиться зведення:
@@ -377,6 +406,21 @@ class OfficialAlerts:
             lvl = 0 if what != "повітряна тривога" else (1 if "жовт" in rest else 2)
             self.overrides[r] = (lvl, ts)
             n += 1
+        for m in self.OBL_RX.finditer(text):
+            o = next((x for x in OBLS if ap(x) == ap(m.group(1))), None)
+            if o:
+                self.ooverrides[o] = (0 if m.group(2).lower() != "повітряна тривога" else 1, ts)
+                n += 1
+        for m in self.CITY_RX.finditer(text):
+            nm, what = m.group(1), m.group(2).lower()
+            if nm.endswith(("ський", "цький", "зький")) or nm.lower() in ("увага", "загроза", "тривога", "відбій"):
+                continue
+            ids = self.hromada_ids(nm, None, True)
+            if not ids or len(ids) > 3:  # неоднозначна назва — не ризикуємо
+                continue
+            for i in ids:
+                self.hoverrides[i] = (0 if not what.startswith("повітряна") else 1, ts)
+            n += 1
         return n
 
     def state(self) -> dict:
@@ -390,6 +434,22 @@ class OfficialAlerts:
                 rl[r] = max(rl.get(r, 0), lvl)
             else:
                 rl.pop(r, None)
-        anyo = set(self.oblast_levels) | (getattr(self, "any_obl", set()) if time.time() - (self.updated or 0) < 600 else set())
-        return {"levels": self.oblast_levels, "alert_obl": sorted(anyo), "raions": sorted(rl), "raion_levels": rl, "points": self.points, "hromadas": self.hromada_levels,
+        hl = dict(self.hromada_levels)
+        for i, (lvl, ts) in list(self.hoverrides.items()):
+            if now - ts > 120:
+                self.hoverrides.pop(i, None)
+            elif lvl:
+                hl[i] = max(hl.get(i, 0), lvl)
+            else:
+                hl.pop(i, None)
+        ol = dict(self.oblast_levels)
+        for o, (lvl, ts) in list(self.ooverrides.items()):
+            if now - ts > 120:
+                self.ooverrides.pop(o, None)
+            elif lvl:
+                ol[o] = max(ol.get(o, 0), lvl)
+            else:
+                ol.pop(o, None)
+        anyo = set(ol) | (getattr(self, "any_obl", set()) if time.time() - (self.updated or 0) < 600 else set())
+        return {"levels": ol, "alert_obl": sorted(anyo), "raions": sorted(rl), "raion_levels": rl, "points": self.points, "hromadas": hl, "sep": sorted(self.sep),
                 "updated": self.updated, "ok": self.ok, "error": self.error, "source": self.source}

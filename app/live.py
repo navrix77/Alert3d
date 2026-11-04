@@ -359,15 +359,23 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
     urgent = bool(bal) or any(x["appr"] and x["km"] <= 30 for x in near)
     home_raion = None
     raion_alert = False
+    sep_city = False
     if home:
         from .geo import raions
+        from .push import home_area, official_home
         home_raion = raions().of(home[0], home[1])
-        raion_alert = bool(home_raion) and home_raion in (off.get("raion_levels") or {})
+        area = home_area(home[0], home[1])
+        oh = official_home(area, off, levels)
+        sep_city = area[0] is not None and area[0] in set(off.get("sep") or [])
+        # тривога саме для точки дому: район, або громада (для міста з власним статусом — лише громада)
+        raion_alert = bool(oh) and not (obl and levels.get(obl))
+        if sep_city and not raion_alert and home_raion in (off.get("raion_levels") or {}):
+            sep_city = "raion_only"
     fp = tuple(sorted((x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "") for x in near[:6])) + (alert, raion_alert, bool(bal))
     if not near and far:
         fp = fp + (("far", far["id"], far["km"] // 25, bool(far["appr"])),)
     partial = alert and not raion_alert and bool(home_raion) and levels.get(obl, 0) < 2 and bool(off.get("raion_levels"))
-    return {"alert": alert, "partial": partial, "raion": home_raion, "raion_alert": raion_alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:],
+    return {"alert": alert, "partial": partial, "city_free": sep_city == "raion_only", "raion": home_raion, "raion_alert": raion_alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:],
             "urgent": urgent, "fp": fp, "radius": radius, "far": far if not near else None}
 
 

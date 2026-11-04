@@ -108,8 +108,9 @@ def official_home(area: tuple, off: dict, levels: dict) -> str | None:
     hi, hn, rn, ob = area
     if ob and levels.get(ob):
         return f"{ob} обл."
-    if rn and (off.get("raion_levels") or {}).get(rn):
-        return rn
+    sep = set(off.get("sep") or [])
+    if rn and (off.get("raion_levels") or {}).get(rn) and not (hi is not None and hi in sep):
+        return rn  # для міста з власним статусом район не рахується
     H = off.get("hromadas") or {}
     if hi is not None and (H.get(hi) or H.get(str(hi))):
         return f"{hn} громада" if hn else "ваша громада"
