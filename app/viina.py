@@ -80,7 +80,7 @@ def build(tess: dict, status: dict[int, str], day: str) -> dict:
 
 
 async def run() -> None:
-    if os.environ.get("VIINA", "1") != "1":
+    if os.environ.get("VIINA", "1") != "1" or os.environ.get("DEEPSTATE_ARCHIVE") == "1":
         return
     async with httpx.AsyncClient(timeout=300, follow_redirects=True, headers={"User-Agent": "navryx-sky/1.0 (civil air-alert aggregator)"}) as cli:
         while True:

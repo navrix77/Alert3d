@@ -2043,3 +2043,11 @@ def test_viina_control_layer():
     sq = lambda i, x: {"type": "Feature", "properties": {"geonameid": i}, "geometry": {"type": "Polygon", "coordinates": [[[x, 48], [x + 1, 48], [x + 1, 49], [x, 49], [x, 48]]]}}
     fc = viina.build({"features": [sq(1, 30), sq(2, 32), sq(3, 31), sq(4, 34)]}, st, day)
     assert sorted(f["properties"]["k"] for f in fc["features"]) == ["occupied", "unknown"] and "VIINA" in fc["properties"]["source"]
+
+
+def test_ds_archive_extract_and_off_by_default():
+    import os
+    from app import ds_archive
+    assert os.environ.get("DEEPSTATE_ARCHIVE") != "1"
+    fc = ds_archive.extract({"features": [{"geometry": {"type": "MultiPolygon", "coordinates": [[[[35.1234567, 45.1], [35.2, 45.1], [35.2, 45.2], [35.1234567, 45.1]]]]}}, {"geometry": {"type": "Point", "coordinates": [1, 1]}}]}, "20261104")
+    assert len(fc["features"]) == 1 and fc["features"][0]["geometry"]["coordinates"][0][0][0][0] == 35.12346
