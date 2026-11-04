@@ -46,7 +46,15 @@
   function sysSpeak(text){return new Promise(res=>{if(!text||!('speechSynthesis' in window))return res(false);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);
     const v=voices.find(x=>/^uk/i.test(x.lang))||voices.find(x=>/^ru/i.test(x.lang)&&false);if(v)u.voice=v;u.lang='uk-UA';u.rate=S.rate;u.volume=S.vol;
     u.onend=u.onerror=()=>res(true);speechSynthesis.speak(u);setTimeout(()=>res(true),20000);}catch(e){res(false);}});}
+  // 04.11 власник: режим «Вібро» (без звуку). Android: Vibration API. iPhone/Safari його не має, тому пробуємо тактильний відгук
+  // перемикача (iOS 17.4+; часом потребує дотику до екрана), а доставку із закритим застосунком робить push (вібрація за налаштуваннями iOS).
+  const VIB=[400,150,400,150,400,150,800];
+  let hapt=null;function vib(p){let ok=false;try{if(navigator.vibrate)ok=navigator.vibrate(p||VIB);}catch(e){}
+    if(!ok)try{if(!hapt){const l=document.createElement('label');l.style.cssText='position:fixed;left:-99px;top:-99px;opacity:0;pointer-events:none';l.innerHTML='<input type="checkbox" switch>';document.body.appendChild(l);hapt=l;}
+      let n=0;const t=setInterval(()=>{hapt.click();if(++n>=6)clearInterval(t);},180);ok=true;}catch(e){}
+    return ok;}
   async function play(text,force){const m=S.mode;if(m==='off'&&!force)return;let wait=0;
+    if(m==='vibro'){vib();return;}
     alerting++;fire(true);hold();
     try{if(m==='tone'||m==='both'||(force&&m==='off'))try{wait=TONES[S.tone](S.vol);}catch(e){}
       if(wait)await new Promise(r=>setTimeout(r,wait*1000));
@@ -58,6 +66,7 @@
   window.NXSound={get:()=>Object.assign({},S),set(k,v){S[k]=v;save();},hasUkVoice:()=>voices.some(x=>/^uk/i.test(x.lang)),
     alert(text){const now=Date.now();if(now-lastT<8000)return;if(text&&said.has(text)&&now-said.get(text)<120000)return;lastT=now;if(text)said.set(text,now);play(text);},
     test(){unlock();const txt='Тест. Шахед, двадцять кілометрів з півдня, приблизно вісім хвилин до вас.';const m=S.mode;
+      if(m==='vibro'){vib();return;}
       if(m==='voice'||m==='both')speak(txt);            // голос, одразу в межах натискання (вимога iOS)
       if(m!=='voice')try{TONES[S.tone](S.vol);}catch(e){}  // сигнал (у режимі «Вимк», теж, щоб почути звук)
     },
