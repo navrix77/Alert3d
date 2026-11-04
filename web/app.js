@@ -214,7 +214,7 @@ function enemyApply(){afldIcon();if(!window.App06||!ENEMY||!map.getSource('enemy
   map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:(!TAC&&f.properties.c==='airfield')?'afld':tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'hostile'}),v:near(f)?'':f.properties.n,dim:near(f)?1:0})}))});ENEMY_SET=true;}
 // тактичний режим тільки 2D: нахил вимкнено і заблоковано; після виходу повертаємо те, що було
 let TILT_BEFORE=null;
-function tac2d(on){try{if(on){if(TILT_BEFORE===null)TILT_BEFORE=tilt;if(tilt)set3d(false,true);map.setMaxPitch(0);map.easeTo({pitch:0,bearing:0,duration:400});}
+function tac2d(on){try{if(on){if(!TACF.scale&&!TACF.obl)setTimeout(()=>tacScale('country'),500);if(TILT_BEFORE===null)TILT_BEFORE=tilt;if(tilt)set3d(false,true);map.setMaxPitch(0);map.easeTo({pitch:0,bearing:0,duration:400});}
   else{map.setMaxPitch(map._mp0||60);if(TILT_BEFORE){set3d(true,true);}TILT_BEFORE=null;}}catch(e){}}
 function setTac(on){const was=TAC;TAC=!!on;if(TAC!==was)tac2d(TAC);ENEMY_SET=false;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);enemyLoad();if(TAC){loadApp06();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
@@ -464,7 +464,8 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const mob=innerWidth<640;
   // кінцевий стан: 3D з наближенням до дому; без дому — до геопозиції (визначається під час паузи); без обох — центр країни з нахилом
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
-  const camFor=()=>{const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
+  const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.2:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
+    const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
   const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
