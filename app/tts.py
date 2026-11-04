@@ -485,6 +485,12 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
     if key == "radio":
         rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо швидше; додатково +12% відтворенням на клієнті (кеш озвучки не чіпаємо)
+    # 04.11: готові (закешовані) фрази віддаємо завжди, навіть коли ключа/ліміту вже немає: заготовки не мають пропадати
+    for prov, ext, t, tag in (("google", "mp3", text, "p1" if _has_pron(text) else ""), ("google", "mp3", text, "" if _has_pron(text) else "p1"),
+                              ("openai", "mp3", stress_marks(words_numbers(text)), ""), ("gemini", "wav", stress_marks(words_numbers(text)), "")):
+        c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{VOICE_V}{tag}|{key}|{rate}|{t}'.encode()).hexdigest()}.{ext}"
+        if c.exists():
+            return c.read_bytes(), f"{prov}-cache"
     order = (os.getenv("TTS_ORDER") or ("google,openai,gemini" if GKEY else "openai,gemini")).split(",") if paid else []
     if not google:  # безкоштовний місячний ліміт Google вичерпано — не виходимо в платний тариф
         order = [p for p in order if p.strip() != "google"]
