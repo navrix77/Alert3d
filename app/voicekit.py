@@ -709,23 +709,33 @@ _WARM = {"state": "idle", "done": 0, "total": 0}
 
 
 async def warm(say, paid_ok) -> None:
-    """Фоном озвучує весь словник (≈600 коротких фраз, ≈20 тис. символів, разово ≈$0,30), по одній, щоб не навантажувати."""
+    """Фоном озвучує весь словник (≈600 коротких фраз). Уже озвучене беремо з кешу миттєво; окрема помилка не зупиняє прогрів,
+    а повторюється в кінці. Паузу тримаємо лише після справжнього синтезу, щоб не впиратися в ліміт запитів."""
     v = vocabulary()
     _WARM.update(state="running", total=len(v), done=0)
-    for x in v:
-        if not paid_ok():
-            _WARM["state"] = "paused:cap"
-            return
-        try:
-            data, _by = await say(x)
-            if not data:
-                _WARM["state"] = "paused:no-voice"
+    for rnd in range(3):
+        miss = []
+        for x in v:
+            if not paid_ok():
+                _WARM["state"] = "paused:cap"
                 return
-        except Exception as e:  # noqa: BLE001
-            log.warning("warm: %s", e)
-        _WARM["done"] += 1
-        await asyncio.sleep(0.3)
-    _WARM["state"] = "done"
+            try:
+                data, by = await say(x)
+            except Exception as e:  # noqa: BLE001
+                log.warning("warm: %s", e)
+                data, by = None, ""
+            if not data:
+                miss.append(x)
+            elif rnd == 0:
+                _WARM["done"] += 1
+            if not str(by).endswith("cache"):
+                await asyncio.sleep(0.7)
+        if not miss:
+            _WARM["state"] = "done"
+            return
+        v = miss
+        await asyncio.sleep(20)
+    _WARM["state"] = "partial:" + str(len(v))
 
 
 def status() -> dict:

@@ -13,19 +13,19 @@
   function vaUnlock(){if(vaOk)return;try{VA.src=SILENT;const p=VA.play();p&&p.then(()=>{vaOk=true;}).catch(()=>{});}catch(e){}}
   ['touchend','click','keydown'].forEach(ev=>{document.addEventListener(ev,unlock,{passive:true});document.addEventListener(ev,vaUnlock,{passive:true});});
   let vaEnd=null,held=null,alerting=0;
-  function vaPlay(url,vol){return new Promise(res=>{let done=false;const fin=ok=>{if(done)return;done=true;if(VA.onended&&vaEnd===fin){VA.onended=VA.onerror=null;}res(ok);};
-    if(vaEnd)vaEnd(true);vaEnd=fin;try{VA.pause();}catch(e){}VA.onended=()=>fin(true);VA.onerror=()=>fin(false);VA.src=url;VA.volume=vol==null?1:vol;
+  function vaPlay(url,vol,rate){return new Promise(res=>{let done=false;const fin=ok=>{if(done)return;done=true;if(VA.onended&&vaEnd===fin){VA.onended=VA.onerror=null;}res(ok);};
+    if(vaEnd)vaEnd(true);vaEnd=fin;try{VA.pause();}catch(e){}VA.onended=()=>fin(true);VA.onerror=()=>fin(false);try{VA.preservesPitch=true;VA.defaultPlaybackRate=rate||1;}catch(e){}VA.src=url;VA.volume=vol==null?1:vol;try{VA.playbackRate=rate||1;}catch(e){}
     const p=VA.play();if(p)p.catch(()=>fin(false));
     // сторож від зависання: лише якщо звук справді не грає (довге зведення радіо триває й 60+ с — не обриваємо)
     const dog=()=>{if(done)return;if((held&&held.fin===fin)||(vaEnd===fin&&!VA.paused&&!VA.ended)){setTimeout(dog,5000);return;}fin(true);};setTimeout(dog,30000);});}
   // 04.11 власник: сповіщення важливіше за радіо й ефір: їхній голос ставиться на паузу, звучить сповіщення, потім продовжується з того ж місця
-  function hold(){if(held||alerting>1)return;try{if(vaEnd&&!VA.paused&&!VA.ended){held={src:VA.src,t:VA.currentTime,fin:vaEnd,vol:VA.volume};vaEnd=null;VA.onended=VA.onerror=null;VA.pause();}}catch(e){held=null;}}
+  function hold(){if(held||alerting>1)return;try{if(vaEnd&&!VA.paused&&!VA.ended){held={src:VA.src,t:VA.currentTime,fin:vaEnd,vol:VA.volume,rate:VA.defaultPlaybackRate};vaEnd=null;VA.onended=VA.onerror=null;VA.pause();}}catch(e){held=null;}}
   function unhold(){const h=held;held=null;if(!h)return;vaEnd=h.fin;VA.onended=()=>h.fin(true);VA.onerror=()=>h.fin(false);
-    try{VA.src=h.src;VA.volume=h.vol;const go=()=>{try{VA.currentTime=Math.max(0,h.t-0.5);}catch(e){}const p=VA.play();if(p)p.catch(()=>h.fin(false));};
+    try{try{VA.defaultPlaybackRate=h.rate||1;}catch(e){}VA.src=h.src;VA.volume=h.vol;try{VA.playbackRate=h.rate||1;}catch(e){}const go=()=>{try{VA.currentTime=Math.max(0,h.t-0.5);}catch(e){}const p=VA.play();if(p)p.catch(()=>h.fin(false));};
       if(VA.readyState>=1)go();else VA.addEventListener('loadedmetadata',go,{once:true});}catch(e){h.fin(false);}}
   const fire=on=>{try{window.dispatchEvent(new CustomEvent('sky-alert',{detail:{on}}));}catch(e){}};
   const afterAlert=()=>new Promise(r=>{if(!alerting)return r();const f=e=>{if(!e.detail.on){removeEventListener('sky-alert',f);r();}};addEventListener('sky-alert',f);});
-  window.SKYVOICE={play:(url,vol)=>alerting?afterAlert().then(()=>vaPlay(url,vol)):vaPlay(url,vol),stop:()=>{try{VA.pause();}catch(e){}if(vaEnd)vaEnd(true);},get alerting(){return alerting>0;}};
+  window.SKYVOICE={play:(url,vol,rate)=>alerting?afterAlert().then(()=>vaPlay(url,vol,rate)):vaPlay(url,vol,rate),stop:()=>{try{VA.pause();}catch(e){}if(vaEnd)vaEnd(true);},get alerting(){return alerting>0;}};
   function env(g,t,a,d,v){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(0.001,v),t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d);}
   function osc(type,f,t,dur,v,f2){const a=ctx(),o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.linearRampToValueAtTime(f2,t+dur);o.connect(g);g.connect(a.destination);env(g,t,0.02,dur,v);o.start(t);o.stop(t+dur+0.05);}
   const TONES={

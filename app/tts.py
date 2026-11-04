@@ -256,6 +256,10 @@ _SH = (("ʃɐˈxɛd", ("шахед", "Шахед")), ("ʃɐˈxɛdɪ", ("шахе
 G_PRON = [(w, ipa) for ipa, ws in _SH for w in ws]
 
 
+def _has_pron(text: str) -> bool:
+    return any(re.search(rf"(?<![\w]){re.escape(f)}(?![\w])", text) for f, _ in G_PRON)
+
+
 async def _google(text: str, key: str, rate: float) -> bytes | None:
     vs = await _google_voices()
     want = "male" if key in ("mykyta", "oleksa", "radio") else "female"
@@ -277,6 +281,12 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
             if r.status_code == 400 and use:
                 log.info("google tts: власна вимова не прийнята, без неї: %s", r.text[:160])
                 continue
+            for wait_ in (1.0, 2.5, 5.0):  # ліміт запитів / тимчасова помилка Google: повторюємо з паузою, а не віддаємо порожнє
+                if r.status_code != 429 and r.status_code < 500:
+                    break
+                await asyncio.sleep(wait_)
+                r = await cli.post("https://texttospeech.googleapis.com/v1/text:synthesize", params={"key": GKEY},
+                                   json={"input": inp, "voice": voice, "audioConfig": cfg})
             r.raise_for_status()
             return base64.b64decode(r.json()["audioContent"])
 
@@ -284,7 +294,7 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
 LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
-VOICE_V = "r10"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
+VOICE_V = "r9"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
 OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
 OAI_STYLE = ("Читай українською як носій мови, чітко й природно, у звичайному темпі. У тексті стоять знаки наголосу (´): "
@@ -365,8 +375,8 @@ async def _gemini(text: str, key: str, rate: float) -> bytes | None:
     return None
 
 
-async def _cached(prov: str, ext: str, fn, text: str, key: str, rate: float):
-    c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{VOICE_V}|{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
+async def _cached(prov: str, ext: str, fn, text: str, key: str, rate: float, tag: str = ""):
+    c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{VOICE_V}{tag}|{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
     if c.exists():
         return c.read_bytes(), f"{prov}-cache"
     if _off.get(prov, 0) > time.time():
@@ -471,7 +481,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
         return None, "empty"
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
     if key == "radio":
-        rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.4")), 2)  # 04.11 власник: ефір і радіо швидше (1.25 → 1.4, межа Google)
+        rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо швидше; додатково +12% відтворенням на клієнті (кеш озвучки не чіпаємо)
     order = (os.getenv("TTS_ORDER") or ("google,openai,gemini" if GKEY else "openai,gemini")).split(",") if paid else []
     if not google:  # безкоштовний місячний ліміт Google вичерпано — не виходимо в платний тариф
         order = [p for p in order if p.strip() != "google"]
@@ -487,7 +497,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
         elif prov == "gemini" and _gkey():
             data, by = await _cached("gemini", "wav", _gemini, stress_marks(words_numbers(text)), key, rate)
         elif prov == "google" and GKEY:
-            data, by = await _cached("google", "mp3", lambda t, k, r: _google(t, k, r), text, key, rate)
+            data, by = await _cached("google", "mp3", lambda t, k, r: _google(t, k, r), text, key, rate, "p1" if _has_pron(text) else "")
         else:
             continue
         if data:
