@@ -814,3 +814,18 @@ body.tac #b-3d{display:none!important}
 /* водяний знак на екрані */
 #wm{position:fixed;left:max(10px,env(safe-area-inset-left));top:calc(env(safe-area-inset-top) + 6px);width:54px;height:54px;object-fit:contain;opacity:.55;pointer-events:none;z-index:4;display:none}
 body.wm #wm{display:block}
+
+/* заставка: лого НЕ обертається; масштабування рухомих елементів самого лого. Вихід: просте згасання без шторки */
+@keyframes lgIn{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+#intro .lg{animation:lgIn .7s ease-out both}
+#intro .lg img{animation:embBreath 3.2s ease-in-out .7s infinite}
+#intro .lg .st,#intro .lg .ar{position:absolute;border-radius:50%;pointer-events:none;mix-blend-mode:screen}
+#intro .lg .st{left:41%;top:26.5%;width:17.6%;height:17.6%;background:radial-gradient(circle,rgba(255,214,120,.95) 0,rgba(255,190,70,.45) 28%,rgba(255,170,40,0) 66%);animation:starPulse 1.9s ease-in-out .8s infinite}
+#intro .lg .ar{left:44.6%;top:3%;width:10.8%;height:12%;border-radius:40%;background:radial-gradient(circle,rgba(90,170,255,.9) 0,rgba(60,140,255,0) 68%);animation:arrPulse 1.9s ease-in-out 1.3s infinite}
+@keyframes starPulse{0%,100%{opacity:.25;transform:scale(.55)}50%{opacity:1;transform:scale(1.25)}}
+@keyframes arrPulse{0%,100%{opacity:.1;transform:scale(.6)}50%{opacity:.9;transform:scale(1.2)}}
+#intro{transition:opacity .35s ease!important}
+#intro.out{clip-path:none!important;opacity:0}
+body.intro-in .top,body.intro-in .me,body.intro-in .dock,body.intro-in .notes{animation:none!important}
+@media (prefers-reduced-motion:reduce){#intro .lg .st,#intro .lg .ar{display:none}}
+#intro .lg::before{inset:auto!important;left:14%;top:3%;width:72%;height:72%}

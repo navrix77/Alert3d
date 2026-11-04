@@ -475,7 +475,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
   const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
-    const c=camFor();if(REDUCE)map.jumpTo(c);else map.flyTo({...c,duration:2400,curve:1.25,essential:true});window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,REDUCE?50:2500);};
+    const c=camFor();map.jumpTo(c);window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,30);};
   if(skip){if(el)el.remove();document.body.classList.remove('intro');go();return;}
   // поки стоїмо й летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
