@@ -719,3 +719,14 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .sh-split .fact{border-left:3px solid #fff}
 .sh-split .est{border-left:3px dashed #FFB347}
 .sh-split .sp-n{opacity:.6;font-size:11px}
+
+/* тактична панель: масштаби й фільтри */
+.tac-bar{position:fixed;left:max(12px,env(safe-area-inset-left));top:max(12px,env(safe-area-inset-top));z-index:6;display:flex;gap:4px;padding:3px;border-radius:12px;background:rgba(14,17,22,.88);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)}
+.tac-bar button{border:0;background:transparent;color:#cfd6e0;font:600 12px/1 inherit;padding:8px 10px;border-radius:9px;min-height:34px}
+.tac-bar button.on{background:#e6ebf2;color:#10141a}
+.tac-bar #tac-f{border-left:1px solid rgba(255,255,255,.14);border-radius:0 9px 9px 0;margin-left:2px}
+.tac-flt{position:fixed;left:max(12px,env(safe-area-inset-left));top:calc(max(12px,env(safe-area-inset-top)) + 48px);z-index:6;width:min(330px,calc(100vw - 80px));max-height:60vh;overflow:auto;padding:10px 12px;border-radius:12px;background:rgba(14,17,22,.96);border:1px solid rgba(255,255,255,.14)}
+.tac-flt h5{margin:8px 0 5px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8d97a6}.tac-flt h5:first-child{margin-top:0}
+.tac-flt div{display:flex;flex-wrap:wrap;gap:5px}
+.tac-flt .tc{border:1px solid rgba(255,255,255,.18);background:transparent;color:#9aa4b2;border-radius:8px;padding:6px 9px;font:600 12px/1 inherit}
+.tac-flt .tc.on{background:#e6ebf2;color:#10141a;border-color:#e6ebf2}

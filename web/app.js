@@ -72,7 +72,12 @@ try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo
   setTimeout(()=>{try{const el=pp.getElement();if(!el)return;const b=el.getBoundingClientRect(),pad=10,top=(document.querySelector('header.top')||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom+6;
     let dx=0,dy=0;if(b.right>innerWidth-pad)dx=b.right-innerWidth+pad;if(b.left-dx<pad)dx=b.left-pad;if(b.top<top)dy=b.top-top;
     if(dx||dy)m.panBy([dx,dy],{duration:350});}catch(e){}},60);return r;};}catch(e){}
-let TACHL=null;let TAC=false;try{TAC=localStorage.getItem('mode_tac')==='1';}catch(e){}window.FXTAC=TAC;
+let TACHL=null;const TACF=(()=>{try{return Object.assign({hide:[],fresh:0,src:'',alerts:true,scale:''},JSON.parse(localStorage.getItem('tac_f')||'{}'));}catch(e){return {hide:[],fresh:0,src:'',alerts:true,scale:''};}})();
+const tacSave=()=>{try{localStorage.setItem('tac_f',JSON.stringify(TACF));}catch(e){}};
+function tacOK(tr,serverT){if(sel===tr.id)return true;if(TACF.hide.includes(tr.type))return false;
+  if(TACF.fresh){const a=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now);if(a>TACF.fresh*60)return false;}
+  if(TACF.src){const P=(tr.ev&&tr.ev.prim&&tr.ev.prim.length?tr.ev.prim:tr.srcs)||[];if(!P.includes(TACF.src))return false;}return true;}
+let TAC=false;try{TAC=localStorage.getItem('mode_tac')==='1';}catch(e){}window.FXTAC=TAC;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
@@ -105,8 +110,29 @@ async function styleFor(kind){
   if(vec.sprite)out.sprite=vec.sprite;return out;
 }
 function wantBase(th){return TAC?(PREF.tacSat?'sat':'tac'):(PREF.base&&PREF.base!=='tac'?PREF.base:(th==='night'?'night':'map'));}
-function setTac(on){TAC=!!on;window.FXTAC=TAC;try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);
-  setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();},80);toast(TAC?'Тактична мапа':'Звичайна мапа');}
+
+/* ---------- тактична панель: масштаби й фільтри ---------- */
+function tacScale(v){TACF.scale=v;tacSave();const H=home||[31.5,49];
+  if(v==='near')map.flyTo({center:H,zoom:9.6,duration:700});else if(v==='oblast')map.flyTo({center:H,zoom:7.2,duration:700});else map.flyTo({center:[31.5,48.8],zoom:5.4,duration:700});
+  const b=document.querySelector('#rad-scope button[data-v="'+({near:'near',oblast:'oblast',country:'country'}[v])+'"]');if(b)b.click();// озвучення радіо змінюється разом із масштабом
+  tacBarSync();}
+function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
+  const n=TACF.hide.length+(TACF.fresh?1:0)+(TACF.src?1:0)+(TACF.alerts?0:1);const f=$('#tac-f');if(f)f.textContent='Фільтри'+(n?' · '+n:'');}
+function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;if(!pn.hidden){pn.hidden=true;return;}
+  const types=[...new Set((SNAP&&SNAP.tracks||[]).filter(t=>t.status==='active').map(t=>t.type))];const srcs=new Map();
+  for(const t of (SNAP&&SNAP.tracks||[]).filter(t=>t.status==='active'))for(const k of ((t.ev&&t.ev.prim&&t.ev.prim.length?t.ev.prim:t.srcs)||[]))srcs.set(k,(SNAP.sources[k]&&SNAP.sources[k].name)||k);
+  const chip=(a,on,l)=>'<button class="tc'+(on?' on':'')+'" '+a+'>'+esc(l)+'</button>';
+  pn.innerHTML='<h5>Типи цілей</h5><div>'+types.map(t=>chip('data-ty="'+t+'"',!TACF.hide.includes(t),TYPE_NAME[t]||t)).join('')+'</div>'+
+    '<h5>Свіжість</h5><div>'+[[0,'Усі'],[10,'до 10 хв'],[30,'до 30 хв'],[60,'до години']].map(x=>chip('data-fr="'+x[0]+'"',TACF.fresh===x[0],x[1])).join('')+'</div>'+
+    '<h5>Джерело</h5><div>'+chip('data-sr=""',!TACF.src,'Усі')+[...srcs].map(x=>chip('data-sr="'+esc(x[0])+'"',TACF.src===x[0],x[1])).join('')+'</div>'+
+    '<h5>Офіційні тривоги</h5><div>'+chip('data-al="1"',TACF.alerts,'Показувати')+chip('data-al="0"',!TACF.alerts,'Сховати')+'</div>';pn.hidden=false;}
+document.addEventListener('click',e=>{const b=e.target.closest('#tac-bar [data-sc],#tac-flt .tc,#tac-f');if(!b)return;
+  if(b.dataset.sc)return tacScale(b.dataset.sc);if(b.id==='tac-f')return tacFilterPanel();
+  if(b.dataset.ty){const i=TACF.hide.indexOf(b.dataset.ty);if(i>=0)TACF.hide.splice(i,1);else TACF.hide.push(b.dataset.ty);}
+  else if(b.dataset.fr!=null)TACF.fresh=+b.dataset.fr;else if(b.dataset.sr!=null)TACF.src=b.dataset.sr;else if(b.dataset.al!=null)TACF.alerts=b.dataset.al==='1';
+  tacSave();applyLayers();tacBarSync();$('#tac-flt').hidden=true;tacFilterPanel();});
+function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+  setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
 async function setBase(kind){base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
 function addImages(){
@@ -469,6 +495,7 @@ function frame(now){
     const serverT=Date.now()/1000+offset;
     const feats=[],trails=[],preds=[],threats=[],lpf=[];
     for(const tr of SNAP.tracks){
+      if(TAC&&!tacOK(tr,serverT))continue;
       const {p,hd}=posAt(tr,serverT);
       let d=DISP.get(tr.id);
       if(!d||Math.abs(d.p[0]-p[0])+Math.abs(d.p[1]-p[1])>1.2){d={p:[...p],hd:hd??0};DISP.set(tr.id,d);}
@@ -1234,7 +1261,8 @@ function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g
   $('#st-3d').checked=tilt;$('#st-sys').checked=!!PREF.sys&&'Notification' in window&&Notification.permission==='granted';$('#st-ru').checked=!!PREF.ru;$('#st-launch').checked=!!PREF.launch;$('#st-zones').checked=!!PREF.zones;}
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);
-  if(TAC)vis(['holo','holo-top','ra-glow'],false);}
+  if(TAC)vis(['holo','holo-top','ra-glow'],false);
+  if(TAC&&!TACF.alerts)vis(['hp-f','hp-l','hrom','hrom-t'],false);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setData(EMPTY);return;// заяви МО РФ «скільки збили над регіоном» прибрано з мапи: застарілі зведення без місця й часу удару нічого не дають людині
 
@@ -1345,7 +1373,7 @@ let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.we
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
 window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
-applyTheme(false);document.body.classList.toggle('tac',TAC);
+applyTheme(false);document.body.classList.toggle('tac',TAC);tacBarSync();
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 
 /* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */
