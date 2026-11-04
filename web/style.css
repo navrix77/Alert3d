@@ -748,3 +748,11 @@ body.tac .maplibregl-ctrl-top-left{margin-top:max(8px,env(safe-area-inset-top))}
 body.tac .maplibregl-ctrl-scale{background:rgba(14,17,22,.8);color:#cfd6e0;border-color:#cfd6e0;font-size:10px}
 
 .tac-bar{flex-wrap:wrap;justify-content:flex-end}
+
+body.tac .me{display:none!important}
+.tac-rail{position:fixed;right:max(6px,env(safe-area-inset-right));top:max(120px,calc(env(safe-area-inset-top) + 112px));z-index:5;display:flex;flex-direction:column;gap:2px;max-height:calc(100% - 260px);overflow-y:auto;padding:3px;background:rgba(14,17,22,.78);border:1px solid #3a424f;border-radius:10px;scrollbar-width:none}
+.tac-rail[hidden]{display:none!important}
+.tac-rail button{position:relative;display:block;width:38px;height:34px;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}
+.tac-rail button svg{display:block;margin:auto;max-width:34px;max-height:30px}
+.tac-rail button i{position:absolute;right:1px;bottom:0;font:700 9px/1 -apple-system,system-ui,sans-serif;color:#cfd6e0;font-style:normal}
+.tac-rail button.on{background:rgba(255,255,255,.16);outline:1px solid #fff}

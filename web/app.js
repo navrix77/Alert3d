@@ -137,6 +137,11 @@ document.addEventListener('click',e=>{const b=e.target.closest('#tac-bar [data-s
 function loadApp06(){return window.__a6||(window.__a6=new Promise(res=>{const a=document.createElement('script');a.src='/vendor/milsymbol.js';
   a.onload=()=>{const b=document.createElement('script');b.src='/app06.js';b.onload=()=>res(window.App06||null);b.onerror=()=>res(null);document.head.appendChild(b);};a.onerror=()=>res(null);document.head.appendChild(a);}));}
 const SYMP=new Set();
+// вертикальна колонка значків цілей справа (замість блоку «Мій дім»): щільно, найновіші зверху
+function tacRail(L){const el=$('#tac-rail');if(!el)return;const A=window.App06;if(!TAC||!A||!L.length){el.hidden=true;return;}
+  L=L.sort((a,b)=>a.m-b.m).slice(0,14);const k=L.map(x=>x.id+x.aff+x.type+x.n+x.m+(sel===x.id?'*':'')).join('|');if(el.dataset.k===k)return;el.dataset.k=k;
+  el.innerHTML=L.map(x=>{let v='';try{v=A.svg({type:x.type,affiliation:x.aff,hd:null,count:x.n>1?x.n:undefined,size:30});}catch(e){}return '<button data-id="'+x.id+'"'+(sel===x.id?' class="on"':'')+' aria-label="Ціль">'+v+'<i>'+(x.m<1?'<1':x.m)+'</i></button>';}).join('');el.hidden=false;}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('#tac-rail button');if(b)openSheet(b.dataset.id);});
 function tacImg(spec){const A=window.App06;if(!A)return null;const b=A.build(spec);if(map.hasImage(b.key)||SYMP.has(b.key))return b.key;SYMP.add(b.key);
   try{const y=A.symbol(spec),an=y.getAnchor(),sz=y.getSize(),W=Math.ceil(2*Math.max(an.x,sz.width-an.x)),H=Math.ceil(2*Math.max(an.y,sz.height-an.y));// рамка завжди в центрі зображення, тож стоїть точно на координаті
     const im=new Image();im.onload=()=>{try{const c=document.createElement('canvas');c.width=W*2;c.height=H*2;const g=c.getContext('2d');g.drawImage(im,(W/2-an.x)*2,(H/2-an.y)*2,sz.width*2,sz.height*2);
@@ -611,10 +616,11 @@ function frame(now){
     if(slow)window.FXBEACONS=PREFL().launch?(SNAP.launches||[]).filter(L=>serverT-L.t<3*3600).map(L=>({p:[L.lon,L.lat]})):[];
     if(slow)map.getSource('targets').setData({type:'FeatureCollection',features:feats});
     if(slow&&map.getSource('tac')){const TF=[];
-      const A6=TAC?window.App06:null;
+      const A6=TAC?window.App06:null;const RAIL=[];
       if(TAC)for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
         const ageS=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),mins=Math.floor(ageS/60),o=ageS<300?1:Math.max(0.4,1-(ageS-300)/1500),c=f.properties.c,P=f.geometry.coordinates;
         TF.push({type:'Feature',properties:{k:'age',l:mins<1?'<1 хв':mins+' хв',o,c},geometry:{type:'Point',coordinates:P}});
+        if(A6&&f.properties.active)RAIL.push({id:tr.id,aff:tacAff(tr),type:A6.MAP[tr.type]?tr.type:'unknown',n:f.properties.count,m:mins,hd:null});
         if(A6){const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next);// напрямок у символі лише коли він відомий
           const key=tacImg({type:A6.MAP[tr.type]?tr.type:'unknown',affiliation:tacAff(tr),hd:(f.properties.unk||tr.hd==null||still)?null:f.properties.sa,count:f.properties.count});
           TF.push({type:'Feature',properties:{k:'sym',img:key,v:(sel===tr.id||map.getZoom()>=6.5)?(A6.MODEL[tr.type]||''):'',o},geometry:{type:'Point',coordinates:P}});
@@ -624,6 +630,7 @@ function frame(now){
           TF.push({type:'Feature',properties:{k:'ln',o,c},geometry:{type:'LineString',coordinates:[[q[0],q[1]],P]}});}}
       if(TACHL&&Date.now()<TACHL.until)TF.push({type:'Feature',properties:{k:'hl'},geometry:{type:'Point',coordinates:TACHL.p}});
       map.getSource('tac').setData({type:'FeatureCollection',features:TF});
+      tacRail(RAIL);
       if(map.getSource('reach'))map.getSource('reach').setData(reachData(serverT));enemyApply();}
     try{if(slow&&map.getSource('flow')){const FL=[],PU=[];const sT=serverT;
       for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
