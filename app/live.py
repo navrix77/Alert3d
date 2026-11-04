@@ -318,6 +318,7 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
     off = state.get("official") or {}
     alert = bool(obl) and (obl in levels or obl in (off.get("alert_obl") or []))
     near = []
+    far = None  # найближча ціль поза радіусом (до 300 км): щоб «поруч немає» не звучало як «немає взагалі»
     for t in state.get("tracks", []):
         if t.get("status") != "active" or not home:
             continue
@@ -325,6 +326,14 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
         at_ll = t.get("at_ll")
         named_km = round(_km(tuple(at_ll), home)) if at_ll else None
         if km > radius and (named_km is None or named_km > radius):
+            dk = named_km if named_km is not None else km
+            if dk <= 300 and (far is None or dk < far["km"]):
+                appr_f = None
+                if t.get("hd") is not None:
+                    appr_f = abs((t["hd"] - _brg((t["lon"], t["lat"]), home) + 180) % 360 - 180) <= 40
+                far = {"id": t["id"], "type": t["type"], "n": t.get("count") or 1, "km": round(dk), "appr": appr_f,
+                       "side": SIDES[int(((_brg(home, tuple(at_ll) if at_ll and named_km is not None else (t["lon"], t["lat"])) + 22.5) % 360) // 45)],
+                       "at": (t.get("at") or [None])[0] if named_km is not None else None}
             continue
         side = SIDES[int(((_brg(home, (t["lon"], t["lat"])) + 22.5) % 360) // 45)]
         appr = None
@@ -355,8 +364,10 @@ def near_facts(state: dict, home, obl: str, since: float, radius: float = 120) -
         home_raion = raions().of(home[0], home[1])
         raion_alert = bool(home_raion) and home_raion in (off.get("raion_levels") or {})
     fp = tuple(sorted((x["id"], bool(x["appr"]), x["km"] // 15, x["next"] or "") for x in near[:6])) + (alert, raion_alert, bool(bal))
+    if not near and far:
+        fp = fp + (("far", far["id"], far["km"] // 25, bool(far["appr"])),)
     return {"alert": alert, "raion": home_raion, "raion_alert": raion_alert, "near": near[:6], "n_near": len(near), "bal": bal[-1:],
-            "urgent": urgent, "fp": fp, "radius": radius}
+            "urgent": urgent, "fp": fp, "radius": radius, "far": far if not near else None}
 
 
 def region_text(f: dict, obl: str) -> tuple[str, str]:

@@ -80,3 +80,10 @@ def test_country_changes_only():
     f = {"al": ["Харківська", "Сумська"], "bal": [], "top": [("Харківська", [("shahed", 3)])]}
     assert v.compose_changes(f, prev) == ["Україна, зміни.", "Нові тривоги:", "Сумщина."]
     assert v.compose_changes(dict(f, al=["Харківська"]), prev) == []
+
+
+def test_far_target_when_nothing_near():
+    fr = v.compose({"bal": [], "near": [], "n_near": 0, "alert": True, "raion_alert": False, "radius": 25,
+                    "far": {"type": "shahed", "n": 2, "km": 63, "side": "на сході", "at": "Чугуїв", "appr": True}})
+    assert fr == ["Тривога в області триває.", "У радіусі двадцяти п'яти кілометрів повідомлень про цілі немає.", "Найближча ціль:",
+                  "Два шахеди", "на сході,", "за шістдесят п'ять кілометрів від вас.", "Місце: Чугуїв.", "Рухається у ваш бік."]
