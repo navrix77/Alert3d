@@ -915,3 +915,15 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 #intro .lg .rg{animation-delay:1.75s!important}#intro .lg .rg.r2{animation-delay:2s!important}
 #intro p.slogan .s1{animation-delay:2.2s!important}#intro p.slogan .s2{animation-delay:2.4s!important}#intro p.slogan em{animation-delay:2.65s!important}
 @media (prefers-reduced-motion:reduce){#intro .lg .p{animation:none!important;opacity:1}}
+
+/* ===== Заставка v6: лого цілісне, з'являється разом; потім ніжно оживають окремі елементи ===== */
+#intro .lg .p{animation:lxFade .9s ease-out .15s both!important;will-change:opacity,filter}
+@keyframes lxFade{from{opacity:0}to{opacity:1}}
+#intro .lg .p.ps,#intro .lg .p.pg,#intro .lg .p.pb{animation:lxFade .9s ease-out .15s both,lxGlow 1.3s ease-in-out 1.2s 1 both!important}
+#intro .lg .p.pg{animation:lxFade .9s ease-out .15s both,lxGlow 1.3s ease-in-out 1.55s 1 both!important}
+#intro .lg .p.pb{animation:lxFade .9s ease-out .15s both,lxGlow 1.3s ease-in-out 1.85s 1 both!important}
+@keyframes lxGlow{0%,100%{filter:brightness(1) saturate(1)}45%{filter:brightness(1.55) saturate(1.25)}}
+#intro .lg .p1,#intro .lg .p2{animation:lxFade .9s ease-out .15s both!important}
+#intro .lg .sh{animation-delay:2.3s!important}
+#intro .lg .rg{animation-delay:2s!important}#intro .lg .rg.r2{animation-delay:2.25s!important}
+#intro p.slogan .s1{animation-delay:2.3s!important}#intro p.slogan .s2{animation-delay:2.5s!important}#intro p.slogan em{animation-delay:2.75s!important}
