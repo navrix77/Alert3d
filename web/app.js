@@ -628,9 +628,12 @@ const STRAT_PATH={tu95:'M0,-42 L3,-36 L4,-8 L40,2 L40,8 L4,6 L3,26 L14,34 L14,38
   mig31:'M0,-44 L3,-32 L5,-14 L34,10 L34,16 L6,10 L7,30 L16,40 L2,38 L0,34 L-2,38 L-16,40 L-7,30 L-6,10 L-34,16 L-34,10 L-5,-14 L-3,-32 Z'};
 const STRAT_STAGE={ground:'на аеродромі',landed:'посадка',takeoff:'зліт',transit:'переліт',line:'на пусковому рубежі',launch:'пуск'};
 let STRAT=[];const STRAT_SEEN=new Set();let stratFx=[];let stratRaf=0;
-function stratImages(){for(const k in STRAT_PATH){const id='st-'+k;if(map.hasImage(id))continue;const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.translate(48,48);
+function stratImages(){for(const k in STRAT_PATH){const id='st-'+k;if(map.hasImage(id))continue;const c=document.createElement('canvas');c.width=c.height=192;const x=c.getContext('2d');x.translate(96,96);x.scale(2,2);
   const p=new Path2D(STRAT_PATH[k]);x.shadowColor='#FF8A1F';x.shadowBlur=9;x.fillStyle='#FFB347';x.fill(p);x.shadowBlur=0;x.lineWidth=2.2;x.strokeStyle='#fff';x.stroke(p);
-  map.addImage(id,x.getImageData(0,0,96,96),{pixelRatio:3});}}
+  map.addImage(id,x.getImageData(0,0,192,192),{pixelRatio:6});
+  // справжній силует літака (вид згори) замінює запасний контур, щойно завантажився
+  const im=new Image();im.onload=()=>{try{const q=document.createElement('canvas');q.width=q.height=192;const g=q.getContext('2d');g.shadowColor='rgba(255,138,31,.85)';g.shadowBlur=10;g.drawImage(im,0,0,192,192);g.shadowBlur=0;g.drawImage(im,0,0,192,192);
+    if(map.hasImage(id))map.updateImage(id,g.getImageData(0,0,192,192));}catch(e){}};im.src='/sprites/s-'+k+'.png';}}
 function stratAL(l){if(!map.getLayer(l.id))map.addLayer(l);}
 function stratEnsure(){if(map.getLayer('strat'))return true;try{return stratBuild();}catch(e){return false;}}
 function stratBuild(){stratImages();
