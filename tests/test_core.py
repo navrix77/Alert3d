@@ -1746,3 +1746,24 @@ def test_stress_marks_for_tts():
     from app.tts import stress_marks, words_numbers
     t = stress_marks(words_numbers("Шахед на Чугуїв, 12 км"))
     assert "Чугу́їв" in t and "Шахе́д" in t and "12" not in t
+
+
+def test_kyiv_objects_not_village_kyivske():
+    """02.11 журнал: «Київське водосховище/море», «Київська ГЕС» — біля Вишгорода; «ПС 750 Київська», «підстанцію «Київська»» —
+    не село Київське на Полтавщині (monikppy, PhantomChe, kyiv_golovne, truexakyiv, novini_ukrtg, MU).
+    «Полтавський …»/«В Полтавську залітає» — не село Полтавське на Харківщині (ppopoltavanightfighters, cherkasy_nebbo)."""
+    names = lambda t, s="X": [r.place.name for r in P.parse(t, s).places]
+    assert names("Реактивний шахед на Київське водосховище.", "monikppy") == ["Вишгород"]
+    assert "Вишгород" in names("реактивний від Куликівки пішов повз Олишівку/Гончарівське на київське море.", "PhantomChe")
+    assert names("Реактивні БпЛА з Чернігівщини на Київщину у напрямку Київського водосховища.", "alarmua") == ["Вишгород"]
+    assert "Київське" not in names("❗️ Герань-5 падає на ПС 750 Київська", "kyiv_golovne")
+    assert "Київське" not in names("🤯Сьогодні більшість «Шахедів» летять у напрямку підстанції «Київська» та Трипільської ТЕС, – монітори.", "truexakyiv")
+    assert "Київське" not in names("🔴Вишгород — Київська ГЕС", "MU")
+    assert "Полтавське" not in names("Полтавський Щас буде тривога 2- реактивних з Дніпра", "ppopoltavanightfighters")
+    assert "Полтавське" not in names("В Полтавську залітає реактивний (керований) в бік Кобеляк , до нашої області 24 хвилини.", "cherkasy_nebbo")
+    # район лишається районом
+    assert "Полтавський р-н" in names("Полтавський, Кременчуцький район відбій", "ppopoltavanightfighters")
+    assert "Полтавський р-н" in names("⚠️5 шахедів з Харківщини на Полтавщину, Полтавський район", "MU")
+    assert names("Полтавський знову на дрони", "ppo_poltava") == ["Полтавський р-н"]
+    assert "Полтавський р-н" in names("❗2 крилаті ракети Х-101 з Харківщини на Полтавщину, Полтавський.", "MU")
+    assert "Полтавське" not in names("4 реактивних в Полтавську, 1 в Черкаській", "kyiv_airdef")
