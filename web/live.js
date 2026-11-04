@@ -410,8 +410,9 @@
     const pre = radioReq(sc0, true).then(r => { if (r && (r.speech || r.text) && r.level !== 'calm') r.voice = r.audio ? preUrl(r.audio) : preVoice(r.speech || r.text, 'radio'); return r; }).catch(() => ({}));
     await Promise.race([sLoad(), wait(900)]);
     bedStart(); const id = SND.ident();
-    const hi = preVoice('Ви слухаєте Скай Радіо.', 'radio');
-    await id; await speak('Ви слухаєте Скай Радіо.', 'radio', hi);
+    const IDT = 'Скай. Розумій, що відбувається в небі.';  // фірмова заставка (специфікація радіо), озвучена один раз і з кешу
+    const hi = preVoice(IDT, 'radio');
+    await id; await speak(IDT, 'radio', hi);
     await radioIssue(null, pre);         // зведення в обраному режимі охоплення
     // 04.11 власник: «де зведення по Україні?» — за концепцією: на початку й раз на 15 хв, у будь-якому режимі (із заготовок, безкоштовно)
     if (radioOn && sc0 !== 'country') await radioIssue('country');
