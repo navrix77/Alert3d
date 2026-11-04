@@ -250,6 +250,12 @@ async def _google_voices() -> dict:
     return _gvoices
 
 
+# Наголос у словах, які Google читає по-своєму (власник 04.11: «Шахеди» коверкає): шахе́д, а не ша́хед
+_SH = (("ʃɐˈxɛd", ("шахед", "Шахед")), ("ʃɐˈxɛdɪ", ("шахеди", "Шахеди")), ("ʃɐˈxɛdiu̯", ("шахедів", "Шахедів")),
+       ("ʃɐˈxɛdɔm", ("шахедом", "Шахедом")), ("ʃɐˈxɛdɐx", ("шахедах", "Шахедах")), ("ʃɐˈxɛdɐm", ("шахедам", "Шахедам")))
+G_PRON = [(w, ipa) for ipa, ws in _SH for w in ws]
+
+
 async def _google(text: str, key: str, rate: float) -> bytes | None:
     vs = await _google_voices()
     want = "male" if key in ("mykyta", "oleksa", "radio") else "female"
@@ -257,18 +263,28 @@ async def _google(text: str, key: str, rate: float) -> bytes | None:
     if not name:
         return None
     import base64
+    cfg = {"audioEncoding": "MP3", "speakingRate": max(0.7, min(1.4, rate))}
+    voice = {"languageCode": "uk-UA", "name": name}
+    prons = [{"phrase": f, "phoneticEncoding": "PHONETIC_ENCODING_IPA", "pronunciation": ipa}
+             for f, ipa in G_PRON if re.search(rf"(?<![\w]){re.escape(f)}(?![\w])", text)]
     async with httpx.AsyncClient(timeout=20) as cli:
-        r = await cli.post("https://texttospeech.googleapis.com/v1/text:synthesize", params={"key": GKEY},
-                           json={"input": {"text": text}, "voice": {"languageCode": "uk-UA", "name": name},
-                                 "audioConfig": {"audioEncoding": "MP3", "speakingRate": max(0.7, min(1.4, rate))}})
-        r.raise_for_status()
-        return base64.b64decode(r.json()["audioContent"])
+        for use in ([True, False] if prons else [False]):
+            inp = {"text": text}
+            if use:  # власні вимова й наголос (Chirp 3 HD); якщо голос їх не підтримує — повторюємо без них
+                inp["customPronunciations"] = {"pronunciations": prons}
+            r = await cli.post("https://texttospeech.googleapis.com/v1/text:synthesize", params={"key": GKEY},
+                               json={"input": inp, "voice": voice, "audioConfig": cfg})
+            if r.status_code == 400 and use:
+                log.info("google tts: власна вимова не прийнята, без неї: %s", r.text[:160])
+                continue
+            r.raise_for_status()
+            return base64.b64decode(r.json()["audioContent"])
 
 
 # Природний голос із правильними наголосами (власник 03.11: «голос жахливий, наголоси не ті»): нейромережевий TTS OpenAI,
 # якщо є OPENAI_API_KEY. Голос і манеру можна змінити в .env: TTS_OPENAI_MODEL, TTS_OPENAI_VOICE. Piper лишається запасним.
 LAST = {"openai": "", "gemini": ""}  # остання помилка OpenAI TTS (без ключа) — для /api/tts/check
-VOICE_V = "r9"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
+VOICE_V = "r10"  # змінюється разом із голосами/інструкцією — старий кеш озвучки не використовується
 OAI_VOICES = {"lada": "coral", "tetiana": "nova", "mykyta": "ash", "oleksa": "echo", "radio": "ash"}
 # 04.11 власник: «голос і вимова — погано». Детальна інструкція диктора: рідна українська, радійна подача, наголоси назв
 OAI_STYLE = ("Читай українською як носій мови, чітко й природно, у звичайному темпі. У тексті стоять знаки наголосу (´): "
@@ -455,7 +471,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
         return None, "empty"
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
     if key == "radio":
-        rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо на 25% швидше
+        rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.4")), 2)  # 04.11 власник: ефір і радіо швидше (1.25 → 1.4, межа Google)
     order = (os.getenv("TTS_ORDER") or ("google,openai,gemini" if GKEY else "openai,gemini")).split(",") if paid else []
     if not google:  # безкоштовний місячний ліміт Google вичерпано — не виходимо в платний тариф
         order = [p for p in order if p.strip() != "google"]
