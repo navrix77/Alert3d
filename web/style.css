@@ -750,14 +750,15 @@ body.tac .maplibregl-ctrl-scale{background:rgba(14,17,22,.8);color:#cfd6e0;borde
 .tac-bar{flex-wrap:wrap;justify-content:flex-end}
 
 body.tac .me{display:none!important}
-body.tac .counters{position:fixed;right:max(6px,env(safe-area-inset-right));top:max(150px,calc(env(safe-area-inset-top) + 142px));flex-direction:column;flex-wrap:nowrap;gap:0;width:auto;max-height:calc(100% - 300px);overflow-y:auto;scrollbar-width:none;border-radius:12px;background:rgba(14,17,22,.82);border:1px solid #3a424f;box-shadow:none;z-index:5}
+body.tac .counters{position:fixed;right:max(6px,env(safe-area-inset-right));top:max(150px,calc(env(safe-area-inset-top) + 142px));flex-direction:column;flex-wrap:nowrap;gap:0;width:auto;max-height:calc(100% - 300px);overflow-y:auto;scrollbar-width:none;border-radius:12px;background:rgba(14,17,22,.9)!important;border:1px solid #3a424f!important;box-shadow:none!important;z-index:5;backdrop-filter:blur(6px)}
 body.tac .counters .cnt{display:flex;align-items:center;gap:4px;padding:3px 7px 3px 4px!important;border-right:0!important;border-bottom:1px solid rgba(255,255,255,.1)!important;min-height:0;color:#e6ebf2}
 body.tac .counters .cnt:last-child{border-bottom:0!important}
 body.tac .counters .cnt .cs{display:block;line-height:0}
 body.tac .counters .cnt .cs svg{display:block;max-width:34px;max-height:30px}
 body.tac .counters .cnt .cw{display:block}
-body.tac .counters .cnt b{font:800 15px/1 -apple-system,system-ui,sans-serif;color:#fff;margin:0}
-body.tac .counters .cnt small{display:none}
+body.tac .counters .cnt b{font:800 16px/1 -apple-system,system-ui,sans-serif;color:#fff!important;margin:0;text-shadow:none}
+body.tac .counters .cnt .cw{display:flex;flex-direction:column;gap:2px;min-width:54px}
+body.tac .counters .cnt small{display:block;font:700 10px/1 -apple-system,system-ui,sans-serif;color:#cfd6e0!important;letter-spacing:.02em;text-transform:none}
 body.tac .counters .cnt:hover{background:rgba(255,255,255,.08)!important}
 .tac-bar{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:4px;padding:5px;border-radius:14px}
 .tac-bar .tb-row{display:flex;gap:4px;align-items:center}
