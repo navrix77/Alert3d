@@ -177,8 +177,8 @@ function addOverlays(){
     x.rotate(0.38);x.strokeStyle='rgba(120,200,255,.55)';x.lineWidth=2;for(let k=0;k<3;k++){x.beginPath();x.moveTo(-52+k*6,10+k*6);x.quadraticCurveTo(-30+k*6,4+k*6,-8,10+k*6);x.quadraticCurveTo(14,16+k*6,36-k*6,10+k*6);x.stroke();}
     map.addImage('moskva',x.getImageData(0,0,120,60),{pixelRatio:2});}
   map.addSource('memo',{type:'geojson',data:{type:'FeatureCollection',features:[
-    {type:'Feature',properties:{i:'moskva',l:'крейсер «Москва»\nна дні з 14.04.2022'},geometry:{type:'Point',coordinates:[30.93,45.17]}},
-    {type:'Feature',properties:{i:'',l:'Кримський міст\nЗАЧЕКАЙ ЩЕ ТРОХИ'},geometry:{type:'Point',coordinates:[36.51,45.31]}}]}});
+    {type:'Feature',properties:{i:'moskva',k:'moskva',l:'крейсер «Москва»\nна дні з 14.04.2022'},geometry:{type:'Point',coordinates:[30.93,45.17]}},
+    {type:'Feature',properties:{i:'',k:'bridge',l:'Кримський міст\nЗАЧЕКАЙ ЩЕ ТРОХИ'},geometry:{type:'Point',coordinates:[36.51,45.31]}}]}});
   map.addLayer({id:'memo-br',type:'line',source:{type:'geojson',data:{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:[[36.44,45.25],[36.52,45.30],[36.60,45.36]]}}},paint:{'line-color':'rgba(255,90,90,.55)','line-width':2.5,'line-dasharray':[1,1]}});
   map.addLayer({id:'memo',type:'symbol',source:'memo',minzoom:4.6,layout:{'icon-image':['get','i'],'icon-size':['interpolate',['linear'],['zoom'],5,0.8,8,1.25],'icon-allow-overlap':true,'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['interpolate',['linear'],['zoom'],5,9.5,8,12],'text-letter-spacing':0.08,'text-offset':[0,1.3],'text-anchor':'top','text-rotate':-8,'text-optional':true,'text-max-width':20},paint:{'text-color':'rgba(255,215,140,.75)','text-halo-color':'rgba(0,0,0,.8)','text-halo-width':1.3,'icon-opacity':0.85}});
   map.addSource('ru',{type:'geojson',data:EMPTY});map.addSource('hits',{type:'geojson',data:EMPTY});
