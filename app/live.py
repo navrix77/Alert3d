@@ -199,6 +199,13 @@ def validate(steps: list, d: dict) -> list[dict]:
 
 
 async def narrate(llm, d: dict, question: str | None = None) -> dict:
+    if KIT and not question:
+        # 04.11 власник: «максимально автоматизуй голос, щоб не витрачати кошти» — «що змінилось» без моделі, голос із заготовок
+        from . import voicekit
+        steps = voicekit.live_steps(d)
+        for st in steps:
+            st["audio"] = "/api/voice/" + voicekit.register(st.pop("voice"))
+        return {"steps": steps, "by": "rules"}
     if llm is None or not llm.on:
         return {"steps": fallback_script(d, question), "by": "rules"}
     lite = dict(d, items=[{k: v for k, v in i.items() if k not in ("lon", "lat")} for i in d["items"]])

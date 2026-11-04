@@ -777,15 +777,24 @@ def api_visits_app(request: Request, k: str = "app"):
 def _paid_ok() -> bool:
     import datetime as _dt
     from zoneinfo import ZoneInfo
-    cap = int(os.getenv("TTS_DAILY_CHARS", "150000"))
+    cap = int(os.getenv("TTS_DAILY_CHARS", "40000"))  # 04.11 власник: «щоб не витрачати кошти» — платний голос ≤ ≈$0,5 на добу
     day = (LLMX._usage or {}).get(_dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d"), {})
-    return sum(v for k, v in day.items() if k.startswith("tts_chars:")) < cap
+    return sum(v for k, v in day.items() if k.startswith("tts_chars:") and k != "tts_chars:google") < cap
+
+
+def _google_ok() -> bool:
+    """Google Chirp 3 HD: перший 1 млн символів на місяць безкоштовний; тримаємось нижче (GOOGLE_FREE_CHARS, за замовчуванням 900 тис.)."""
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    mon = _dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m")
+    used = sum(v.get("tts_chars:google", 0) for d, v in (LLMX._usage or {}).items() if str(d).startswith(mon) and isinstance(v, dict))
+    return used < int(os.getenv("GOOGLE_FREE_CHARS", "900000"))
 
 
 async def _say(text: str, voice: str = "radio", rate: float = 1.0):
-    """Озвучка з обліком: нові (не з кешу) символи платного голосу йдуть у денний ліміт."""
+    """Озвучка з обліком: нові (не з кешу) символи йдуть у ліміти (денний платний, місячний безкоштовний Google)."""
     from . import tts
-    data, why = await tts.speak(text, voice, rate, paid=_paid_ok())
+    data, why = await tts.speak(text, voice, rate, paid=_paid_ok(), google=_google_ok())
     if data and why in ("openai", "gemini", "google"):
         LLMX.count("tts_chars:" + why, len(text))
     return data, why
@@ -829,14 +838,14 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
     """Українська озвучка (Piper). 503, поки ставиться рушій або голос; клієнт тоді говорить голосом пристрою."""
     from fastapi import Response
     from . import tts
-    cap = int(os.getenv("TTS_DAILY_CHARS", "150000"))  # ~$2–3 на добу; понад — запасний голос, щоб не спустошити рахунок
+    cap = int(os.getenv("TTS_DAILY_CHARS", "40000"))  # 04.11: ≈$0,5 на добу максимум; понад — запасний голос, щоб не спустошити рахунок
     import datetime as _dt
     from zoneinfo import ZoneInfo
     day = (LLMX._usage or {}).get(_dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d"), {})
-    paid_ok = sum(v for k, v in day.items() if k.startswith("tts_chars:")) < cap
-    data, why = await tts.speak(text, voice, rate, paid=paid_ok)
+    paid_ok = sum(v for k, v in day.items() if k.startswith("tts_chars:") and k != "tts_chars:google") < cap
+    data, why = await tts.speak(text, voice, rate, paid=paid_ok, google=_google_ok())
     LLMX.count("tts:" + (why or "none").split(":")[0])
-    if data and why in ("openai", "gemini"):
+    if data and why in ("openai", "gemini", "google"):
         LLMX.count("tts_chars:" + why, len(text))
     if not data:
         return JSONResponse({"ok": False, "why": why, **tts.status()}, status_code=503)

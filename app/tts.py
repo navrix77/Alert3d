@@ -449,7 +449,7 @@ def _say_form(text: str) -> str:
     return t
 
 
-async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True) -> tuple[bytes | None, str]:
+async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True, google: bool = True) -> tuple[bytes | None, str]:
     text = say_form(" ".join((text or "").split())[:600])
     if not text:
         return None, "empty"
@@ -457,6 +457,8 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
     if key == "radio":
         rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо на 25% швидше
     order = (os.getenv("TTS_ORDER") or ("google,openai,gemini" if GKEY else "openai,gemini")).split(",") if paid else []
+    if not google:  # безкоштовний місячний ліміт Google вичерпано — не виходимо в платний тариф
+        order = [p for p in order if p.strip() != "google"]
     if not paid:  # денний ліміт платного голосу вичерпано: уже синтезоване з кешу, нове — запасним голосом
         for prov, ext in (("openai", "mp3"), ("gemini", "wav")):
             c = BASE / "cache" / f"{prov[0]}-{hashlib.sha1(f'{VOICE_V}|{key}|{rate}|{text}'.encode()).hexdigest()}.{ext}"
@@ -474,7 +476,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
             continue
         if data:
             return data, by
-    if GKEY:
+    if GKEY and google:
         gcache = BASE / "cache" / f"g-{hashlib.sha1(f'{VOICE_V}|{key}|{rate}|{text}'.encode()).hexdigest()}.mp3"
         if gcache.exists():
             return gcache.read_bytes(), "google-cache"

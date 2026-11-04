@@ -195,7 +195,7 @@ class LLM:
         day[key] = day.get(key, 0) + n
         if time.time() - self._usage_t > 30:
             self._usage_t = time.time()
-            for k in sorted(u)[:-14]:
+            for k in sorted(u)[:-40]:  # 40 днів: місячний облік безкоштовного ліміту Google
                 u.pop(k, None)
             try:
                 USAGE.parent.mkdir(parents=True, exist_ok=True)

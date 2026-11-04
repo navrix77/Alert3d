@@ -129,6 +129,7 @@ def vocabulary() -> list[str]:
     # «Моя область» і «Вся Україна»
     v += OBL_FIXED + [reg(o) + "." for o in REG] + [reg(o) + "," for o in REG] + [alerts_n(n) for n in range(1, 26)]
     v += [f"переважно {w}." for w in TOPW.values()]
+    v += LIVE_FIXED + [_cnt(l, n) for l in ("Нових цілей", "Змінилось", "Зникли з мапи") for n in range(1, 11)]
     for typ in ("shahed", "jet", "cruise", "ballistic", "kab"):
         v += [count_type(n, typ) + "." for n in range(1, 11)]
     return v
@@ -213,6 +214,59 @@ def compose(f: dict, first: bool = False, greeted: bool = True) -> list[str]:
             out.append("Тривога в області триває.")
         out.append("Поруч з вами цілей немає.")
     return out
+
+
+# ---------- Ефір «що змінилось» без моделі: кроки для мапи + голос із заготовок
+def _cnt(label: str, n: int) -> str:
+    return f"{label}: {num(min(int(n), 60), 'f')}."
+
+
+LIVE_FIXED = ["Що змінилось біля вас.", "Суттєвих змін у вашому районі немає.", "Оголошено повітряну тривогу.", "Тривогу знято.",
+              "Повідомлення про балістику.", "Відбій балістики.", "Нова ціль.", "Кількість змінилась.", "Курс змінився.",
+              "Нових повідомлень з того часу немає."]
+
+
+def live_steps(d: dict) -> list[dict]:
+    """Детермінований сценарій Ефіру: say — для екрана, voice — заготовки для голосу (жодних нових витрат на кожен показ)."""
+    c = d["counts"]
+    steps = []
+    v = ["Що змінилось біля вас."]
+    parts = []
+    if c["new"]:
+        v.append(_cnt("Нових цілей", c["new"])); parts.append(f"нових цілей {c['new']}")
+    if c["changed"]:
+        v.append(_cnt("Змінилось", c["changed"])); parts.append(f"змінилось {c['changed']}")
+    if c["gone"]:
+        v.append(_cnt("Зникли з мапи", c["gone"])); parts.append(f"зникли з мапи {c['gone']}")
+    al = d.get("alert")
+    if al and al["now"] != al["was"]:
+        v.append("Оголошено повітряну тривогу." if al["now"] else "Тривогу знято.")
+        parts.append("оголошено тривогу" if al["now"] else "тривогу знято")
+    if len(v) == 1:
+        v.append("Суттєвих змін у вашому районі немає.")
+    m = d.get("minutes")
+    steps.append({"say": (f"За {m} хв: " if m else "Зараз: ") + (", ".join(parts) if parts else "суттєвих змін у вашому районі немає") + ".",
+                  "action": "overview", "voice": v})
+    if d.get("bal"):
+        b = d["bal"][-1]
+        ph = "Відбій балістики." if b.get("close") else "Повідомлення про балістику."
+        steps.append({"say": ph[:-1] + f" о {time.strftime('%H:%M', time.localtime(b['t']))}.", "action": "dim", "value": True, "voice": [ph]})
+    for it in [i for i in d["items"] if i["status"] in ("new", "changed")][:5]:
+        v = [count_type(it["count"], it["type"]) + "."]
+        say = it["name"] + (f" ×{it['count']}" if it["count"] > 1 else "")
+        if it["status"] == "new":
+            v.append("Нова ціль."); say += ", нова ціль"
+        elif it.get("count_was") and it["count_was"] != it["count"]:
+            v.append("Кількість змінилась."); say += f": було {it['count_was']}, стало {it['count']}"
+        elif it.get("next") and it["next"] != it.get("next_was"):
+            v.append("Курс змінився."); say += ": курс змінився"
+        if it.get("next"):
+            v.append(f"Курс: {it['next']}."); say += f", курс на {it['next']}"
+        if it.get("km") is not None:
+            v.append(dist(it["km"])); say += f", {it['km']} км від вас"
+        act = "breakdown" if it.get("count_was") and it["count_was"] != it["count"] else "focus"
+        steps.append({"say": say + ".", "action": act, "ids": [it["id"]], "voice": v})
+    return steps
 
 
 # ---------- голосові сповіщення: текст картки → заготовки (числа округлені, щоб фраз було мало й вони повторювались)

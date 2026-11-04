@@ -131,11 +131,13 @@
   }
   async function run(steps) {
     playing = true; stop = false; box.hidden = false; $('#lv-pause').textContent = '⏸ Пауза';
-    for (const s of steps) {
+    // голос усіх кроків замовляється одразу (заготовки склеюються миттєво), тож між репліками немає очікування
+    const pre = steps.map(s => s.audio && audioOn ? preUrl(s.audio) : null);
+    for (const [k, s] of steps.entries()) {
       if (stop) break;
       say.textContent = s.say || ''; act(s);
-      const t0 = Date.now(); await speak(s.say);
-      const rest = Math.max(0, Math.min(6500, 1800 + (s.say || '').length * 45) - (Date.now() - t0));
+      const t0 = Date.now(); await speak(s.say, 'radio', pre[k]);
+      const rest = audioOn ? 600 : Math.max(0, Math.min(6500, 1800 + (s.say || '').length * 45) - (Date.now() - t0));  // з голосом — без зайвих пауз
       for (let k = 0; k < rest && !stop; k += 200) await wait(200);
       while (paused && !stop) await wait(200);
     }

@@ -37,3 +37,22 @@ def test_oblast_country_compose():
     assert o == ["Запоріжжя.", "Повітряна тривога на всю область.", "Повідомлень про цілі в області немає."]
     c = v.compose_country({"al": ["a", "b"], "bal": [], "top": [("Харківська", [("shahed", 5)])]})
     assert c == ["Огляд по Україні.", "Областей з тривогою: дві.", "Найбільше повідомлень про цілі:", "Харківщина,", "переважно шахеди."]
+
+
+def test_live_without_model():
+    import asyncio
+    from app import live
+
+    class L:
+        on = True
+        n = 0
+        async def call(self, *a, **k):
+            self.n += 1
+            return None, None
+    d = {"counts": {"new": 1, "changed": 0, "gone": 0}, "minutes": 10, "alert": None, "bal": [],
+         "items": [{"id": "Ш-1", "type": "shahed", "name": "Шахед", "status": "new", "count": 1, "count_was": None,
+                    "next": None, "next_was": None, "km": 12}]}
+    m = L()
+    r = asyncio.run(live.narrate(m, d))
+    assert m.n == 0 and r["steps"] and all(s["audio"].startswith("/api/voice/") for s in r["steps"])
+    assert all("voice" not in s for s in r["steps"])
