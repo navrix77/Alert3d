@@ -31,6 +31,10 @@ const A=[
   d:'Б\'ють по прифронтових і прикордонних громадах: Харківщина, Сумщина, Херсон, Нікополь. Показуємо, лише коли прямо пишуть «РСЗВ».'},
  {t:'recon',n:'Дрони-розвідники: «Орлан-10», ZALA, Supercam, «Мерлін»',k:'Розвідувальні БпЛА',s:[['Швидкість','~80–150 км/год'],['Тривалість польоту','до ~10–16 год («Орлан»)'],['Висота','до 3–5 км'],['Задача','пошук цілей і коригування ударів ракет, КАБ, артилерії'],['Час у повітрі','дуже різний: ZALA 421-16EM 2 год 10 хв; Supercam S350 до 4 год 30 хв; «Орлан-10» до 16 год; «Орлан-30» до 15 год; «Оріон» до 24 год (інші оцінки до 30 год)']],
   d:'Сам не б\'є, але після розвідника часто летять ракети, КАБ або «Іскандер». Показуємо, коли канали прямо пишуть «розвідувальний БпЛА» / «розвідник» / «Орлан».'},
+ {t:'gerbera',n:'«Гербера»',k:'Дрон-імітатор, окрема платформа',s:[['Роль','за ГУР: хибна ціль, баражуючий або розвідувальний апарат'],['Запуск','разом із «Шахедами»'],['Час у повітрі','надійний максимум не встановлено']],
+  d:'Канали рідко відрізняють «Гербери» від «Шахедів» у польоті, тому на мапі вони йдуть як «Шахед». Безпечною ціллю її вважати не можна.'},
+ {t:'parodiya',n:'«Пародія»',k:'Дрон-імітатор',s:[['Образ','довідковий, ілюстративний'],['Характеристики','не наводимо, доки немає надійних відкритих даних']],
+  d:'Показано для впізнавання зовнішнього вигляду. На мапі окремим типом не виділяємо.'},
  {t:'lancet',n:'«Ланцет-1» / «Ланцет-3»',k:'Баражуючий боєприпас',s:[['Швидкість','80–110 км/год (обидві моделі)'],['Час у повітрі','«Ланцет-1» до 30 хв; «Ланцет-3» («Изделие-51») до 40 хв'],['Дальність','«Ланцет-1» 30 або 40 км (за різними джерелами); «Ланцет-3» до 40 км'],['Злітна маса','5 кг / 12 кг'],['Корисне навантаження','1 кг / 3 кг']],
   d:'Кружляє над районом і пікірує на техніку біля фронту. Ранні версії впізнають за двома групами Х-подібних крил і гвинтом у хвості. Сам напис «Ланцет» у повідомленні не визначає версію. Показуємо, коли канал прямо пише «Ланцет»; поки це рідкість (за тиждень 1 згадка на 28 585 повідомлень).'},
  {t:'fpv',n:'FPV-дрони',k:'Тактичні дрони-камікадзе',s:[['Швидкість','80–150 км/год'],['Радіус','~10–20 км від лінії фронту'],['Бойова частина','1–3 кг'],['Час у повітрі','залежить від збірки, акумулятора й навантаження']],
@@ -58,7 +62,7 @@ const LEG=[
 ];
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=72;const x=C.getContext('2d');x.translate(36,36);x.lineWidth=3;x.strokeStyle=c;x.fillStyle=c;
-  const spr=(t,al,cb)=>{const i=new Image();i.src='sprites/t-'+t+'.png?v=ref11';i.onload=()=>{x.save();x.globalAlpha=al;x.rotate(0.5);x.drawImage(i,-24,-24,48,48);x.restore();cb&&cb();};};
+  const spr=(t,al,cb)=>{const i=new Image();i.src='sprites/t-'+t+'.png?v=ref12';i.onload=()=>{x.save();x.globalAlpha=al;x.rotate(0.5);x.drawImage(i,-24,-24,48,48);x.restore();cb&&cb();};};
   if(k==='tgt'){x.globalAlpha=.35;x.fillStyle='#000';x.beginPath();x.arc(2,4,24,0,7);x.filter='blur(6px)';x.fill();x.filter='none';x.globalAlpha=1;spr('shahed',1);return C;}
   if(k==='est'){x.strokeStyle='rgba(255,255,255,.55)';x.lineWidth=1.5;x.beginPath();x.arc(0,0,28,0,7);x.stroke();spr('shahed',.45);return C;}
   if(k==='rep'){x.strokeStyle='#fff';x.lineWidth=1.6;x.setLineDash([2,4]);x.beginPath();x.moveTo(-24,20);x.lineTo(10,-8);x.stroke();x.setLineDash([]);x.fillStyle='#fff';x.beginPath();x.arc(-24,20,5,0,7);x.fill();x.strokeStyle='#0B0F17';x.lineWidth=2;x.stroke();x.translate(14,-11);x.scale(.6,.6);spr('shahed',1);return C;}
@@ -71,7 +75,7 @@ function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=
   if(k==='dot'){x.beginPath();x.arc(0,0,11,0,7);x.fill();x.strokeStyle='#fff';x.stroke();}
   else if(k==='plane'){const p=new Path2D('M0,-26 L3,-19 L3,-8 L22,5 L22,9 L3,5 L3,15 L9,20 L9,23 L0,21 L-9,23 L-9,20 L-3,15 L-3,5 L-22,9 L-22,5 L-3,-8 L-3,-19 Z');x.fill(p);x.strokeStyle='#fff';x.lineWidth=1.5;x.stroke(p);}
   else if(k==='ring'){x.globalAlpha=.2;x.beginPath();x.arc(0,0,26,0,7);x.fill();x.globalAlpha=1;x.setLineDash([6,5]);x.stroke();}
-  else if(k==='kab'){const i=new Image();i.src='sprites/t-kab.png?v=ref11';i.onload=()=>{x.drawImage(i,-28,-28,56,56);};}
+  else if(k==='kab'){const i=new Image();i.src='sprites/t-kab.png?v=ref12';i.onload=()=>{x.drawImage(i,-28,-28,56,56);};}
   else if(k==='trail'){for(let i=-26;i<=26;i+=9){x.globalAlpha=.35;x.fillStyle='#E8ECF4';x.beginPath();x.arc(i,-10+i*.25,2.4,0,7);x.fill();x.globalAlpha=1;x.fillStyle=c;x.beginPath();x.arc(i,10+i*.25,2.6,0,7);x.fill();}}
   else if(k==='pred'){x.lineWidth=2.2;x.setLineDash([2,6]);x.lineCap='round';x.beginPath();x.moveTo(-26,14);x.quadraticCurveTo(0,-14,22,-6);x.stroke();x.setLineDash([]);x.font='bold 9px sans-serif';x.fillText('ймовірно',-6,-18);}
   else if(k==='fill'){x.globalAlpha=.45;x.fillRect(-26,-20,52,40);x.globalAlpha=1;x.strokeStyle='#fff';x.lineWidth=2;x.strokeRect(-26,-20,52,40);}
@@ -81,7 +85,7 @@ function legIcon(k,c){const C=document.createElement('canvas');C.width=C.height=
 function build(){const el=document.getElementById('arsenal');if(el.dataset.ok)return;el.dataset.ok=1;
   const box=el.querySelector('.ars-list');
   A.forEach(a=>{const c=document.createElement('article');c.className='ars-card';c.style.setProperty('--tc',(window.TYPE_COLOR||{})[a.t]||'#fff');
-    c.innerHTML='<div class="ars-img"><img alt="" decoding="async" src="sprites/ref/'+a.t+'.png?v=ref11" onerror="this.onerror=function(){this.style.visibility=\'hidden\'};this.src=\'sprites/t-'+a.t+'.png\'"></div><div class="ars-b"><small>'+esc(a.k)+'</small><h4>'+esc(a.n)+'</h4><dl>'+a.s.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><p>'+esc(a.d)+'</p><button class="ars-map" data-t="'+a.t+'" hidden></button></div>';
+    c.innerHTML='<div class="ars-img"><img alt="" decoding="async" src="sprites/ref/'+a.t+'.png?v=ref12" onerror="this.onerror=function(){this.style.visibility=\'hidden\'};this.src=\'sprites/t-'+a.t+'.png\'"></div><div class="ars-b"><small>'+esc(a.k)+'</small><h4>'+esc(a.n)+'</h4><dl>'+a.s.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl><p>'+esc(a.d)+'</p><button class="ars-map" data-t="'+a.t+'" hidden></button></div>';
     c.querySelector('.ars-map').onclick=()=>{const n=((window.NX&&NX.snap())?NX.snap().tracks:[]).filter(x=>x.status==='active'&&x.type===a.t).length;if(!n&&a.t!=='kab'){if(window.NX)NX.toast('Зараз у повітрі не видно: '+a.n);return;}el.hidden=true;if(a.t==='kab'){const z=((window.NX&&NX.snap())?NX.snap().zones:[])[0];if(z&&window.tryvogaMap)tryvogaMap.flyTo({center:z.places[0],zoom:8});else if(window.NX)NX.toast('Зараз загроз КАБ немає');return;}if(window.NX)NX.focusType(a.t);};
     box.appendChild(c);});
   const lg=el.querySelector('.ars-leg');
