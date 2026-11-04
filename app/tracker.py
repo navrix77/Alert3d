@@ -38,6 +38,7 @@ def _same_claim(e: dict, key: str, grams: frozenset, topo: tuple, cnt) -> bool:
     return len(grams & g0) / len(grams | g0) >= 0.8
 
 
+from .strat import StratBook
 from .launch import LaunchBook
 from .parser import Observation
 
@@ -312,6 +313,7 @@ class Tracker:
         self.merge_cands: dict = {}     # сумнівні пари для судді-моделі: frozenset(a, b) -> час  # повідомлення про балістику: які області названо (режим балістичної загрози)
         self.last_update = 0.0
         self.launches = LaunchBook(brain)
+        self.strat = StratBook()
         self.exclude: set[str] = set()
         self.prefer: str | None = None
 
@@ -323,7 +325,8 @@ class Tracker:
     def dump_state(self) -> bytes:
         import pickle
         return pickle.dumps({"v": 1, "saved": time.time(), **{k: getattr(self, k) for k in self._STATE},
-                             "launches": self.launches.items, "launch_n": self.launches.n}, protocol=pickle.HIGHEST_PROTOCOL)
+                             "launches": self.launches.items, "launch_n": self.launches.n,
+                             "strat": self.strat.groups, "strat_n": self.strat.n}, protocol=pickle.HIGHEST_PROTOCOL)
 
     def load_state(self, raw: bytes, max_age: float = 900) -> bool:
         import pickle
@@ -339,6 +342,8 @@ class Tracker:
         known = {(L.site.name, L.type, int(L.t)) for L in self.launches.items}
         self.launches.items += [L for L in d["launches"] if (L.site.name, L.type, int(L.t)) not in known]
         self.launches.n = max(self.launches.n, d["launch_n"])
+        self.strat.groups = d.get("strat") or []
+        self.strat.n = max(self.strat.n, d.get("strat_n", 0))
         self.restored_at = d["saved"]
         return True
 
@@ -379,6 +384,11 @@ class Tracker:
                "places": [{"r": r.role, "n": r.place.name} for r in obs.places] if not obs.safety else []}
         self.log.append(rec)
         self.log = self.log[-400:]
+        try:
+            if getattr(obs, "raw", None):
+                self.strat.feed(obs.raw, src, t, link)  # групи стратегічної авіації й МіГ-31К (app/strat.py)
+        except Exception:
+            pass
         try:
             if obs.type in ("ballistic", "banderol") and obs.kind in ("track", "info", "close", "zone"):
                 self._bal_event(obs, src, t, link)
@@ -1211,5 +1221,5 @@ class Tracker:
                          "targets": [z.places[0].name for z in kz][:6]})
         from . import count as _count
         counts = {"live": _count.live(out, now, now), "live_min": _count.LIVE_MIN}
-        return {"now": now, "counts": counts, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
+        return {"now": now, "counts": counts, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "strat": self.strat.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
                 "log": self.log[-60:], "bal": [e for e in self.bal if now - e["t"] < 3600]}

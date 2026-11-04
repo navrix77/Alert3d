@@ -227,6 +227,7 @@ function addOverlays(){
   map.addLayer({id:'avia-l',type:'line',source:'avia-l',paint:{'line-color':'#22E1FF','line-width':1.3,'line-dasharray':[1,2.2],'line-opacity':0.7}});
   map.addLayer({id:'avia',type:'symbol',source:'avia',layout:{'icon-image':'su34','icon-size':['interpolate',['linear'],['zoom'],4,0.7,8,1.1],'icon-rotate':['get','r'],'icon-rotation-alignment':'map','icon-allow-overlap':true,
     'text-field':['step',['zoom'],'',5.2,['get','l']],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-max-width':12,'text-offset':[0,1.7],'text-anchor':'top','text-optional':true},paint:{'icon-opacity':['-',1,['*',0.6,['get','f']]],'text-color':'#FF9A9A','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.5}});
+  try{stratEnsure();}catch(e){console.warn('strat',e);}
   if(!map._kabClick){map._kabClick=1;map.on('click','zones-t',e=>{const f=e.features&&e.features[0];if(!f||!SNAP)return;const z=SNAP.zones[f.properties.zi];if(!z)return;
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'320px',className:'kab-pop',offset:18}).setLngLat(f.geometry.coordinates).setHTML(kabInfo(z)).addTo(map);});
   map.on('click','avia',e=>{const f=e.features&&e.features[0];if(!f||!SNAP)return;const a=(SNAP.avia||[])[f.properties.ai];if(!a)return;
@@ -620,7 +621,75 @@ function launchWhat(L){const N={shahed:'шахеди',jet:'реактивні Б
   if(st.length===1)return {short:'ймовірно '+(N[st[0]]||st[0]),full:'тип не названо; звідси зазвичай пускають '+(N[st[0]]||st[0])};
   return {short:'тип не названо',full:'тип не названо'+(st.length?'; звідси пускають: '+st.map(t=>N[t]||t).join(', '):'')};}
 let kabPop=null;
-function syncZones(){syncAvia();if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap((z,zi)=>z.places.map(([lo,la])=>({type:'Feature',properties:{zi},geometry:{type:'Point',coordinates:[lo,la]}})))});}
+/* ---------- стратегічна авіація і МіГ-31К: групи мініатюр, шлях, пуски, напрямки (оцінка SKY) ---------- */
+const STRAT_PATH={tu95:'M0,-42 L3,-36 L4,-8 L40,2 L40,8 L4,6 L3,26 L14,34 L14,38 L0,35 L-14,38 L-14,34 L-3,26 L-4,6 L-40,8 L-40,2 L-4,-8 L-3,-36 Z',
+  tu160:'M0,-44 L3,-34 L5,-14 L38,22 L36,28 L6,14 L4,30 L12,38 L12,42 L0,38 L-12,42 L-12,38 L-4,30 L-6,14 L-36,28 L-38,22 L-5,-14 L-3,-34 Z',
+  tu22:'M0,-42 L3,-30 L4,-10 L32,18 L30,24 L5,12 L4,28 L12,36 L12,40 L0,36 L-12,40 L-12,36 L-4,28 L-5,12 L-30,24 L-32,18 L-4,-10 L-3,-30 Z',
+  mig31:'M0,-44 L3,-32 L5,-14 L34,10 L34,16 L6,10 L7,30 L16,40 L2,38 L0,34 L-2,38 L-16,40 L-7,30 L-6,10 L-34,16 L-34,10 L-5,-14 L-3,-32 Z'};
+const STRAT_STAGE={ground:'на аеродромі',landed:'посадка',takeoff:'зліт',transit:'переліт',line:'на пусковому рубежі',launch:'пуск'};
+let STRAT=[];const STRAT_SEEN=new Set();let stratFx=[];let stratRaf=0;
+function stratImages(){for(const k in STRAT_PATH){const id='st-'+k;if(map.hasImage(id))continue;const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.translate(48,48);
+  const p=new Path2D(STRAT_PATH[k]);x.shadowColor='#FF8A1F';x.shadowBlur=9;x.fillStyle='#FFB347';x.fill(p);x.shadowBlur=0;x.lineWidth=2.2;x.strokeStyle='#fff';x.stroke(p);
+  map.addImage(id,x.getImageData(0,0,96,96),{pixelRatio:3});}}
+function stratAL(l){if(!map.getLayer(l.id))map.addLayer(l);}
+function stratEnsure(){if(map.getLayer('strat'))return true;try{return stratBuild();}catch(e){return false;}}
+function stratBuild(){stratImages();
+  ['strat','strat-l','strat-fx','strat-ring'].forEach(id=>{if(!map.getSource(id))map.addSource(id,{type:'geojson',data:EMPTY});});
+  stratAL({id:'strat-dir',type:'line',source:'strat-l',filter:['==',['get','k'],'dir'],paint:{'line-color':'#F5B83D','line-width':1.6,'line-dasharray':[1.4,1.8],'line-opacity':0.85}});
+  stratAL({id:'strat-route',type:'line',source:'strat-l',filter:['==',['get','k'],'route'],paint:{'line-color':'#FF8A1F','line-width':1.4,'line-dasharray':[3,2],'line-opacity':0.6}});
+  stratAL({id:'strat-trail',type:'line',source:'strat-l',filter:['==',['get','k'],'trail'],layout:{'line-cap':'round'},paint:{'line-color':'#FFB347','line-width':2.6,'line-opacity':0.9}});
+  stratAL({id:'strat-ring',type:'circle',source:'strat-ring',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,14,8,30],'circle-color':'rgba(255,60,60,.12)','circle-stroke-color':'#FF4D4D','circle-stroke-width':1.6,'circle-stroke-opacity':0.9}});
+  stratAL({id:'strat-dirt',type:'symbol',source:'strat-l',filter:['all',['==',['get','k'],'dirpt']],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'left','text-offset':[0.6,0],'text-allow-overlap':false},paint:{'text-color':'#F5B83D','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
+  stratAL({id:'strat',type:'symbol',source:'strat',layout:{'icon-image':['concat','st-',['get','ic']],'icon-size':['interpolate',['linear'],['zoom'],3,0.55,6,0.85,9,1.2],'icon-rotate':['get','r'],'icon-rotation-alignment':'map','icon-allow-overlap':true,'icon-ignore-placement':true,
+    'icon-offset':['get','off'],'text-field':['step',['zoom'],'',4.5,['get','l']],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-max-width':14,'text-offset':[0,2.6],'text-anchor':'top','text-optional':true},
+    paint:{'icon-opacity':['get','o'],'text-color':'#FFC878','text-halo-color':'rgba(0,0,0,.92)','text-halo-width':1.8}});
+  stratAL({id:'strat-fxl',type:'line',source:'strat-fx',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round'},paint:{'line-color':'#FFD27A','line-width':['get','w'],'line-opacity':['get','o'],'line-blur':1.2}});
+  stratAL({id:'strat-fxp',type:'circle',source:'strat-fx',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':['get','r'],'circle-color':['get','c'],'circle-opacity':['get','o'],'circle-blur':0.7}});
+  if(!map._stratClick){map._stratClick=1;map.on('click','strat',e=>{const f=e.features&&e.features[0];if(!f)return;const g=STRAT.find(x=>x.id===f.properties.gid);if(!g)return;
+    if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'330px',className:'kab-pop avia-pop',offset:18}).setLngLat([g.lon,g.lat]).setHTML(stratInfo(g)).addTo(map);});
+  map.on('mouseenter','strat',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','strat',()=>map.getCanvas().style.cursor='');}return true;}
+function stratWhere(g){const s=STRAT_STAGE[g.stage]||g.stage;
+  if(g.stage==='transit')return 'переліт '+(g.origin||'?')+' → '+(g.dest||'?');
+  if(g.stage==='takeoff')return 'зліт'+(g.origin?' з аеродрому «'+g.origin+'»':'');
+  if(g.stage==='line')return 'вийшли на пусковий рубіж'+(g.site?' · '+g.site:'');
+  if(g.stage==='launch')return 'пуск'+(g.site?' · '+g.site:'');
+  return s+(g.site?' «'+g.site+'»':'');}
+function stratInfo(g){const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k].name)||k;
+  return '<div class="kp"><small>СТРАТЕГІЧНА АВІАЦІЯ</small><h4>'+esc(g.name)+(g.n?' ×'+g.n:'')+'</h4>'+
+   '<div class="kp-r"><span>Стан</span><b>'+esc(stratWhere(g))+'</b></div>'+
+   '<div class="kp-r"><span>Остання згадка</span><b>'+hm(g.t)+'</b></div>'+
+   (g.missiles?'<div class="kp-r"><span>Пуски</span><b>'+g.missiles+' ракет (за повідомленням)</b></div>':'')+
+   (g.dirs&&g.dirs.length?'<div class="kp-r"><span>Можливі напрямки</span><b>'+g.dirs.map(d=>esc(d.label)).join(', ')+'</b></div>':'')+
+   '<div class="kp-r"><span>Позиція</span><b>'+(g.est?'оцінка за часом і швидкістю, не радар':'за повідомленням каналів')+'</b></div>'+
+   (g.dirs&&g.dirs.length?'<div class="kp-r"><span>Напрямки</span><b>оцінка SKY за курсом і дальністю, не прогноз</b></div>':'')+
+   ((g.ev||[]).length?'<div class="kp-ev">'+g.ev.slice(-3).reverse().map(e=>'<div><i>'+hm(e.t)+' · '+esc(nm(e.src))+'</i>'+esc(e.text||'')+'</div>').join('')+'</div>':'')+'</div>';}
+function stratOffsets(n){const out=[];for(let i=0;i<n;i++){const row=Math.ceil(i/2),side=i%2?-1:1;out.push([i?side*row*24:0,row*30]);}return out;}
+function syncStrat(){if(!SNAP||!stratEnsure())return;STRAT=SNAP.strat||[];const P=[],L=[],R=[];
+  STRAT.forEach(g=>{const act=g.stage==='takeoff'||g.stage==='transit'||g.stage==='line'||g.stage==='launch';const cnt=Math.max(1,Math.min(9,g.n||1));const o=stratOffsets(cnt);
+    const ageF=Math.max(0.35,1-Math.max(0,(Date.now()/1000+offset-g.t))/(g.until-g.t0+1)*0.5);
+    o.forEach((off,i)=>P.push({type:'Feature',properties:{gid:g.id,ic:g.icon,r:g.hd||0,off,o:act?1:0.6*ageF+0.2,l:i===0?(g.name+(g.n>9?' ×'+g.n:'')+' · '+(STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)):''},geometry:{type:'Point',coordinates:[g.lon,g.lat]}}));
+    if(g.path&&g.path.length>1)L.push({type:'Feature',properties:{k:'route'},geometry:{type:'LineString',coordinates:g.path}});
+    if(g.trail&&g.trail.length>1)L.push({type:'Feature',properties:{k:'trail'},geometry:{type:'LineString',coordinates:g.trail}});
+    (g.dirs||[]).forEach(d=>{L.push({type:'Feature',properties:{k:'dir'},geometry:{type:'LineString',coordinates:[[g.lon,g.lat],[d.lon,d.lat]]}});
+      L.push({type:'Feature',properties:{k:'dirpt',l:d.label+' ~'+d.km+' км'},geometry:{type:'Point',coordinates:[d.lon,d.lat]}});});
+    if(g.stage==='line'||g.stage==='launch')R.push({type:'Feature',properties:{},geometry:{type:'Point',coordinates:[g.lon,g.lat]}});
+    // пуск: ефект вильоту ракет з мініатюр (раз на пуск, лише свіжий)
+    const key=g.id+'|'+(g.launch_t||0);if(g.stage==='launch'&&g.launch_t&&!STRAT_SEEN.has(key)){STRAT_SEEN.add(key);if(Date.now()/1000+offset-g.launch_t<600)stratLaunchFx(g,cnt);}});
+  map.getSource('strat').setData({type:'FeatureCollection',features:P});map.getSource('strat-l').setData({type:'FeatureCollection',features:L});map.getSource('strat-ring').setData({type:'FeatureCollection',features:R});}
+// ракети виходять із кожного літака групи вздовж курсу (або на першу ймовірну ціль), 4,5 с, з вогняним хвостом
+function stratLaunchFx(g,cnt){const hd=(g.dirs&&g.dirs[0])?Math.atan2((g.dirs[0].lon-g.lon)*Math.cos(g.lat*Math.PI/180),g.dirs[0].lat-g.lat):(g.hd||0)*Math.PI/180;
+  const per=Math.min(3,Math.max(1,Math.round((g.missiles||cnt*2)/cnt)));const t0=performance.now();
+  const sp=Math.PI/180*0.9,sign=[0,-1,1];
+  for(let i=0;i<cnt;i++)for(let j=0;j<per;j++)stratFx.push({lon:g.lon+(i%2?-1:1)*Math.ceil(i/2)*0.06*Math.cos(hd),lat:g.lat,h:hd+(per>1?sign[j%3]*sp:0),t0:t0+i*90+j*140,life:4500,v:0.0016});
+  if(!stratRaf)stratRaf=requestAnimationFrame(stratTick);}
+function stratTick(){stratRaf=0;if(!map.getSource('strat-fx')){stratFx=[];return;}const now=performance.now(),F=[];stratFx=stratFx.filter(m=>now-m.t0<m.life+200);
+  for(const m of stratFx){const a=now-m.t0;if(a<0)continue;const d=Math.max(0,a)*m.v*0.05,k=a/m.life;const dx=Math.sin(m.h),dy=Math.cos(m.h),cl=Math.cos(m.lat*Math.PI/180)||1;
+    const lon=m.lon+dx*d/cl,lat=m.lat+dy*d,o=Math.max(0,1-k*k);
+    F.push({type:'Feature',properties:{r:5+4*(1-k),c:a<400?'#FFFFFF':'#FF9A2E',o},geometry:{type:'Point',coordinates:[lon,lat]}});
+    const tl=Math.min(d,0.5);F.push({type:'Feature',properties:{w:2.4*(1-k)+0.6,o:o*0.8},geometry:{type:'LineString',coordinates:[[lon-dx*tl/cl,lat-dy*tl],[lon,lat]]}});}
+  map.getSource('strat-fx').setData({type:'FeatureCollection',features:F});if(stratFx.length)stratRaf=requestAnimationFrame(stratTick);}
+
+function syncZones(){syncAvia();try{syncStrat();}catch(e){console.warn(e);}if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap((z,zi)=>z.places.map(([lo,la])=>({type:'Feature',properties:{zi},geometry:{type:'Point',coordinates:[lo,la]}})))});}
 
 /* ---------- лічильники, статус ---------- */
 const CNTI={};

@@ -1935,3 +1935,23 @@ def test_astra_region_and_transport_not_a_port():
     r = u.parse_astra("В Белгороде после атаки беспилотников горит нефтебаза")
     assert r and r[0]["what"] == "Нафтобаза" and r[0]["place"] == "Бєлгород"
     assert u.parse_astra("Беспилотники атаковали порт Новороссийск")[0]["what"] == "Порт"
+
+
+def test_strategic_aviation_groups_stages_and_directions():
+    import time
+    from app.strat import StratBook, parse
+    assert parse("Може бути застосування Ту-95МС") is None and parse("Масована атака за ніч, Ту-95МС задіяно") is None
+    p = parse("3 Ту-95МС сіли на ае «Оленья»")
+    assert p["kind"] == "landed" and p["n"] == 3 and [s.name for _, s in p["sites"]] == ["Оленья"]
+    assert parse("Ту-95МС вийшли на пускові рубежі, Каспійське море, 6 бортів")["kind"] == "line"
+    b, t = StratBook(), time.time()
+    b.feed("Ту-95МС злетіли з аеродрому Енгельс, 6 бортів", "a", t)
+    b.feed("Ту-95МС вийшли на пускові рубежі, Каспійське море", "b", t + 3600)
+    g = b.feed("Пуск крилатих ракет з Каспійського моря, 24 ракети, Ту-95МС", "c", t + 4000)
+    assert g["stage"] == "launch" and g["missiles"] == 24 and g["n"] == 6 and len(b.groups) == 1
+    s = b.snapshot(t + 4100)[0]
+    assert s["site"] == "Каспійське море" and s["dirs"] and all(d["km"] > 80 for d in s["dirs"])
+    b.feed("Ту-160 переліт з Енгельс на Оленья", "a", t + 100)
+    tr = [x for x in b.snapshot(t + 100 + 3600) if x["name"] == "Ту-160"][0]
+    assert tr["stage"] == "transit" and tr["est"] and 51 < tr["lat"] < 69 and tr["trail"] and tr["path"]
+    assert not [x for x in b.snapshot(t + 40 * 3600)]  # старі групи зникають
