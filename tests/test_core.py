@@ -1880,3 +1880,22 @@ def test_gemini_cloud_only_for_idents(tmp_path, monkeypatch):
     d2, by2 = asyncio.run(tts.speak(radio_spec.IDENTS["sky_ident"], "radio"))  # вдруге з кешу, без нового виклику
     assert d2 == b"MP3DATA" and len(calls) == 1
     assert tts._is_ident("Це Скай.  Оновлюємо повітряну обстановку.") and not tts._is_ident("Шахед біля Чугуєва.")
+
+
+def test_gemini_all_caches_and_respects_budget(tmp_path, monkeypatch):
+    import asyncio
+    from app import tts
+    monkeypatch.setattr(tts, "BASE", tmp_path)
+    monkeypatch.setattr(tts, "_gkey", lambda: "k")
+    calls = []
+
+    async def fake(text, key, rate, style=None):
+        calls.append(text)
+        return b"RIFFxxxx"
+    monkeypatch.setattr(tts, "_gemini", fake)
+    d, by = asyncio.run(tts.speak("Шахед біля Чугуєва.", "radio", paid=True))
+    assert by == "gemini" and d[:4] == b"RIFF" and len(calls) == 1
+    d, by = asyncio.run(tts.speak("Шахед біля Чугуєва.", "radio", paid=False))  # ліміт вичерпано: готове віддаємо з кешу
+    assert by == "gemini-cache" and len(calls) == 1
+    d, by = asyncio.run(tts.speak("Нова фраза.", "radio", paid=False))  # нове за межею ліміту — не Gemini
+    assert by != "gemini" and len(calls) == 1

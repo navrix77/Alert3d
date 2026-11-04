@@ -784,7 +784,7 @@ def _paid_ok() -> bool:
     from zoneinfo import ZoneInfo
     cap = int(os.getenv("TTS_DAILY_CHARS", "40000"))  # 04.11 власник: «щоб не витрачати кошти» — платний голос ≤ ≈$0,5 на добу
     day = (LLMX._usage or {}).get(_dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d"), {})
-    return sum(v for k, v in day.items() if k.startswith("tts_chars:") and k != "tts_chars:google") < cap
+    return sum(v for k, v in day.items() if k.startswith("tts_chars:") and k not in ("tts_chars:google", "tts_chars:openai")) < cap
 
 
 def _google_ok() -> bool:
@@ -851,7 +851,7 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
     import datetime as _dt
     from zoneinfo import ZoneInfo
     day = (LLMX._usage or {}).get(_dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d"), {})
-    paid_ok = sum(v for k, v in day.items() if k.startswith("tts_chars:") and k != "tts_chars:google") < cap
+    paid_ok = sum(v for k, v in day.items() if k.startswith("tts_chars:") and k not in ("tts_chars:google", "tts_chars:openai")) < cap
     data, why = await tts.speak(text, voice, rate, paid=paid_ok, google=_google_ok())
     LLMX.count("tts:" + (why or "none").split(":")[0])
     if data and why in ("openai", "gemini", "google"):

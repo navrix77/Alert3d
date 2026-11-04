@@ -521,6 +521,19 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
         data, by = await _cached("gemcloud", "mp3", _gemini_cloud, text0, key, 1.0, "gc1")
         if data:
             return data, "gemini-cloud"
+    # Gemini для всього ефіру (власник 04.11: Google «жахливий»): фраза озвучується один раз і кешується; усі фрази
+    # однакового формату (WAV 24 кГц), тож склеюються в один відрізок. Нові фрази лише в межах денного ліміту (paid).
+    if os.getenv("TTS_GEMINI_ALL", "1") != "0" and _gkey() and not ident:
+        gt = _spec.brand_say(text0)
+        gp = BASE / "cache" / f"g-{hashlib.sha1(f'{VOICE_V}gv1|{key}|1.0|{gt}'.encode()).hexdigest()}.wav"
+        if gp.exists():
+            return gp.read_bytes(), "gemini-cache"
+        if paid and _off.get("gemini", 0) <= time.time():
+            async def _fr(t, k, r):
+                return await _gemini(t, k, r, _spec.FRAG_STYLE)
+            data, by = await _cached("gemini", "wav", _fr, gt, key, 1.0, "gv1")
+            if data:
+                return data, "gemini"
     # 04.11: OpenAI коверкає українські слова й наголоси → рідний український синтез Google (Chirp 3 HD, uk-UA) першим, якщо є ключ
     if key == "radio":
         rate = round(rate * float(os.getenv("TTS_RADIO_SPEED", "1.25")), 2)  # 04.11 власник: ефір і радіо швидше; додатково +12% відтворенням на клієнті (кеш озвучки не чіпаємо)
