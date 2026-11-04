@@ -196,7 +196,7 @@ def corridors(active: list[dict]) -> list[dict]:
         if hd is not None:
             g["src"][tr.get("hd_src") or "movement"] += 1
         g["ids"].append(tr["id"])
-        g["n"] += tr.get("count") or 1
+        g["n"] += 1
         if hd is not None:
             g["hds"].append(hd)
         if tr.get("next"):
@@ -233,7 +233,7 @@ def direction_quality(active: list[dict]) -> dict:
     """Звідки відомий напрямок кожної активної цілі, щоб довіряти напрямкам свідомо."""
     c = collections.Counter()
     for tr in active:
-        c[(tr.get("hd_src") or "movement") if tr.get("hd") is not None else "none"] += tr.get("count") or 1
+        c[(tr.get("hd_src") or "movement") if tr.get("hd") is not None else "none"] += 1
     return dict(c)
 
 
@@ -245,7 +245,7 @@ def likely_next(active: list[dict]) -> list[dict]:
             continue
         n = tr["pred_next"]
         x = tg.setdefault(n, {"name": n, "n": 0, "p": 0.0, "types": collections.Counter(), "ids": []})
-        x["n"] += tr.get("count") or 1
+        x["n"] += 1
         x["p"] = max(x["p"], tr.get("pred_p") or 0)
         x["types"][tr["type"]] += 1
         x["ids"].append(tr["id"])
@@ -266,7 +266,7 @@ def targets(active: list[dict]) -> list[dict]:
         d = dist_km(to_xy(tr["lat"], tr["lon"]), to_xy(la, lo))
         eta = d / max(30, tr.get("speed") or 170) * 60
         x = tg.setdefault(n, {"name": n, "n": 0, "types": collections.Counter(), "eta_min": None, "ids": []})
-        x["n"] += tr.get("count") or 1
+        x["n"] += 1
         x["types"][tr["type"]] += 1
         x["ids"].append(tr["id"])
         x["eta_min"] = round(eta) if x["eta_min"] is None else min(x["eta_min"], round(eta))
@@ -301,10 +301,12 @@ def _types_phrase(c: dict) -> str:
 
 def analyze(snap: dict, hist: list[dict], brain=None, now: float | None = None) -> dict:
     now = now or snap.get("now") or time.time()
-    active = [t for t in snap.get("tracks", []) if t.get("status") == "active"]
+    # 04.11: ті самі цифри, що й лічильник на мапі: треки (а не сума ×N), про які писали менше 10 хв тому
+    active = [t for t in snap.get("tracks", []) if t.get("status") == "active"
+              and ((t.get("ev") or {}).get("age") or 0) + max(0, now - (snap.get("now") or now)) < 600]
     by_type = collections.Counter()
     for t in active:
-        by_type[t["type"]] += t.get("count") or 1
+        by_type[t["type"]] += 1
     res: dict = {"t": int(now), "active": dict(by_type), "active_n": sum(by_type.values()),
                  "wave": wave(hist, now), "corridors": corridors(active), "targets": targets(active),
                  "likely_next": likely_next(active), "direction": direction_quality(active)}

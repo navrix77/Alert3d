@@ -512,7 +512,7 @@ def test_analyst_sources_copies_and_nights():
     act = [{"id": "Ш-1", "type": "shahed", "lat": 49.6, "lon": 34.5, "hd": 270, "count": 3, "next": "Решетилівка"},
            {"id": "Ш-2", "type": "shahed", "lat": 49.5, "lon": 34.6, "hd": 280, "count": 2, "next": "Решетилівка"}]
     c = corridors(act)
-    assert c[0]["n"] == 5 and c[0]["dir"] == "захід" and c[0]["next"] == ["Решетилівка"]
+    assert c[0]["n"] == 2 and c[0]["dir"] == "захід" and c[0]["next"] == ["Решетилівка"]
     r = {"active_n": 5, "active": {"shahed": 5}, "wave": {"new30": 5, "prev30": 1, "trend": "наростає", "peak12h": 5},
          "corridors": c, "targets": [], "oblast_p60": [], "launches": [], "nights": None, "sources": [], "self": {}}
     txt = " ".join(summary(r))
@@ -709,14 +709,14 @@ def test_analyst_direction_and_likely_next():
     act = [{"id": "Ш-1", "type": "shahed", "lat": 49.6, "lon": 34.5, "hd": 270, "hd_src": "learned", "count": 2, "next": None, "pred_next": "Решетилівка", "pred_p": 0.6},
            {"id": "Ш-2", "type": "shahed", "lat": 49.5, "lon": 34.6, "hd": None, "count": 1, "next": None}]
     dq = direction_quality(act)
-    assert dq == {"learned": 2, "none": 1}
+    assert dq == {"learned": 1, "none": 1}
     ln = likely_next(act)
-    assert ln[0]["name"] == "Решетилівка" and ln[0]["n"] == 2
-    r = {"active_n": 3, "active": {"shahed": 3}, "wave": {"new30": 0, "prev30": 0, "trend": "стабільна", "peak12h": 3},
+    assert ln[0]["name"] == "Решетилівка" and ln[0]["n"] == 1
+    r = {"active_n": 2, "active": {"shahed": 2}, "wave": {"new30": 0, "prev30": 0, "trend": "стабільна", "peak12h": 3},
          "corridors": [], "targets": [], "likely_next": ln, "direction": dq, "oblast_p60": [], "launches": [], "nights": None,
          "sources": [], "self": {"hd_acc": {"shahed": {"acc": 0.72, "n": 90}}}}
     txt = " ".join(summary(r))
-    assert "Напрямок відомий для 2 з 3" in txt and "Решетилівка (2 цілі, 60%)" in txt and "шахед 72% з 90" in txt
+    assert "Напрямок відомий для 1 з 2" in txt and "Решетилівка (1 ціль, 60%)" in txt and "шахед 72% з 90" in txt
 
 
 def test_push_stages_like_israel():
