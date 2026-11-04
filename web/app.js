@@ -581,7 +581,7 @@ function syncHolo(lv){if(!map.getSource('holo')||!RA)return;const F=[];
   const L=(SNAP&&SNAP.levels)||{};if(OBLF)OBLF.forEach(f=>{const l=L[f.properties.n];if(l)F.push({type:'Feature',properties:{l},geometry:f.geometry});});
   map.getSource('holo').setData({type:'FeatureCollection',features:F});}
 let OBLN=null;function fetchOblNames(){if(OBLN)return Promise.resolve(OBLN);return fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>OBLN=j.features.map(f=>f.properties.n));}
-function syncHome(){clearTimeout(window.__wpT);window.__wpT=setTimeout(()=>window.webPushSync&&webPushSync(false),1500);if(map.getSource('home'))map.getSource('home').setData(home&&!FOLHOME?{type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:home}}]}:EMPTY);}
+function syncHome(){clearTimeout(window.__wpT);window.__wpT=setTimeout(()=>window.webPushSync&&webPushSync(false),1500);if(map.getSource('home'))map.getSource('home').setData(realHome()?{type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:realHome()}}]}:EMPTY);}
 function syncAvia(){if(!SNAP||!map.getSource('avia'))return;const A=SNAP.avia||[];const P=[],Z=[],L=[];
   A.forEach(a=>{const c=[a.lon,a.lat];const tgt=a.to&&a.to[0]||[31.5,49];const r=Math.atan2((tgt[0]-a.lon)*Math.cos(a.lat*Math.PI/180),tgt[1]-a.lat)*180/Math.PI;
     P.push({type:'Feature',properties:{ai:A.indexOf(a),r,f:a.fade||0,l:(a.kab?'пуски КАБ':'тактична авіація')+' · '+hm(a.t)+'\n'+a.area},geometry:{type:'Point',coordinates:c}});
@@ -929,11 +929,12 @@ function renderFeed(){
 // дім: змінити або видалити (з Налаштувань і дотиком до значка на мапі)
 function delHome(){if(FOLHOME)homeSaved=null;if(!home)return;try{localStorage.setItem('home_prev',JSON.stringify(home));}catch(x){}home=null;try{localStorage.removeItem('home');localStorage.removeItem('wp_home');}catch(x){}
   syncHome();homeRow();try{renderMe([]);}catch(x){}toast('Дім видалено. Сповіщення про загрози для дому вимкнено');}
-function homeRow(){const l=$('#st-home-l');if(!l)return;l.textContent=home?'Дім: '+(homeObl()?homeObl()+' обл. · ':'')+home[1].toFixed(3)+', '+home[0].toFixed(3):'Дім не позначено';
+function realHome(){return FOLHOME?homeSaved:home;}
+function homeRow(){const home=realHome();const l=$('#st-home-l');if(!l)return;l.textContent=home?'Дім: '+(homeObl()?homeObl()+' обл. · ':'')+home[1].toFixed(3)+', '+home[0].toFixed(3):'Дім не позначено';
   $('#st-home-set').textContent=home?'Змінити':'Позначити';$('#st-home-del').hidden=!home;}
 if($('#st-home-set')){$('#st-home-set').onclick=()=>{if(!$('#settings').hidden)$('#st-close').click();armHome();};$('#st-home-del').onclick=()=>{if(confirmDel())delHome();};setTimeout(homeRow,1500);}
 function confirmDel(){const b=$('#st-home-del');if(b.dataset.ask){delete b.dataset.ask;b.textContent='Видалити';return true;}b.dataset.ask='1';b.textContent='Точно видалити?';setTimeout(()=>{delete b.dataset.ask;b.textContent='Видалити';},4000);return false;}
-map.on('click','home',e=>{if(!home)return;const pp=new maplibregl.Popup({closeButton:false,offset:22,className:'home-pop'}).setLngLat(home)
+map.on('click','home',e=>{const home=realHome();if(!home)return;const pp=new maplibregl.Popup({closeButton:false,offset:22,className:'home-pop'}).setLngLat(home)
   .setHTML('<div style="display:flex;gap:6px"><button class="pill" id="hp-move">Перемістити</button><button class="pill" id="hp-del">Видалити</button></div>').addTo(map);
   setTimeout(()=>{const m=document.getElementById('hp-move'),d=document.getElementById('hp-del');if(m)m.onclick=()=>{pp.remove();armHome();};if(d)d.onclick=()=>{pp.remove();delHome();};},0);});
 $('#b-home').onclick=()=>{if(setHomeMode){disarmHome();toast('Скасовано');return;}if(home){map.flyTo({center:home,zoom:Math.max(map.getZoom(),9)});toast('Торкніться значка «Дім», щоб перемістити або видалити');return;}armHome();};
@@ -1154,19 +1155,19 @@ $('#st-3d').onchange=e=>set3d(e.target.checked,true);
 $('#st-sys').onchange=async e=>{if(e.target.checked&&'Notification' in window&&Notification.permission!=='granted'){const r=await Notification.requestPermission();if(r!=='granted'){e.target.checked=false;toast('Браузер не дозволив сповіщення');}}PREF.sys=e.target.checked;savePref();webPushSync(true);};
 /* ---------- Web Push: сповіщення від сервера навіть із закритим сайтом ---------- */
 function b64u(s){const p='='.repeat((4-s.length%4)%4);const b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0));}
-async function webPushSync(loud){
+async function webPushSync(loud){const H0=realHome();
   if(!('serviceWorker' in navigator)||!('PushManager' in window)){wpStatus(null,/iPhone|iPad/.test(navigator.userAgent)?'відкрийте SKY з іконки на початковому екрані («Поділитися» → «На початковий екран»)':'цей браузер не підтримує');if(loud&&PREF.sys)toast(/iPhone|iPad/.test(navigator.userAgent)?'На iPhone: «Поділитися → На початковий екран», потім відкрийте звідти':'Цей браузер не підтримує сповіщення із закритим сайтом');return;}
   try{// якщо служба сповіщень не запустилась, ready чекає вічно: обмежуємо 8 с і кажемо про це
     const reg=await Promise.race([navigator.serviceWorker.ready,new Promise((_,j)=>setTimeout(()=>j(new Error('служба сповіщень не запустилась. Закрийте SKY свайпом і відкрийте з іконки ще раз')),8000))]);let sub=await reg.pushManager.getSubscription();
-    if(!PREF.sys||!home||Notification.permission!=='granted'){
+    if(!PREF.sys||!H0||Notification.permission!=='granted'){
       if(sub){fetch('/api/webpush/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{});await sub.unsubscribe();try{localStorage.removeItem('wp_home');}catch(e){}}
-      if(loud&&PREF.sys&&!home)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');
-      wpStatus(null,!home?'не позначено дім':Notification.permission==='denied'?'телефон заборонив: Налаштування iPhone → Сповіщення → NAVRYX SKY':!PREF.sys?'вимкнено':'немає дозволу');return;}
+      if(loud&&PREF.sys&&!H0)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');
+      wpStatus(null,!H0?'не позначено дім':Notification.permission==='denied'?'телефон заборонив: Налаштування iPhone → Сповіщення → NAVRYX SKY':!PREF.sys?'вимкнено':'немає дозволу');return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
     // обрані області й громади (явно, не автоматична «область дому») — сервер шле по них зведення навіть із закритим застосунком
     const MZ=myZones(),zones=!MZ.auto&&((MZ.obl&&MZ.obl.length)||(MZ.hrom&&MZ.hrom.length))?{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)}:null;// область дому «автоматично» не шлемо: зведення по всій області засмічує// без явного вибору — область дому
-    const hk=home.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false)+'|'+JSON.stringify(zones);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
-    if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+home[0].toFixed(2),lat:+home[1].toFixed(2),pre:PREF.pre!==false,zones})});
+    const hk=H0.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false)+'|'+JSON.stringify(zones);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
+    if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+H0[0].toFixed(2),lat:+H0[1].toFixed(2),pre:PREF.pre!==false,zones})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
     wpStatus(sub);
   }catch(e){wpStatus(null,'помилка: '+(e&&e.message||e));if(loud)toast('Не вдалося увімкнути сповіщення: '+(e&&e.message||e));}}
@@ -1191,16 +1192,16 @@ function pushCard(){if(document.getElementById('push-card'))return;
   if(can&&Notification.permission==='granted')return;
   if(can&&Notification.permission==='denied')return;
   if(!can&&ios&&!standalone){txt='Щоб SKY попереджав навіть із закритим телефоном: «Поділитися» → «На початковий екран», і відкрийте SKY звідти.';btn=null;}
-  else if(can){txt=home?'Попереджати про загрози для вашого дому й області навіть із закритим застосунком?':'Позначте свій дім, і SKY попереджатиме про загрози для нього навіть із закритим застосунком.';btn=home?'Увімкнути сповіщення':'Позначити дім';}
+  else if(can){txt=H0?'Попереджати про загрози для вашого дому й області навіть із закритим застосунком?':'Позначте свій дім, і SKY попереджатиме про загрози для нього навіть із закритим застосунком.';btn=H0?'Увімкнути сповіщення':'Позначити дім';}
   else return;
   const el=document.createElement('div');el.id='push-card';el.className='push-card';
   el.innerHTML='<b>🔔 Сповіщення</b><span>'+esc(txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>';
   document.body.appendChild(el);try{localStorage.setItem('push_card_once',Date.now());}catch(e){}
   $('#pc-x').onclick=()=>{el.remove();toast('Увімкнути можна будь-коли: Налаштування → Сповіщення');};
-  const on=$('#pc-on');if(on)on.onclick=async()=>{el.remove();if(!home){armHome();return;}await pushEnable();};}
+  const on=$('#pc-on');if(on)on.onclick=async()=>{el.remove();if(!H0){armHome();return;}await pushEnable();};}
 async function pushEnable(){
   {
-    if(!home){toast('Спершу позначте свій дім');armHome();return;}
+    if(!H0){toast('Спершу позначте свій дім');armHome();return;}
     const r=await Notification.requestPermission();if(r!=='granted'){toast('Телефон не дозволив сповіщення. Увімкніть їх у налаштуваннях телефону для SKY');return;}
     PREF.sys=true;savePref();if($('#st-sys'))$('#st-sys').checked=true;await webPushSync(true);
     // одразу перевіряємо доставку: тестове сповіщення
@@ -1216,7 +1217,7 @@ $('#st-launch').onchange=e=>{PREF.launch=e.target.checked;savePref();applyLayers
 $('#st-zones').onchange=e=>{PREF.zones=e.target.checked;savePref();applyLayers();};
 $('#st-geo').onclick=()=>{$('#b-locate').click();};
 $('#st-pick').onclick=()=>{$('#settings').hidden=true;armHome();};
-$('#st-clear').onclick=()=>{if(FOLHOME)homeSaved=null;home=null;localStorage.removeItem('home');syncHome();toast('Дім прибрано');};
+$('#st-clear').onclick=()=>{if(FOLHOME)homeSaved=null;H0=null;localStorage.removeItem('H0');syncHome();toast('Дім прибрано');};
 let lanDone=false;function loadLan(){if(!$('#st-qr'))return;fetch('/api/lan').then(r=>r.json()).then(j=>{lanDone=true;const urls=j.urls||[];const host=location.hostname;
   const sec=(j.secure||[]).sort((a,b)=>(/\/\/192\.168\./.test(b)-/\/\/192\.168\./.test(a)));const best=sec[0]||((host!=='localhost'&&host!=='127.0.0.1')?location.origin:(urls[0]||location.origin));
   $('#st-urls').innerHTML=[...sec,...(urls.length?urls:[location.origin])].map(u=>'<code>'+esc(u)+'</code>').join('');
@@ -1337,8 +1338,8 @@ window.__note=note;
 const FOL={watch:null,pos:null,acc:null,fired:new Map()};
 // 04.11 власник: у режимі «стежити за мною» прив'язка до дому вимкнена, усе рахується лише від геопозиції (home тимчасово = позиція)
 function folHome(){if(!PREF.follow||!FOL.pos)return;const fresh=!FOLHOME;if(fresh){homeSaved=home;FOLHOME=true;}
-  const far=!home||fresh||dist(xy(home),xy(FOL.pos))>1;home=FOL.pos.slice();if(far){syncHome();try{homeRow();}catch(e){}}}
-function folHomeOff(){if(!FOLHOME)return;FOLHOME=false;home=homeSaved||null;homeSaved=null;syncHome();try{homeRow();}catch(e){}}
+  const far=!home||fresh||dist(xy(home),xy(FOL.pos))>1;home=FOL.pos.slice();}
+function folHomeOff(){if(!FOLHOME)return;FOLHOME=false;home=homeSaved||null;homeSaved=null;}
 function ringGeo(c,km){const P=xy(c),pts=[];for(let i=0;i<=64;i++){const a=i/64*2*Math.PI;pts.push(ll([P[0]+Math.sin(a)*km,P[1]+Math.cos(a)*km]));}return {type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[pts]}};}
 function syncMe(){if(!map.getSource('mepos'))return;map.getSource('mepos').setData(PREF.follow&&FOL.pos?{type:'FeatureCollection',features:[ringGeo(FOL.pos,PREF.radius||10),{type:'Feature',properties:{},geometry:{type:'Point',coordinates:FOL.pos}}]}:EMPTY);}
 function followOn(){
@@ -1398,7 +1399,12 @@ setInterval(()=>{
   }
 },3000);
 {const cb=$('#st-follow'),seg=$('#st-radius');
-  if(cb){cb.checked=!!PREF.follow;cb.onchange=()=>{PREF.follow=cb.checked;savePref();if(PREF.follow){if(!followOn()){PREF.follow=false;cb.checked=false;savePref();}}else followOff();};}
+  const md=$('#st-mode'),mh=$('#st-mode-hint');
+  const modeUi=()=>{if(md)md.querySelectorAll('button').forEach(b=>b.classList.toggle('on',(b.dataset.m==='me')===!!PREF.follow));
+    if(mh)mh.textContent=PREF.follow?'Усі відстані й попередження рахуються лише від вашої геопозиції, дім не враховується.':'Відстані й попередження рахуються від позначеного дому.';};
+  if(cb){cb.checked=!!PREF.follow;cb.onchange=()=>{PREF.follow=cb.checked;savePref();if(PREF.follow){if(!followOn()){PREF.follow=false;cb.checked=false;savePref();}}else followOff();modeUi();};}
+  if(md){md.onclick=e=>{const b=e.target.closest('button');if(!b||!cb)return;const want=b.dataset.m==='me';if(cb.checked!==want){cb.checked=want;cb.onchange();}};}
+  modeUi();
   if(seg){const upd=()=>seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===(PREF.radius||10)));upd();
     seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;PREF.radius=+b.dataset.v;savePref();upd();syncMe();FOL.fired.clear();toast('Радіус '+PREF.radius+' км');};}
   if(PREF.follow)followOn();}
