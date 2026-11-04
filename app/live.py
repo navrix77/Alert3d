@@ -552,7 +552,8 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
         ctx, fb = country_text(state, cf) if scope == "country" else oblast_text(cf)
         level = "info"
         fp = cf["fp"]
-        if mem["said"] and fp == mem["fp"] and not out_:
+        # огляд України повторюється раз на 15 хв навіть без змін (заготовки, без витрат); область — лише при змінах
+        if mem["said"] and fp == mem["fp"] and not out_ and (scope != "country" or now - mem["t"] < 840):
             return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
         if KIT and not out_:
             # 04.11 власник: «максимально з заготовок» — і область, і Україна без моделі

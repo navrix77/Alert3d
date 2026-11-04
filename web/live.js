@@ -403,8 +403,12 @@
     const hi = preVoice('Ви слухаєте Скай Радіо.', 'radio');
     await id; await speak('Ви слухаєте Скай Радіо.', 'radio', hi);
     await radioIssue(null, pre);         // зведення в обраному режимі охоплення
+    // 04.11 власник: «де зведення по Україні?» — за концепцією: на початку й раз на 15 хв, у будь-якому режимі (із заготовок, безкоштовно)
+    if (radioOn && sc0 !== 'country') await radioIssue('country');
     // «Поруч зі мною» на заготовках дешеве й миттєве — перевіряємо кожні 15 с; область і Україна (через модель) — раз на 40 с
-    let tick = 0; radioT = setInterval(() => { tick++; if ((LS.get('radio_scope') || 'near') === 'near' || tick % 3 === 0) radioIssue(); }, 15000);
+    let tick = 0; radioT = setInterval(() => { tick++; const md = LS.get('radio_scope') || 'near';
+      if (md !== 'country' && NX().now() - lastCountry > 900) radioIssue('country');
+      else if (md === 'near' || tick % 3 === 0) radioIssue(); }, 15000);
   };
 
   // ---------- повернення після відсутності: запропонувати ефір
