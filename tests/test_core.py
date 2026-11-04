@@ -1572,7 +1572,8 @@ def test_say_form_and_radio_memory(monkeypatch):
     m = L()
     r1 = asyncio.run(live.radio(m, st, [], None, _t.time() - 600, home, "Харківська", "region", "s1"))
     r2 = asyncio.run(live.radio(m, st, [], None, _t.time() - 600, home, "Харківська", "region", "s1"))
-    assert r1["text"] and r1["level"] == "urgent" and r2.get("quiet") and m.n == 1  # без змін — мовчить і не платить
+    assert r1["text"] and r1["level"] == "urgent" and r2.get("quiet") and m.n == (0 if live.KIT else 1)  # без змін мовчить; на заготовках модель не потрібна взагалі
+    assert (r1.get("audio") or "").startswith("/api/voice/") if live.KIT else True
     f = live.near_facts(st, home, "Харківська", 0)
     assert f["near"][0]["side"] == "на півдні" and f["near"][0]["appr"] is True
     r4 = asyncio.run(live.radio(m, st, [], None, 0, home, "Харківська", "region", "s2"))

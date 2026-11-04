@@ -80,6 +80,7 @@
   const ttsUrl = (text, voice) => '/api/tts?v=4&text=' + encodeURIComponent(text.slice(0, 600)) + '&voice=' + (voice || 'radio');
   // голос наперед: поки звучить позивний чи попередня фраза, наступна вже генерується й завантажується
   const preVoice = (text, voice) => fetch(ttsUrl(text, voice)).then(r => r.ok ? r.blob() : null).then(b => b && b.size > 500 ? URL.createObjectURL(b) : null).catch(() => null);
+  const preUrl = url => fetch(url).then(r => r.ok ? r.blob() : null).then(b => b && b.size > 500 ? URL.createObjectURL(b) : null).catch(() => null);
   async function speak(text, voice, pre) {
     if (!audioOn || !text) return;
     try {
@@ -360,7 +361,7 @@
       const hard = r.level === 'urgent' || r.level === 'outage' || r.kind === 'correction';
       if (hard) bedStop(); else bedStart();  // важливе, виправлення, збій — без фону
       if (r.level === 'urgent' && window.SKYVOICE) window.SKYVOICE.stop();  // важливе перериває поточне
-      const sp = r.speech || r.text || '', vp = r.voice || preVoice(sp, 'radio');  // голос генерується, поки грає сигнал
+      const sp = r.speech || r.text || '', vp = r.voice || (r.audio ? preUrl(r.audio) : preVoice(sp, 'radio'));  // голос генерується, поки грає сигнал
       await (r.level === 'urgent' ? SND.urgent() : r.level === 'outage' ? SND.outage() : r.level === 'calm' ? SND.calm() : SND.news());
       duck(true); await speak(sp, 'radio', vp); duck(false);
       if (scope === 'country' && !hard) await SND.outro();
@@ -394,13 +395,14 @@
     radioSeen = seen || (NX().now() - 1800); radioSid = Math.random().toString(36).slice(2, 12); lastCountry = 0; radioLast = NX().now();
     // швидкий старт (04.11): випуск і його голос замовляються одразу; позивний і привітання (готовий записаний голос) грають, поки вони готуються
     const sc0 = LS.get('radio_scope') || 'near';
-    const pre = radioReq(sc0, true).then(r => { if (r && (r.speech || r.text) && r.level !== 'calm') r.voice = preVoice(r.speech || r.text, 'radio'); return r; }).catch(() => ({}));
+    const pre = radioReq(sc0, true).then(r => { if (r && (r.speech || r.text) && r.level !== 'calm') r.voice = r.audio ? preUrl(r.audio) : preVoice(r.speech || r.text, 'radio'); return r; }).catch(() => ({}));
     await Promise.race([sLoad(), wait(900)]);
     bedStart(); const id = SND.ident();
     const hi = preVoice('Ви слухаєте Скай Радіо.', 'radio');
     await id; await speak('Ви слухаєте Скай Радіо.', 'radio', hi);
     await radioIssue(null, pre);         // зведення в обраному режимі охоплення
-    radioT = setInterval(radioIssue, 40000);
+    // «Поруч зі мною» на заготовках дешеве й миттєве — перевіряємо кожні 15 с; область і Україна (через модель) — раз на 40 с
+    let tick = 0; radioT = setInterval(() => { tick++; if ((LS.get('radio_scope') || 'near') === 'near' || tick % 3 === 0) radioIssue(); }, 15000);
   };
 
   // ---------- повернення після відсутності: запропонувати ефір

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import math
+import os
 import re
 import time
 
@@ -555,9 +556,22 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
             if now - mem["t"] < 480:
                 return {"text": "", "speech": "", "scope": scope, "quiet": True, "level": "calm"}
             # 8 хв без змін — коротке нагадування з даних, без моделі
-            txt = ("Без змін. " + fb) if f["near"] or f["alert"] else "Без змін. Поруч з вами цілей немає."
             mem["t"] = now
+            if KIT:
+                from . import voicekit
+                fr = ["Без змін."] + [x for x in voicekit.compose(f) if x not in ("Оновлення.", "Увага!")]
+                txt = " ".join(fr)
+                return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "kit", "audio": "/api/voice/" + voicekit.register(fr)}
+            txt = ("Без змін. " + fb) if f["near"] or f["alert"] else "Без змін. Поруч з вами цілей немає."
             return {"text": txt, "speech": txt, "scope": scope, "level": "calm", "by": "rules"}
+        if KIT and not out_:
+            # 04.11 власник: «паузи шалені» → голосові заготовки: без моделі й без нового синтезу, звучить одразу
+            from . import voicekit
+            fr = voicekit.compose(f, first=not mem["said"], greeted=greeted)
+            txt = " ".join(fr)
+            mem.update(fp=fp, t=now, said=(mem["said"] + [txt])[-5:])
+            return {"text": txt, "speech": txt, "kind": "summary" if len(mem["said"]) == 1 else "update", "by": "kit", "scope": scope,
+                    "level": level, "audio": "/api/voice/" + voicekit.register(fr)}
     if out_:
         ctx = f"ЗБІЙ ДЖЕРЕЛ: {out_}.\n" + ctx
         fb = "Оновлення SKY тимчасово недоступні. Стежте за офіційними сповіщеннями."
@@ -608,6 +622,7 @@ async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "
 
 
 RADIO_STATE: dict = {}
+KIT = os.getenv("RADIO_KIT", "1") != "0"  # голосові заготовки для режиму «Поруч зі мною»
 
 RADIO_CACHE: dict = {}
 RADIO_MEM: dict = {}  # що «Радіо SKY» вже сказало для (охоплення, області): не повторювати незмінну обстановку

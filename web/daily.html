@@ -32,6 +32,9 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 .legend .r.th1{font-weight:800;color:#fff}.legend .r.th1 i{height:5px}.legend .r.th2{font-weight:700;color:#E6EAF2}.legend .r.th3{font-weight:600;color:#C3CAD6}.legend .r.th3 i{opacity:.75;box-shadow:none}
 .legend .r.th4{font-weight:500;color:#98A2B3}.legend .r.th4 i{opacity:.55;box-shadow:none;height:3px}
 .legend small.hint{color:#C9D2E3;font-weight:600}
+.legend .lrow,.legend .lfold{display:none}
+.lrow{gap:12px;overflow-x:auto;white-space:nowrap;align-items:center;font-size:12px;font-weight:700;scrollbar-width:none;cursor:pointer}.lrow::-webkit-scrollbar{display:none}
+.lrow span{display:inline-flex;align-items:center;gap:5px}.lrow i{display:inline-block;width:14px;height:3px;border-radius:2px}.lrow .more{margin-left:auto;padding-left:6px;color:var(--mute);position:sticky;right:0;background:linear-gradient(90deg,transparent,rgba(12,15,22,.95) 30%)}
 .legend .grp{display:flex;gap:4px;margin:0 0 8px;padding:3px;background:rgba(255,255,255,.06);border-radius:12px;grid-column:1/-1}
 .legend .grp button{flex:1;padding:6px 8px;border-radius:9px;background:transparent;font-size:12.5px;color:var(--mute)}.legend .grp button.on{background:rgba(255,255,255,.16);color:#fff}
 .legend small{display:block;color:var(--mute);font-size:11px;font-weight:500;margin-top:6px;max-width:260px;line-height:1.35}
@@ -54,6 +57,8 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
   .stats{top:auto;left:10px;right:10px;bottom:calc(64px + env(safe-area-inset-bottom));max-width:none;padding:8px 12px;display:flex;align-items:center;gap:10px;border-radius:14px}
   .stats h3{margin:0;font-size:10px}.stats .big{font-size:20px}.stats ul,.stats .bh{display:none}.stats>div:not(.big){font-size:12px;line-height:1.2}
   .legend{left:10px;right:10px;bottom:calc(118px + env(safe-area-inset-bottom));min-width:0;padding:8px 12px;display:grid;grid-template-columns:1fr 1fr;column-gap:14px;border-radius:14px}
+  .legend.col{display:block!important;padding:9px 12px}.legend.col>*:not(.lrow){display:none!important}.legend.col .lrow{display:flex}
+  .legend:not(.col) .lfold{display:block;grid-column:1/-1;margin-top:6px;width:100%;padding:5px;font-size:12px;color:var(--mute)}
   .legend .r{margin:1px -4px;font-size:12px;gap:7px}.legend .r i{width:18px}.legend small{display:none}.legend small.hint{display:block;grid-column:1/-1;font-size:11px;margin-top:4px}
   .play{left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:auto;padding:8px 10px;border-radius:14px}
   .maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left{display:none}.credit{display:block}
@@ -240,12 +245,18 @@ function links(f,T1){const L=[],Hh=[],Pu=[],fired={};
     if(T1-s0<1500){const key=t.arc[0].join();if(!fired[key]||fired[key]>T1-s0)fired[key]=T1-s0;}}
   for(const key in fired){const g=fired[key]/1500;Pu.push({type:'Feature',properties:{r:8+g*42,a:Math.max(0,1-g)},geometry:{type:'Point',coordinates:key.split(',').map(Number)}});}
   map.getSource('links').setData({type:'FeatureCollection',features:L});map.getSource('lhead').setData({type:'FeatureCollection',features:Hh});map.getSource('spulse').setData({type:'FeatureCollection',features:Pu});}
+const SHORT={ballistic:'Балістика',cruise:'Крилаті',jet:'Реактивні',shahed:'Шахеди',kab:'КАБи',geran5:'Герань-5',banderol:'Бандеролі',rszv:'РСЗВ',lancet:'Ланцети',molniya:'Молнії',fpv:'FPV',fpvf:'FPV опт.',recon:'Розвідники'};
+let LCOL=true;// 04.11 власник: на телефоні легенда — один ряд кольорових позначок, повна розгортається дотиком
 function legend(){const cnt={};for(const t of D.tracks)if(t.inO)cnt[t.type]=(cnt[t.type]||0)+1;
   const ord=ORDER.filter(k=>T[k]&&cnt[k]&&(GRP==='all'||(GRP==='miss')===MAJOR.has(k)));
   $('#legend').innerHTML='<div class="grp">'+GRPS.map(([k,n])=>'<button data-g="'+k+'"'+(GRP===k?' class="on"':'')+'>'+n+'</button>').join('')+'</div>'+ord.map(k=>'<div class="r t'+(SEL===k?' on':SEL?' off':'')+' th'+(THREAT[k]||3)+'" data-k="'+k+'" role="button" tabindex="0"><i style="'+(DASH.has(k)?'background:repeating-linear-gradient(90deg,'+T[k][1]+' 0 6px,transparent 6px 10px)':'background:'+T[k][1])+';color:'+T[k][1]+(MAIN.has(k)?'':';height:2px;box-shadow:none;opacity:.8')+'"></i>'+T[k][0]+'</div>').join('')+
     '<div class="r"><span style="width:26px;text-align:center">🔥</span>Вибухи'+(D.crawling?' <small style="display:inline;margin:0">· збираю з історії каналів…</small>':'')+'<b>'+VB.length+'</b></div><div class="r"><span style="width:26px;text-align:center">🚀</span>Місця пусків<b>'+VS.length+'</b></div>'+
     '<small class="hint">'+(SEL?'Показано лише: '+T[SEL][0]+'. Торкніться ще раз, щоб повернути все.':'Торкніться типу, щоб побачити лише його. Лінії умовні: з\'єднують місця, які назвали канали.')+'</small>'+
     '<small>Маршрути відтворено з повідомлень моніторів і приблизні; кількість цілей дивіться в підсумку Повітряних сил. Вибухи, з точністю до населеного пункту.</small>';
+  const sw=k=>DASH.has(k)?'background:repeating-linear-gradient(90deg,'+T[k][1]+' 0 4px,transparent 4px 7px)':'background:'+T[k][1]+(MAIN.has(k)?'':';height:2px;opacity:.8');
+  $('#legend').insertAdjacentHTML('afterbegin','<div class="lrow" role="button" aria-label="Розгорнути легенду">'+[...ord.filter(k=>MAIN.has(k)),...ord.filter(k=>!MAIN.has(k))].map(k=>'<span><i style="'+sw(k)+'"></i>'+SHORT[k]+'</span>').join('')+'<span>🔥'+VB.length+'</span><span>🚀'+VS.length+'</span><span class="more">▴</span></div>');
+  $('#legend').insertAdjacentHTML('beforeend','<button class="lfold">▾ Згорнути</button>');
+  $('#legend').classList.toggle('col',LCOL&&mobile());$('#legend .lrow').onclick=()=>{LCOL=false;legend();fit();};$('#legend .lfold').onclick=()=>{LCOL=true;legend();fit();};
   document.querySelectorAll('#legend .grp button').forEach(b=>b.onclick=()=>{GRP=b.dataset.g;SEL=null;legend();draw(CUR);});
   document.querySelectorAll('#legend .r.t').forEach(r=>{r.onclick=()=>{SEL=SEL===r.dataset.k?null:r.dataset.k;legend();draw(CUR);};r.onkeydown=e=>{if(e.key==='Enter')r.onclick();};});}
 function stats(){const o=D.official;

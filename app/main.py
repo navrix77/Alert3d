@@ -470,6 +470,10 @@ async def lifespan(app: FastAPI):
                 await tts._ensure_model(k)
             except Exception as e:  # noqa: BLE001
                 log.info("tts warm %s: %s", k, e)
+        # голосові заготовки Sky Radio: озвучуються разово у фоні, далі радіо говорить без очікування (04.11)
+        if not os.getenv("REPLAY") and (os.getenv("OPENAI_API_KEY") or os.getenv("GOOGLE_TTS_KEY")):
+            from . import voicekit
+            asyncio.create_task(voicekit.warm(_say, _paid_ok))
         for _ in range(60):  # рушій міг ще ставитися — чекаємо й «розігріваємо» голос, щоб перше сповіщення звучало одразу
             if tts.piper_ok():
                 await tts.speak("Готово", "lada")
@@ -509,7 +513,7 @@ def _client_ip(scope_client, headers) -> str | None:
 
 # ---------- захист (04.11, незалежна оцінка): ліміти на платні ендпоінти, службове лише для власника, заголовки безпеки
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
-RATE = {"/api/tts": (30, 60), "/api/stt": (6, 60), "/api/live": (8, 60), "/api/ask": (8, 60), "/api/radio": (8, 60),
+RATE = {"/api/tts": (30, 60), "/api/stt": (6, 60), "/api/live": (8, 60), "/api/ask": (8, 60), "/api/radio": (12, 60), "/api/voice": (20, 60),
         "/api/tts/check": (3, 60), "/api/brief": (6, 60), "/api/llm/check": (3, 60), "/api/llm/report": (6, 60)}
 _hits: dict = {}
 
@@ -523,7 +527,7 @@ def _is_admin(request) -> bool:
 @app.middleware("http")
 async def guard(request, call_next):
     path = request.url.path
-    lim = RATE.get(path)
+    lim = RATE.get(path) or (RATE.get("/api/voice") if path.startswith("/api/voice/") else None)
     if lim and not _is_admin(request):
         ip = request.headers.get("cf-connecting-ip") or _client_ip(request.client, request.headers) or "?"
         now = time.time()
@@ -768,6 +772,38 @@ def api_visits_app(request: Request, k: str = "app"):
     except Exception:  # noqa: BLE001
         pass
     return JSONResponse({"ok": True})
+
+
+def _paid_ok() -> bool:
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    cap = int(os.getenv("TTS_DAILY_CHARS", "150000"))
+    day = (LLMX._usage or {}).get(_dt.datetime.now(ZoneInfo("Europe/Kyiv")).strftime("%Y-%m-%d"), {})
+    return sum(v for k, v in day.items() if k.startswith("tts_chars:")) < cap
+
+
+async def _say(text: str, voice: str = "radio"):
+    """Озвучка з обліком: нові (не з кешу) символи платного голосу йдуть у денний ліміт."""
+    from . import tts
+    data, why = await tts.speak(text, voice, 1.0, paid=_paid_ok())
+    if data and why in ("openai", "gemini", "google"):
+        LLMX.count("tts_chars:" + why, len(text))
+    return data, why
+
+
+@app.get("/api/voice/{sid}")
+async def api_voice(sid: str):
+    """Голос Sky Radio із заготовок (voicekit): склейка вже озвучених фраз, без нового синтезу для знайомих фраз."""
+    from fastapi import Response
+    from . import voicekit
+    item = voicekit.SEQ.get(sid[:16])
+    if not item:
+        return JSONResponse({"ok": False, "why": "unknown"}, status_code=404)
+    data, why = await voicekit.render(item[1], _say)
+    LLMX.count("tts:" + why)
+    if not data:
+        return JSONResponse({"ok": False, "why": why}, status_code=503)
+    return Response(data, media_type="audio/mpeg", headers={"Cache-Control": "max-age=86400", "X-TTS": why})
 
 
 @app.get("/api/tts")
