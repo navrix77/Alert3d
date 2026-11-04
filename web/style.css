@@ -826,6 +826,28 @@ body.wm #wm{display:block}
 @keyframes arrPulse{0%,100%{opacity:.1;transform:scale(.6)}50%{opacity:.9;transform:scale(1.2)}}
 #intro{transition:opacity .35s ease!important}
 #intro.out{clip-path:none!important;opacity:0}
-body.intro-in .top,body.intro-in .me,body.intro-in .dock,body.intro-in .notes{animation:none!important}
 @media (prefers-reduced-motion:reduce){#intro .lg .st,#intro .lg .ar{display:none}}
 #intro .lg::before{inset:auto!important;left:14%;top:3%;width:72%;height:72%}
+
+/* виїзд інтерфейсу після заставки: каскад із розмиттям, пружиною та «хвилею» по кнопках */
+@keyframes uiTop{0%{opacity:0;transform:translateY(-26px) scale(.97);filter:blur(10px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
+@keyframes uiSide{0%{opacity:0;transform:translateX(34px) scale(.92);filter:blur(8px)}100%{opacity:1;transform:none;filter:none}}
+@keyframes uiCard{0%{opacity:0;transform:translateY(46px) scale(.96);filter:blur(8px)}100%{opacity:1;transform:none;filter:none}}
+@keyframes uiDock{0%{opacity:0;transform:translate(-50%,70px) scale(.88);filter:blur(8px)}70%{opacity:1;transform:translate(-50%,-4px) scale(1.01);filter:none}100%{opacity:1;transform:translate(-50%,0) scale(1);filter:none}}
+@keyframes uiPop{0%{opacity:0;transform:translateY(14px) scale(.6)}70%{opacity:1;transform:translateY(-2px) scale(1.12)}100%{opacity:1;transform:none}}
+@keyframes uiGlow{0%{box-shadow:0 0 0 0 rgba(110,170,255,.55)}100%{box-shadow:0 0 0 22px rgba(110,170,255,0)}}
+body.intro-in .top{animation:uiTop .9s cubic-bezier(.16,1,.3,1) .05s both!important}
+body.intro-in .counters .cnt{animation:uiSide .8s cubic-bezier(.16,1,.3,1) both!important}
+body.intro-in .counters .cnt:nth-child(1){animation-delay:.25s!important}body.intro-in .counters .cnt:nth-child(2){animation-delay:.33s!important}
+body.intro-in .counters .cnt:nth-child(3){animation-delay:.41s!important}body.intro-in .counters .cnt:nth-child(4){animation-delay:.49s!important}
+body.intro-in .counters .cnt:nth-child(n+5){animation-delay:.57s!important}
+body.intro-in .tac-bar{animation:uiTop .9s cubic-bezier(.16,1,.3,1) .2s both!important}
+body.intro-in .me{animation:uiCard .95s cubic-bezier(.16,1,.3,1) .4s both!important}
+body.intro-in .dock{animation:uiDock 1s cubic-bezier(.2,.9,.25,1) .55s both,uiGlow 1.1s ease-out 1.1s 1!important}
+body.intro-in .dock button{animation:uiPop .6s cubic-bezier(.34,1.56,.64,1) both!important}
+body.intro-in .dock button:nth-child(1){animation-delay:.8s!important}body.intro-in .dock button:nth-child(2){animation-delay:.87s!important}
+body.intro-in .dock button:nth-child(3){animation-delay:.94s!important}body.intro-in .dock button:nth-child(4){animation-delay:1.01s!important}
+body.intro-in .dock button:nth-child(5){animation-delay:1.08s!important}body.intro-in .dock button:nth-child(6){animation-delay:1.15s!important}
+body.intro-in .notes{animation:uiSide .8s cubic-bezier(.16,1,.3,1) 1s both!important}
+body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
+@media (prefers-reduced-motion:reduce){body.intro-in .top,body.intro-in .counters .cnt,body.intro-in .tac-bar,body.intro-in .me,body.intro-in .dock,body.intro-in .dock button,body.intro-in .notes,body.intro-in #wm{animation:none!important}}
