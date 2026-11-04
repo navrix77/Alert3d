@@ -475,11 +475,12 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   if(TAC){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
   const LG=window.__stlog=window.__stlog||[];const lg=m=>LG.push(m+'@'+Math.round((Date.now()-introT0)/100)/10);
   // переліт на «Дім» власною покадровою анімацією (не залежить від flyTo/«зменшення руху»): 4,5 с, плавний розгін і гальмування; переривається лише дотиком уже під час руху
-  const flyHome=()=>{const t0=Date.now(),tr=()=>{const tg=home||window.__GEOPOS;if(!tg){if(Date.now()-t0<4500){setTimeout(tr,300);return;}lg('немає_цілі');return;}
-      const c0=map.getCenter(),z0=map.getZoom(),ts=performance.now(),D=4500,T0=Date.now();window.__padLock=1;lg('політ');
-      const step=now=>{if((window.__touch||0)>T0){window.__padLock=0;lg('перервано');return;}const e=Math.min(1,(now-ts)/D),k=-(Math.cos(Math.PI*e)-1)/2;
-        try{map.jumpTo({center:[c0.lng+(tg[0]-c0.lng)*k,c0.lat+(tg[1]-c0.lat)*k],zoom:z0+(7.4-z0)*k});}catch(x){lg('помилка');window.__padLock=0;return;}
-        if(e<1)requestAnimationFrame(step);else{window.__padLock=0;lg('готово');}};requestAnimationFrame(step);};tr();};
+  // плавна камера покадрово (не залежить від flyTo/«зменшення руху»): центр, масштаб, нахил за D мс із м'яким розгоном і гальмуванням; переривається лише дотиком уже під час руху
+  const smoothCam=(c,D)=>{const c0=map.getCenter(),z0=map.getZoom(),p0=map.getPitch(),b0=map.getBearing(),ts=performance.now(),T0=Date.now();window.__padLock=1;lg('політ');
+    const step=now=>{if((window.__touch||0)>T0){window.__padLock=0;lg('перервано');return;}const e=Math.min(1,(now-ts)/D),k=-(Math.cos(Math.PI*e)-1)/2;
+      try{map.jumpTo({center:[c0.lng+(c.center[0]-c0.lng)*k,c0.lat+(c.center[1]-c0.lat)*k],zoom:z0+(c.zoom-z0)*k,pitch:p0+((c.pitch||0)-p0)*k,bearing:b0+((c.bearing||0)-b0)*k});}catch(x){lg('помилка');window.__padLock=0;return;}
+      if(e<1)requestAnimationFrame(step);else{window.__padLock=0;lg('готово');}};requestAnimationFrame(step);};
+  const flyHome=()=>{const t0=Date.now(),tr=()=>{const tg=home||window.__GEOPOS;if(!tg){if(Date.now()-t0<4500){setTimeout(tr,300);return;}lg('немає_цілі');return;}smoothCam({center:tg,zoom:7.4,pitch:0,bearing:0},4500);};tr();};
   // огляд: мапа стоїть на всій країні, усі цілі пульсують кільцями, щоб користувач охопив ситуацію, і лише потім переліт на «Дім»
   const tacSurvey=ms=>{const t0=performance.now(),id='tac-hl2';const step=now=>{if(!map.getLayer(id))return;const e=now-t0;if(e>=ms){map.setPaintProperty(id,'circle-stroke-opacity',0);return;}
     const ph=(e%1100)/1100,fade=Math.min(1,e/300)*Math.min(1,(ms-e)/400);map.setPaintProperty(id,'circle-radius',14+22*ph);map.setPaintProperty(id,'circle-stroke-opacity',(1-ph)*0.95*fade);requestAnimationFrame(step);};requestAnimationFrame(step);};
@@ -487,7 +488,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
   const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
-    const c=camFor();if(!window.__tacCam)map.jumpTo(c);window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,30);
+    const c=camFor();if(TAC){if(!window.__tacCam)map.jumpTo(c);}else smoothCam(c,4500);window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,30);
     if(TAC){// огляд України, потім плавно на точку «Дім», а без неї на геопозицію
       const t0=Date.now(),tryZoom=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;
         if(tg){const fly=()=>map.flyTo({center:tg,zoom:7.4,duration:2200,essential:true,curve:1.2});fly();setTimeout(()=>{if(Date.now()-(window.__touch||0)<5000)return;const c=map.getCenter();if(Math.abs(c.lng-tg[0])>0.8||Math.abs(c.lat-tg[1])>0.8||map.getZoom()<6.8)fly();},2800);return;}
@@ -501,8 +502,8 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   if(!home&&navigator.geolocation){try{navigator.geolocation.getCurrentPosition(p=>{window.__GEOPOS=[p.coords.longitude,p.coords.latitude];},()=>{},{enableHighAccuracy:false,timeout:4000,maximumAge:600000});}catch(e){}}
   setTimeout(()=>{if(el){el.classList.add('out');setTimeout(()=>el.remove(),1400);}document.body.classList.remove('intro');
     // поки мапа стоїть у 2D, усі цілі пульсують кільцями кольору свого типу: за 5 с видно, що де летить
-    window.FXHLALL={t0:performance.now(),until:performance.now()+5000};map.triggerRepaint();
-    if(TAC){window.__introAt=Date.now();tilt=false;finish();lg('огляд');tacSurvey(3600);setTimeout(flyHome,3700);}else setTimeout(go,5000);},wait);}
+    window.FXHLALL={t0:performance.now(),until:performance.now()+3600};map.triggerRepaint();
+    if(TAC){window.__introAt=Date.now();tilt=false;finish();lg('огляд');tacSurvey(3600);setTimeout(flyHome,3700);}else{lg('огляд');setTimeout(go,3600);}},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;// так само, як лічильники вгорі: треки, без ×N
@@ -1419,7 +1420,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;const seen=new Map()
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=329,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'')+' · код '+Math.floor(AV/100)+'.'+String(AV%100).padStart(2,'0')+(b&&+b!==AV?' (чекає оновлення)':'')+(window.__stlog&&window.__stlog.length?' · старт: '+window.__stlog.join(' '):' · старт: не запускався');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=330,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'')+' · код '+Math.floor(AV/100)+'.'+String(AV%100).padStart(2,'0')+(b&&+b!==AV?' (чекає оновлення)':'')+(window.__stlog&&window.__stlog.length?' · старт: '+window.__stlog.join(' '):' · старт: не запускався');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
