@@ -793,12 +793,16 @@ def _google_ok() -> bool:
     return used < int(os.getenv("GOOGLE_FREE_CHARS", "900000"))
 
 
+_BY: dict = {}
+
+
 async def _say(text: str, voice: str = "radio", rate: float = 1.0):
     """Озвучка з обліком: нові (не з кешу) символи йдуть у ліміти (денний платний, місячний безкоштовний Google)."""
     from . import tts
     data, why = await tts.speak(text, voice, rate, paid=_paid_ok(), google=_google_ok())
     if data and why in ("openai", "gemini", "google"):
         LLMX.count("tts_chars:" + why, len(text))
+    _BY[why] = _BY.get(why, 0) + 1
     return data, why
 
 
@@ -888,6 +892,7 @@ def api_tts_status(request: Request):
         return st
     # публічно — без назв сторонніх провайдерів: лише чи є природний голос і чи готовий запасний
     return {"neural": bool(st.get("openai") or st.get("gemini") or st.get("google")), "ready": bool(st.get("piper")), "last_codes": tts.codes(),
+            "by": dict(_BY), "g_key": bool(st.get("google")), "g_ok": _google_ok(), "paid_ok": _paid_ok(),
             "voices": [{"key": v["key"], "name": v["name"]} for v in st.get("voices", [])]}
 
 
