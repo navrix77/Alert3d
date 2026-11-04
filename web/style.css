@@ -827,7 +827,7 @@ body.wm #wm{display:block}
 #intro{transition:opacity .35s ease!important}
 #intro.out{clip-path:none!important;opacity:0}
 @media (prefers-reduced-motion:reduce){#intro .lg .st,#intro .lg .ar{display:none}}
-#intro .lg::before{inset:auto!important;left:14%;top:3%;width:72%;height:72%}
+#intro .lg::before{inset:auto!important;left:13.4%!important;top:-1%!important;width:72%!important;height:72%!important;right:auto!important;bottom:auto!important;transform-origin:50% 50%}
 
 /* виїзд інтерфейсу після заставки: каскад із розмиттям, пружиною та «хвилею» по кнопках */
 @keyframes uiTop{0%{opacity:0;transform:translateY(-26px) scale(.97);filter:blur(10px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
