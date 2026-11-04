@@ -230,7 +230,7 @@ function draw(f){CUR=f;const T1=D.t0+(Math.min(D.t1,D.built)-D.t0)*f;const F=[],
   map.getSource('tr').setData({type:'FeatureCollection',features:F});
   map.getSource('heads').setData({type:'FeatureCollection',features:Hd});links(f,T1);map.getSource('arr').setData({type:'FeatureCollection',features:A});
   map.getSource('sites').setData({type:'FeatureCollection',features:VS.map(s=>({type:'Feature',properties:{n:s.n,c:s.c},geometry:{type:'Point',coordinates:[s.lon,s.lat]}}))});
-  map.getSource('booms').setData({type:'FeatureCollection',features:VB.filter(b=>b.t<=T1).map(b=>({type:'Feature',properties:{n:b.n+(b.c>1?' ×'+b.c:''),c:b.c,a:(f<1&&T1-b.t<900)?1:0.42},geometry:{type:'Point',coordinates:[b.lon,b.lat]}}))});
+  map.getSource('booms').setData({type:'FeatureCollection',features:VB.filter(b=>b.t<=T1).map(b=>({type:'Feature',properties:{n:b.n,c:b.c,a:(f<1&&T1-b.t<900)?1:0.42},geometry:{type:'Point',coordinates:[b.lon,b.lat]}}))});
   $('#tl').textContent=f>=1?'усе':hm(T1);}
 // дуги «звідки летіло»: під час відтворення ростуть від пуску до першої фіксації (голова-комета), потім гаснуть;
 // на повній мапі лишаються ледь видимі, лише для ракет або вибраного типу (сотні шахедів з Курська інакше закриють усе)
@@ -261,7 +261,7 @@ function legend(){const cnt={};for(const t of D.tracks)if(t.inO)cnt[t.type]=(cnt
   document.querySelectorAll('#legend .r.t').forEach(r=>{r.onclick=()=>{SEL=SEL===r.dataset.k?null:r.dataset.k;legend();draw(CUR);};r.onkeydown=e=>{if(e.key==='Enter')r.onclick();};});}
 function stats(){const o=D.official;
   $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ'+(OBL?' · по Україні':'')+'</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+
-    (VB.length?'<h3 class="bh" style="margin-top:12px">Найбільше вибухів'+(OBL?' в області':'')+'</h3><ul>'+VB.slice(0,12).map(b=>'<li><span>'+b.n+'</span><b>'+b.c+'</b></li>').join('')+'</ul>':'');}
+    (VB.length?'<h3 class="bh" style="margin-top:12px">Де найчастіше писали про вибухи'+(OBL?' в області':'')+'</h3><ul>'+VB.slice(0,12).map(b=>'<li><span>'+b.n+'</span></li>').join('')+'</ul><small style="display:block;opacity:.6;margin-top:4px">Порядок за кількістю повідомлень каналів. Одну подію можуть описувати кілька каналів, тому це не кількість вибухів.</small>':'');}
 $('#tt').oninput=e=>{playing=false;$('#pl').textContent='▶';draw(e.target.value/1000);};
 const SPD=[1,2.5,5,10,20,40];let spd=1;try{const r=localStorage.getItem('dspd2');if(r!==null&&+r>=0&&+r<SPD.length)spd=+r;}catch(e){}
 const spdLbl=()=>{$('#spd').textContent=SPD[spd]+' с/год';};spdLbl();
