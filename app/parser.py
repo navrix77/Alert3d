@@ -20,10 +20,12 @@ TYPES = [
     ("jet", re.compile(r"реактив(?:н|\b|\s|и(?![зс]))|(^|[^а-яіїє])р\.\s*шаболд|(^|[^а-яіїє])р\.\s*шахед|(^|[^а-яіїє])рбпла|гер[ао]н[ья]?[-\s–]?[34](?!\d)|гербер\w*[-\s–]?[34](?!\d)|шахед[-\s–]?238")),
     ("molniya", re.compile(r"молни|молні")),
     ("kab", re.compile(r"(^|[^а-яіїє])каб(?!ел|ін|ан|ач|ріол|риол)|бомб|авиабомб|авіабомб|керован[аі] авіа")),
-    ("cruise", re.compile(r"ракет|крилат|крылат|калибр|калібр|х-101|х-59|х-69|х-22")),
+    ("cruise", re.compile(r"ракет(?!оно)|крилат|крылат|калибр|калібр|х-101|х-59|х-69|х-22")),
     ("shahed", re.compile(r"шахед|мопед|бпла|беспилот|безпілот|герань|гербер|дрон|(^|[^а-яіїє])шах(и|ів)?\b|шаболд|(^|[^а-яіїє])ударн(ий|ик|і|их|ого)\b|(^|[^а-яіїє])ударн(ый|ые|ых)\b")),
 ]
 RECON_RX = dict(TYPES)["recon"]
+# «в Чорному морі відсутні ракетоносії», «пусків ракет не зафіксовано»: відсутність не є ціллю, слова після неї не визначають тип (04.11: «ракетоносії» дали «крилату ракету» над Коростенем)
+ABSENT = re.compile(r"(?:відсутн\w*|отсутств\w*|нема(?:є|ють)?|не зафіксован\w*|не фіксуєтьс\w*|не зафиксирован\w*)\s+(?:[\w'’\-]+\s*){1,2}")
 TYPE_ANY = re.compile("|".join(f"(?:{rx.pattern})" for _n, rx in TYPES))
 LANCET_THREAT = re.compile(r"(?:угроз\w*|загроз\w*|можлив\w*|ймовірн\w*|возможн\w*|вероятн\w*)\s+(?:удар\w*\s+)?ланцет\w*"
                            r"|ланцет\w*\s+(?:не\s+)?(?:виключ\w*|исключ\w*)|(?:в\s+)?пар\w*\s+[зс]\s+ланцет\w*")
@@ -517,7 +519,8 @@ class Parser:
         pair = None
         if LANCET_THREAT.search(t) and RECON_RX.search(LANCET_THREAT.sub(" ", t)):
             t, pair = LANCET_THREAT.sub(" ", t), "lancet"
-        typ = next((k for k, rx in TYPES if rx.search(t)), None)
+        t_typ = ABSENT.sub(" ", t)
+        typ = next((k for k, rx in TYPES if rx.search(t_typ)), None)
         self._typ = typ
         m = COUNT.search(t) or COUNT_PAREN.search(t)
         alert_status = bool(ALERT_STATUS.search(t)) or bool(ALERT_LINE.search(text)) or level_status

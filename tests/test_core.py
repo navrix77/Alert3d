@@ -1955,3 +1955,26 @@ def test_strategic_aviation_groups_stages_and_directions():
     tr = [x for x in b.snapshot(t + 100 + 3600) if x["name"] == "Ту-160"][0]
     assert tr["stage"] == "transit" and tr["est"] and 51 < tr["lat"] < 69 and tr["trail"] and tr["path"]
     assert not [x for x in b.snapshot(t + 40 * 3600)]  # старі групи зникають
+
+
+def test_app06_symbology():
+    """Символи тактичного режиму: перевірка за APP-6(E) (node tests/app06_check.js)."""
+    import shutil
+    import subprocess
+    import pathlib
+    node = shutil.which("node")
+    if not node:
+        import pytest
+        pytest.skip("node недоступний")
+    root = pathlib.Path(__file__).resolve().parent.parent
+    r = subprocess.run([node, "tests/app06_check.js"], cwd=root, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-2000:] + r.stdout[-500:]
+
+
+def test_absence_of_missile_carriers_is_not_a_cruise_missile():
+    """04.11: «В Чорному морі відсутні ракетоносії» у зведенні давало тип «крилата ракета» над Коростенем."""
+    txt = ("Станом на 22:02\n\nБПЛА - пуски відбулись як завжди, нічого нового\n\nВ ППУ БПЛА присутні:\n-Київщина\n-Чернігівщина\n\n"
+           "В Коростенському районі тривога\n\nТушки - без загрози\n\nСтаном на зараз:\nВ Чорному морі відсутні ракетоносії\n")
+    assert P.parse(txt, "x").type != "cruise"
+    assert P.parse("Крилата ракета курсом на Житомир", "x").type == "cruise"
+    assert P.parse("Ракети на Київ", "x").type == "cruise"

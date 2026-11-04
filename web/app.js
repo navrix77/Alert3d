@@ -126,14 +126,38 @@ function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;if(!pn.hidden){pn
     '<h5>Свіжість</h5><div>'+[[0,'Усі'],[10,'до 10 хв'],[30,'до 30 хв'],[60,'до години']].map(x=>chip('data-fr="'+x[0]+'"',TACF.fresh===x[0],x[1])).join('')+'</div>'+
     '<h5>Джерело</h5><div>'+chip('data-sr=""',!TACF.src,'Усі')+[...srcs].map(x=>chip('data-sr="'+esc(x[0])+'"',TACF.src===x[0],x[1])).join('')+'</div>'+
     '<h5>Офіційні тривоги</h5><div>'+chip('data-al="1"',TACF.alerts,'Показувати')+chip('data-al="0"',!TACF.alerts,'Сховати')+'</div>';pn.hidden=false;}
-document.addEventListener('click',e=>{const b=e.target.closest('#tac-bar [data-sc],#tac-flt .tc,#tac-f');if(!b)return;
+document.addEventListener('click',e=>{const b=e.target.closest('#tac-bar [data-sc],#tac-flt .tc,#tac-f,#tac-lg');if(!b)return;if(b.id==='tac-lg')return tacLegend();
   if(b.dataset.sc)return tacScale(b.dataset.sc);if(b.id==='tac-f')return tacFilterPanel();
   if(b.dataset.ty){const i=TACF.hide.indexOf(b.dataset.ty);if(i>=0)TACF.hide.splice(i,1);else TACF.hide.push(b.dataset.ty);}
   else if(b.dataset.fr!=null)TACF.fresh=+b.dataset.fr;else if(b.dataset.sr!=null)TACF.src=b.dataset.sr;else if(b.dataset.al!=null)TACF.alerts=b.dataset.al==='1';
   tacSave();applyLayers();tacBarSync();$('#tac-flt').hidden=true;tacFilterPanel();});
-function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+
+/* ---------- тактичні символи NATO APP-6(E): єдиний генератор web/app06.js, малює milsymbol ---------- */
+function loadApp06(){return window.__a6||(window.__a6=new Promise(res=>{const a=document.createElement('script');a.src='/vendor/milsymbol.js';
+  a.onload=()=>{const b=document.createElement('script');b.src='/app06.js';b.onload=()=>res(window.App06||null);b.onerror=()=>res(null);document.head.appendChild(b);};a.onerror=()=>res(null);document.head.appendChild(a);}));}
+const SYMP=new Set();
+function tacImg(spec){const A=window.App06;if(!A)return null;const b=A.build(spec);if(map.hasImage(b.key)||SYMP.has(b.key))return b.key;SYMP.add(b.key);
+  try{const y=A.symbol(spec),an=y.getAnchor(),sz=y.getSize(),W=Math.ceil(2*Math.max(an.x,sz.width-an.x)),H=Math.ceil(2*Math.max(an.y,sz.height-an.y));// рамка завжди в центрі зображення, тож стоїть точно на координаті
+    const im=new Image();im.onload=()=>{try{const c=document.createElement('canvas');c.width=W*2;c.height=H*2;const g=c.getContext('2d');g.drawImage(im,(W/2-an.x)*2,(H/2-an.y)*2,sz.width*2,sz.height*2);
+      if(!map.hasImage(b.key))map.addImage(b.key,g.getImageData(0,0,c.width,c.height),{pixelRatio:2});}catch(e){}};
+    im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(y.asSVG());}catch(e){}
+  return b.key;}
+// належність цілі за даними (кількість незалежних джерел, достовірність, ШІ), не за виглядом
+function tacAff(tr){const A=window.App06;return A?A.affiliationOf({indep:tr.n_indep!=null?tr.n_indep:((tr.ev&&tr.ev.prim)||[]).length,idLvl:tr.id_lvl,ai:tr.ai}):'suspect';}
+function tacLegend(){const pn=$('#tac-legend'),A=window.App06;if(!pn)return;if(!pn.hidden){pn.hidden=true;return;}
+  if(!A){pn.innerHTML='<p>Бібліотеку символів ще не завантажено. Спробуйте за мить.</p>';pn.hidden=false;loadApp06().then(()=>{if(!pn.hidden){pn.hidden=true;tacLegend();}});return;}
+  const sv=(spec,m)=>{try{return A.svg(Object.assign({size:26,mono:m},spec));}catch(e){return '';}};
+  const row=(spec,t,d)=>'<div class="lg-r"><span class="lg-s">'+sv(spec,false)+'</span><span class="lg-s">'+sv(spec,true)+'</span><span><b>'+esc(t)+'</b><small>'+esc(d)+'</small></span></div>';
+  const used=new Map();for(const t of (SNAP&&SNAP.tracks||[]).filter(t=>t.status==='active'))used.set(t.type,tacAff(t));for(const g of (SNAP&&SNAP.strat||[]))used.set(g.icon,A.affiliationOf({indep:(g.srcs||[]).length}));
+  let h='<h5>Символіка NATO APP-6(E)</h5><p class="lg-n">Зліва колір, поруч той самий символ без кольору: належність видно за формою рамки.</p><h5>Належність (рамка)</h5>';
+  h+=A.affiliations().map(a=>row({type:'unknown',affiliation:a.aff},a.ua+' · '+a.name,a.aff==='hostile'?'офіційно, ≥2 незалежних джерел або висока достовірність':a.aff==='suspect'?'одне джерело, ще не підтверджено':'розпізнано лише ШІ')).join('');
+  h+='<h5>Типи на мапі зараз</h5>'+([...used].length?[...used].map(([t,a])=>{const e=A.entryOf(t);return row({type:t,affiliation:a},(A.MODEL[t]||t),e.std+(e.exact?'':' (найближча сутність)'));}).join(''):'<p class="lg-n">Активних цілей немає.</p>');
+  h+='<h5>Поля символу</h5>'+row({type:'tu95',affiliation:'hostile',hd:60,count:4},'Напрямок і кількість','лінія від рамки: напрямок руху, лише коли відомий; число: кількість');
+  h+='<h5>Поля SKY (не частина символу)</h5><p class="lg-n">«N хв»: вік повідомлення. Біла точка: назване місце. Пунктир і коло: оцінка SKY. Блідість: давність, а не знищення. Рамка й знак не змінюються від давності, оцінки чи невідомого типу.</p>';
+  h+='<p class="lg-n">Символіка за NATO APP-6(E) Version 1 (milsymbol 3.0.5). Це не сертифікація НАТО.</p>';pn.innerHTML=h;pn.hidden=false;}
+function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC)loadApp06();if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
-async function setBase(kind){base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
+async function setBase(kind){SYMP.clear();base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
 function addImages(){
   // реалістичні спрайти цілей (вид згори, ніс на північ) + тіні
@@ -343,7 +367,9 @@ function addOverlays(){
   map.addLayer({id:'tac-ln',type:'line',source:'tac',filter:['==',['get','k'],'ln'],layout:{'line-cap':'butt'},paint:{'line-color':['get','c'],'line-width':1.4,'line-dasharray':[2,2],'line-opacity':['*',0.8,['get','o']]}});
   map.addLayer({id:'tac-fact',type:'circle',source:'tac',filter:['==',['get','k'],'fact'],paint:{'circle-radius':4.5,'circle-color':['get','c'],'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6,'circle-opacity':['get','o'],'circle-stroke-opacity':['get','o']}});
   map.addLayer({id:'tac-hl',type:'circle',source:'tac',filter:['==',['get','k'],'hl'],paint:{'circle-radius':18,'circle-color':'rgba(255,255,255,0.10)','circle-stroke-color':'#FFFFFF','circle-stroke-width':2.4,'circle-pitch-alignment':'map'}});
-  map.addLayer({id:'tac-age',type:'symbol',source:'tac',filter:['==',['get','k'],'age'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-anchor':'left','text-offset':['interpolate',['linear'],['zoom'],4,['literal',[0.9,0]],8,['literal',[1.4,0]],11,['literal',[1.9,0]]],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
+  map.addLayer({id:'tac-sel',type:'circle',source:'tac',filter:['==',['get','k'],'sel'],paint:{'circle-radius':22,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6,'circle-stroke-opacity':0.9,'circle-pitch-alignment':'map'}});
+  map.addLayer({id:'tac-sym',type:'symbol',source:'tac',filter:['==',['get','k'],'sym'],layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],4,0.72,8,0.9,11,1.1],'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','text-field':['get','v'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'top','text-offset':[0,1.5],'text-optional':true},paint:{'icon-opacity':['get','o'],'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
+  map.addLayer({id:'tac-age',type:'symbol',source:'tac',filter:['==',['get','k'],'age'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-anchor':'left','text-offset':[1.9,0],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['all',['>',['get','count'],1],['!',['!=',['get','next'],null]]],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-anchor':'top','text-offset':['interpolate',['linear'],['zoom'],2,['literal',[0,1.30]],5,['literal',[0,1.68]],7,['literal',[0,2.04]],9.5,['literal',[0,2.48]]],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
   if(map.getLayer('tg-course'))map.moveLayer('tg-course');
   map.on('click','tg-hit',e=>{const f=e.features[0];openSheet(f.properties.id);});
@@ -541,15 +567,20 @@ function frame(now){
         const fx0=fx.find(z=>z.id===g.properties.id);if(fx0)fx0.p=[q.lng,q.lat];});}}
     for(const f of shown)delete f._p;// екранна точка (клас Point) не має йти в setData: MapLibre 5.24 падає на серіалізації, і цілі зникають
     feats.length=0;feats.push(...shown);
-    const vis=new Set(shown.map(f=>f.properties.id));window.FX=fx.filter(f=>vis.has(f.id));
+    const vis=new Set(shown.map(f=>f.properties.id));window.FX=fx.filter(f=>vis.has(f.id));if(TAC&&window.App06)window.FX=[];// тактичний режим: цілі показують лише стандартні символи
     {const top=threats.slice().sort((a,b)=>(a.rel.eta??999)-(b.rel.eta??999))[0];for(const f of window.FX)f.thr=!!(top&&f.id===top.tr.id);}
-    window.FXHOME=home?{p:home,state:$('#me').classList.contains('danger')?'danger':$('#me').classList.contains('watch')?'watch':'calm'}:null;
+    window.FXHOME=(home&&!(TAC&&window.App06))?{p:home,state:$('#me').classList.contains('danger')?'danger':$('#me').classList.contains('watch')?'watch':'calm'}:null;
     if(slow)window.FXBEACONS=PREFL().launch?(SNAP.launches||[]).filter(L=>serverT-L.t<3*3600).map(L=>({p:[L.lon,L.lat]})):[];
     if(slow)map.getSource('targets').setData({type:'FeatureCollection',features:feats});
     if(slow&&map.getSource('tac')){const TF=[];
+      const A6=TAC?window.App06:null;
       if(TAC)for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
         const ageS=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),mins=Math.floor(ageS/60),o=ageS<300?1:Math.max(0.4,1-(ageS-300)/1500),c=f.properties.c,P=f.geometry.coordinates;
         TF.push({type:'Feature',properties:{k:'age',l:mins<1?'<1 хв':mins+' хв',o,c},geometry:{type:'Point',coordinates:P}});
+        if(A6){const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next);// напрямок у символі лише коли він відомий
+          const key=tacImg({type:A6.MAP[tr.type]?tr.type:'unknown',affiliation:tacAff(tr),hd:(f.properties.unk||tr.hd==null||still)?null:f.properties.sa,count:f.properties.count});
+          TF.push({type:'Feature',properties:{k:'sym',img:key,v:(sel===tr.id||map.getZoom()>=6.5)?(A6.MODEL[tr.type]||''):'',o},geometry:{type:'Point',coordinates:P}});
+          if(sel===tr.id)TF.push({type:'Feature',properties:{k:'sel'},geometry:{type:'Point',coordinates:P}});}
         const q=tr.trail&&tr.trail.length&&tr.trail[tr.trail.length-1];
         if(q&&!isBal(tr)&&dist(xy([q[0],q[1]]),xy(P))>=1.5){TF.push({type:'Feature',properties:{k:'fact',o,c},geometry:{type:'Point',coordinates:[q[0],q[1]]}});
           TF.push({type:'Feature',properties:{k:'ln',o,c},geometry:{type:'LineString',coordinates:[[q[0],q[1]],P]}});}}
@@ -704,6 +735,7 @@ function stratBuild(){stratImages();
     paint:{'icon-opacity':['get','o'],'text-color':'#FFC878','text-halo-color':'rgba(0,0,0,.92)','text-halo-width':1.8}});
   stratAL({id:'strat-fxl',type:'line',source:'strat-fx',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round'},paint:{'line-color':'#FFD27A','line-width':['get','w'],'line-opacity':['get','o'],'line-blur':1.2}});
   stratAL({id:'strat-fxp',type:'circle',source:'strat-fx',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':['get','r'],'circle-color':['get','c'],'circle-opacity':['get','o'],'circle-blur':0.7}});
+  if(TAC&&map.getLayer('strat')){const L=(k,v)=>map.setLayoutProperty('strat',k,v);L('icon-image',['get','img']);L('icon-rotate',0);L('icon-offset',[0,0]);L('icon-size',['interpolate',['linear'],['zoom'],3,0.7,7,0.9,10,1.1]);L('text-offset',[0,2.1]);map.setPaintProperty('strat','text-color','#E6EBF2');}
   if(!map._stratClick){map._stratClick=1;map.on('click','strat',e=>{const f=e.features&&e.features[0];if(!f)return;const g=STRAT.find(x=>x.id===f.properties.gid);if(!g)return;
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'330px',className:'kab-pop avia-pop',offset:18}).setLngLat([g.lon,g.lat]).setHTML(stratInfo(g)).addTo(map);});
   map.on('mouseenter','strat',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','strat',()=>map.getCanvas().style.cursor='');}return true;}
@@ -726,7 +758,10 @@ function stratOffsets(n){const out=[];for(let i=0;i<n;i++){const row=Math.ceil(i
 function syncStrat(){if(!SNAP||!stratEnsure())return;STRAT=SNAP.strat||[];const P=[],L=[],R=[];
   STRAT.forEach(g=>{const act=g.stage==='takeoff'||g.stage==='transit'||g.stage==='line'||g.stage==='launch';const cnt=Math.max(1,Math.min(9,g.n||1));const o=stratOffsets(cnt);
     const ageF=Math.max(0.35,1-Math.max(0,(Date.now()/1000+offset-g.t))/(g.until-g.t0+1)*0.5);
-    o.forEach((off,i)=>P.push({type:'Feature',properties:{gid:g.id,ic:g.icon,r:g.hd||0,off,o:act?1:0.6*ageF+0.2,l:i===0?(g.name+(g.n>9?' ×'+g.n:'')+' · '+(STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)):''},geometry:{type:'Point',coordinates:[g.lon,g.lat]}}));
+    if(TAC&&window.App06){const A6=window.App06,mk=g.icon&&A6.MAP[g.icon]?g.icon:'unknown',mv=(g.stage==='takeoff'||g.stage==='transit'||g.stage==='line'||g.stage==='launch')&&g.hd!=null;
+      const key=tacImg({type:mk,affiliation:A6.affiliationOf({indep:(g.srcs||[]).length}),hd:mv?g.hd:null,count:g.n||null});
+      P.push({type:'Feature',properties:{gid:g.id,img:key,o:act?1:0.6*ageF+0.2,l:(g.name||A6.MODEL[mk]||'')+' · '+(STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)},geometry:{type:'Point',coordinates:[g.lon,g.lat]}});}
+    else o.forEach((off,i)=>P.push({type:'Feature',properties:{gid:g.id,ic:g.icon,r:g.hd||0,off,o:act?1:0.6*ageF+0.2,l:i===0?(g.name+(g.n>9?' ×'+g.n:'')+' · '+(STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)):''},geometry:{type:'Point',coordinates:[g.lon,g.lat]}}));
     if(g.path&&g.path.length>1)L.push({type:'Feature',properties:{k:'route'},geometry:{type:'LineString',coordinates:g.path}});
     if(g.trail&&g.trail.length>1)L.push({type:'Feature',properties:{k:'trail'},geometry:{type:'LineString',coordinates:g.trail}});
     (g.dirs||[]).forEach(d=>{L.push({type:'Feature',properties:{k:'dir'},geometry:{type:'LineString',coordinates:[[g.lon,g.lat],[d.lon,d.lat]]}});
@@ -736,7 +771,7 @@ function syncStrat(){if(!SNAP||!stratEnsure())return;STRAT=SNAP.strat||[];const 
     const key=g.id+'|'+(g.launch_t||0);if(g.stage==='launch'&&g.launch_t&&!STRAT_SEEN.has(key)){STRAT_SEEN.add(key);if(Date.now()/1000+offset-g.launch_t<600)stratLaunchFx(g,cnt);}});
   map.getSource('strat').setData({type:'FeatureCollection',features:P});map.getSource('strat-l').setData({type:'FeatureCollection',features:L});map.getSource('strat-ring').setData({type:'FeatureCollection',features:R});}
 // ракети виходять із кожного літака групи вздовж курсу (або на першу ймовірну ціль), 4,5 с, з вогняним хвостом
-function stratLaunchFx(g,cnt){const hd=(g.dirs&&g.dirs[0])?Math.atan2((g.dirs[0].lon-g.lon)*Math.cos(g.lat*Math.PI/180),g.dirs[0].lat-g.lat):(g.hd||0)*Math.PI/180;
+function stratLaunchFx(g,cnt){if(TAC)return;const hd=(g.dirs&&g.dirs[0])?Math.atan2((g.dirs[0].lon-g.lon)*Math.cos(g.lat*Math.PI/180),g.dirs[0].lat-g.lat):(g.hd||0)*Math.PI/180;
   const per=Math.min(3,Math.max(1,Math.round((g.missiles||cnt*2)/cnt)));const t0=performance.now();
   const sp=Math.PI/180*0.9,sign=[0,-1,1];
   for(let i=0;i<cnt;i++)for(let j=0;j<per;j++)stratFx.push({lon:g.lon+(i%2?-1:1)*Math.ceil(i/2)*0.06*Math.cos(hd),lat:g.lat,h:hd+(per>1?sign[j%3]*sp:0),t0:t0+i*90+j*140,life:4500,v:0.0016});
@@ -1262,6 +1297,7 @@ function syncSettingsUI(){document.querySelectorAll('.seg[data-pref]').forEach(g
 function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))map.setLayoutProperty(i,'visibility',on?'visible':'none');});
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);
   if(TAC)vis(['holo','holo-top','ra-glow'],false);
+  if(TAC)vis(['tg-n','strat-ring','strat-fxl','strat-fxp'],false);
   if(TAC&&!TACF.alerts)vis(['hp-f','hp-l','hrom','hrom-t'],false);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setData(EMPTY);return;// заяви МО РФ «скільки збили над регіоном» прибрано з мапи: застарілі зведення без місця й часу удару нічого не дають людині
@@ -1373,7 +1409,7 @@ let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.we
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
 window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
-applyTheme(false);document.body.classList.toggle('tac',TAC);tacBarSync();
+applyTheme(false);document.body.classList.toggle('tac',TAC);if(TAC)loadApp06();tacBarSync();
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 
 /* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */
