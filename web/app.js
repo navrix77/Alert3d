@@ -880,11 +880,13 @@ function renderCounters(){
   // Цілі, про які не писали 10+ хв, у лічильник не входять (на мапі вони напівпрозорі)
   const nowS=Date.now()/1000+offset;const LM=(SNAP.counts&&SNAP.counts.live_min)||{};const fresh=t=>(((t.ev&&t.ev.age)||0)+Math.max(0,nowS-SNAP.now))<(LM[t.type]||10)*60;// той самий час життя за типом, що й на мапі й в аналітиці (app/count.py)
   const act=SNAP.tracks.filter(t=>t.status==='active'&&fresh(t));const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+1);
+  // компроміс: велике число — оцінка кількості одиниць (як на мапі: той самий тип і пункт призначення = одна група, береться найбільша названа кількість, різні пункти додаються); дрібно — скільки це груп/цілей
+  const UN={};{const g={};act.forEach(t=>{const k=t.type+'|'+((t.next||'').trim()||t.id);g[k]=Math.max(g[k]||0,t.count||1);});for(const k in g){const ty=k.split('|')[0];UN[ty]=(UN[ty]||0)+g[k];}}
   const order=['shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','lancet','fpv','fpvf'];
   $('#counters').innerHTML='';
-  order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];if(TAC&&window.App06){const sv=document.createElement('span');sv.className='cs';try{sv.innerHTML=window.App06.svg({type:window.App06.MAP[t]?t:'unknown',affiliation:'hostile',hd:null,size:26});}catch(e){}d.appendChild(sv);}else{const c=(CNTI[t]&&CNTI[t]._sprite?CNTI[t]:(CNTI[t]=drawTarget(t,28)));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);}const w=document.createElement('div');w.className='cw';const b=document.createElement('b');b.textContent=by[t];if(renderCounters.prev&&renderCounters.prev[t]!==by[t])b.className='pop';
-    const l=document.createElement('small');l.textContent=CNT_LBL[t]||TYPE_NAME[t];w.appendChild(b);w.appendChild(l);d.appendChild(w);d.style.setProperty('--tc',TYPE_COLOR[t]);d.onclick=()=>focusType(t);$('#counters').appendChild(d);});
-  renderCounters.prev=by;
+  order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];if(TAC&&window.App06){const sv=document.createElement('span');sv.className='cs';try{sv.innerHTML=window.App06.svg({type:window.App06.MAP[t]?t:'unknown',affiliation:'hostile',hd:null,size:26});}catch(e){}d.appendChild(sv);}else{const c=(CNTI[t]&&CNTI[t]._sprite?CNTI[t]:(CNTI[t]=drawTarget(t,28)));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);}const w=document.createElement('div');w.className='cw';const b=document.createElement('b');b.textContent=UN[t]||by[t];if(renderCounters.prev&&renderCounters.prev[t]!==(UN[t]||by[t]))b.className='pop';
+    const l=document.createElement('small');l.textContent=(CNT_LBL[t]||TYPE_NAME[t])+((UN[t]||by[t])!==by[t]?' · '+by[t]+' гр.':'');w.appendChild(b);w.appendChild(l);d.appendChild(w);d.style.setProperty('--tc',TYPE_COLOR[t]);d.onclick=()=>focusType(t);$('#counters').appendChild(d);});
+  renderCounters.prev=Object.fromEntries(Object.keys(by).map(k=>[k,UN[k]||by[k]]));
   if(!act.length){const d=document.createElement('div');d.className='cnt';d.innerHTML='<b style="font-size:16px">Цілей не видно</b>';$('#counters').appendChild(d);}
 }
 function renderAsOf(){
