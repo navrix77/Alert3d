@@ -887,6 +887,13 @@ async def api_tts_check(request: Request):
     return {"ok": bool(data), "voice": "neural" if why.startswith(("openai", "gemini", "google")) else "basic" if data else "none"}
 
 
+@app.get("/api/enemy/summary")
+def enemy_summary():
+    """Діагностика точкових об'єктів DeepState: типи геометрій, категорії, найчастіші назви (щоб звірити класифікацію з реальними даними)."""
+    f = ROOT / "data" / "enemy_summary.json"
+    return JSONResponse(json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"status": "ще не завантажено"})
+
+
 @app.get("/api/tts/status")
 def api_tts_status(request: Request):
     from . import tts
@@ -1211,10 +1218,10 @@ async def ws_endpoint(ws: WebSocket):
 
 @app.get("/data/{name}")
 def data_file(name: str):
-    allowed = {"oblasts.geojson", "raions.geojson", "occupied.geojson", "hromadas.geojson", "outside.geojson", "ua.geojson"}
+    allowed = {"oblasts.geojson", "raions.geojson", "occupied.geojson", "enemy_objects.geojson", "hromadas.geojson", "outside.geojson", "ua.geojson"}
     if name not in allowed or not (ROOT / "data" / name).exists():
-        return JSONResponse({"type": "FeatureCollection", "features": []} if name == "occupied.geojson" else {"error": "not found"},
-                            status_code=200 if name == "occupied.geojson" else 404)
+        return JSONResponse({"type": "FeatureCollection", "features": []} if name in ("occupied.geojson", "enemy_objects.geojson") else {"error": "not found"},
+                            status_code=200 if name in ("occupied.geojson", "enemy_objects.geojson") else 404)
     return FileResponse(ROOT / "data" / name, media_type="application/geo+json")
 
 

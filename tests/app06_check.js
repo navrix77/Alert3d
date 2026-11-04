@@ -9,6 +9,8 @@ for (const t of types) for (const a of affs) for (const hd of [null, 0, 47, 359.
   n++; const p = A.check({ type: t, affiliation: a, hd, count });
   p.forEach(x => fail(`${t}/${a}/hd=${hd}/n=${count}: ${x}`));
 }
+// наземні об'єкти ворога: HQ лише з індикатором штабу, кожен варіант проходить перевірку
+for (const t of ['enemy_airfield', 'enemy_hq', 'enemy_object']) for (const a of ['suspect', 'hostile']) { A.check({ type: t, affiliation: a }).forEach(x => fail(`${t}/${a}: ${x}`)); n++; }
 // невідомий або відсутній тип: загальний повітряний об'єкт, належність не змінюється
 for (const t of [undefined, null, 'щось-нове']) for (const a of affs) {
   const s = A.sidc(t, a); if (s.slice(10, 16) !== '000000') fail('невідомий тип має давати сутність 000000: ' + t);

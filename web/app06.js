@@ -23,7 +23,8 @@
   const AFF = { pending: '0', unknown: '1', assumed: '2', friend: '3', neutral: '4', suspect: '5', hostile: '6' };
   const AFF_NAME = { '0': 'Pending', '1': 'Unknown', '2': 'Assumed friend', '3': 'Friend', '4': 'Neutral', '5': 'Suspect', '6': 'Hostile' };
   const AFF_UA = { '0': 'Не визначено', '1': 'Невідома', '2': 'Імовірно своя', '3': 'Своя', '4': 'Нейтральна', '5': 'Підозрювана', '6': 'Ворожа' };
-  const SETS = { '01': 'Air', '02': 'Air missile' };
+  const SETS = { '01': 'Air', '02': 'Air missile', '10': 'Land unit', '20': 'Land installation' };
+  const DIM = { '01': 'Air', '02': 'Air', '10': 'Ground', '20': 'Ground' };
 
   // Відповідність типів SKY стандартним кодам: набір (symbol set), сутність (6 цифр), модифікатор 1 і 2.
   // exact=false: у стандарті немає точнішої сутності, взято найближчу батьківську, а конкретика йде текстовим полем.
@@ -48,11 +49,15 @@
     tu160: E('01', '110100', '02', '00', 'Air / Military / Fixed-wing / Bomber', true, 'Ту-160'),
     tu22: E('01', '110100', '02', '00', 'Air / Military / Fixed-wing / Bomber', true, 'Ту-22М3'),
     mig31: E('01', '110100', '00', '00', 'Air / Military / Fixed-wing', false, 'МіГ-31К: роль у повідомленнях не названа, тому загальний «Fixed-wing» без ролі'),
+    // об'єкти ворога з DeepState (наземні): установка або підрозділ; сутність лише там, де є точний код, інакше загальний знак
+    enemy_airfield: E('20', '120803', '00', '00', 'Land installation / Infrastructure / Military / Airport', true, 'Аеродром (DeepState)'),
+    enemy_hq: Object.assign(E('10', '000000', '00', '00', 'Land unit / Unspecified (HQ indicator)', false, 'Штаб (DeepState): рід військ не відомий, тому загальний підрозділ зі знаком штабу'), { hq: true }),
+    enemy_object: E('20', '110000', '00', '00', 'Land installation / Military', false, 'Об\'єкт ворога (DeepState): загальна військова установка; назва в полі'),
     // тип невстановлений: загальний повітряний об'єкт; належність при цьому лишається за даними
     unknown: E('01', '000000', '00', '00', 'Air (unspecified)', true, 'Тип не встановлено: порожній внутрішній знак, рамка за належністю'),
   };
   const MODEL = { shahed: 'Шахед', geran5: 'Герань-5', jet: 'Реактивний БпЛА', molniya: 'Молнія', fpv: 'FPV', fpvf: 'FPV (оптоволокно)', lancet: 'Ланцет',
-    recon: 'Розвідник', cruise: 'КР', banderol: 'Бандероль', ballistic: 'БР', kab: 'КАБ', rszv: 'РСЗВ', tu95: 'Ту-95МС', tu160: 'Ту-160', tu22: 'Ту-22М3', mig31: 'МіГ-31К', unknown: '' };
+    recon: 'Розвідник', cruise: 'КР', banderol: 'Бандероль', ballistic: 'БР', kab: 'КАБ', rszv: 'РСЗВ', tu95: 'Ту-95МС', tu160: 'Ту-160', tu22: 'Ту-22М3', mig31: 'МіГ-31К', unknown: '', enemy_airfield: 'Аеродром', enemy_hq: 'Штаб', enemy_object: '' };
 
   const pad = (s, n) => String(s).padStart(n, '0');
   function affiliationOf(d) {
@@ -69,7 +74,7 @@
   // Збирає SIDC: версія 13, контекст 0 (реальність), належність, набір, статус 0, HQ/TF/dummy 0, ешелон/мобільність 00, сутність, M1, M2, решта нулі
   function sidc(type, aff) {
     const en = entryOf(type), a = AFF[aff] != null ? AFF[aff] : AFF.unknown;
-    return EDITION.sidcVersion + '0' + a + en.set + '0' + '0' + '00' + en.entity + en.m1 + en.m2 + '0000000000';
+    return EDITION.sidcVersion + '0' + a + en.set + '0' + (en.hq ? '2' : '0') + '00' + en.entity + en.m1 + en.m2 + '0000000000';
   }
 
   // spec: {type, affiliation, hd (градуси або null), count (число або null), mono, size}
@@ -102,16 +107,16 @@
     if (s.slice(0, 2) !== EDITION.sidcVersion) p.push('версія SIDC не 13 (APP-6E)');
     if (s[2] !== '0') p.push('контекст не «реальність»');
     if (!'0123456'.includes(s[3])) p.push('невідома належність');
-    if (!SETS[s.slice(4, 6)]) p.push('набір не повітряний');
+    if (!SETS[s.slice(4, 6)]) p.push('набір не передбачений (01, 02, 10, 20)');
     if (s[6] !== '0') p.push('статус символу має бути «present»: оцінка/давність не виражаються статусом');
-    if (s[7] !== '0' || s.slice(8, 10) !== '00') p.push('HQ/TF/dummy і ешелон не застосовні до повітряних цілей');
+    if (s[7] !== (b.entry.hq ? '2' : '0') || s.slice(8, 10) !== '00') p.push('HQ/TF/dummy і ешелон: дозволено лише індикатор штабу, де він у таблиці');
     if (s.slice(20) !== '0000000000') p.push('невикористані позиції SIDC мають бути нульовими');
     let y;
     try { y = new ms.Symbol(s, b.opts); } catch (e) { p.push('бібліотека не збудувала символ: ' + e.message); return p; }
     const v = y.isValid(true);
     if (!v.icon) p.push('код сутності/модифікаторів відсутній у таблицях стандарту');
     if (!v.drawInstructions) p.push('символ не має повних інструкцій малювання');
-    if (v.dimension !== 'Air') p.push('вимір не «Air»');
+    if (v.dimension !== DIM[s.slice(4, 6)]) p.push('вимір символу не відповідає набору: ' + v.dimension);
     const want = { '0': 'Unknown', '1': 'Unknown', '2': 'Friend', '3': 'Friend', '4': 'Neutral', '5': 'Hostile', '6': 'Hostile' }[s[3]];
     if (v.affiliation !== want) p.push('рамка не відповідає належності: ' + v.affiliation + ' ≠ ' + want);
     if (b.dir != null && !(b.opts.direction >= 0 && b.opts.direction < 360)) p.push('некоректний напрямок');

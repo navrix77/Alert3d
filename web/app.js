@@ -72,7 +72,7 @@ try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo
   setTimeout(()=>{try{const el=pp.getElement();if(!el)return;const b=el.getBoundingClientRect(),pad=10,top=(document.querySelector('header.top')||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom+6;
     let dx=0,dy=0;if(b.right>innerWidth-pad)dx=b.right-innerWidth+pad;if(b.left-dx<pad)dx=b.left-pad;if(b.top<top)dy=b.top-top;
     if(dx||dy)m.panBy([dx,dy],{duration:350});}catch(e){}},60);return r;};}catch(e){}
-let TACHL=null;const TACF=(()=>{try{return Object.assign({hide:[],fresh:0,src:'',alerts:true,scale:''},JSON.parse(localStorage.getItem('tac_f')||'{}'));}catch(e){return {hide:[],fresh:0,src:'',alerts:true,scale:''};}})();
+let TACHL=null;let MEAS={on:false,pts:[]},ENEMY=null,ENEMY_SET=false;const TACF=(()=>{try{return Object.assign({hide:[],fresh:0,src:'',alerts:true,scale:'',enemy:true,reach:true},JSON.parse(localStorage.getItem('tac_f')||'{}'));}catch(e){return {hide:[],fresh:0,src:'',alerts:true,scale:'',enemy:true,reach:true};}})();
 const tacSave=()=>{try{localStorage.setItem('tac_f',JSON.stringify(TACF));}catch(e){}};
 function tacOK(tr,serverT){if(sel===tr.id)return true;if(TACF.hide.includes(tr.type))return false;
   if(TACF.fresh){const a=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now);if(a>TACF.fresh*60)return false;}
@@ -117,7 +117,7 @@ function tacScale(v){TACF.scale=v;tacSave();const H=home||[31.5,49];
   const b=document.querySelector('#rad-scope button[data-v="'+({near:'near',oblast:'oblast',country:'country'}[v])+'"]');if(b)b.click();// озвучення радіо змінюється разом із масштабом
   tacBarSync();}
 function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
-  const n=TACF.hide.length+(TACF.fresh?1:0)+(TACF.src?1:0)+(TACF.alerts?0:1);const f=$('#tac-f');if(f)f.textContent='Фільтри'+(n?' · '+n:'');}
+  const n=TACF.hide.length+(TACF.fresh?1:0)+(TACF.src?1:0)+(TACF.alerts?0:1)+(TACF.enemy?0:1)+(TACF.reach?0:1);const f=$('#tac-f');if(f)f.textContent='Фільтри'+(n?' · '+n:'');}
 function tacPanelTop(){const b=$('#tac-bar');if(b)document.documentElement.style.setProperty('--tac-top',Math.round(b.getBoundingClientRect().bottom+6)+'px');}
 function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;tacPanelTop();if(!pn.hidden){pn.hidden=true;return;}
   const types=[...new Set((SNAP&&SNAP.tracks||[]).filter(t=>t.status==='active').map(t=>t.type))];const srcs=new Map();
@@ -126,11 +126,11 @@ function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;tacPanelTop();if(
   pn.innerHTML='<h5>Типи цілей</h5><div>'+types.map(t=>chip('data-ty="'+t+'"',!TACF.hide.includes(t),TYPE_NAME[t]||t)).join('')+'</div>'+
     '<h5>Свіжість</h5><div>'+[[0,'Усі'],[10,'до 10 хв'],[30,'до 30 хв'],[60,'до години']].map(x=>chip('data-fr="'+x[0]+'"',TACF.fresh===x[0],x[1])).join('')+'</div>'+
     '<h5>Джерело</h5><div>'+chip('data-sr=""',!TACF.src,'Усі')+[...srcs].map(x=>chip('data-sr="'+esc(x[0])+'"',TACF.src===x[0],x[1])).join('')+'</div>'+
-    '<h5>Офіційні тривоги</h5><div>'+chip('data-al="1"',TACF.alerts,'Показувати')+chip('data-al="0"',!TACF.alerts,'Сховати')+'</div>';pn.hidden=false;}
-document.addEventListener('click',e=>{const b=e.target.closest('#tac-bar [data-sc],#tac-flt .tc,#tac-f,#tac-lg');if(!b)return;if(b.id==='tac-lg')return tacLegend();
+    '<h5>Офіційні тривоги</h5><div>'+chip('data-al="1"',TACF.alerts,'Показувати')+chip('data-al="0"',!TACF.alerts,'Сховати')+'</div>'+'<h5>Позначки ворога (DeepState)</h5><div>'+chip('data-en="1"',TACF.enemy,'Показувати')+chip('data-en="0"',!TACF.enemy,'Сховати')+'</div>'+'<h5>Радіуси досяжності вибраної цілі</h5><div>'+chip('data-rc="1"',TACF.reach,'Показувати')+chip('data-rc="0"',!TACF.reach,'Сховати')+'</div>';pn.hidden=false;}
+document.addEventListener('click',e=>{const b=e.target.closest('#tac-bar [data-sc],#tac-flt .tc,#tac-f,#tac-lg,#tac-ms');if(!b)return;if(b.id==='tac-ms')return measToggle();if(b.id==='tac-lg')return tacLegend();
   if(b.dataset.sc)return tacScale(b.dataset.sc);if(b.id==='tac-f')return tacFilterPanel();
   if(b.dataset.ty){const i=TACF.hide.indexOf(b.dataset.ty);if(i>=0)TACF.hide.splice(i,1);else TACF.hide.push(b.dataset.ty);}
-  else if(b.dataset.fr!=null)TACF.fresh=+b.dataset.fr;else if(b.dataset.sr!=null)TACF.src=b.dataset.sr;else if(b.dataset.al!=null)TACF.alerts=b.dataset.al==='1';
+  else if(b.dataset.fr!=null)TACF.fresh=+b.dataset.fr;else if(b.dataset.sr!=null)TACF.src=b.dataset.sr;else if(b.dataset.al!=null)TACF.alerts=b.dataset.al==='1';else if(b.dataset.en!=null)TACF.enemy=b.dataset.en==='1';else if(b.dataset.rc!=null)TACF.reach=b.dataset.rc==='1';
   tacSave();applyLayers();tacBarSync();$('#tac-flt').hidden=true;tacFilterPanel();});
 
 /* ---------- тактичні символи NATO APP-6(E): єдиний генератор web/app06.js, малює milsymbol ---------- */
@@ -155,13 +155,38 @@ function tacLegend(){const pn=$('#tac-legend'),A=window.App06;if(!pn)return;tacP
   h+='<h5>Типи на мапі зараз</h5>'+([...used].length?[...used].map(([t,a])=>{const e=A.entryOf(t);return row({type:t,affiliation:a},(A.MODEL[t]||t),e.std+(e.exact?'':' (найближча сутність)'));}).join(''):'<p class="lg-n">Активних цілей немає.</p>');
   h+='<h5>Поля символу</h5>'+row({type:'tu95',affiliation:'hostile',hd:60,count:4},'Напрямок і кількість','лінія від рамки: напрямок руху, лише коли відомий; число: кількість');
   h+='<h5>Поля SKY (не частина символу)</h5><p class="lg-n">«N хв»: вік повідомлення. Біла точка: назване місце. Пунктир і коло: оцінка SKY. Блідість: давність, а не знищення. Рамка й знак не змінюються від давності, оцінки чи невідомого типу.</p>';
-  h+='<p class="lg-n">Координати: WGS-84, система цілевказання НАТО MGRS (сітка UTM). Масштабні лінійки в км і морських милях (NM). Точність MGRS відповідає точності місця: ≥10 км — 10 км, ≥1 км — 1 км, краще — 100 м.</p><p class="lg-n">Символіка за NATO APP-6(E) Version 1 (milsymbol 3.0.5). Це не сертифікація НАТО.</p>';pn.innerHTML=h;pn.hidden=false;}
+  h+='<h5>Інше на мапі</h5><p class="lg-n">Позначки ворога: з DeepState (deepstatemap.live), тип позначки за назвою об\'єкта; аеродром і штаб мають стандартні знаки, решта загальний знак військової установки. Кола 30 і 60 хв: найбільша відстань за швидкістю цілі, розрахунок SKY, а не прогноз маршруту. Лінійка: відстань у км і NM та істинний азимут.</p><p class="lg-n"><b>Дані з відкритих джерел</b>: надходять із затримкою, можуть бути неповними чи помилковими. Відсутність позначки не означає відсутності загрози.</p>';h+='<p class="lg-n">Координати: WGS-84, система цілевказання НАТО MGRS (сітка UTM). Масштабні лінійки в км і морських милях (NM). Точність MGRS відповідає точності місця: ≥10 км — 10 км, ≥1 км — 1 км, краще — 100 м.</p><p class="lg-n">Символіка за NATO APP-6(E) Version 1 (milsymbol 3.0.5). Це не сертифікація НАТО.</p>';pn.innerHTML=h;pn.hidden=false;}
 // лінійний масштаб у кілометрах і морських милях (як у зарамковому оформленні карт НАТО)
 function tacScaleBars(){try{if(TAC&&!map._tacScale){map._tacScale=[new maplibregl.ScaleControl({unit:'metric',maxWidth:90}),new maplibregl.ScaleControl({unit:'nautical',maxWidth:90})];map._tacScale.forEach(c=>map.addControl(c,'top-left'));}
   else if(!TAC&&map._tacScale){map._tacScale.forEach(c=>map.removeControl(c));map._tacScale=null;}}catch(e){}}
-function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC)loadApp06();if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+
+/* ---------- лінійка, радіуси досяжності, позначки ворога (DeepState) ---------- */
+const hav=(a,b)=>{const R=6371.0088,r=Math.PI/180,dl=(b[1]-a[1])*r,dn=(b[0]-a[0])*r,x=Math.sin(dl/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(x));};
+const brgTrue=(a,b)=>{const r=Math.PI/180,y=Math.sin((b[0]-a[0])*r)*Math.cos(b[1]*r),x=Math.cos(a[1]*r)*Math.sin(b[1]*r)-Math.sin(a[1]*r)*Math.cos(b[1]*r)*Math.cos((b[0]-a[0])*r);return (Math.atan2(y,x)/r+360)%360;};
+const dest=(p,az,km)=>{const r=Math.PI/180,d=km/6371.0088,la=p[1]*r,lo=p[0]*r,b=az*r,la2=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(b)),lo2=lo+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(la2));return [lo2/r,la2/r];};
+const f1=v=>(Math.round(v*10)/10).toFixed(1).replace('.',',');
+function measDraw(){if(!map.getSource('meas'))return;const F=[],P=MEAS.pts;let tot=0;
+  P.forEach(p=>F.push({type:'Feature',properties:{k:'p'},geometry:{type:'Point',coordinates:p}}));
+  if(P.length>1)F.push({type:'Feature',properties:{k:'l'},geometry:{type:'LineString',coordinates:P}});
+  for(let i=1;i<P.length;i++){const km=hav(P[i-1],P[i]);tot+=km;const mid=[(P[i-1][0]+P[i][0])/2,(P[i-1][1]+P[i][1])/2];
+    F.push({type:'Feature',properties:{k:'t',l:f1(km)+' км · '+f1(km/1.852)+' NM · '+Math.round(brgTrue(P[i-1],P[i]))+'°'},geometry:{type:'Point',coordinates:mid}});}
+  if(P.length>2)F.push({type:'Feature',properties:{k:'t',l:'Разом '+f1(tot)+' км · '+f1(tot/1.852)+' NM'},geometry:{type:'Point',coordinates:P[P.length-1]}});
+  map.getSource('meas').setData({type:'FeatureCollection',features:F});}
+function measToggle(){if(!MEAS.on){MEAS.on=true;MEAS.pts=[];toast('Лінійка: торкайтеся точок на мапі. Ще раз кнопка: очистити');}else{MEAS.on=false;MEAS.pts=[];}
+  measDraw();const b=$('#tac-ms');if(b)b.classList.toggle('on',MEAS.on);map.getCanvas().style.cursor=MEAS.on?'crosshair':'';}
+// найбільша відстань, яку ціль могла б подолати за 30 і 60 хв за своєю швидкістю: розрахунок SKY, не прогноз маршруту
+function reachData(serverT){if(!TAC||!TACF.reach||!sel)return EMPTY;const tr=SNAP.tracks.find(t=>t.id===sel),d=DISP.get(sel);if(!tr||!d||tr.status!=='active'||isBal(tr))return EMPTY;
+  const v=tr.speed||TYPES_KMH(tr.type),F=[];for(const m of [30,60]){const R=Math.min(900,v*m/60);if(!(R>1))continue;const ring=[];for(let a=0;a<=360;a+=5)ring.push(dest(d.p,a,R));
+    F.push({type:'Feature',properties:{k:'f'},geometry:{type:'Polygon',coordinates:[ring]}});F.push({type:'Feature',properties:{k:'l'},geometry:{type:'LineString',coordinates:ring}});
+    F.push({type:'Feature',properties:{k:'t',l:m+' хв ≈ '+Math.round(R)+' км · розрахунок'},geometry:{type:'Point',coordinates:ring[0]}});}
+  return {type:'FeatureCollection',features:F};}
+const ENEMY_TYPE={airfield:'enemy_airfield',hq:'enemy_hq'};
+function enemyLoad(){if(ENEMY!==null||!TAC)return;ENEMY=[];loadApp06().then(A=>{if(!A)return;fetch('/data/enemy_objects.geojson',{cache:'no-cache'}).then(r=>r.json()).then(j=>{ENEMY=(j.features||[]);ENEMY_SET=false;}).catch(()=>{ENEMY=null;});});}
+function enemyApply(){if(!TAC||!window.App06||!ENEMY||ENEMY_SET||!map.getSource('enemy'))return;
+  map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'suspect'}),v:f.properties.n})}))});ENEMY_SET=true;}
+function setTac(on){TAC=!!on;window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC){loadApp06();enemyLoad();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
-async function setBase(kind){SYMP.clear();base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
+async function setBase(kind){SYMP.clear();ENEMY_SET=false;base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
 function addImages(){
   // реалістичні спрайти цілей (вид згори, ніс на північ) + тіні
@@ -344,6 +369,7 @@ function addOverlays(){
   // Так видно, що відомо з повідомлення, а що домалювала система (03.11)
   if(!map.getSource('selrep'))map.addSource('selrep',{type:'geojson',data:EMPTY});
   if(!map.getSource('tac'))map.addSource('tac',{type:'geojson',data:EMPTY});
+  for(const sid of ['meas','reach','enemy'])if(!map.getSource(sid))map.addSource(sid,sid==='enemy'?{type:'geojson',data:EMPTY,attribution:'Позначки ворога: DeepState (deepstatemap.live)'}:{type:'geojson',data:EMPTY});
   map.addLayer({id:'selrep-l',type:'line',source:'selrep',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round'},paint:{'line-color':'#fff','line-width':1.4,'line-opacity':0.85,'line-dasharray':[1,2.2]}});
   map.addLayer({id:'selrep-p',type:'circle',source:'selrep',filter:['==',['get','k'],'rep'],paint:{'circle-radius':4.5,'circle-color':'#fff','circle-stroke-color':'#0B0F17','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'selrep-t',type:'symbol',source:'selrep',filter:['==',['geometry-type'],'Point'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':['case',['==',['get','k'],'rep'],['literal',[0,-1.3]],['literal',[0,2.9]]],'text-max-width':30,'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6,'text-halo-blur':0.4}});
@@ -370,13 +396,21 @@ function addOverlays(){
   // тактичний режим: факт (назване місце, суцільна точка) окремо від оцінки SKY (значок, пунктир), вік повідомлення біля цілі
   map.addLayer({id:'tac-ln',type:'line',source:'tac',filter:['==',['get','k'],'ln'],layout:{'line-cap':'butt'},paint:{'line-color':['get','c'],'line-width':1.4,'line-dasharray':[2,2],'line-opacity':['*',0.8,['get','o']]}});
   map.addLayer({id:'tac-fact',type:'circle',source:'tac',filter:['==',['get','k'],'fact'],paint:{'circle-radius':4.5,'circle-color':['get','c'],'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6,'circle-opacity':['get','o'],'circle-stroke-opacity':['get','o']}});
+  map.addLayer({id:'reach-f',type:'fill',source:'reach',filter:['==',['get','k'],'f'],paint:{'fill-color':'#FFFFFF','fill-opacity':0.04}});
+  map.addLayer({id:'reach-l',type:'line',source:'reach',filter:['==',['get','k'],'l'],paint:{'line-color':'#E6EBF2','line-width':1.2,'line-dasharray':[4,3],'line-opacity':0.7}});
+  map.addLayer({id:'reach-t',type:'symbol',source:'reach',filter:['==',['get','k'],'t'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'bottom','text-allow-overlap':false},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5}});
+  map.addLayer({id:'enemy-sym',type:'symbol',source:'enemy',minzoom:4.5,layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],5,0.6,9,0.85],'icon-allow-overlap':false,'text-field':['step',['zoom'],'',8,['get','v']],'text-font':['Noto Sans Bold'],'text-size':10,'text-anchor':'top','text-offset':[0,1.3],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.4,'icon-opacity':0.9}});
+  map.addLayer({id:'meas-l',type:'line',source:'meas',filter:['==',['get','k'],'l'],paint:{'line-color':'#FFFFFF','line-width':2,'line-opacity':0.95}});
+  map.addLayer({id:'meas-p',type:'circle',source:'meas',filter:['==',['get','k'],'p'],paint:{'circle-radius':5,'circle-color':'#14171C','circle-stroke-color':'#FFFFFF','circle-stroke-width':2}});
+  map.addLayer({id:'meas-t',type:'symbol',source:'meas',filter:['==',['get','k'],'t'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11.5,'text-anchor':'bottom','text-offset':[0,-0.4],'text-allow-overlap':true},paint:{'text-color':'#FFFFFF','text-halo-color':'rgba(10,12,16,.95)','text-halo-width':2}});
   map.addLayer({id:'tac-hl',type:'circle',source:'tac',filter:['==',['get','k'],'hl'],paint:{'circle-radius':18,'circle-color':'rgba(255,255,255,0.10)','circle-stroke-color':'#FFFFFF','circle-stroke-width':2.4,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'tac-sel',type:'circle',source:'tac',filter:['==',['get','k'],'sel'],paint:{'circle-radius':22,'circle-color':'rgba(0,0,0,0)','circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6,'circle-stroke-opacity':0.9,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'tac-sym',type:'symbol',source:'tac',filter:['==',['get','k'],'sym'],layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],4,0.72,8,0.9,11,1.1],'icon-allow-overlap':true,'icon-ignore-placement':true,'icon-rotation-alignment':'viewport','text-field':['get','v'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'top','text-offset':[0,1.5],'text-optional':true},paint:{'icon-opacity':['get','o'],'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
   map.addLayer({id:'tac-age',type:'symbol',source:'tac',filter:['==',['get','k'],'age'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-anchor':'left','text-offset':[1.9,0],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['all',['>',['get','count'],1],['!',['!=',['get','next'],null]]],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-anchor':'top','text-offset':['interpolate',['linear'],['zoom'],2,['literal',[0,1.30]],5,['literal',[0,1.68]],7,['literal',[0,2.04]],9.5,['literal',[0,2.48]]],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
   if(map.getLayer('tg-course'))map.moveLayer('tg-course');
-  map.on('click','tg-hit',e=>{const f=e.features[0];openSheet(f.properties.id);});
+  map.on('click','tg-hit',e=>{if(MEAS.on)return;const f=e.features[0];openSheet(f.properties.id);});
+  if(!map._measClick){map._measClick=1;map.on('click',e=>{if(!MEAS.on)return;MEAS.pts.push([e.lngLat.lng,e.lngLat.lat]);measDraw();});}
   map.on('mouseenter','tg-hit',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg-hit',()=>map.getCanvas().style.cursor='');
   map.addLayer({id:'lpred',type:'line',source:'lpred',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':2,'line-dasharray':[0.6,2.2],'line-opacity':0.75}});
   map.addLayer({id:'lpred-t',type:'symbol',source:'lpred',filter:['==',['geometry-type'],'Point'],minzoom:6,layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,-1],'text-allow-overlap':false},paint:{'text-color':['get','c'],'text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4,'text-opacity':0.9}});
@@ -589,7 +623,8 @@ function frame(now){
         if(q&&!isBal(tr)&&dist(xy([q[0],q[1]]),xy(P))>=1.5){TF.push({type:'Feature',properties:{k:'fact',o,c},geometry:{type:'Point',coordinates:[q[0],q[1]]}});
           TF.push({type:'Feature',properties:{k:'ln',o,c},geometry:{type:'LineString',coordinates:[[q[0],q[1]],P]}});}}
       if(TACHL&&Date.now()<TACHL.until)TF.push({type:'Feature',properties:{k:'hl'},geometry:{type:'Point',coordinates:TACHL.p}});
-      map.getSource('tac').setData({type:'FeatureCollection',features:TF});}
+      map.getSource('tac').setData({type:'FeatureCollection',features:TF});
+      if(map.getSource('reach'))map.getSource('reach').setData(reachData(serverT));enemyApply();}
     try{if(slow&&map.getSource('flow')){const FL=[],PU=[];const sT=serverT;
       for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
         const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next)||(tr.hd==null&&!tr.route.length);
@@ -1302,6 +1337,7 @@ function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))ma
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);
   if(TAC)vis(['holo','holo-top','ra-glow'],false);
   if(TAC)vis(['tg-n','strat-ring','strat-fxl','strat-fxp'],false);
+  vis(['enemy-sym'],TAC&&TACF.enemy);vis(['reach-f','reach-l','reach-t'],TAC&&TACF.reach);vis(['meas-l','meas-p','meas-t'],TAC);
   if(TAC&&!TACF.alerts)vis(['hp-f','hp-l','hrom','hrom-t'],false);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setData(EMPTY);return;// заяви МО РФ «скільки збили над регіоном» прибрано з мапи: застарілі зведення без місця й часу удару нічого не дають людині
@@ -1413,7 +1449,7 @@ let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.we
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
 window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
-applyTheme(false);document.body.classList.toggle('tac',TAC);tacScaleBars();if(TAC)loadApp06();tacBarSync();
+applyTheme(false);document.body.classList.toggle('tac',TAC);tacScaleBars();if(TAC){loadApp06();enemyLoad();}tacBarSync();
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 
 /* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */

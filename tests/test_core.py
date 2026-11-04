@@ -1992,3 +1992,18 @@ def test_mgrs_matches_reference():
     root = pathlib.Path(__file__).resolve().parent.parent
     r = subprocess.run([node, "tests/mgrs_check.js"], cwd=root, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr[-2000:] + r.stdout[-500:]
+
+
+def test_deepstate_enemy_objects_extraction():
+    """Точкові об'єкти DeepState: лише Україна, назва до «//», категорії за назвою, діагностичний звіт."""
+    from app import occupied
+    doc = {"datetime": "x", "map": {"features": [
+        {"geometry": {"type": "Point", "coordinates": [36.1, 49.9, 0]}, "properties": {"name": "Аеродром Бельбек // Belbek airfield", "description": "d"}},
+        {"geometry": {"type": "Point", "coordinates": [10, 10]}, "properties": {"name": "far"}},
+        {"geometry": {"type": "Point", "coordinates": [37, 48]}, "properties": {"name": "Штаб 5 армії // HQ"}},
+        {"geometry": {"type": "LineString", "coordinates": [[1, 1], [2, 2]]}, "properties": {}}]}}
+    fc, summ = occupied.objects(doc)
+    assert len(fc["features"]) == 2
+    assert summ["categories"]["airfield"] == 1 and summ["categories"]["hq"] == 1
+    assert summ["geometry_types"]["Point"] == 3
+    assert fc["features"][0]["properties"]["n"] == "Аеродром Бельбек"
