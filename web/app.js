@@ -471,26 +471,28 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
   const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.4:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
+  if(TAC){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
+  const flyHome=()=>{const t0=Date.now(),tr=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;if(tg){map.flyTo({center:tg,zoom:7.4,duration:2200,essential:true,curve:1.2});return;}if(Date.now()-t0<4500)setTimeout(tr,300);};tr();};
   const finish=()=>{tacPad(false);document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
   const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
-    const c=camFor();map.jumpTo(c);window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,30);
+    const c=camFor();if(!window.__tacCam)map.jumpTo(c);window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,30);
     if(TAC){// огляд України, потім плавно на точку «Дім», а без неї на геопозицію
       const t0=Date.now(),tryZoom=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;
         if(tg){const fly=()=>map.flyTo({center:tg,zoom:7.4,duration:2200,essential:true,curve:1.2});fly();setTimeout(()=>{if(Date.now()-(window.__touch||0)<5000)return;const c=map.getCenter();if(Math.abs(c.lng-tg[0])>0.8||Math.abs(c.lat-tg[1])>0.8||map.getZoom()<6.8)fly();},2800);return;}
         if(Date.now()-t0<4500)setTimeout(tryZoom,400);};
-      setTimeout(tryZoom,1200);}};
+      setTimeout(tryZoom,300);}};
   if(skip){if(el)el.remove();document.body.classList.remove('intro');go();return;}
   // поки стоїмо й летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
-  const wait=(el&&INTRO)?Math.max(0,3300-(Date.now()-introT0)):0;   // логотип встигає зіграти (лише при першому запуску в сесії)
+  const wait=(el&&INTRO)?Math.max(0,3900-(Date.now()-introT0)):0;   // логотип встигає зіграти (лише при першому запуску в сесії)
   // без дому: за час паузи питаємо геопозицію (тихо, 4 с), щоб було куди наближатися
   if(!home&&navigator.geolocation){try{navigator.geolocation.getCurrentPosition(p=>{window.__GEOPOS=[p.coords.longitude,p.coords.latitude];},()=>{},{enableHighAccuracy:false,timeout:4000,maximumAge:600000});}catch(e){}}
   setTimeout(()=>{if(el){el.classList.add('out');setTimeout(()=>el.remove(),1400);}document.body.classList.remove('intro');
     // поки мапа стоїть у 2D, усі цілі пульсують кільцями кольору свого типу: за 5 с видно, що де летить
     window.FXHLALL={t0:performance.now(),until:performance.now()+5000};map.triggerRepaint();
-    setTimeout(go,5000);},wait);}
+    if(TAC){window.__introAt=Date.now();tilt=false;finish();flyHome();}else setTimeout(go,5000);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;// так само, як лічильники вгорі: треки, без ×N

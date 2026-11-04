@@ -869,3 +869,7 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 #intro #ix{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
 #intro p.slogan .s1{animation-delay:1.9s!important}#intro p.slogan .s2{animation-delay:2.1s!important}#intro p.slogan em{animation-delay:2.35s!important}
 @media (prefers-reduced-motion:reduce){#intro .lg img{animation:none!important;opacity:1}}
+#intro .lg img{animation:ixWipe .6s linear 1.75s both!important;clip-path:inset(0 0 100% 0);opacity:1!important}
+@keyframes ixWipe{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+#intro p.slogan .s1{animation-delay:2.4s!important}#intro p.slogan .s2{animation-delay:2.6s!important}#intro p.slogan em{animation-delay:2.85s!important}
+@media (prefers-reduced-motion:reduce){#intro .lg img{animation:none!important;clip-path:none}}
