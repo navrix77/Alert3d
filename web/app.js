@@ -190,10 +190,10 @@ function reachData(serverT){if(!TAC||!TACF.reach||!sel)return EMPTY;const tr=SNA
     F.push({type:'Feature',properties:{k:'t',l:m+' хв ≈ '+Math.round(R)+' км · розрахунок'},geometry:{type:'Point',coordinates:ring[0]}});}
   return {type:'FeatureCollection',features:F};}
 const ENEMY_TYPE={airfield:'enemy_airfield',hq:'enemy_hq'};
-function enemyLoad(){if(ENEMY!==null||!TAC)return;ENEMY=[];loadApp06().then(A=>{if(!A)return;fetch('/data/enemy_objects.geojson',{cache:'no-cache'}).then(r=>r.json()).then(j=>{ENEMY=(j.features||[]);ENEMY_SET=false;}).catch(()=>{ENEMY=null;});});}
-function enemyApply(){if(!TAC||!window.App06||!ENEMY||ENEMY_SET||!map.getSource('enemy'))return;
+function enemyLoad(){if(ENEMY!==null)return;ENEMY=[];loadApp06().then(A=>{if(!A)return;fetch('/data/enemy_objects.geojson',{cache:'no-cache'}).then(r=>r.json()).then(j=>{ENEMY=(j.features||[]);ENEMY_SET=false;}).catch(()=>{ENEMY=null;});});}
+function enemyApply(){if(!window.App06||!ENEMY||ENEMY_SET||!map.getSource('enemy'))return;
   map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'suspect'}),v:f.properties.n})}))});ENEMY_SET=true;}
-function setTac(on){TAC=!!on;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);if(TAC){loadApp06();enemyLoad();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+function setTac(on){TAC=!!on;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);enemyLoad();if(TAC){loadApp06();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
 async function setBase(kind){SYMP.clear();ENEMY_SET=false;base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
@@ -408,7 +408,7 @@ function addOverlays(){
   map.addLayer({id:'reach-f',type:'fill',source:'reach',filter:['==',['get','k'],'f'],paint:{'fill-color':'#FFFFFF','fill-opacity':0.04}});
   map.addLayer({id:'reach-l',type:'line',source:'reach',filter:['==',['get','k'],'l'],paint:{'line-color':'#E6EBF2','line-width':1.2,'line-dasharray':[4,3],'line-opacity':0.7}});
   map.addLayer({id:'reach-t',type:'symbol',source:'reach',filter:['==',['get','k'],'t'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'bottom','text-allow-overlap':false},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5}});
-  map.addLayer({id:'enemy-sym',type:'symbol',source:'enemy',minzoom:4.5,layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],5,0.6,9,0.85],'icon-allow-overlap':false,'text-field':['step',['zoom'],'',8,['get','v']],'text-font':['Noto Sans Bold'],'text-size':10,'text-anchor':'top','text-offset':[0,1.3],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.4,'icon-opacity':0.9}});
+  map.addLayer({id:'enemy-sym',type:'symbol',source:'enemy',minzoom:4.5,layout:{'icon-image':['get','img'],'icon-size':['interpolate',['linear'],['zoom'],5,0.6,9,0.85],'icon-allow-overlap':false,'text-field':['step',['zoom'],'',5,['get','v']],'text-font':['Noto Sans Bold'],'text-size':10,'text-anchor':'top','text-offset':[0,1.3],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.4,'icon-opacity':0.9}});
   map.addLayer({id:'meas-l',type:'line',source:'meas',filter:['==',['get','k'],'l'],paint:{'line-color':'#FFFFFF','line-width':2,'line-opacity':0.95}});
   map.addLayer({id:'meas-p',type:'circle',source:'meas',filter:['==',['get','k'],'p'],paint:{'circle-radius':5,'circle-color':'#14171C','circle-stroke-color':'#FFFFFF','circle-stroke-width':2}});
   map.addLayer({id:'meas-t',type:'symbol',source:'meas',filter:['==',['get','k'],'t'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11.5,'text-anchor':'bottom','text-offset':[0,-0.4],'text-allow-overlap':true},paint:{'text-color':'#FFFFFF','text-halo-color':'rgba(10,12,16,.95)','text-halo-width':2}});
@@ -1348,7 +1348,7 @@ function applyLayers(){const vis=(ids,on)=>ids.forEach(i=>{if(map.getLayer(i))ma
   vis(['ru-glow','ru-dot','ru-t','hits'],PREF.ru);vis(['chains','lsites','lsites-t'],PREF.launch);vis(['zones','zones-t','avia','avia-z','avia-zl','avia-l'],PREF.zones);
   if(TAC)vis(['holo','holo-top','ra-glow'],false);
   if(TAC)vis(['tg-n','strat-ring','strat-fxl','strat-fxp'],false);
-  vis(['enemy-sym'],TAC&&TACF.enemy);vis(['reach-f','reach-l','reach-t'],TAC&&TACF.reach);vis(['meas-l','meas-p','meas-t'],TAC);
+  vis(['enemy-sym'],TAC?TACF.enemy:true);vis(['reach-f','reach-l','reach-t'],TAC&&TACF.reach);vis(['meas-l','meas-p','meas-t'],TAC);
   if(TAC&&!TACF.alerts)vis(['hp-f','hp-l','hrom','hrom-t'],false);}
 map.on('styledata',()=>{if(map.getLayer('ru-glow'))applyLayers();});
 function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setData(EMPTY);return;// заяви МО РФ «скільки збили над регіоном» прибрано з мапи: застарілі зведення без місця й часу удару нічого не дають людині
@@ -1460,7 +1460,7 @@ let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.we
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
 window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
-applyTheme(false);document.body.classList.toggle('tac',TAC);tacScaleBars();if(TAC){loadApp06();enemyLoad();}tacBarSync();
+applyTheme(false);document.body.classList.toggle('tac',TAC);tacScaleBars();enemyLoad();if(TAC){loadApp06();}tacBarSync();
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
 
 /* ---------- важливі сповіщення: з'являються на головному екрані й лишаються, доки їх не закрити ---------- */
