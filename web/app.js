@@ -308,7 +308,7 @@ function addOverlays(){
   map.addLayer({id:'me-dot',type:'circle',source:'mepos',filter:['==',['geometry-type'],'Point'],paint:{'circle-radius':6.5,'circle-color':'#2F8BFF','circle-stroke-color':'#fff','circle-stroke-width':2.2}});
   map.addLayer({id:'myplaces',type:'circle',source:'myplaces',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,3,8,6],'circle-color':'#B07CFF','circle-stroke-color':'#fff','circle-stroke-width':['interpolate',['linear'],['zoom'],4,1.2,8,2]}});
   map.addLayer({id:'myplaces-t',type:'symbol',source:'myplaces',minzoom:6,layout:{'text-field':['get','n'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':false},paint:{'text-color':'#fff','text-halo-color':'rgba(40,10,70,.9)','text-halo-width':1.8}});
-  lastLv='';lastRa='';syncHome();syncMe();syncPlaces();
+  lastLv='';lastRa='';CUTK='';syncHome();syncMe();syncPlaces();
   if(tilt)set3d(true,'keep');
   if(!map._scaleAdded&&innerWidth>640){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
 }
@@ -545,11 +545,28 @@ let RA=null,lastRa='';
 function inRing(r,x,y){let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const [xi,yi]=r[i],[xj,yj]=r[j];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/((yj-yi)||1e-12)+xi))c=!c;}return c;}
 function raionOf(lon,lat){if(!RA)return -1;for(const r of RA){if(lon<r.bb[0]||lon>r.bb[2]||lat<r.bb[1]||lat>r.bb[3])continue;for(const pl of r.polys)if(inRing(pl[0],lon,lat))return r.i;}return -1;}
 fetch('/data/raions.geojson').then(r=>r.json()).then(j=>{RA=j.features.map((f,i)=>{const g=f.geometry;const polys=g.type==='Polygon'?[g.coordinates]:g.coordinates;let bb=[180,90,-180,-90];polys.forEach(pl=>pl[0].forEach(([x,y])=>{bb[0]=Math.min(bb[0],x);bb[1]=Math.min(bb[1],y);bb[2]=Math.max(bb[2],x);bb[3]=Math.max(bb[3],y);}));return {i,n:f.properties.n,polys,bb};});});
+// Місто з власним статусом (Харків) лежить усередині району, але тривога в районі його не зафарбовує (як в офіційній мапі):
+// вирізаємо межі такої громади з району на мапі, щоб жовте не накривало місто, де тривоги немає (04.11)
+let CUTK='';
+function cutSep(ids){
+  if(!window.__RAGJ||!map.getSource('ra')||!ids.length)return;
+  if(!HPDATA){loadHP().then(d=>{if(d)cutSep(ids);});return;}
+  const key=JSON.stringify(ids);if(key===CUTK)return;
+  const inR=(pt,r)=>{let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const [xi,yi]=r[i],[xj,yj]=r[j];if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi))c=!c;}return c;};
+  const g=JSON.parse(JSON.stringify(window.__RAGJ));
+  for(const id of ids){
+    const h=HPDATA.features[+id];if(!h||h.geometry.type!=='Polygon')continue;
+    const ring=h.geometry.coordinates[0],pr=ring[0];
+    for(const f of g.features){const G=f.geometry,P=G.type==='Polygon'?[G.coordinates]:G.coordinates;
+      for(const pl of P)if(inR(pr,pl[0])&&!pl.slice(1).some(x=>inR(pr,x))&&pl[0].length>ring.length)pl.push(ring);}
+  }
+  try{map.getSource('ra').setData(g);CUTK=key;lastRa='';}catch(e){}
+}
 function syncRaions(){
   if(!SNAP||!RA||!map.getSource('ra'))return;const lv={};const up=(i,v)=>{if(i>=0&&(lv[i]||0)<v)lv[i]=v;};
   const O=SNAP.official||{};const rl=O.raion_levels||{};RA.forEach(r=>{if(rl[r.n])up(r.i,rl[r.n]);});
   if(map.getSource('hrom'))map.getSource('hrom').setData({type:'FeatureCollection',features:(O.points||[]).map(([lo,la,n,l,poly])=>({type:'Feature',properties:{l,n,poly:poly||0},geometry:{type:'Point',coordinates:[lo,la]}}))});
-  syncHromadas(O.hromadas||{});
+  syncHromadas(O.hromadas||{});cutSep(SNAP.sep||O.sep||[]);
   // райони фарбуються лише за офіційними тривогами (alerts.in.ua)
   const key=JSON.stringify(lv);if(key===lastRa)return;lastRa=key;
   RA.forEach(r=>{try{map.setFeatureState({source:'ra',id:r.i},{lvl:lv[r.i]||0});}catch(e){lastRa='';}});
