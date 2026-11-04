@@ -1209,5 +1209,7 @@ class Tracker:
                          "fade": round(min(1.0, (now - a["t"]) / AVIA_LIFE), 2), "ev": a.get("ev", []),
                          "act": int(a["act"]) if a.get("act") else None, "until": int(a["t"] + AVIA_LIFE),
                          "targets": [z.places[0].name for z in kz][:6]})
-        return {"now": now, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
+        from . import count as _count
+        counts = {"live": _count.live(out, now, now), "live_min": _count.LIVE_MIN}
+        return {"now": now, "counts": counts, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
                 "log": self.log[-60:], "bal": [e for e in self.bal if now - e["t"] < 3600]}

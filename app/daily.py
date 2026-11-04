@@ -236,6 +236,9 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
         pts = ob if len(ob) >= 2 else v["pts"]
         if len(pts) >= 2:
             tracks.append({"id": k, "type": v["type"], "count": v["count"], "launch": v["launch"], "lxy": v.get("lxy"), "lt": v.get("lt"), "next": v["next"], "pts": pts})
+    from . import count as _count
+    uniq = _count.estimate([{"type": t["type"], "t0": t["pts"][0][2], "t1": t["pts"][-1][2], "p0": (t["pts"][0][1], t["pts"][0][0]),
+                             "p1": (t["pts"][-1][1], t["pts"][-1][0])} for t in tracks if t["type"] in _count.SPEED])
     tracks = stitch(tracks)
     by_type: dict[str, int] = {}
     for tr in tracks:
@@ -250,7 +253,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
     # точки вибухів: лише ті, що підтверджені ≥1 джерелом і не збіглися з «пусками»
     bl = [{"n": b["n"], "lat": b["lat"], "lon": b["lon"], "c": b["c"], "t": b["t"]} for b in booms.values()]
     return {"v": VER, "day": day, "t0": t0, "t1": t1, "final": time.time() > t1 + 4 * 3600 or (t1 <= time.time() and official is not None), "built": int(time.time()), "msgs": len(rows),
-            "tracks": tracks, "by_type": by_type, "official": official, "sites": list(sites.values()), "booms": sorted(bl, key=lambda b: -b["c"])}
+            "tracks": tracks, "by_type": by_type, "uniq": uniq, "official": official, "sites": list(sites.values()), "booms": sorted(bl, key=lambda b: -b["c"])}
 
 
 SPEED = {"shahed": 170, "jet": 450, "molniya": 120, "cruise": 800, "ballistic": 2000, "kab": 400, "geran5": 550, "banderol": 700, "rszv": 1500, "fpv": 80, "fpvf": 60, "recon": 110, "lancet": 95}

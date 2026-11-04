@@ -263,7 +263,7 @@ function legend(){const cnt={};for(const t of D.tracks)if(t.inO)cnt[t.type]=(cnt
   document.querySelectorAll('#legend .grp button').forEach(b=>b.onclick=()=>{GRP=b.dataset.g;SEL=null;legend();draw(CUR);});
   document.querySelectorAll('#legend .r.t').forEach(r=>{r.onclick=()=>{SEL=SEL===r.dataset.k?null:r.dataset.k;legend();draw(CUR);};r.onkeydown=e=>{if(e.key==='Enter')r.onclick();};});}
 function stats(){const o=D.official;
-  $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ'+(OBL?' · по Україні':'')+'</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+
+  $('#stats').innerHTML=(o?'<h3>Повітряні сили ЗСУ'+(OBL?' · по Україні':'')+'</h3><div class="big">'+o.shot+'</div><div>збито / подавлено за ніч (станом на ранок)</div>':'<h3>Офіційний підсумок</h3><div>Ще не оголошено</div>')+(D.uniq&&D.uniq.total&&D.uniq.total.mid&&!OBL?'<small style="display:block;margin-top:6px">За повідомленнями каналів: приблизно '+D.uniq.total.mid+' різних цілей (від '+D.uniq.total.low+' до '+D.uniq.total.high+'). Точну кількість з повідомлень не встановити.</small>':'')+
     (VB.length?'<h3 class="bh" style="margin-top:12px">Де найчастіше писали про вибухи'+(OBL?' в області':'')+'</h3><ul>'+VB.slice(0,12).map(b=>'<li><span>'+b.n+'</span></li>').join('')+'</ul><small style="display:block;opacity:.6;margin-top:4px">Порядок за кількістю повідомлень каналів. Одну подію можуть описувати кілька каналів, тому це не кількість вибухів.</small>':'');}
 $('#tt').oninput=e=>{playing=false;$('#pl').textContent='▶';draw(e.target.value/1000);};
 const SPD=[1,2.5,5,10,20,40];let spd=1;try{const r=localStorage.getItem('dspd2');if(r!==null&&+r>=0&&+r<SPD.length)spd=+r;}catch(e){}

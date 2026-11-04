@@ -302,8 +302,9 @@ def _types_phrase(c: dict) -> str:
 def analyze(snap: dict, hist: list[dict], brain=None, now: float | None = None) -> dict:
     now = now or snap.get("now") or time.time()
     # 04.11: ті самі цифри, що й лічильник на мапі: треки (а не сума ×N), про які писали менше 10 хв тому
+    from .count import LIVE_MIN
     active = [t for t in snap.get("tracks", []) if t.get("status") == "active"
-              and ((t.get("ev") or {}).get("age") or 0) + max(0, now - (snap.get("now") or now)) < 600]
+              and ((t.get("ev") or {}).get("age") or 0) + max(0, now - (snap.get("now") or now)) < LIVE_MIN.get(t.get("type"), 10) * 60]
     by_type = collections.Counter()
     for t in active:
         by_type[t["type"]] += 1

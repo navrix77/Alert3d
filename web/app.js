@@ -635,7 +635,7 @@ function focusType(t){const ps=SNAP.tracks.filter(x=>x.status==='active'&&x.type
 function renderCounters(){
   // 04.11: лічильник рахує ТРЕКИ, а не суму ×N (85 «одиниць» при 48 треках збивало з пантелику); ×N лишається на значках.
   // Цілі, про які не писали 10+ хв, у лічильник не входять (на мапі вони напівпрозорі)
-  const nowS=Date.now()/1000+offset;const fresh=t=>(((t.ev&&t.ev.age)||0)+Math.max(0,nowS-SNAP.now))<600;
+  const nowS=Date.now()/1000+offset;const LM=(SNAP.counts&&SNAP.counts.live_min)||{};const fresh=t=>(((t.ev&&t.ev.age)||0)+Math.max(0,nowS-SNAP.now))<(LM[t.type]||10)*60;// той самий час життя за типом, що й на мапі й в аналітиці (app/count.py)
   const act=SNAP.tracks.filter(t=>t.status==='active'&&fresh(t));const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+1);
   const order=['shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','lancet','fpv','fpvf'];
   $('#counters').innerHTML='';

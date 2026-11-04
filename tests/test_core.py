@@ -1822,3 +1822,20 @@ def test_ops_export_collect(tmp_path):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
     import backtest
     assert backtest.load(str(tmp_path / "journal-72h.json.gz"))[0][1] == "M"
+
+
+def test_count_estimate_chains_and_live():
+    """04.11: єдиний підрахунок цілей: фрагменти однієї цілі склеюються, одночасні в різних місцях лишаються різними."""
+    from app.count import estimate, live
+    base = 1_000_000.0
+    a = {"type": "shahed", "t0": base, "t1": base + 600, "p0": (50.5, 36.0), "p1": (50.2, 36.1)}
+    b = {"type": "shahed", "t0": base + 900, "t1": base + 1500, "p0": (50.1, 36.2), "p1": (49.9, 36.3)}   # продовження а (≈ 14 км за 5 хв)
+    c = {"type": "shahed", "t0": base, "t1": base + 600, "p0": (48.0, 30.0), "p1": (48.2, 30.1)}           # одночасно далеко: інша ціль
+    e = estimate([a, b, c])["total"]
+    assert e["low"] == 2 and e["mid"] == 2 and e["high"] >= 2
+    assert estimate([])["total"] == {"low": 0, "mid": 0, "high": 0}
+    tr = [{"status": "active", "type": "shahed", "count": 3, "ev": {"age": 20 * 60}},
+          {"status": "active", "type": "jet", "count": 2, "ev": {"age": 20 * 60}},   # реактивний живе 6 хв: уже не рахується
+          {"status": "lost", "type": "shahed", "count": 1, "ev": {"age": 10}}]
+    lv = live(tr, 100.0, 100.0)
+    assert lv["total"] == 1 and lv["by_type"] == {"shahed": 1} and lv["units_max"] == 3
