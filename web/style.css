@@ -661,3 +661,8 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .me .me-fresh{margin:6px 0 0;font-size:12.5px;line-height:1.35;color:var(--mute,#8a94a6)}
 .me .me-fresh.mid{color:#FFB020}.me .me-fresh.bad{color:#FF6B6B;font-weight:600}
 .me .me-share{flex:none;width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#dfe6f2;font-size:15px;line-height:28px;padding:0;cursor:pointer}
+
+/* 04.11: картка балістичної загрози згортається (власник: «не закривається, потрібна можливість звертати») */
+.me-fold{border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--fg);border-radius:50%;width:34px;height:34px;font:700 16px var(--f);cursor:pointer;flex:none}
+.me.bal.fold .bal-log,.me.bal.fold .bal-note,.me.bal.fold .bal-btn,.me.bal.fold .ai-box,.me.bal.fold .me-fresh,.me.bal.fold .fc,.me.bal.fold .me-list{display:none!important}
+.me.bal.fold .me-fold{transform:rotate(180deg)}

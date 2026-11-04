@@ -766,7 +766,7 @@ function renderMe(threats){
       '<ol class="bal-log">'+BALM.items.map(e=>'<li><span>'+fmt(e.t)+'</span><b>'+nm(e.src)+'</b> '+esc(e.k==='mig'?(e.txt||'МіГ-31К').slice(0,70):e.pl.length?e.pl.join(', '):e.obl.map(o=>OBL_GEN[o]||o).slice(0,4).join(', ')+(e.obl.length>4?' +'+(e.obl.length-4):''))+(e.link?' <a href="'+esc(e.link)+'" target=_blank rel=noopener>↗</a>':'')+'</li>').join('')+'</ol>'+
       (BALM.mig?'<small class="bal-note">Зліт носія ще не пуск: на нього Повітряні сили зазвичай оголошують тривогу по всій Україні. Кількість бортів не дорівнює кількості ракет</small>':'<small class="bal-note">Це вік повідомлення, а не час до удару. Де ракета, канали не знають</small>')+
       (BALM.mig?'':'<button class="bal-btn" id="bal-show">Показати регіон загрози</button>');}
-  box.className=cls+(box.classList.contains('open')?' open':'');$('#me-word').textContent=word;
+  box.className=cls+(box.classList.contains('open')?' open':'')+(box.classList.contains('fold')?' fold':'');$('#me-word').textContent=word;{const fb=$('#me-fold');if(fb){fb.hidden=!BALM;fb.setAttribute('aria-label',box.classList.contains('fold')?'Розгорнути':'Згорнути');}}
   // великі хвилини, лише коли маршрут названо каналами (обґрунтована оцінка), а не з напрямку
   if(first&&!isStale&&!BALM&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
     sub=offL+'<div class="big"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="trk"/><circle cx="50" cy="50" r="44" class="arc" style="stroke-dasharray:'+(C*k)+' '+C+'"/></svg><b>'+eta+'</b><i>хв</i></div>'+
@@ -1025,6 +1025,7 @@ function playChanges(evs){
   clearTimeout(playChanges.t);playChanges.t=setTimeout(clearChg,45000);toast('Кружечок, де було, крапка, де зараз');}
 setTimeout(()=>showChanges(),6000);
 /* ---------- телефон: панель стану згорнута, тап, розгорнути ---------- */
+{const fb=$('#me-fold');if(fb)fb.onclick=e=>{e.stopPropagation();const b=$('#me');b.classList.toggle('fold');fb.setAttribute('aria-label',b.classList.contains('fold')?'Розгорнути':'Згорнути');};}
 $('#me').addEventListener('click',e=>{if(innerWidth>640||e.target.closest('li,button'))return;$('#me').classList.toggle('open');});
 /* ---------- віджет для Windows ---------- */
 if(new URLSearchParams(location.search).has('mini'))document.body.classList.add('mini');
