@@ -72,7 +72,7 @@ try{const _add=maplibregl.Popup.prototype.addTo;maplibregl.Popup.prototype.addTo
   setTimeout(()=>{try{const el=pp.getElement();if(!el)return;const b=el.getBoundingClientRect(),pad=10,top=(document.querySelector('header.top')||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom+6;
     let dx=0,dy=0;if(b.right>innerWidth-pad)dx=b.right-innerWidth+pad;if(b.left-dx<pad)dx=b.left-pad;if(b.top<top)dy=b.top-top;
     if(dx||dy)m.panBy([dx,dy],{duration:350});}catch(e){}},60);return r;};}catch(e){}
-let TAC=false;try{TAC=localStorage.getItem('mode_tac')==='1';}catch(e){}window.FXTAC=TAC;
+let TACHL=null;let TAC=false;try{TAC=localStorage.getItem('mode_tac')==='1';}catch(e){}window.FXTAC=TAC;
 async function styleFor(kind){
   const vec=await fetch(CFG.vectorStyle).then(r=>r.json());
   // підписи українською: name:uk → name (OSM) замість латиниці
@@ -316,6 +316,7 @@ function addOverlays(){
   // тактичний режим: факт (назване місце, суцільна точка) окремо від оцінки SKY (значок, пунктир), вік повідомлення біля цілі
   map.addLayer({id:'tac-ln',type:'line',source:'tac',filter:['==',['get','k'],'ln'],layout:{'line-cap':'butt'},paint:{'line-color':['get','c'],'line-width':1.4,'line-dasharray':[2,2],'line-opacity':['*',0.8,['get','o']]}});
   map.addLayer({id:'tac-fact',type:'circle',source:'tac',filter:['==',['get','k'],'fact'],paint:{'circle-radius':4.5,'circle-color':['get','c'],'circle-stroke-color':'#FFFFFF','circle-stroke-width':1.6,'circle-opacity':['get','o'],'circle-stroke-opacity':['get','o']}});
+  map.addLayer({id:'tac-hl',type:'circle',source:'tac',filter:['==',['get','k'],'hl'],paint:{'circle-radius':18,'circle-color':'rgba(255,255,255,0.10)','circle-stroke-color':'#FFFFFF','circle-stroke-width':2.4,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'tac-age',type:'symbol',source:'tac',filter:['==',['get','k'],'age'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-anchor':'left','text-offset':['interpolate',['linear'],['zoom'],4,['literal',[0.9,0]],8,['literal',[1.4,0]],11,['literal',[1.9,0]]],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['all',['>',['get','count'],1],['!',['!=',['get','next'],null]]],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-anchor':'top','text-offset':['interpolate',['linear'],['zoom'],2,['literal',[0,1.30]],5,['literal',[0,1.68]],7,['literal',[0,2.04]],9.5,['literal',[0,2.48]]],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
   if(map.getLayer('tg-course'))map.moveLayer('tg-course');
@@ -525,6 +526,7 @@ function frame(now){
         const q=tr.trail&&tr.trail.length&&tr.trail[tr.trail.length-1];
         if(q&&!isBal(tr)&&dist(xy([q[0],q[1]]),xy(P))>=1.5){TF.push({type:'Feature',properties:{k:'fact',o,c},geometry:{type:'Point',coordinates:[q[0],q[1]]}});
           TF.push({type:'Feature',properties:{k:'ln',o,c},geometry:{type:'LineString',coordinates:[[q[0],q[1]],P]}});}}
+      if(TACHL&&Date.now()<TACHL.until)TF.push({type:'Feature',properties:{k:'hl'},geometry:{type:'Point',coordinates:TACHL.p}});
       map.getSource('tac').setData({type:'FeatureCollection',features:TF});}
     try{if(slow&&map.getSource('flow')){const FL=[],PU=[];const sT=serverT;
       for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
@@ -973,8 +975,20 @@ function fillSheet(first){
      const dr=SNAP.sources&&SNAP.sources[it.src]&&SNAP.sources[it.src].dir;const dt=dr&&it.dest?'<i class=cp title="Як часто напрямок від цього каналу справджувався (≤30°), перевірено '+dr.n+' разів">курс ✓'+Math.round(dr.acc*100)+'%</i>':'';
      return '<li class="'+(it.copy?'copy':'')+'"><div class=ev-m><span>'+fmt(it.t)+'</span><b>'+nm(it.src)+'</b>'+dt+tag+(it.link?'<a href="'+esc(it.link)+'" target=_blank rel=noopener>пост ↗</a>':'')+'</div>'+(it.text?'<q>'+esc(it.text)+'</q>':'')+'</li>';}).join('')+'</ol>';
    $('#sh-proof').innerHTML=h;}
+  // тактичний режим: окремо «що повідомили» (факт з каналів) і «що оцінив SKY» (розрахунок), дотик підсвічує місце на мапі
+  {const box=$('#sh-split');if(box){box.hidden=!TAC||tr.status!=='active';if(TAC&&tr.status==='active'){
+    const nm=k=>esc(SNAP.sources[k]?.name||k),E=tr.ev||{},P=((E.prim&&E.prim.length?E.prim:tr.srcs)||[]),pos=DISP.get(tr.id),q=tr.trail&&tr.trail.length?tr.trail[tr.trail.length-1]:null;
+    const lt=(q&&q[2])||(tr.at&&tr.at[1])||tr.last,mins=lt?Math.max(0,Math.round((serverT-lt)/60)):null,ago=mins==null?'':mins<1?'щойно':mins+' хв тому';
+    const items=(E.items||EVC.get(tr.id)?.items||[]).slice().sort((a,b)=>b.t-a.t),last=items.find(i=>!i.copy)||items[0];
+    const place=tr.nopos?'місце не назване, лише курс'+(tr.next?' на '+esc(tr.next):''):tr.at?esc(tr.at[0]):q?'точка за повідомленнями':'місце не назване';
+    const fact='<div class="sp-c fact"'+(q&&!tr.nopos?' data-ll="'+q[0]+','+q[1]+'"':'')+'><h5>Що повідомили</h5><p><b>'+place+'</b></p>'+(lt?'<p>'+fmt(lt)+' · '+ago+'</p>':'')+(P.length?'<p>'+P.map(nm).join(', ')+'</p>':'')+(last&&last.text?'<q>'+esc(last.text.slice(0,140))+'</q>':'')+'</div>';
+    const km=pos&&q?Math.round(dist(xy([q[0],q[1]]),xy(pos.p))):null;
+    const est='<div class="sp-c est"'+(pos?' data-ll="'+pos.p[0]+','+pos.p[1]+'"':'')+'><h5>Що оцінив SKY</h5><p><b>'+(tr.pos_est||tr.nopos||(km!=null&&km>=2)?'позиція за курсом і швидкістю':'місце збігається з повідомленням')+'</b></p>'+(km!=null&&km>=2?'<p>≈ '+km+' км від названого місця</p>':'')+
+      (tr.hd!=null?'<p>напрямок: '+SIDE[Math.round(tr.hd/45)%8]+(tr.next?' · на '+esc(tr.next):'')+'</p>':tr.next?'<p>на '+esc(tr.next)+'</p>':'<p>напрямок невідомий</p>')+(tr.pos_km!=null?'<p>точність: ±'+tr.pos_km+' км</p>':'')+'<p class="sp-n">Це розрахунок, а не повідомлення</p></div>';
+    box.innerHTML=fact+est;}}}
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }
+if($('#sh-split'))$('#sh-split').onclick=e=>{const c=e.target.closest('.sp-c');if(!c||!c.dataset.ll)return;const p=c.dataset.ll.split(',').map(Number);TACHL={p,until:Date.now()+6000};map.easeTo({center:p,zoom:Math.max(map.getZoom(),8.5),duration:600});};
 $('#sh-close').onclick=()=>{$('#sheet').hidden=true;if(!follow)sel=null;};
 // «Стежити за ціллю»: камера веде ціль, картка ховається, зверху, компактна плашка з живими даними і «Зупинити»
 let followPrev=null,followSayT=0;

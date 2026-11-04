@@ -710,3 +710,12 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
   .maplibregl-popup.kab-pop .maplibregl-popup-tip{display:none}
   .maplibregl-popup.kab-pop .maplibregl-popup-close-button{width:40px;height:40px;font-size:26px;right:2px;top:2px;line-height:40px}
 }
+
+/* тактична картка: факт і оцінка окремо */
+.sh-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.sh-split .sp-c{border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.05);cursor:pointer;font-size:12.5px;line-height:1.35}
+.sh-split .sp-c h5{margin:0 0 4px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
+.sh-split .sp-c p{margin:2px 0}.sh-split .sp-c q{display:block;margin-top:4px;opacity:.75;font-size:11.5px}
+.sh-split .fact{border-left:3px solid #fff}
+.sh-split .est{border-left:3px dashed #FFB347}
+.sh-split .sp-n{opacity:.6;font-size:11px}
