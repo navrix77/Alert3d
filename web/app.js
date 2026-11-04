@@ -473,8 +473,13 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.4:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
   if(TAC){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
-  const flyHome=()=>{const t0=Date.now(),tr=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;if(tg){window.__padLock=1;map.once('moveend',()=>{window.__padLock=0;});
-      map.easeTo({center:tg,zoom:7.4,duration:4500,essential:true,easing:t=>-(Math.cos(Math.PI*t)-1)/2});return;}if(Date.now()-t0<4500)setTimeout(tr,300);};tr();};
+  const LG=window.__stlog=window.__stlog||[];const lg=m=>LG.push(m+'@'+Math.round((Date.now()-introT0)/100)/10);
+  // переліт на «Дім» власною покадровою анімацією (не залежить від flyTo/«зменшення руху»): 4,5 с, плавний розгін і гальмування; переривається лише дотиком уже під час руху
+  const flyHome=()=>{const t0=Date.now(),tr=()=>{const tg=home||window.__GEOPOS;if(!tg){if(Date.now()-t0<4500){setTimeout(tr,300);return;}lg('немає_цілі');return;}
+      const c0=map.getCenter(),z0=map.getZoom(),ts=performance.now(),D=4500,T0=Date.now();window.__padLock=1;lg('політ');
+      const step=now=>{if((window.__touch||0)>T0){window.__padLock=0;lg('перервано');return;}const e=Math.min(1,(now-ts)/D),k=-(Math.cos(Math.PI*e)-1)/2;
+        try{map.jumpTo({center:[c0.lng+(tg[0]-c0.lng)*k,c0.lat+(tg[1]-c0.lat)*k],zoom:z0+(7.4-z0)*k});}catch(x){lg('помилка');window.__padLock=0;return;}
+        if(e<1)requestAnimationFrame(step);else{window.__padLock=0;lg('готово');}};requestAnimationFrame(step);};tr();};
   // огляд: мапа стоїть на всій країні, усі цілі пульсують кільцями, щоб користувач охопив ситуацію, і лише потім переліт на «Дім»
   const tacSurvey=ms=>{const t0=performance.now(),id='tac-hl2';const step=now=>{if(!map.getLayer(id))return;const e=now-t0;if(e>=ms){map.setPaintProperty(id,'circle-stroke-opacity',0);return;}
     const ph=(e%1100)/1100,fade=Math.min(1,e/300)*Math.min(1,(ms-e)/400);map.setPaintProperty(id,'circle-radius',14+22*ph);map.setPaintProperty(id,'circle-stroke-opacity',(1-ph)*0.95*fade);requestAnimationFrame(step);};requestAnimationFrame(step);};
@@ -497,7 +502,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   setTimeout(()=>{if(el){el.classList.add('out');setTimeout(()=>el.remove(),1400);}document.body.classList.remove('intro');
     // поки мапа стоїть у 2D, усі цілі пульсують кільцями кольору свого типу: за 5 с видно, що де летить
     window.FXHLALL={t0:performance.now(),until:performance.now()+5000};map.triggerRepaint();
-    if(TAC){window.__introAt=Date.now();tilt=false;finish();tacSurvey(3600);setTimeout(flyHome,3700);}else setTimeout(go,5000);},wait);}
+    if(TAC){window.__introAt=Date.now();tilt=false;finish();lg('огляд');tacSurvey(3600);setTimeout(flyHome,3700);}else setTimeout(go,5000);},wait);}
 // живий статус у заставці
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;// так само, як лічильники вгорі: треки, без ×N
@@ -1414,7 +1419,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;const seen=new Map()
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=328,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'')+' · код '+Math.floor(AV/100)+'.'+String(AV%100).padStart(2,'0')+(b&&+b!==AV?' (чекає оновлення)':'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=329,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'')+' · код '+Math.floor(AV/100)+'.'+String(AV%100).padStart(2,'0')+(b&&+b!==AV?' (чекає оновлення)':'')+(window.__stlog&&window.__stlog.length?' · старт: '+window.__stlog.join(' '):' · старт: не запускався');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
