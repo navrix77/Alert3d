@@ -854,7 +854,7 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 
 /* дихання лого: суто масштаб від центру, без анімації фільтрів; світіння окремим симетричним шаром */
 #intro .lg{margin-left:auto;margin-right:auto}
-#intro .lg img{animation:lgBreath 3.4s ease-in-out .7s infinite!important;filter:none!important;transform-origin:50% 50%;will-change:transform;backface-visibility:hidden}
+#intro .lg img{animation:lgBreath 3.4s ease-in-out .7s infinite!important;transform-origin:50% 50%;will-change:transform;backface-visibility:hidden}
 #intro .lg .gl{position:absolute;left:50%;top:0;width:96%;height:96%;margin-left:-48%;border-radius:50%;pointer-events:none;background:radial-gradient(circle at 50% 38%,rgba(70,140,255,.32) 0,rgba(70,140,255,.12) 34%,rgba(70,140,255,0) 64%);animation:glPulse 3.4s ease-in-out .7s infinite}
 @keyframes lgBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
 @keyframes glPulse{0%,100%{opacity:.55}50%{opacity:1}}
@@ -864,7 +864,7 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 /* ===== Заставка v2 «збирання з частинок» (перекриває попередні шари) ===== */
 #intro .lg::before,#intro .lg::after,#intro .lg .st,#intro .lg .ar{display:none!important}
 #intro .lg{animation:none!important;transform:none!important}
-#intro .lg img{animation:ixImg .5s ease-out 1.7s both!important;opacity:0;filter:none!important;transform:none!important}
+#intro .lg img{animation:ixImg .5s ease-out 1.7s both!important;opacity:0}
 @keyframes ixImg{from{opacity:0}to{opacity:1}}
 #intro #ix{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
 #intro p.slogan .s1{animation-delay:1.9s!important}#intro p.slogan .s2{animation-delay:2.1s!important}#intro p.slogan em{animation-delay:2.35s!important}
@@ -880,3 +880,20 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 .settings:not([hidden])>*:nth-child(2){animation-delay:.04s}.settings:not([hidden])>*:nth-child(3){animation-delay:.08s}.settings:not([hidden])>*:nth-child(4){animation-delay:.12s}.settings:not([hidden])>*:nth-child(5){animation-delay:.16s}
 @keyframes stIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.settings,.settings[hidden]{transition:none}.settings:not([hidden])>*{animation:none}}
+
+/* ===== Заставка v4: плавне дороге проявлення (лише GPU-анімації, без частинок) ===== */
+#intro #ix{display:none!important}
+#intro .lg img{opacity:0;clip-path:none!important;will-change:transform,opacity,filter;
+  animation:lxIn 1.7s cubic-bezier(.16,1,.3,1) .15s forwards!important}
+@keyframes lxIn{0%{opacity:0;transform:scale(1.07);filter:blur(16px)}60%{filter:blur(2px)}100%{opacity:1;transform:scale(1);filter:blur(0)}}
+#intro .lg .sh{display:block!important;position:absolute;inset:0;pointer-events:none;border-radius:0;mix-blend-mode:normal;
+  -webkit-mask:url(brand/logo-a.png) center/contain no-repeat;mask:url(brand/logo-a.png) center/contain no-repeat;
+  background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.9) 50%,transparent 58%) 160% 0/260% 100% no-repeat;opacity:0;
+  animation:lxSheen 1.5s cubic-bezier(.45,0,.2,1) 1.5s forwards}
+@keyframes lxSheen{0%{opacity:1;background-position:160% 0}100%{opacity:1;background-position:-60% 0}}
+#intro .lg .rg{display:block!important;position:absolute;left:50%;top:-1%;width:72%;height:72%;margin-left:-36%;border-radius:50%;pointer-events:none;box-sizing:border-box;
+  border:1.5px solid rgba(120,180,255,.7);opacity:0;transform:scale(.35);animation:lxRing 1.9s cubic-bezier(.2,.7,.2,1) 1.35s forwards}
+#intro .lg .rg.r2{border-color:rgba(255,200,95,.6);animation-delay:1.6s}
+@keyframes lxRing{0%{opacity:.9;transform:scale(.35)}100%{opacity:0;transform:scale(1.35)}}
+#intro p.slogan .s1{animation-delay:1.9s!important}#intro p.slogan .s2{animation-delay:2.1s!important}#intro p.slogan em{animation-delay:2.35s!important}
+@media (prefers-reduced-motion:reduce){#intro .lg img{animation:none!important;opacity:1;transform:none!important;filter:none!important}#intro .lg .sh,#intro .lg .rg{display:none!important}}

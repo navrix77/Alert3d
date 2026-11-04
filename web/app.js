@@ -471,8 +471,8 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
   const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.4:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
-  if(TAC){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
-  const flyHome=()=>{const t0=Date.now(),tr=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;if(tg){map.flyTo({center:tg,zoom:7.4,duration:2200,essential:true,curve:1.2});return;}if(Date.now()-t0<4500)setTimeout(tr,300);};tr();};
+  if(TAC&&el&&INTRO){try{map.jumpTo(camFor());tacPad(false);window.__tacCam=1;}catch(e){}}// камера на Україні готується ПІД заставкою, користувач цього не бачить
+  const flyHome=()=>{const t0=Date.now(),tr=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;if(tg){map.flyTo({center:tg,zoom:7.4,duration:3000,essential:true,curve:1.3,easing:t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2});return;}if(Date.now()-t0<4500)setTimeout(tr,300);};tr();};
   const finish=()=>{tacPad(false);document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
@@ -486,7 +486,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   if(skip){if(el)el.remove();document.body.classList.remove('intro');go();return;}
   // поки стоїмо й летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
-  const wait=(el&&INTRO)?Math.max(0,3900-(Date.now()-introT0)):0;   // логотип встигає зіграти (лише при першому запуску в сесії)
+  const wait=(el&&INTRO)?Math.max(0,3500-(Date.now()-introT0)):0;   // логотип встигає зіграти (лише при першому запуску в сесії)
   // без дому: за час паузи питаємо геопозицію (тихо, 4 с), щоб було куди наближатися
   if(!home&&navigator.geolocation){try{navigator.geolocation.getCurrentPosition(p=>{window.__GEOPOS=[p.coords.longitude,p.coords.latitude];},()=>{},{enableHighAccuracy:false,timeout:4000,maximumAge:600000});}catch(e){}}
   setTimeout(()=>{if(el){el.classList.add('out');setTimeout(()=>el.remove(),1400);}document.body.classList.remove('intro');
