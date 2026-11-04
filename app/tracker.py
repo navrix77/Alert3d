@@ -50,7 +50,7 @@ TYPES = {
     "cruise": {"label": "КР", "name": "Крилата ракета", "speed": 700, "life": 8 * 60},
     "ballistic": {"label": "Б", "name": "Балістика", "speed": 2000, "life": 3 * 60},
     "geran5": {"label": "Г5", "name": "«Герань-5»", "speed": 550, "life": 12 * 60},
-    "banderol": {"label": "БД", "name": "«Бандероль»", "speed": 540, "life": 8 * 60},
+    "banderol": {"label": "БД", "name": "Крилата ракета «Бандероль»", "speed": 540, "life": 8 * 60},
     "rszv": {"label": "РС", "name": "РСЗВ", "speed": 1500, "life": 3 * 60},
     "fpv": {"label": "FPV", "name": "FPV-дрон", "speed": 80, "life": 8 * 60},
     "fpvf": {"label": "FPV", "name": "FPV на оптоволокні", "speed": 60, "life": 8 * 60},

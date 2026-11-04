@@ -23,7 +23,7 @@ DB = Path(__file__).resolve().parent.parent / "data" / "push.sqlite"
 TOKEN_RX = re.compile(r"^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_\-]{10,}\]$")
 FROM = ["півночі", "північного сходу", "сходу", "південного сходу", "півдня", "південного заходу", "заходу", "північного заходу"]
 NAME = {"shahed": "Шахед", "jet": "Реактивний БпЛА", "molniya": "«Молнія»", "cruise": "Крилата ракета", "ballistic": "Балістика",
-        "geran5": "«Герань-5»", "banderol": "«Бандероль»", "rszv": "РСЗВ", "fpv": "FPV-дрон", "fpvf": "FPV на оптоволокні",
+        "geran5": "«Герань-5»", "banderol": "Крилата ракета «Бандероль»", "rszv": "РСЗВ", "fpv": "FPV-дрон", "fpvf": "FPV на оптоволокні",
         "recon": "Дрон-розвідник", "lancet": "«Ланцет»"}
 # «зображення цілі» в тексті: iPhone не показує картинок у web push, тому силует типу емодзі в заголовку
 ICON = {"shahed": "🛩", "molniya": "🛩", "lancet": "🛩", "recon": "🛩", "geran5": "🛩", "banderol": "🛩", "fpv": "🛸", "fpvf": "🛸",
