@@ -112,11 +112,15 @@ async function styleFor(kind){
 function wantBase(th){return TAC?(PREF.tacSat?'sat':'tac'):(PREF.base&&PREF.base!=='tac'?PREF.base:(th==='night'?'night':'map'));}
 
 /* ---------- тактична панель: масштаби й фільтри ---------- */
-function tacScale(v){TACF.scale=v;tacSave();const H=home||[31.5,49];
-  if(v==='near')map.flyTo({center:H,zoom:9.6,duration:700});else if(v==='oblast')map.flyTo({center:H,zoom:7.2,duration:700});else map.flyTo({center:[31.5,48.8],zoom:5.4,duration:700});
+function oblBox(n){const f=(OBLF||[]).find(x=>x.properties.n===n);if(!f)return null;let a=[1e9,1e9,-1e9,-1e9];const w=c=>typeof c[0]==='number'?(a=[Math.min(a[0],c[0]),Math.min(a[1],c[1]),Math.max(a[2],c[0]),Math.max(a[3],c[1])]):c.forEach(w);w(f.geometry.coordinates);return a;}
+function tacObl(n){TACF.obl=n||'';TACF.scale='oblast';tacSave();const b=n&&oblBox(n);if(b)map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:{top:170,bottom:120,left:30,right:60},duration:700,maxZoom:9});else tacScale('oblast');tacBarSync();}
+function tacOblFill(){const sl=$('#tac-ob');if(!sl||sl.dataset.f||!OBLF)return;sl.dataset.f='1';OBLF.map(f=>f.properties.n).sort((a,b)=>a.localeCompare(b,'uk')).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sl.appendChild(o);});sl.value=TACF.obl||'';}
+document.addEventListener('change',e=>{if(e.target&&e.target.id==='tac-ob')tacObl(e.target.value);});
+function tacScale(v){TACF.scale=v;if(v!=='oblast')TACF.obl='';tacSave();const H=home||[31.5,49];
+  if(v==='oblast'&&TACF.obl&&oblBox(TACF.obl)){const b=oblBox(TACF.obl);map.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:{top:170,bottom:120,left:30,right:60},duration:700,maxZoom:9});}else if(v==='near')map.flyTo({center:H,zoom:9.6,duration:700});else if(v==='oblast')map.flyTo({center:H,zoom:7.2,duration:700});else map.flyTo({center:[31.5,48.8],zoom:5.4,duration:700});
   const b=document.querySelector('#rad-scope button[data-v="'+({near:'near',oblast:'oblast',country:'country'}[v])+'"]');if(b)b.click();// озвучення радіо змінюється разом із масштабом
   tacBarSync();}
-function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
+function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;tacOblFill();const so=$('#tac-ob');if(so)so.value=TACF.obl||'';bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
   const n=TACF.hide.length+(TACF.fresh?1:0)+(TACF.src?1:0)+(TACF.alerts?0:1)+(TACF.enemy?0:1)+(TACF.reach?0:1);const f=$('#tac-f');if(f)f.textContent='Фільтри'+(n?' · '+n:'');}
 function tacPanelTop(){const b=$('#tac-bar');if(b)document.documentElement.style.setProperty('--tac-top',Math.round(b.getBoundingClientRect().bottom+6)+'px');}
 function tacFilterPanel(){const pn=$('#tac-flt');if(!pn)return;tacPanelTop();if(!pn.hidden){pn.hidden=true;return;}
@@ -708,7 +712,7 @@ function syncRaions(){
   syncHolo(lv);
 }
 setInterval(syncRaions,3000);
-let OBLF=null;fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{OBLF=j.features;lastRa='';syncOutside();});
+let OBLF=null;fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>{OBLF=j.features;try{tacOblFill();}catch(e){}lastRa='';syncOutside();});
 // поза Україною, притемнено, щоб країна «світилася» на карті (маска готується на сервері)
 function syncOutside(){}
 function syncHolo(lv){if(!map.getSource('holo')||!RA)return;const F=[];

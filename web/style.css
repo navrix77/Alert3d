@@ -756,3 +756,12 @@ body.tac .me{display:none!important}
 .tac-rail button svg{display:block;margin:auto;max-width:34px;max-height:30px}
 .tac-rail button i{position:absolute;right:1px;bottom:0;font:700 9px/1 -apple-system,system-ui,sans-serif;color:#cfd6e0;font-style:normal}
 .tac-rail button.on{background:rgba(255,255,255,.16);outline:1px solid #fff}
+
+.tac-bar{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:4px;padding:5px;border-radius:14px}
+.tac-bar .tb-row{display:flex;gap:4px;align-items:center}
+.tac-bar .tb-seg{background:rgba(255,255,255,.07);border-radius:10px;padding:2px}
+.tac-bar .tb-seg button{flex:1;text-align:center}
+.tac-bar .tb-row:not(.tb-seg) button{flex:0 0 auto;border:1px solid rgba(255,255,255,.14);border-radius:9px;margin:0;padding:8px 9px}
+.tac-bar #tac-f{border-left:1px solid rgba(255,255,255,.14);border-radius:9px;margin-left:0}
+.tac-bar select{flex:1 1 auto;min-width:0;min-height:34px;border:1px solid rgba(255,255,255,.14);border-radius:9px;background:#1b212b;color:#e6ebf2;font:600 12px/1 inherit;padding:0 8px}
+.top .tac-bar{width:min(420px,calc(100vw - 24px))}
