@@ -191,9 +191,10 @@ function reachData(serverT){if(!TAC||!TACF.reach||!sel)return EMPTY;const tr=SNA
   return {type:'FeatureCollection',features:F};}
 const ENEMY_TYPE={airfield:'enemy_airfield',hq:'enemy_hq'};
 function enemyLoad(){if(ENEMY!==null)return;ENEMY=[];loadApp06().then(A=>{if(!A)return;fetch('/data/enemy_objects.geojson',{cache:'no-cache'}).then(r=>r.json()).then(j=>{ENEMY=(j.features||[]);ENEMY_SET=false;}).catch(()=>{ENEMY=null;});});}
-function enemyApply(){if(!window.App06||!ENEMY||ENEMY_SET||!map.getSource('enemy'))return;
-  map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'suspect'}),v:f.properties.n})}))});ENEMY_SET=true;}
-function setTac(on){TAC=!!on;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);enemyLoad();if(TAC){loadApp06();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+async function afldIcon(){if(map.hasImage('afld'))return;try{const r=await fetch('/sprites/afld.png'),b=await createImageBitmap(await r.blob());if(!map.hasImage('afld'))map.addImage('afld',b,{pixelRatio:4});}catch(e){}}
+function enemyApply(){afldIcon();if(!window.App06||!ENEMY||ENEMY_SET||!map.getSource('enemy'))return;
+  map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:(!TAC&&f.properties.c==='airfield')?'afld':tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'suspect'}),v:f.properties.n})}))});ENEMY_SET=true;}
+function setTac(on){TAC=!!on;ENEMY_SET=false;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);enemyLoad();if(TAC){loadApp06();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
 async function setBase(kind){SYMP.clear();ENEMY_SET=false;base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
