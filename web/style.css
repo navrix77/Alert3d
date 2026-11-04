@@ -873,3 +873,10 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 @keyframes ixWipe{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
 #intro p.slogan .s1{animation-delay:2.4s!important}#intro p.slogan .s2{animation-delay:2.6s!important}#intro p.slogan em{animation-delay:2.85s!important}
 @media (prefers-reduced-motion:reduce){#intro .lg img{animation:none!important;clip-path:none}}
+/* плавний виїзд меню налаштувань і арсеналу справа: hidden більше не display:none, а зсув за екран */
+.settings{display:block!important;transform:translateX(0);opacity:1;transition:transform .42s cubic-bezier(.2,.85,.15,1),opacity .3s ease,visibility 0s}
+.settings[hidden]{transform:translateX(104%);opacity:0;visibility:hidden;pointer-events:none;transition:transform .32s cubic-bezier(.5,0,.75,.2),opacity .28s ease,visibility 0s .32s}
+.settings:not([hidden])>*{animation:stIn .5s cubic-bezier(.2,.85,.15,1) both}
+.settings:not([hidden])>*:nth-child(2){animation-delay:.04s}.settings:not([hidden])>*:nth-child(3){animation-delay:.08s}.settings:not([hidden])>*:nth-child(4){animation-delay:.12s}.settings:not([hidden])>*:nth-child(5){animation-delay:.16s}
+@keyframes stIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.settings,.settings[hidden]{transition:none}.settings:not([hidden])>*{animation:none}}
