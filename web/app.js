@@ -207,7 +207,11 @@ function enemyApply(){afldIcon();if(!window.App06||!ENEMY||!map.getSource('enemy
   const near=f=>Ls.some(L=>hav([L.lon,L.lat],f.geometry.coordinates)<15);const key=ENEMY.map(f=>near(f)?1:0).join('');
   if(ENEMY_SET&&enemyApply.k===key)return;enemyApply.k=key;
   map.getSource('enemy').setData({type:'FeatureCollection',features:ENEMY.map(f=>({type:'Feature',geometry:f.geometry,properties:Object.assign({},f.properties,{img:(!TAC&&f.properties.c==='airfield')?'afld':tacImg({type:ENEMY_TYPE[f.properties.c]||'enemy_object',affiliation:'hostile'}),v:near(f)?'':f.properties.n,dim:near(f)?1:0})}))});ENEMY_SET=true;}
-function setTac(on){TAC=!!on;ENEMY_SET=false;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);enemyLoad();if(TAC){loadApp06();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
+// тактичний режим тільки 2D: нахил вимкнено і заблоковано; після виходу повертаємо те, що було
+let TILT_BEFORE=null;
+function tac2d(on){try{if(on){if(TILT_BEFORE===null)TILT_BEFORE=tilt;if(tilt)set3d(false,true);map.setMaxPitch(0);map.easeTo({pitch:0,bearing:0,duration:400});}
+  else{map.setMaxPitch(map._mp0||60);if(TILT_BEFORE){set3d(true,true);}TILT_BEFORE=null;}}catch(e){}}
+function setTac(on){const was=TAC;TAC=!!on;if(TAC!==was)tac2d(TAC);ENEMY_SET=false;try{if(SNAP)renderCounters();}catch(e){}window.FXTAC=TAC;document.body.classList.toggle('tac',TAC);enemyLoad();if(TAC){loadApp06();}if(!TAC&&$('#tac-legend'))$('#tac-legend').hidden=true;tacScaleBars();try{localStorage.setItem('mode_tac',TAC?'1':'0');}catch(e){}document.body.classList.toggle('tac',TAC);tacBarSync();
   setBase(wantBase(effTheme()));setTimeout(()=>{syncSettingsUI();applyLayers();tacBarSync();},80);if(!TAC&&$('#tac-flt'))$('#tac-flt').hidden=true;toast(TAC?'Тактична мапа':'Звичайна мапа');}
 async function setBase(kind){SYMP.clear();ENEMY_SET=false;base=kind;localStorage.setItem('base2',kind);map.setStyle(await styleFor(kind),{diff:false});}
 
@@ -445,7 +449,7 @@ function addOverlays(){
   map.addLayer({id:'myplaces',type:'circle',source:'myplaces',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,3,8,6],'circle-color':'#B07CFF','circle-stroke-color':'#fff','circle-stroke-width':['interpolate',['linear'],['zoom'],4,1.2,8,2]}});
   map.addLayer({id:'myplaces-t',type:'symbol',source:'myplaces',minzoom:6,layout:{'text-field':['get','n'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,1.1],'text-anchor':'top','text-allow-overlap':false},paint:{'text-color':'#fff','text-halo-color':'rgba(40,10,70,.9)','text-halo-width':1.8}});
   lastLv='';lastRa='';CUTK='';syncHome();syncMe();syncPlaces();
-  if(tilt)set3d(true,'keep');
+  if(TAC){TILT_BEFORE=tilt;tilt=false;try{map.setMaxPitch(0);}catch(e){}}else if(tilt)set3d(true,'keep');
   if(!map._scaleAdded&&innerWidth>640){map.addControl(new maplibregl.ScaleControl({unit:'metric',maxWidth:110}),'bottom-left');map._scaleAdded=true;}
 }
 map.on('style.load',addOverlays);
@@ -460,7 +464,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
   const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
-    const c=camFor();if(REDUCE)map.jumpTo(c);else map.flyTo({...c,duration:2400,curve:1.25,essential:true});window.__introAt=Date.now();tilt=true;setTimeout(finish,REDUCE?50:2500);};
+    const c=camFor();if(REDUCE)map.jumpTo(c);else map.flyTo({...c,duration:2400,curve:1.25,essential:true});window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,REDUCE?50:2500);};
   if(skip){if(el)el.remove();document.body.classList.remove('intro');go();return;}
   // поки стоїмо й летимо, без підписів пусків і цілей (каша), вони проявляються в кінці польоту
   ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','none');});
