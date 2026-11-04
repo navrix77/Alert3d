@@ -469,7 +469,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const mob=innerWidth<640;
   // кінцевий стан: 3D з наближенням до дому; без дому — до геопозиції (визначається під час паузи); без обох — центр країни з нахилом
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
-  const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.2:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
+  const camFor=()=>{if(TAC)return {center:[31.5,48.8],zoom:mob?5.4:5.6,pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
   const finish=()=>{document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};

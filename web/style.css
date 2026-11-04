@@ -851,3 +851,10 @@ body.intro-in .dock button:nth-child(5){animation-delay:1.08s!important}body.int
 body.intro-in .notes{animation:uiSide .8s cubic-bezier(.16,1,.3,1) 1s both!important}
 body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 @media (prefers-reduced-motion:reduce){body.intro-in .top,body.intro-in .counters .cnt,body.intro-in .tac-bar,body.intro-in .me,body.intro-in .dock,body.intro-in .dock button,body.intro-in .notes,body.intro-in #wm{animation:none!important}}
+
+/* дихання лого: суто масштаб від центру, без анімації фільтрів; світіння окремим симетричним шаром */
+#intro .lg{margin-left:auto;margin-right:auto}
+#intro .lg img{animation:lgBreath 3.4s ease-in-out .7s infinite!important;filter:none!important;transform-origin:50% 50%;will-change:transform;backface-visibility:hidden}
+#intro .lg .gl{position:absolute;left:50%;top:0;width:96%;height:96%;margin-left:-48%;border-radius:50%;pointer-events:none;background:radial-gradient(circle at 50% 38%,rgba(70,140,255,.32) 0,rgba(70,140,255,.12) 34%,rgba(70,140,255,0) 64%);animation:glPulse 3.4s ease-in-out .7s infinite}
+@keyframes lgBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+@keyframes glPulse{0%,100%{opacity:.55}50%{opacity:1}}
