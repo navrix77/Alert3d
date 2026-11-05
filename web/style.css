@@ -940,3 +940,10 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 .counters .cnt:nth-child(3n){border-right:0!important}
 .counters .cnt:nth-child(n+4){border-top:1px solid var(--line)!important}
 .counters .cnt small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+/* 05.11 лічильники: окремий блок на кожен тип цілі, новий тип = ще один блок у ряду.
+   Ряд притиснутий праворуч і не заходить на логотип у лівому куті */
+body:not(.tac) .counters{gap:6px!important;justify-content:flex-end!important;background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-radius:0!important;overflow:visible!important;max-width:calc(100vw - 24px)}
+body.wm:not(.tac) .counters{max-width:calc(100vw - 92px)}
+body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start;border:1px solid color-mix(in srgb,var(--tc,#fff) 40%,var(--rim))!important;border-radius:14px!important;background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(255,255,255,.02) 38%,rgba(0,0,0,.08)),var(--glass)!important;backdrop-filter:var(--glass-fx);-webkit-backdrop-filter:var(--glass-fx);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 8px 24px rgba(0,0,0,.4)!important}
+:root[data-theme="day"] body:not(.tac) .counters .cnt{background:rgba(255,255,255,.78)!important;box-shadow:0 6px 18px rgba(20,30,60,.15)!important}
