@@ -384,7 +384,7 @@ function addOverlays(){
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'300px',className:'kab-pop ru-pop',offset:12}).setLngLat(f.geometry.coordinates).setHTML(
      '<div class="kp"><small>'+(h.src==='ASTRA'?'ПРИЛІТ НАШИХ ДРОНІВ':'УРАЖЕНО СИЛАМИ ОБОРОНИ')+'</small><h4>'+esc(h.place)+'</h4>'+
      '<div class="kp-r"><span>Що</span><b>'+esc(h.what)+'</b></div>'+
-     '<div class="kp-r"><span>Коли</span><b>'+new Date(h.t*1000).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</b></div>'+
+     '<div class="kp-r"><span>Коли</span><b>'+new Date(h.t*1000).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' · '+(()=>{const m=Math.max(0,Math.round((Date.now()/1000+offset-h.t)/60));return m<60?m+' хв тому':Math.floor(m/60)+' год '+(m%60)+' хв тому';})()+'</b></div>'+
      '<div class="kp-r"><span>Джерело</span><b>'+esc(h.src||'Генштаб ЗСУ')+'</b></div>'+
      '<div class="kp-ev"><div>'+esc(h.detail||'')+'</div>'+(h.link?'<a href="'+esc(h.link)+'" target="_blank" rel="noopener" style="color:inherit">першоджерело ↗</a>':'')+'</div></div>').addTo(map);});
   map.on('mouseenter','hits',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','hits',()=>map.getCanvas().style.cursor='');
@@ -1416,14 +1416,20 @@ function syncRu(){if(!SNAP||!map.getSource('ru'))return;map.getSource('ru').setD
   map.getSource('ru').setData({type:'FeatureCollection',features:F});}
 setInterval(syncRu,5000);
 let HITS=[];
-function syncHits(){if(!SNAP||!map.getSource('hits'))return;const seen=new Map();
-  const t24=Date.now()/1000+offset-86400;// лише свіжі (за добу), вчорашні влучання не про сьогоднішню ніч
-  for(const h of (SNAP.hits||[]).filter(h=>h.t>=t24).sort((a,b)=>b.t-a.t)){const k=h.place+'|'+h.what;if(!seen.has(k))seen.set(k,h);}
-  HITS=[...seen.values()];map.getSource('hits').setData({type:'FeatureCollection',features:HITS.map((h,hi)=>({type:'Feature',properties:{hi,wb:!!h.wb,fresh:(Date.now()/1000+offset-h.t)<10800,l:(h.wb?'🔥 ':'')+(h.src==='ASTRA'?'Приліт: ':'Уражено: ')+h.what+'\n'+h.place+' · '+new Date(h.t*1000).toLocaleDateString('uk-UA',{day:'2-digit',month:'2-digit'}),link:h.link},geometry:{type:'Point',coordinates:[h.lon,h.lat]}}))});}
+function syncHits(){if(!SNAP||!map.getSource('hits'))return;
+  const nowS=Date.now()/1000+offset,t24=nowS-86400;// лише свіжі (за добу), вчорашні влучання не про сьогоднішню ніч
+  const seen=new Map();// одна подія = один вогник: ключ — пост, місце й об'єкт (два уражені об'єкти в одному місті дають два вогники)
+  for(const h of (SNAP.hits||[]).filter(h=>h.t>=t24).sort((a,b)=>b.t-a.t)){const k=(h.link||h.t)+'|'+h.place+'|'+h.what;if(!seen.has(k))seen.set(k,h);}
+  HITS=[...seen.values()];
+  // кілька подій в одній точці: розводимо віялом (~2 км), щоб кожен вогник було видно й можна було торкнутись
+  const grp={};HITS.forEach((h,i)=>{const g=h.lat.toFixed(2)+','+h.lon.toFixed(2);(grp[g]=grp[g]||[]).push(i);});
+  const pos=HITS.map(h=>[h.lon,h.lat]);for(const g in grp){const ix=grp[g];if(ix.length<2)continue;ix.forEach((i,n)=>{const a=-Math.PI/2+n*2*Math.PI/ix.length,r=0.022;pos[i]=[HITS[i].lon+r*Math.cos(a)/Math.cos(HITS[i].lat*Math.PI/180),HITS[i].lat+r*Math.sin(a)];});}
+  const hm=t=>new Date(t*1000).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+  map.getSource('hits').setData({type:'FeatureCollection',features:HITS.map((h,hi)=>({type:'Feature',properties:{hi,wb:!!h.wb,fresh:(nowS-h.t)<10800,l:(h.wb?'🔥 ':'')+h.what+'\n'+h.place+' · '+hm(h.t),link:h.link},geometry:{type:'Point',coordinates:pos[hi]}}))});}
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=333,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'')+' · код '+Math.floor(AV/100)+'.'+String(AV%100).padStart(2,'0')+(b&&+b!==AV?' (чекає оновлення)':'')+(window.__stlog&&window.__stlog.length?' · старт: '+window.__stlog.join(' '):' · старт: не запускався');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=334,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'')+' · код '+Math.floor(AV/100)+'.'+String(AV%100).padStart(2,'0')+(b&&+b!==AV?' (чекає оновлення)':'')+(window.__stlog&&window.__stlog.length?' · старт: '+window.__stlog.join(' '):' · старт: не запускався');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows

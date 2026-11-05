@@ -2133,3 +2133,10 @@ def test_wildberries_warehouse_flag():
     assert r and r[0]["what"] == "Склад Wildberries" and r[0].get("wb") is True
     r2 = u.parse_astra("Беспилотники атаковали порт Новороссийск")
     assert r2 and not r2[0].get("wb")
+
+
+def test_two_objects_one_city_two_events():
+    from app.strikes_ua import UaStrikes
+    r = UaStrikes().parse_astra("Беспилотники атаковали Рязань: горит НПЗ, также поврежден склад Wildberries")
+    assert sorted(e["what"] for e in r) == ["НПЗ", "Склад Wildberries"]
+    assert all(e["place"] == "Рязань" for e in r)

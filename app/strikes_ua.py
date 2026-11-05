@@ -76,6 +76,7 @@ class UaStrikes:
         self.gaz = gaz
         self.events: list[dict] = []
         self.seen: set[str] = set()
+        self._extra: list[str] = []
 
     def locate(self, name: str):
         low = name.lower()
@@ -144,10 +145,20 @@ class UaStrikes:
             if hit and hit[0] not in seen:
                 seen.add(hit[0])
                 wb = bool(WB_RE.search(text))
-                what = "Склад Wildberries" if wb else next((lab for k, lab in WHAT_RU if re.search(r"(?<![а-яе])" + re.escape(k), low)), "Атака дронів")  # з початку слова: «транспортное» не «порт»
-                out.append({"what": what, "detail": text.strip().split("\n")[0][:160], "place": hit[0], "lat": hit[1], "lon": hit[2], "src": "ASTRA", **({"wb": True} if wb else {})})
+                whats = (["Склад Wildberries"] if wb else []) + [lab for k, lab in WHAT_RU if re.search(r"(?<![а-яе])" + re.escape(k), low) and not (wb and lab == "Склад")]  # з початку слова: «транспортное» не «порт»
+                whats = list(dict.fromkeys(whats))
+                if any(w not in ("Завод", "Підприємство", "Склад") for w in whats):
+                    whats = [w for w in whats if w not in ("Завод", "Підприємство", "Склад")]  # «завод» у тексті про НПЗ — той самий об'єкт, не окремий
+                whats = whats[:3] or ["Атака дронів"]
+                out.append({"what": whats[0], "detail": re.sub(r"\s+", " ", text.strip())[:320], "place": hit[0], "lat": hit[1], "lon": hit[2], "src": "ASTRA", **({"wb": True} if wb else {})})
+                self._extra = whats[1:]
             if len(out) >= 3:
                 break
+        # одне місто, кілька уражених об'єктів (НПЗ і склад Wildberries): окрема подія, а отже й окремий вогник, на кожен
+        if len(out) == 1 and getattr(self, "_extra", None):
+            for w in self._extra[:3]:
+                out.append({**out[0], "what": w, **({"wb": True} if w == "Склад Wildberries" else {})})
+        self._extra = []
         return out
 
     def state(self) -> list[dict]:
