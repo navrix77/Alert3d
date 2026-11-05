@@ -933,3 +933,8 @@ body.intro-in #wm{animation:uiTop .9s ease-out 1.2s both!important}
 #intro .lg .sh{animation-delay:2.3s!important}
 #intro .lg .rg{animation-delay:2s!important}#intro .lg .rg.r2{animation-delay:2.25s!important}
 #intro p.slogan .s1{animation-delay:2.3s!important}#intro p.slogan .s2{animation-delay:2.5s!important}#intro p.slogan em{animation-delay:2.75s!important}
+
+/* лічильники: один ряд, рівномірно по ширині (без порожнечі й переносу на другий рядок) */
+.counters{flex-wrap:nowrap!important;justify-content:stretch!important}
+.counters .cnt{flex:1 1 0;min-width:0;justify-content:center}
+.counters .cnt small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
