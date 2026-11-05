@@ -2168,3 +2168,13 @@ def test_air_force_summary_is_not_our_strike():
          "Міллерово – рф.\n\nЗбито/подавлено 105 ворожих БпЛА. Зафіксовано влучання 21 ударного БпЛА на 12 локаціях.")
     assert u.parse_astra(t) == [] and u.ingest(t, 1, "l", "ПС") == 0
     assert [e["place"] for e in u.parse_astra("Беспилотники атаковали Тулу и Рязань\n\nВ Туле горит завод. В Рязани взрывы в районе НПЗ.")]
+def test_course_only_near_border_starts_at_border():
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p, tr = Parser(), Tracker(SOURCES)
+    t0 = 1_800_000_000
+    tr.ingest(p.parse("БПЛА на Прудянку", "ND"), "ND", t0)
+    tk = [x for x in tr.snapshot(t0 + 5)["tracks"] if x["status"] == "active"]
+    print(tk and {k: tk[0].get(k) for k in ("lat", "lon", "heading", "from", "course_to")})
+    assert tk
+    assert tk[0]["lat"] > 50.2  # північніше за Прудянку, біля кордону

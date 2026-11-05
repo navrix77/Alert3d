@@ -42,6 +42,27 @@ from .strat import StratBook
 from .launch import LaunchBook
 from .parser import Observation
 
+# орієнтовна лінія державного кордону з РФ/РБ (lat, lon): для цілей «курсом на X» біля кордону
+_BORDER = [(52.1, 33.5), (51.8, 34.4), (51.45, 35.1), (51.0, 35.4), (50.6, 35.9), (50.43, 36.3),
+           (50.28, 36.95), (49.8, 37.6), (49.55, 38.2), (49.1, 39.0), (48.6, 39.9)]
+
+
+def _border_start(xy, max_km=60.0):
+    """Найближча точка кордону до пункту призначення, якщо він ближче max_km: звідти ціль і летить."""
+    pts = [_gxy(a, b) for a, b in _BORDER]
+    best = None
+    for i in range(len(pts) - 1):
+        (x1, y1), (x2, y2) = pts[i], pts[i + 1]
+        dx, dy = x2 - x1, y2 - y1
+        u = max(0.0, min(1.0, ((xy[0] - x1) * dx + (xy[1] - y1) * dy) / (dx * dx + dy * dy)))
+        q = (x1 + u * dx, y1 + u * dy)
+        d = dist_km(q, xy)
+        if best is None or d < best[0]:
+            best = (d, q)
+    if best is None or best[0] > max_km or best[0] < 2:
+        return None
+    return best[1]
+
 # швидкості — з відкритих характеристик (03.11, методика «час у повітрі»): крилата 700 (Х-101 190–200 м/с),
 # «Бандероль» 540 (крейсерська 520–560); шахед і реактивні — як було, їх перевіряє бектест
 TYPES = {
@@ -659,7 +680,11 @@ class Tracker:
                     tr.obs.append(Point(t, px, py, src, prev[0] + " (оцінка)", link, None, True))
                     tr.pred_src = "learned-origin"
                 else:
-                    tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
+                    bp = _border_start(X.xy)
+                    if bp is not None:
+                        tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
+                    else:
+                        tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
             tr.route = [p for p in route if dist_km(p.xy, (tr.last.x, tr.last.y)) > 2]
             if tr.route:
                 tr.route_src, tr.route_t = src, t
