@@ -2210,3 +2210,12 @@ def test_not_live_mentions_do_not_create_targets():
         assert o.type is None and o.no_target, t
     assert P_.parse("Не шахед, а розвідник", "sumygo").type == "recon"
     assert P_.parse("Шахед курсом на Харків", "sumygo").type == "shahed"
+
+
+def test_defense_news_does_not_create_target():
+    from app.parser import Parser
+    p = Parser()
+    t = ("Також у Харкові вже облаштували перший антидроновий коридор на ділянці Харківського шосе. "
+         "Надалі планують захистити частину кільцевої дороги та трасу в напрямку Дергачів.")
+    o = p.parse(t, "KL")
+    assert o.type is None and o.no_target

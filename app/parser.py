@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 
 from .geo import OBLAST_HINTS, Gazetteer, Place, dist_km, norm
 
+# новини про захист і облаштування («облаштували антидроновий коридор на Харківському шосе, планують захистити»),
+# без руху цілі: не створюють курс і фантомну ціль; «Харківського шосе» не є курсом на Харків
+DEFENSE_NEWS = re.compile(r"антидрон\w*|облаштув\w*|захистит\w*|захищат\w*|планують|планируют", re.I)
+MOVING = re.compile(r"летит|летять|летить|курс|прямує|прямуют|рухається|рухаються|движется|двигается|курсом|летит", re.I)
 NOT_LIVE = re.compile(
     r"(^|[^а-яіїє])(?:не\s+(?:фіксу\w*|спостеріга\w*|летить|летять|підтверд\w*|було|буде)|нема(?:є)?\s+(?:шахед|бпла|дрон|ракет|цілей)|без\s+(?:пуск|підтверд)"
     r"|купил\w*|купив\w*|купит\w*|продаю|продам|продаж\w*|донат\w*|закупівл\w*|замовил\w*|магазин\w*|ремонт\w*"
@@ -779,6 +783,8 @@ class Parser:
             obs.type, obs.no_target, obs.close = None, True, False
         # заперечення / торгівля / минулий час: згадка типу ≠ об'єкт у повітрі («Шахедів не фіксують», «Купили оптику»,
         # «Мопед продаю», «Вчора було три шахеди»). Виправлення «не шахед, а розвідник» сюди не потрапляє
+        if DEFENSE_NEWS.search(t) and not MOVING.search(t) and not obs.close:
+            obs.type, obs.no_target, obs.close = None, True, False
         if NOT_LIVE.search(t) and not obs.close and not re.search(r"більше не|больше не|зараз|сейчас|щойно|только что|наразі|не\s+\w+,?\s+а\s", t):
             obs.type, obs.no_target, obs.close = None, True, False
         return obs
