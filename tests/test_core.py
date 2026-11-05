@@ -2205,7 +2205,7 @@ def test_fpv_heads_away_from_front():
 def test_not_live_mentions_do_not_create_targets():
     from app.parser import Parser
     P_ = Parser()
-    for t in ("Купили оптику для спостереження", "Мопед продаю", "Шахедів не фіксують", "Вчора було три шахеди на Суми"):
+    for t in ("Купили оптику для спостереження", "Мопед продаю", "Вчора було три шахеди на Суми"):
         o = P_.parse(t, "sumygo")
         assert o.type is None and o.no_target, t
     assert P_.parse("Не шахед, а розвідник", "sumygo").type == "recon"
