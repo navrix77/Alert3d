@@ -2322,3 +2322,15 @@ def test_destination_oblast_does_not_move_position_out_of_channel_region():
     o3 = P.parse("новий реактивнтй повенен так само піти від Сновська до Куликівки, потім до Кіптів/Козельця і на Київщину.", "PhantomChe")
     k = [r.place for r in o3.places if r.place.name == "Куликівка"][0]
     assert abs(k.lat - 51.376) < 0.02
+
+
+def test_turbo_drone_is_jet():
+    """nikalert «ТурбоБпЛА …», «ТурбоШаболда»: ті самі цілі в той самий час інші канали звуть реактивними
+    (04.11 13:01 shovnebi «реактив … Ігрень»; 04.11 21:39 shovnebi «реактив на Соколове»; 05.11 05:39 KL «Реактивний БпЛА
+    курсом на Самар»). Раніше ставали звичайними шахедами (170 км/год замість реактивних)."""
+    from app.parser import Parser
+    p = Parser()
+    assert p.parse("Ⓜ️👁 Dнпр: ТурбоБпЛА в бік Сад / Острів Ігрень", "nikalert").type == "jet"
+    assert p.parse("ТурбоБпЛА Самар ліс курс Дніпро", "nikalert").type == "jet"
+    assert p.parse("Ⓜ️👁 Dнпр: 🚨 Дніпрята, тривожимось по  ТурбоШаболде біля Соколове", "nikalert").type == "jet"
+    assert p.parse("Ⓜ️👁 Dнпр: БпЛА в бік Сад / Острів Ігрень", "nikalert").type == "uav"
