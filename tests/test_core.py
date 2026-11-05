@@ -2178,3 +2178,9 @@ def test_course_only_near_border_starts_at_border():
     print(tk and {k: tk[0].get(k) for k in ("lat", "lon", "heading", "from", "course_to")})
     assert tk
     assert tk[0]["lat"] > 50.2  # північніше за Прудянку, біля кордону
+
+
+def test_kozachka_means_kozacha_lopan():
+    from app.parser import Parser
+    o = Parser().parse("Развед. БПЛА Козачка/Прудянка", "TLK")
+    assert o.places[0].place.name == "Козача Лопань"
