@@ -79,7 +79,7 @@ button:hover{background:rgba(255,255,255,.18)}button:disabled{opacity:.35;cursor
 <script>
 'use strict';
 // 04.11 власник: балістика зелена, крилаті червоні пунктиром, реактивні жовті, шахеди блакитні; решта тонше й приглушено
-const T={ballistic:['Балістичні ракети','#35E07A'],cruise:['Крилаті ракети','#FF3B4E'],jet:['Реактивні БпЛА','#FFD43B'],shahed:['Шахеди / Герані','#4FC3FF'],kab:['КАБи','#B48CFF'],geran5:['«Герань-5»','#FF9F43'],banderol:['«Бандеролі»','#E58FD0'],rszv:['РСЗВ','#A9B4C2'],lancet:['«Ланцети»','#A0927E'],molniya:['«Молнії»','#8E9A80'],fpv:['FPV-дрони','#8A93A3'],fpvf:['FPV на оптоволокні','#8A93A3'],recon:['Дрони-розвідники','#77808F']};
+const T={uav:['БпЛА невизначеного типу','#B9C2D0'],ballistic:['Балістичні ракети','#35E07A'],cruise:['Крилаті ракети','#FF3B4E'],jet:['Реактивні БпЛА','#FFD43B'],shahed:['Шахеди / Герані','#4FC3FF'],kab:['КАБи','#B48CFF'],geran5:['«Герань-5»','#FF9F43'],banderol:['«Бандеролі»','#E58FD0'],rszv:['РСЗВ','#A9B4C2'],lancet:['«Ланцети»','#A0927E'],molniya:['«Молнії»','#8E9A80'],fpv:['FPV-дрони','#8A93A3'],fpvf:['FPV на оптоволокні','#8A93A3'],recon:['Дрони-розвідники','#77808F']};
 const MAIN=new Set(['ballistic','cruise','jet','shahed']),DASH=new Set(['cruise']);
 const $=s=>document.querySelector(s);
 const q=new URLSearchParams(location.search);let DAY=q.get('d')||null,D=null,CUR=1,playing=false;
@@ -202,7 +202,7 @@ const MAJOR=new Set(['cruise','ballistic','kab','geran5','banderol','rszv']);let
 const GRPS=[['miss','Ракети й КАБи'],['dron','Дрони'],['all','Усе']];
 // рівень загрози типу: 1 найнебезпечніший (балістика: хвилини до удару, найбільша бойова частина) … 4 найменший
 const THREAT={ballistic:1,cruise:1,kab:1,geran5:2,jet:2,banderol:2,rszv:2,shahed:3,lancet:3,molniya:3,fpv:4,fpvf:4,recon:4};
-const ORDER=['ballistic','cruise','kab','geran5','jet','banderol','rszv','shahed','lancet','molniya','fpv','fpvf','recon'];
+const ORDER=['uav','ballistic','cruise','kab','geran5','jet','banderol','rszv','shahed','lancet','molniya','fpv','fpvf','recon'];
 const TW={1:1.25,2:1,3:0.85,4:0.7};
 let XB=0;// експорт: товстіші й насиченіші лінії, бо PDF/відео дивляться без збільшення
 function style(type){const s0=style0(type);if(!s0)return s0;const thin=!MAIN.has(type)&&SEL!==type;

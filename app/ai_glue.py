@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DICT_FILE = ROOT / "data" / "llm_dict.json"
 NIGHT_FILE = ROOT / "data" / "llm_night.json"
 
-WORD = {"uav": "БпЛА (тип не визначено)", "shahed": "Шахед", "jet": "Реактивний БпЛА", "geran5": "Герань-5", "molniya": "Молнія", "lancet": "Ланцет",
+WORD = {"uav": "БпЛА невизначеного типу", "shahed": "Шахед", "jet": "Реактивний БпЛА", "geran5": "Герань-5", "molniya": "Молнія", "lancet": "Ланцет",
         "recon": "Розвідувальний БпЛА", "fpv": "FPV", "fpvf": "FPV на оптоволокні", "cruise": "Крилата ракета",
         "banderol": "Бандероль", "ballistic": "Балістика", "kab": "КАБ"}
 
