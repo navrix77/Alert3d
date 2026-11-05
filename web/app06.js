@@ -59,7 +59,7 @@
     // тип невстановлений: загальний повітряний об'єкт; належність при цьому лишається за даними
     unknown: E('01', '000000', '00', '00', 'Air (unspecified)', true, 'Тип не встановлено: порожній внутрішній знак, рамка за належністю'),
   };
-  const MODEL = { shahed: 'Шахед', geran5: 'Герань-5', jet: 'Реактивний БпЛА', molniya: 'Молнія', fpv: 'FPV', fpvf: 'FPV (оптоволокно)', lancet: 'Ланцет',
+  const MODEL = { uav: 'БпЛА (тип?)', shahed: 'Шахед', geran5: 'Герань-5', jet: 'Реактивний БпЛА', molniya: 'Молнія', fpv: 'FPV', fpvf: 'FPV (оптоволокно)', lancet: 'Ланцет',
     recon: 'Розвідник', cruise: 'КР', banderol: 'Бандероль', ballistic: 'БР', kab: 'КАБ', rszv: 'РСЗВ', tu95: 'Ту-95МС', tu160: 'Ту-160', tu22: 'Ту-22М3', mig31: 'МіГ-31К', unknown: '', enemy_airfield: 'Аеродром', enemy_hq: 'Штаб', enemy_object: '' };
 
   const pad = (s, n) => String(s).padStart(n, '0');

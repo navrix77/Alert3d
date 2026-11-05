@@ -14,10 +14,10 @@ from __future__ import annotations
 import math
 from collections import Counter
 
-SPEED = {"shahed": 170, "jet": 450, "molniya": 120, "geran5": 550, "cruise": 800, "banderol": 700, "ballistic": 2000, "kab": 400,
+SPEED = {"uav": 170, "shahed": 170, "jet": 450, "molniya": 120, "geran5": 550, "cruise": 800, "banderol": 700, "ballistic": 2000, "kab": 400,
          "rszv": 1500, "recon": 110, "lancet": 95, "fpv": 80, "fpvf": 60}
 # час життя цілі в лічильнику «зараз у повітрі», хв: той самий, що й показ на мапі (SHOW у web/app.js)
-LIVE_MIN = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "banderol": 2, "geran5": 5, "rszv": 1,
+LIVE_MIN = {"uav": 25, "shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "banderol": 2, "geran5": 5, "rszv": 1,
             "recon": 15, "lancet": 10, "fpv": 5, "fpvf": 5, "kab": 5}
 # параметри з бектесту (6 ночей): допуск похибки позиції, км, і найбільший розрив між фрагментами, с
 TOL_KM, GAP_S = 10.0, 2700

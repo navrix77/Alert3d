@@ -1,6 +1,6 @@
 // Силуети цілей зверху (ніс угору = північ). Малюються на canvas, щоб бути чіткими на будь-якому екрані.
-window.TYPE_COLOR={shahed:'#FFA31A',jet:'#FF2BD6',molniya:'#7CFF2A',cruise:'#9D3CFF',ballistic:'#F2F5FA',kab:'#22E1FF',geran5:'#F49BE8',banderol:'#C08CFF',rszv:'#E3C9A1',fpv:'#A9B6C4',fpvf:'#3DA5FF',lancet:'#FFC43C',recon:'#2EE6A8'};
-window.TYPE_NAME={shahed:'Шахед',jet:'Реактивний БпЛА',molniya:'«Молнія»',cruise:'Крилата ракета',ballistic:'Балістика',kab:'КАБ',geran5:'«Герань-5»',banderol:'Крилата ракета «Бандероль»',rszv:'РСЗВ',fpv:'FPV-дрон',fpvf:'FPV на оптоволокні',lancet:'«Ланцет»',recon:'Дрон-розвідник'};
+window.TYPE_COLOR={shahed:'#FFA31A',jet:'#FF2BD6',molniya:'#7CFF2A',cruise:'#9D3CFF',ballistic:'#F2F5FA',kab:'#22E1FF',geran5:'#F49BE8',banderol:'#C08CFF',rszv:'#E3C9A1',fpv:'#A9B6C4',fpvf:'#3DA5FF',lancet:'#FFC43C',recon:'#2EE6A8',uav:'#B9C2D0'};
+window.TYPE_NAME={uav:'БпЛА, тип не визначено',shahed:'Шахед',jet:'Реактивний БпЛА',molniya:'«Молнія»',cruise:'Крилата ракета',ballistic:'Балістика',kab:'КАБ',geran5:'«Герань-5»',banderol:'Крилата ракета «Бандероль»',rszv:'РСЗВ',fpv:'FPV-дрон',fpvf:'FPV на оптоволокні',lancet:'«Ланцет»',recon:'Дрон-розвідник'};
 window.drawTarget=function(type,px,opts){
   opts=opts||{};const s=px*2,c=document.createElement('canvas');c.width=c.height=s;const x=c.getContext('2d');
   x.translate(s/2,s/2);x.scale(s/100,s/100);
@@ -11,6 +11,7 @@ window.drawTarget=function(type,px,opts){
     molniya:'M0,-38 L5,-26 L5,-10 L42,-6 L42,2 L5,4 L4,22 L16,30 L16,34 L-16,34 L-16,30 L-4,22 L-5,4 L-42,2 L-42,-6 L-5,-10 L-5,-26 Z',
     cruise:'M0,-46 L4,-34 L4,-6 L22,6 L22,11 L4,6 L4,30 L12,40 L12,44 L-12,44 L-12,40 L-4,30 L-4,6 L-22,11 L-22,6 L-4,-6 L-4,-34 Z',
     ballistic:'M0,-46 L7,-26 L7,28 L16,40 L16,44 L-16,44 L-16,40 L-7,28 L-7,-26 Z',
+    uav:'M0,-34 L34,0 L0,34 L-34,0 Z',
     kab:'M0,-36 L9,-22 L9,-4 L44,-2 L44,4 L9,6 L9,22 L20,34 L-20,34 L-9,22 L-9,6 L-44,4 L-44,-2 L-9,-4 L-9,-22 Z'
   };
   const p=new Path2D(shapes[type]||shapes.shahed);

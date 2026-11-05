@@ -85,6 +85,7 @@ def _border_start(xy, max_km=60.0, out_km=12.0):
 # швидкості — з відкритих характеристик (03.11, методика «час у повітрі»): крилата 700 (Х-101 190–200 м/с),
 # «Бандероль» 540 (крейсерська 520–560); шахед і реактивні — як було, їх перевіряє бектест
 TYPES = {
+    "uav": {"label": "Б", "name": "БпЛА, тип не визначено", "speed": 170, "life": 15 * 60},
     "shahed": {"label": "Ш", "name": "Шахед/Гербера", "speed": 170, "life": 15 * 60},  # 04.11: було 25 хв; у наліт >половини лічильника були цілі без згадок 10+ хв
     "jet": {"label": "РБ", "name": "Реактивний БпЛА", "speed": 450, "life": 15 * 60},
     "molniya": {"label": "М", "name": "«Молнія»", "speed": 120, "life": 20 * 60},
@@ -216,7 +217,7 @@ class Track:
 # повідомлення запізнюються, дрони маневрують. Бектест 26.10–02.11 (поз. похибка до наступної названої позиції,
 # навчання до 01.11 09:00 / перевірка після): шахеди k≈0.3–0.4 (медіана 23.0 → 17.8 км), реактивні k≈0.6 (26.0 → 21.2 км).
 # Для зіставлення повідомлень і часу підльоту лишається паспортна швидкість (обережніше).
-MAP_K = {"shahed": 0.35, "jet": 0.6}
+MAP_K = {"shahed": 0.35, "uav": 0.35, "jet": 0.6}
 # Зміщення шахеда між названими позиціями росте повільніше за час (маневри, запізнення постів, грубі «села»):
 # бектест 28.10–02.11 (n≈45 на горизонт): ≈1.0× паспортної за перші 10 хв, 0.71× за 20, 0.49× за 40.
 # Модель d(h) = v·10/60·k10·(h/10)^b (h ≥ 10 хв), до 10 хв — лінійно з k10. Шахед (0.7, 0.5): медіана похибки
@@ -234,7 +235,7 @@ def map_disp(typ: str, speed: float, sec: float) -> float:
     return speed * 10 / 60 * k10 * (h / 10) ** b
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
-SHOW_BY_TYPE = {"shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5, "recon": 15, "lancet": 10}
+SHOW_BY_TYPE = {"uav": 25, "shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5, "recon": 15, "lancet": 10}
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:
@@ -442,7 +443,7 @@ class Tracker:
         places = obs.places
         if obs.kind == "filtered":
             # «збито / вибухи / приліт» не публікуємо (безпека), але ціль після цього прибираємо з карти
-            fast = FAST_TYPES if obs.type is None else ((obs.type,) if obs.type in TYPES else ())
+            fast = FAST_TYPES if obs.type is None else (("shahed", "uav") if obs.type in ("shahed", "uav") else ((obs.type,) if obs.type in TYPES else ()))
             if fast:
                 done = 0
                 for tr in sorted(self.tracks, key=lambda x: -x.last.t):
@@ -453,11 +454,11 @@ class Tracker:
                     if places:
                         if not any(dist_km(p.place.xy, q) < 30 for p in places for q in ends):
                             continue
-                    elif src not in tr.srcs or tr.type == "shahed":
+                    elif src not in tr.srcs or tr.type in ("shahed", "uav"):
                         continue  # без місця — лише ракета, яку вів цей самий канал
                     tr.closed = t
                     done += 1
-                    if not places or tr.type == "shahed":
+                    if not places or tr.type in ("shahed", "uav"):
                         break  # дрон у групі — лише один, найсвіжіший
                 rec["closed"] = done
             return rec
@@ -642,7 +643,7 @@ class Tracker:
             if route:
                 # пункт, до якого понад годину польоту, — це тезка з іншого кінця країни, не маршрут цієї цілі
                 here = tr.est(t)
-                route = [p for p in route if dist_km(here, p.xy) <= min(tr.speed * 1.0 + 60, 260 if tr.type == "shahed" else 900)]
+                route = [p for p in route if dist_km(here, p.xy) <= min(tr.speed * 1.0 + 60, 260 if tr.type in ("shahed", "uav") else 900)]
                 if len(route) >= 2:
                     # «курсом на Лозова/Питомник» над Лісним (04.11): варіанти через «/» — сусідні пункти; пункт, що набагато
                     # далі за найближчий і відірваний від решти маршруту на 80+ км, — тезка (Лозова на півдні), а не курс:
@@ -977,7 +978,7 @@ class Tracker:
                 best, bs = tr, s
         return best
 
-    MERGE_KM = {"jet": 30, "cruise": 35, "ballistic": 40, "geran5": 30, "banderol": 30, "shahed": 7, "molniya": 6}
+    MERGE_KM = {"jet": 30, "cruise": 35, "ballistic": 40, "geran5": 30, "banderol": 30, "uav": 7, "shahed": 7, "molniya": 6}
 
     def _dedup(self, now: float) -> None:
         """Один і той самий об'єкт різні канали називають різними селами (а то й типами), треки-близнюки зливаємо.
@@ -999,14 +1000,14 @@ class Tracker:
                     continue
                 d = dist_km(pos[a.id], pos[b.id])
                 ai_same = frozenset((a.id, b.id)) in self.ai_merge
-                near_cand = d <= 25 and (a.type == b.type or {a.type, b.type} <= {"jet", "shahed", "recon", "molniya"})
+                near_cand = d <= 25 and (a.type == b.type or {a.type, b.type} <= {"jet", "shahed", "uav", "recon", "molniya"})
                 if a.type == b.type:
                     lim = self.MERGE_KM.get(a.type, 10)
                     # шахеди летять групами — зливаємо лише «той самий пункт від різних каналів»
                     # або сильний збіг (04.11, дублі в наліт): різні канали назвали сусідні пункти (≤12 км) майже одночасно
                     # (≤6 хв), і в обох той самий названий пункт призначення/курс або близький напрямок (<30°).
                     # Групи (у обох count>1) і повідомлення одного й того ж каналу не склеюємо — це справді різні
-                    if a.type in ("shahed", "molniya") and not (a.last.label == b.last.label or d < 3) and not ai_same:
+                    if a.type in ("shahed", "uav", "molniya") and not (a.last.label == b.last.label or d < 3) and not ai_same:
                         strong = (d <= 12 and abs(a.last.t - b.last.t) <= 360 and not (a.srcs & b.srcs)
                                   and not ((a.count or 1) > 1 and (b.count or 1) > 1)
                                   and ((a.course_to and a.course_to == b.course_to)
@@ -1057,7 +1058,7 @@ class Tracker:
     def _rare_echo(self, a: "Track", b: "Track", d: float) -> bool:
         """Рідкісний тип з одного джерела — відлуння підтвердженої цілі поруч (див. _dedup)."""
         for rare, main in ((a, b), (b, a)):
-            if rare.type in self.RARE and main.type in ("shahed", "jet") and len(rare.srcs) == 1 and len(main.srcs) >= 2 \
+            if rare.type in self.RARE and main.type in ("shahed", "uav", "jet") and len(rare.srcs) == 1 and len(main.srcs) >= 2 \
                     and not (rare.srcs & main.srcs) and (rare.count or 1) <= 1 and abs(rare.obs[0].t - main.last.t) <= 360 and d <= 15:
                 named = [o for o in rare.obs if not o.est]
                 if not named or d <= 8:  # «лише курс» або дуже близько до названого місця

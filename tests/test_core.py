@@ -22,7 +22,7 @@ def test_jet_list_ru():
 
 def test_shahed_position_uk():
     o = P.parse("2х БпЛА в районі Богодухова, курсом на Харків")
-    assert o.type == "shahed" and o.count == 2
+    assert o.type == "uav" and o.count == 2  # «БпЛА» без назви моделі — тип не визначено
     assert names(o, "p") == ["Богодухів"] and "Харків" in names(o, "t")
 
 
@@ -1687,7 +1687,7 @@ def test_plane_header_and_geran2_and_ai_exotic_guard():
     p = Parser()
     segs = p.segments("✈️Сумщина:\n→Суми/р-н (4х);\n→Лебедин/Полтавщина.")
     obs = [p.parse(s_, "KL") for s_ in segs]
-    assert all(o.type == "shahed" for o in obs) and obs[0].count == 4
+    assert all(o.type == "uav" for o in obs) and obs[0].count == 4  # «БпЛА», модель не названа
     seg = p.segments("❗️✈️ Кропивницький - групи БпЛА (Герань-2/Гербера-2) на місто.")
     assert len(seg) == 1 and p.parse(seg[0], "war_monitor").type == "shahed"
     from app.ai_glue import AI
