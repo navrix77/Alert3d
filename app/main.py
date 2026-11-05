@@ -67,6 +67,8 @@ def _fresh(obs, ts: float) -> None:
 
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool, typ_hint: str | None = None) -> None:
     """Одне повідомлення каналу може містити кілька цілей, ділимо на сегменти й кожен веде в трекер."""
+    if log:
+        hits.ingest(text, ts, link, getattr(config.SOURCES.get(key), "name", key))
     segs = parser.segments(text)
     # контекст для одноіменних сіл: усі пункти повідомлення разом + що канал називав останні 30 хв
     prev = CTX.get(key)

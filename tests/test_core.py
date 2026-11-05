@@ -2140,3 +2140,15 @@ def test_two_objects_one_city_two_events():
     r = UaStrikes().parse_astra("Беспилотники атаковали Рязань: горит НПЗ, также поврежден склад Wildberries")
     assert sorted(e["what"] for e in r) == ["НПЗ", "Склад Wildberries"]
     assert all(e["place"] == "Рязань" for e in r)
+
+
+def test_ukrainian_post_npz_and_wildberries():
+    from app.strikes_ua import UaStrikes
+    t = ("❗️ Рязанський НПЗ у Рязанській області рф сьогодні опинився під атакою ударних БпЛА\n\n"
+         "▪️ Завод входить до числа чотирьох найбільших нафтопереробних підприємств росії.\n\n"
+         "▪️ Крім того, під удар потрапив логістичний центр Wildberries.")
+    u = UaStrikes()
+    assert u.ingest(t, 1000.0, "l1", "НОВИНА") == 2
+    assert sorted(e["what"] for e in u.events) == ["Логістичний центр Wildberries", "НПЗ"]
+    assert {e["what"]: bool(e.get("wb")) for e in u.events} == {"Логістичний центр Wildberries": True, "НПЗ": False}
+    assert u.ingest(t, 1500.0, "l2", "інший канал") == 0  # дубль з іншого каналу
