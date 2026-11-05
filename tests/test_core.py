@@ -2219,3 +2219,15 @@ def test_defense_news_does_not_create_target():
          "Надалі планують захистити частину кільцевої дороги та трасу в напрямку Дергачів.")
     o = p.parse(t, "KL")
     assert o.type is None and o.no_target
+
+
+def test_turbo_drone_is_jet():
+    """nikalert «ТурбоБпЛА …», «ТурбоШаболда»: ті самі цілі в той самий час інші канали звуть реактивними
+    (04.11 13:01 shovnebi «реактив … Ігрень»; 04.11 21:39 shovnebi «реактив на Соколове»; 05.11 05:39 KL «Реактивний БпЛА
+    курсом на Самар»). Раніше ставали звичайними шахедами (170 км/год замість реактивних)."""
+    from app.parser import Parser
+    p = Parser()
+    assert p.parse("Ⓜ️👁 Dнпр: ТурбоБпЛА в бік Сад / Острів Ігрень", "nikalert").type == "jet"
+    assert p.parse("ТурбоБпЛА Самар ліс курс Дніпро", "nikalert").type == "jet"
+    assert p.parse("Ⓜ️👁 Dнпр: 🚨 Дніпрята, тривожимось по  ТурбоШаболде біля Соколове", "nikalert").type == "jet"
+    assert p.parse("Ⓜ️👁 Dнпр: БпЛА в бік Сад / Острів Ігрень", "nikalert").type == "uav"
