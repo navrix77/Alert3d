@@ -2093,3 +2093,12 @@ def test_forecast_posts_are_not_targets_or_launches():
     assert len(M.tracker.tracks) == n_tr and len(M.tracker.bal) == n_bal
     if n_l is not None:
         assert len(M.tracker.launches.items) == n_l
+
+
+def test_remnants_post_is_not_a_cruise_missile():
+    """KM 04.11 20:45: «Замість грибів біля Харкова можна виявити залишки ракет…» ставало крилатою ракетою в Замості й Харкові."""
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("Замість грибів біля Харкова можна виявити залишки ракет та шахедів😬", "KM")
+    assert o.type is None and o.no_target and not any(r.place.name == "Заміст" for r in o.places)
+    assert p.parse("Крилата ракета біля Харкова, курс на захід", "KM").type == "cruise"
