@@ -174,11 +174,11 @@ class UaStrikes:
         n = 0
         try:
             for ev in self.parse_astra(text):
+                n += 1  # розпізнано (навіть якщо це дубль з іншого каналу): пост про прильот по РФ
                 if any(e["place"] == ev["place"] and e["what"] == ev["what"] and abs(e["t"] - ts) < 10800 for e in self.events):
                     continue
                 ev.update(src=src, t=ts, link=link)
                 self.events.append(ev)
-                n += 1
         except Exception as e:  # noqa: BLE001
             log.warning("ingest: %s", e)
         return n

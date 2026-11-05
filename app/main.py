@@ -65,10 +65,14 @@ def _fresh(obs, ts: float) -> None:
             FRESH["obl"][o] = max(FRESH["obl"].get(o, 0), ts)
 
 
+FOOTER_RX = re.compile(r"(?im)^[^\n]*(?:надіслати\s+новину|наші\s+медіа|підписатис\w+|підписуйтес\w+|(?:^|[^а-яіїєґ])захід\s+головне)[^\n]*$")
+
+
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool, typ_hint: str | None = None) -> None:
     """Одне повідомлення каналу може містити кілька цілей, ділимо на сегменти й кожен веде в трекер."""
-    if log:
-        hits.ingest(text, ts, link, getattr(config.SOURCES.get(key), "name", key))
+    text = FOOTER_RX.sub("", text).strip() or text  # підписи каналів («🔴 Захід Головне», «Надіслати новину | Наші медіа») — не місця (05.11: «Головне» ставило шахед)
+    if log and hits.ingest(text, ts, link, getattr(config.SOURCES.get(key), "name", key)):
+        return  # пост про прильот по РФ: це не цілі над Україною, у трекер не віддаємо (раніше «Добрі дрони… у Рязані» давали шахед на «Добру»/«Головне»)
     segs = parser.segments(text)
     # контекст для одноіменних сіл: усі пункти повідомлення разом + що канал називав останні 30 хв
     prev = CTX.get(key)

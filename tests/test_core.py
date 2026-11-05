@@ -2151,4 +2151,10 @@ def test_ukrainian_post_npz_and_wildberries():
     assert u.ingest(t, 1000.0, "l1", "НОВИНА") == 2
     assert sorted(e["what"] for e in u.events) == ["Логістичний центр Wildberries", "НПЗ"]
     assert {e["what"]: bool(e.get("wb")) for e in u.events} == {"Логістичний центр Wildberries": True, "НПЗ": False}
-    assert u.ingest(t, 1500.0, "l2", "інший канал") == 0  # дубль з іншого каналу
+    assert u.ingest(t, 1500.0, "l2", "інший канал") == 2 and len(u.events) == 2  # дубль з іншого каналу: розпізнано, але не додано
+
+
+def test_channel_footer_is_not_a_place():
+    from app.main import FOOTER_RX
+    t = "Добрі дрони атакували НПЗ та склад Wildberries у Рязані\n\n🔴 Захід Головне\nНадіслати новину | Наші медіа"
+    assert "Головне" not in FOOTER_RX.sub("", t) and "Рязані" in FOOTER_RX.sub("", t)
