@@ -96,6 +96,9 @@ class UaStrikes:
             what = next((label for k, label in WHAT if k in lo_obj), None)
             if not what:
                 continue
+            # «Склад», «Пункт», «Чому» з великої на початку наступного рядка/речення — не населений пункт (05.11: точка «Склад» на мапі)
+            if re.match(r"(?:склад|пункт|завод|район|област|чому|наслідк|за\b|це\b|тот\b|ар\b|зргк|зрк|рлс|нпз)", place.lower()):
+                continue
             loc = self.locate(place)
             if not loc:
                 continue
@@ -110,12 +113,24 @@ class UaStrikes:
             return []  # лише атаки дронів (не артобстріли)
         seen, out = set(), []
         tx = text.replace("ё", "е")
+        head_end = len(tx.split("\n", 1)[0])  # заголовок (перший рядок) — там завжди місце події
         for wm in re.finditer(r"(?<![а-яё])([А-ЯЁ][а-яё]+(?:-[а-яА-ЯЁё]+){0,2})", tx):
             w = wm.group(1)
             lw = w.lower()
             # «в Белгородской области», «Ракитянского округа»: це назва регіону, а не міста; крапку на місто не ставимо (ASTRA 04.11)
             if re.match(r"\s+(?:област|округ|район|край|республик)", tx[wm.end():wm.end() + 12].lower()) or re.search(r"(?:ой|ого|ому|ая|ую|ское|ского|ских|ские)$", lw):
                 continue
+            # місто лише згадане, а не атаковане: «снабжает Москву», «в 180 км от Москвы», «как и Рязань ранее» (05.11: вогонь на Москві
+            # з поста про Рязанський НПЗ). Поза заголовком місто беремо лише з речення, де є сама атака/пожежа, і не в такому контексті.
+            if wm.start() > head_end:
+                s0 = max(tx.rfind(".", 0, wm.start()), tx.rfind("\n", 0, wm.start())) + 1
+                s1 = min([i for i in (tx.find(".", wm.end()), tx.find("\n", wm.end())) if i >= 0] or [len(tx)])
+                sent = tx[s0:s1].lower()
+                before = tx[s0:wm.start()].lower()
+                if not ATTACK.search(sent) and not re.search(r"горит|горел|пожар|взрыв|удар|прилет|поражен|атак", sent):
+                    continue
+                if re.search(r"(?<![а-я])(?:снабжа\w*|поставля\w*|поставщик\w*|потребител\w*|для|км от|от|до|направлени\w*|в сторону|как и|ранее|прошл\w*|аналогичн\w*)\s+\S*$", before):
+                    continue
             hit = None
             for form, key in RU_FORMS.items():
                 if lw.startswith(form):
