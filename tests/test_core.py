@@ -2184,3 +2184,10 @@ def test_kozachka_means_kozacha_lopan():
     from app.parser import Parser
     o = Parser().parse("Развед. БПЛА Козачка/Прудянка", "TLK")
     assert o.places[0].place.name == "Козача Лопань"
+
+
+def test_pavlohrad_city_not_luhansk_hamlet():
+    from app.parser import Parser
+    o = Parser().parse("Днпр+ : Реактивний з Донецька на Павлоград/р-н", "RS")
+    t = [r.place for r in o.places if r.role == "t"][0]
+    assert t.name == "Павлоград" and 48.4 < t.lat < 48.7

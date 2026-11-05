@@ -817,6 +817,9 @@ class Parser:
                     if getattr(self, "_hint_n", 0) == 1 and not any(off(i) <= 150 for i in ids):
                         continue  # лише коли текст називає одну область («На Вінниччині … На Хмельниччині …» — кілька)
                 cand = inb or ids
+            _ct = [i for i in ids if i not in cand and P[i].kind in ("M", "K") and P[i].pop >= 20000]
+            if _ct and all(P[i].kind == "X" and P[i].pop < 5000 for i in cand):
+                cand = list(cand) + _ct  # у регіоні з тексту лише хутір-тезка, а відоме місто далі: вирішить score
             hint = getattr(self, "_hint", None)
             if hint and len(cand) > 1:
                 from .geo import oblasts as _ob
@@ -854,6 +857,8 @@ class Parser:
                 d = front_km(p.lat, p.lon) if front else math.hypot((p.lat - cen[0]) * 111, (p.lon - cen[1]) * 73)
                 # місто (≥20 тис.) майже завжди важливіше за одноіменне село, якщо контекст прямо не вказує на село
                 city = (25 if ctx or uniq else 70) if p.pop >= 20000 else 0
+                if p.pop >= 20000 and p.kind in ("M", "K") and len(cand) > 1 and all(P[j].kind == "X" and P[j].pop < 5000 for j in cand if j != i):
+                    city = 250  # хутір-тезка проти великого міста: «на Павлоград» — це місто, не хутір на Луганщині
                 return d - math.log10(1 + p.pop) * (3 if ctx else 6) - city
 
             if not ctx and not uniq and not bbox and getattr(self, "_typ", None) not in FRONTLINE:
