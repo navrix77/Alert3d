@@ -2158,3 +2158,13 @@ def test_channel_footer_is_not_a_place():
     from app.main import FOOTER_RX
     t = "Добрі дрони атакували НПЗ та склад Wildberries у Рязані\n\n🔴 Захід Головне\nНадіслати новину | Наші медіа"
     assert "Головне" not in FOOTER_RX.sub("", t) and "Рязані" in FOOTER_RX.sub("", t)
+
+
+def test_air_force_summary_is_not_our_strike():
+    """05.11: зведення ПС про атаку по Україні («із напрямків: Орел, Курськ») ставило вогник на Орлі."""
+    from app.strikes_ua import UaStrikes
+    u = UaStrikes()
+    t = ("У ніч на 5 листопада противник атакував двома ракетами Х-35 та 128 ударними БпЛА типу Shahed із напрямків: Орел, Курськ, "
+         "Міллерово – рф.\n\nЗбито/подавлено 105 ворожих БпЛА. Зафіксовано влучання 21 ударного БпЛА на 12 локаціях.")
+    assert u.parse_astra(t) == [] and u.ingest(t, 1, "l", "ПС") == 0
+    assert [e["place"] for e in u.parse_astra("Беспилотники атаковали Тулу и Рязань\n\nВ Туле горит завод. В Рязани взрывы в районе НПЗ.")]

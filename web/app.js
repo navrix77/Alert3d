@@ -335,7 +335,7 @@ function addOverlays(){
   map.addLayer({id:'ru-glow',type:'circle',source:'ru',minzoom:3,filter:['!',['!=',['get','sum'],null]],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,['+',10,['*',2,['coalesce',['get','c'],3]]],8,['+',30,['*',4,['coalesce',['get','c'],3]]]],'circle-color':'#2F7BFF','circle-blur':1,'circle-opacity':0.22,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ru-dot',type:'circle',source:'ru',filter:['!',['!=',['get','sum'],null]],paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,1.8,7,3.5],'circle-color':'#FFD500','circle-stroke-color':'#2F7BFF','circle-stroke-width':['interpolate',['linear'],['zoom'],4,1,7,2],'circle-opacity':0.85}});
   map.addLayer({id:'ru-t',type:'symbol',source:'ru',minzoom:6.5,filter:['!',['!=',['get','sum'],null]],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':['case',['!=',['get','sum'],null],12,10.5],'text-max-width':16,'text-offset':['case',['!=',['get','sum'],null],['literal',[0,0]],['literal',[0,1.1]]],'text-anchor':['case',['!=',['get','sum'],null],'center','top'],'text-allow-overlap':false},paint:{'text-color':'rgba(255,227,107,.8)','text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.6}});
-  map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':['*',['case',['all',['get','wb'],['get','fresh']],1.45,['get','wb'],1.15,1],['interpolate',['linear'],['zoom'],4,0.9,7,1.5,10,2]],'symbol-sort-key':['case',['get','wb'],10,0],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',6.5,['get','l']],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':['case',['get','wb'],'#FF9F2E','#FFE36B'],'text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
+  map.addLayer({id:'hits',type:'symbol',source:'hits',layout:{'icon-image':'hit','icon-size':['interpolate',['linear'],['zoom'],4,['*',['case',['all',['get','wb'],['get','fresh']],1.45,['get','wb'],1.15,1],0.9],7,['*',['case',['all',['get','wb'],['get','fresh']],1.45,['get','wb'],1.15,1],1.5],10,['*',['case',['all',['get','wb'],['get','fresh']],1.45,['get','wb'],1.15,1],2]],'symbol-sort-key':['case',['get','wb'],10,0],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',6.5,['get','l']],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.5],'text-anchor':'top','text-max-width':14,'text-optional':true},paint:{'text-color':['case',['get','wb'],'#FF9F2E','#FFE36B'],'text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   map.addSource('xr',{type:'geojson',data:EMPTY});
   map.addLayer({id:'xr-dim',type:'background',layout:{visibility:'none'},paint:{'background-color':'#02040A','background-opacity':0.55}});
   // рентген: 1-2-3, де ціль назвали канали (по черзі), суцільна лінія, шлях за повідомленнями; пунктир, оцінка SKY / заявлений курс
@@ -1032,6 +1032,8 @@ function renderMe(threats){
       '<ol class="bal-log">'+BALM.items.map(e=>'<li><span>'+fmt(e.t)+'</span><b>'+nm(e.src)+'</b> '+esc(e.k==='mig'?(e.txt||'МіГ-31К').slice(0,70):e.pl.length?e.pl.join(', '):e.obl.map(o=>OBL_GEN[o]||o).slice(0,4).join(', ')+(e.obl.length>4?' +'+(e.obl.length-4):''))+(e.link?' <a href="'+esc(e.link)+'" target=_blank rel=noopener>↗</a>':'')+'</li>').join('')+'</ol>'+
       (BALM.mig?'<small class="bal-note">Зліт носія ще не пуск: на нього Повітряні сили зазвичай оголошують тривогу по всій Україні. Кількість бортів не дорівнює кількості ракет</small>':'<small class="bal-note">Це вік повідомлення, а не час до удару. Де ракета, канали не знають</small>')+
       (BALM.mig?'':'<button class="bal-btn" id="bal-show">Показати регіон загрози</button>');}
+  {const was=box.classList.contains('bal');if(!BALM)box.classList.remove('fold');// нова загроза завжди показується повністю, потім сама згортається
+    if(BALM&&!was){box.classList.remove('fold');clearTimeout(window.__foldT);window.__foldT=setTimeout(()=>{if($('#me').classList.contains('bal'))meFold(true);},15000);}}
   box.className=cls+(box.classList.contains('open')?' open':'')+(box.classList.contains('fold')?' fold':'');$('#me-word').textContent=word;box.classList.toggle('off-on',OF.on===1);box.classList.toggle('off-part',OF.on===2);{const fb=$('#me-fold');if(fb){fb.hidden=!BALM;fb.setAttribute('aria-label',box.classList.contains('fold')?'Розгорнути':'Згорнути');}}
   // великі хвилини, лише коли маршрут названо каналами (обґрунтована оцінка), а не з напрямку
   if(first&&!isStale&&!BALM&&first.r.eta!=null&&first.r.rel==='route'){const eta=Math.max(1,Math.round(first.r.eta)),k=Math.max(0.04,Math.min(1,eta/30));const C=2*Math.PI*44;
@@ -1305,8 +1307,16 @@ function playChanges(evs){
   clearTimeout(playChanges.t);playChanges.t=setTimeout(clearChg,45000);toast('Кружечок, де було, крапка, де зараз');}
 setTimeout(()=>showChanges(),6000);
 /* ---------- телефон: панель стану згорнута, тап, розгорнути ---------- */
-{const fb=$('#me-fold');if(fb)fb.onclick=e=>{e.stopPropagation();const b=$('#me');b.classList.toggle('fold');fb.setAttribute('aria-label',b.classList.contains('fold')?'Розгорнути':'Згорнути');};}
-$('#me').addEventListener('click',e=>{if(innerWidth>640||e.target.closest('li,button'))return;$('#me').classList.toggle('open');});
+// 05.11: червона картка загрози закривала весь екран. Згортається кнопкою ▾, дотиком по картці, змахом униз; сама згортається за 15 с без дотиків.
+// У згорнутій лишаються смуга тривоги, назва загрози й «Перейдіть в укриття».
+const meFold=on=>{const b=$('#me'),fb=$('#me-fold');clearTimeout(window.__foldT);b.classList.toggle('fold',on);if(fb)fb.setAttribute('aria-label',on?'Розгорнути':'Згорнути');};
+{const fb=$('#me-fold');if(fb)fb.onclick=e=>{e.stopPropagation();meFold(!$('#me').classList.contains('fold'));};}
+$('#me').addEventListener('click',e=>{const b=$('#me');if(e.target.closest('li a,button,a'))return;
+  if(b.classList.contains('bal')){if(Date.now()-(window.__meSw||0)<400)return;meFold(!b.classList.contains('fold'));return;}
+  if(innerWidth>640||e.target.closest('li'))return;b.classList.toggle('open');});
+{let y0=null,x0=0;const b=$('#me');b.addEventListener('touchstart',e=>{y0=e.touches[0].clientY;x0=e.touches[0].clientX;clearTimeout(window.__foldT);},{passive:true});
+  b.addEventListener('touchend',e=>{if(y0==null)return;const t=e.changedTouches[0],dy=t.clientY-y0,dx=t.clientX-x0;y0=null;if(Math.abs(dy)<28||Math.abs(dy)<Math.abs(dx)*1.5)return;
+    if(b.scrollTop>0&&dy<0)return;window.__meSw=Date.now();if(b.classList.contains('bal'))meFold(dy>0);else if(innerWidth<=640)b.classList.toggle('open',dy<0);},{passive:true});}
 /* ---------- віджет для Windows ---------- */
 if(new URLSearchParams(location.search).has('mini'))document.body.classList.add('mini');
 async function openWidget(){

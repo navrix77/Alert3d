@@ -666,6 +666,12 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .me-fold{border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--fg);border-radius:50%;width:34px;height:34px;font:700 16px var(--f);cursor:pointer;flex:none}
 .me.bal.fold .bal-log,.me.bal.fold .bal-note,.me.bal.fold .bal-btn,.me.bal.fold .ai-box,.me.bal.fold .me-fresh,.me.bal.fold .fc,.me.bal.fold .me-list{display:none!important}
 .me.bal.fold .me-fold{transform:rotate(180deg)}
+/* 05.11: згорнута картка загрози — один компактний блок: назва + «Перейдіть в укриття» */
+.me.bal.fold .bal-age{display:none!important}
+.me.bal.fold .me-head b{font-size:17px!important;line-height:1.2}
+.me.bal.fold .bal-go{margin-top:4px;font-size:13.5px;padding:4px 9px}
+.me.bal.fold .me-share{display:none}
+.me.bal{cursor:pointer}
 
 /* ===================== Редизайн 04.11: ієрархія картки, лічильники одним блоком =====================
    Відкат: видалити цей блок і повернути 4 рядки в app.js (гілка backup/ui-before-redesign-2026-11-04) */
