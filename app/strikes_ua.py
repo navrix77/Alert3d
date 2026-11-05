@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import time
 
@@ -46,6 +47,8 @@ WHAT = [("wildberries", "Склад Wildberries"), ("вайлдберр", "Ск�
 
 # ASTRA — незалежне російське медіа: оперативно пише, куди саме прилетіли наші дрони (місто, об'єкт), з фото/відео
 ASTRA = "astrapress"
+# додаткові відкриті канали, що першими пишуть про прильоти по РФ (укр./рос.); власні можна додати через STRIKE_CHANNELS="канал1,канал2" (без @)
+EXTRA_CHANNELS = ["supernova_plus", "exilenova_plus", "ukrpravda_news", "nexta_tv"]
 RU_FORMS = {  # російські форми назв (лише з великої літери в тексті) → ключ RU_CITIES
     "саратов": "саратов", "энгельс": "енгельс", "рязан": "рязан", "новокуйбышевск": "новокуйбишевськ", "сызран": "сизран",
     "самар": "самар", "волгоград": "волгоград", "туапсе": "туапсе", "новороссийск": "новоросійськ", "брянск": "брянськ",
@@ -199,6 +202,17 @@ class UaStrikes:
                                 ev.setdefault("src", src)
                                 ev.update(t=ts, link=link)
                                 self.events.append(ev)
+                    for ch in dict.fromkeys(EXTRA_CHANNELS + [c.strip().lstrip("@") for c in os.getenv("STRIKE_CHANNELS", "").split(",") if c.strip()]):
+                        try:
+                            r = await cli.get(f"https://t.me/s/{ch}")
+                            for mid, ts, text in parse_page(r.text):
+                                link = f"https://t.me/{ch}/{mid}"
+                                if link in self.seen:
+                                    continue
+                                self.seen.add(link)
+                                self.ingest(text, ts, link, "@" + ch)
+                        except Exception as e:  # noqa: BLE001
+                            log.debug("strikes %s: %s", ch, e)
                     self.events = self.state()
                 except Exception as e:  # noqa: BLE001
                     log.warning("strikes: %s", e)
