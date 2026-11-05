@@ -54,7 +54,7 @@ _C = [
     ("KR", "kramatorsk_radar", "Краматорськ радар", 0.65, False, "Донецька", True),
 ]
 _SLOW = {
-    None: "UkraineAlarmSignal alarmua tryvoga_chomu eRadarrua monikppy povitryanatrivogaaa radar_raketaa radar_top_ua raketa_trevoga UkraineRadar_24_7 rozvidkaneba Ukrainian_Intelligence war_monitor veselyy_pivden pivden_varta Shturval_media sectorv666 totallzrada vibuxaviasia deraketaua admiralbukhta newspn zahidnimonitoring monitoring_zaxid truexanewsua operativnoZSU novini_ukrtg suspilnenews tgsn_ua zahid_golovne_ua",
+    None: "UkraineAlarmSignal alarmua tryvoga_chomu eRadarrua monikppy povitryanatrivogaaa radar_raketaa radar_top_ua raketa_trevoga UkraineRadar_24_7 rozvidkaneba Ukrainian_Intelligence war_monitor veselyy_pivden pivden_varta Shturval_media sectorv666 totallzrada vibuxaviasia deraketaua admiralbukhta newspn zahidnimonitoring monitoring_zaxid truexanewsua operativnoZSU novini_ukrtg suspilnenews tgsn_ua zahid_golovne_ua PpoUARadar",
     "Вінницька": "vinnradar ppo_vinnytsa vin_info_ppo",  # vinytsa_radar: веб-версія закрита (перевірено 01.11.2026)
     "Волинська": "lutsk_radar lutsk_info volynblog",
     "Житомирська": "zhytomyr_operativ zhitomirtrivoga Angry_Pol korostentoday",
