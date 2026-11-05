@@ -855,6 +855,22 @@ class Tracker:
             self.brain.pred_score("dir:" + e["src"], ang_diff(bearing(p0, pt), bearing(p0, e["dxy"])) <= 30)
 
     def _learned_heading(self, tr: Track, place, pt) -> float | None:
+        if tr.type in ("fpv", "fpvf"):
+            # FPV (особливо на оптоволокні) завжди летить з боку РФ/окупованої території: напрямок — від найближчої
+            # точки лінії фронту/кордону вглиб, а не за навченими «перельотами»
+            from .parser import FRONT_PTS
+            best = None
+            for (lo1, la1), (lo2, la2) in zip(FRONT_PTS, FRONT_PTS[1:]):
+                a, b = _gxy(la1, lo1), _gxy(la2, lo2)
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                l2 = dx * dx + dy * dy
+                u = max(0.0, min(1.0, ((pt[0] - a[0]) * dx + (pt[1] - a[1]) * dy) / l2)) if l2 else 0.0
+                q = (a[0] + u * dx, a[1] + u * dy)
+                d = dist_km(q, pt)
+                if best is None or d < best[0]:
+                    best = (d, q)
+            if best and best[0] > 0.5:
+                return bearing(best[1], pt)
         if not self.brain or not place or not hasattr(self.brain, "next_places"):
             return None
         la, lo = from_xy(*pt)

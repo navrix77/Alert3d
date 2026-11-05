@@ -2191,3 +2191,12 @@ def test_pavlohrad_city_not_luhansk_hamlet():
     o = Parser().parse("Днпр+ : Реактивний з Донецька на Павлоград/р-н", "RS")
     t = [r.place for r in o.places if r.role == "t"][0]
     assert t.name == "Павлоград" and 48.4 < t.lat < 48.7
+
+
+def test_fpv_heads_away_from_front():
+    from app.parser import Parser
+    from app.tracker import Tracker
+    tr = Tracker(SOURCES)
+    tr.ingest(Parser().parse("Стецьківка можлива поява fpv на оптоволокні", "RD"), "RD", 1_800_000_000)
+    hd = tr.snapshot(1_800_000_005)["tracks"][0]["hd"]
+    assert 180 <= hd <= 270  # від кордону (північний схід) на південний захід
