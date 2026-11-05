@@ -42,26 +42,45 @@ from .strat import StratBook
 from .launch import LaunchBook
 from .parser import Observation
 
-# орієнтовна лінія державного кордону з РФ/РБ (lat, lon): для цілей «курсом на X» біля кордону
-_BORDER = [(52.1, 33.5), (51.8, 34.4), (51.45, 35.1), (51.0, 35.4), (50.6, 35.9), (50.43, 36.3),
-           (50.28, 36.95), (49.8, 37.6), (49.55, 38.2), (49.1, 39.0), (48.6, 39.9)]
+_UA_RING = None
 
 
-def _border_start(xy, max_km=60.0):
-    """Найближча точка кордону до пункту призначення, якщо він ближче max_km: звідти ціль і летить."""
-    pts = [_gxy(a, b) for a, b in _BORDER]
+def _ua_ring():
+    global _UA_RING
+    if _UA_RING is None:
+        import json, os
+        try:
+            g = json.load(open(os.path.join(os.path.dirname(__file__), "..", "data", "ua.geojson")))
+            geo = (g["features"][0] if "features" in g else g).get("geometry", g)
+            ring = geo["coordinates"][0] if geo["type"] == "Polygon" else geo["coordinates"][0][0]
+            _UA_RING = [_gxy(c[1], c[0]) for c in ring]
+        except Exception:
+            _UA_RING = []
+    return _UA_RING
+
+
+def _border_start(xy, max_km=60.0, out_km=12.0):
+    """Ціль «курсом на X» біля кордону: стартує з боку РФ/РБ (найближча точка контуру + out_km назовні)."""
+    pts = _ua_ring()
     best = None
     for i in range(len(pts) - 1):
         (x1, y1), (x2, y2) = pts[i], pts[i + 1]
         dx, dy = x2 - x1, y2 - y1
-        u = max(0.0, min(1.0, ((xy[0] - x1) * dx + (xy[1] - y1) * dy) / (dx * dx + dy * dy)))
+        l2 = dx * dx + dy * dy
+        if l2 == 0:
+            continue
+        u = max(0.0, min(1.0, ((xy[0] - x1) * dx + (xy[1] - y1) * dy) / l2))
         q = (x1 + u * dx, y1 + u * dy)
         d = dist_km(q, xy)
         if best is None or d < best[0]:
             best = (d, q)
-    if best is None or best[0] > max_km or best[0] < 2:
+    if best is None or best[0] > max_km:
         return None
-    return best[1]
+    d, q = best
+    az = bearing(xy, q)
+    if not (az >= 285 or az <= 135):  # кордон з півночі/сходу — інакше це не РФ/РБ
+        return None
+    return move(q, az, out_km)
 
 # швидкості — з відкритих характеристик (03.11, методика «час у повітрі»): крилата 700 (Х-101 190–200 м/с),
 # «Бандероль» 540 (крейсерська 520–560); шахед і реактивні — як було, їх перевіряє бектест
