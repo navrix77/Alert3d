@@ -2200,3 +2200,13 @@ def test_fpv_heads_away_from_front():
     tr.ingest(Parser().parse("Стецьківка можлива поява fpv на оптоволокні", "RD"), "RD", 1_800_000_000)
     hd = tr.snapshot(1_800_000_005)["tracks"][0]["hd"]
     assert 180 <= hd <= 270  # від кордону (північний схід) на південний захід
+
+
+def test_not_live_mentions_do_not_create_targets():
+    from app.parser import Parser
+    P_ = Parser()
+    for t in ("Купили оптику для спостереження", "Мопед продаю", "Шахедів не фіксують", "Вчора було три шахеди на Суми"):
+        o = P_.parse(t, "sumygo")
+        assert o.type is None and o.no_target, t
+    assert P_.parse("Не шахед, а розвідник", "sumygo").type == "recon"
+    assert P_.parse("Шахед курсом на Харків", "sumygo").type == "shahed"
