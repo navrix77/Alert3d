@@ -85,6 +85,9 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     if typ_hint and not msg_type:
         msg_type = typ_hint  # повтор із журналу: тип був у заголовку початкового повідомлення
     summary = bool(launch.SUMMARY_RX.search(text.lower()))
+    # прогноз на ніч («ворог може застосувати: до 22 балістичних з Брянської…», «потенційні цілі: м. Київ…»): рядки
+    # такого повідомлення не цілі й не пуски, навіть коли окремий рядок схожий на ціль (04.11, operatyvnohlep, UkraineRadar_24_7)
+    fc_msg = parser_mod.forecast(parser_mod.norm(text))
     useful = 0
     trk.exclude = set()
     # «Далее Алексеевка/Сортировка» — продовження тієї самої цілі, про яку канал писав щойно
@@ -93,6 +96,8 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     trk.prefer = last[2] if cont and last and ts - last[0] < 420 else None
     for seg in segs:
         obs = parser.parse(seg, key, ctx)
+        if fc_msg and not parser_mod.LIVE.search(parser_mod.norm(seg)):
+            obs.type, obs.no_target, obs.close = None, True, False
         if obs.type and not obs.close and parser_mod.is_junk(seg):
             obs.type, obs.no_target = None, True  # довгий текст без ознак руху: новина, підсумок, реклама
         if obs.type is None and msg_type and obs.places and not obs.close and not obs.no_target and (len(segs) > 1 or typ_hint):
@@ -104,7 +109,7 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
         if obs.type is None and obs.places and not obs.close and not obs.no_target and last and ts - last[0] < 1200 and re.search(r"курс|→|вектор", seg.lower()):
             obs.type = last[1]
         # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
-        sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type)
+        sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type) if not (fc_msg and obs.no_target) else ([], None, None, False)
         if sites:
             trk.launches.add(sites, ltyp, obs.count, carrier, key, link, ts, summary, seg)
             useful += 1

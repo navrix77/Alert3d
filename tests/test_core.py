@@ -2059,3 +2059,37 @@ def test_key_airfields_only():
     names = {f["properties"]["n"] for f in fc["features"]}
     assert {"Енгельс-2", "Шаталово", "Приморсько-Ахтарськ"} <= names and all(f["properties"]["c"] == "airfield" for f in fc["features"])
     assert all(20 < f["geometry"]["coordinates"][0] < 135 and 40 < f["geometry"]["coordinates"][1] < 70 for f in fc["features"])
+
+
+def test_forecast_posts_are_not_targets_or_launches():
+    """04.11 21:10–21:33: прогнози на ніч ставали «балістикою на Київ/Дніпро/Полтаву» (екстрений сигнал по області),
+    реактивними цілями на Львів/Луцьк і пусками з Брянська. Прогноз не ціль; живе повідомлення лишається ціллю."""
+    import os
+    os.environ.setdefault("REPLAY", "1")
+    from app.parser import Parser
+    p = Parser()
+    for src, t in (("kyev_radar", "❗️Підвищена загроза балістики вночі для Києва та області."),
+                   ("Ukrainian_Intelligence", "‼️ На найближчі ночі є попередження по балістиці для Києва та області"),
+                   ("PoltavaRanger", "🔴⚠️⚠️Полтава 48 годин підвищеної атаки на місто калібрами та балістикою."),
+                   ("UkraineRadar_24_7", "❗️Паралельно ворог планує залучити близько 90 реактивних БпЛА для атак по енергетиці "
+                                         "в західних та центральних регіонах: Тернопіль, Луцьк, Хмельницький, Вінниця та Львів."),
+                   ("tryvoga_chomu", "‼️На заході України п*дари планують атакувати енергетичні обʼєкти за допомогою реактивних БпЛА, "
+                                     "зокрема в Луцьку, Тернополі, Львові, Хмельницького, Вінниці."),
+                   ("poltava_alarm", "Суть: ❗️УВАГА: ❗️Очікуємо на масований комбінований удар по території України протягом 48 годин❗️: "
+                                     "❗️Ворог може застосувати: ❗35+ крилатих ракет Х-101 з 10 бомбардувальників Ту-95МС")):
+        o = p.parse(t, src)
+        assert o.type is None and o.no_target, t
+    # живі повідомлення з тими самими словами не чіпаємо
+    assert p.parse("Підвищена загроза балістики! Зліт МіГ-31К", "kyev_radar").type == "ballistic"
+    assert p.parse("Швидкісна ціль курсом на Київ", "kyev_radar").type == "ballistic"
+    assert p.parse("Балістика на Київ!", "kyev_radar").type == "ballistic"
+    # рівень повідомлення: рядки прогнозу не стають цілями й пусками, навіть коли окремий рядок схожий на ціль
+    from app import main as M
+    n_tr, n_bal, n_l = len(M.tracker.tracks), len(M.tracker.bal), len(M.tracker.launches.items) if hasattr(M.tracker.launches, "items") else None
+    M.feed(M.tracker, "Балістика:\nДніпро\nХарків\nПолтава та область\nКиїв та область (енергетичні об’єкти та підстанції)\n"
+           "Щодо потенційних цілей:: м. Київ (енергооб’єкти та підстанції)", "UkraineRadar_24_7", 1793826780, None, False)
+    M.feed(M.tracker, "❗️Ворог може застосувати:\n▫️До 6 балістичних ракет з Криму\n▫️До 22 балістичних ракет з Брянської області",
+           "operatyvnohlep", 1793826600, None, False)
+    assert len(M.tracker.tracks) == n_tr and len(M.tracker.bal) == n_bal
+    if n_l is not None:
+        assert len(M.tracker.launches.items) == n_l
