@@ -890,8 +890,8 @@ function syncZones(){syncAvia();try{syncStrat();}catch(e){console.warn(e);}if(!S
 const CNTI={};
 const CNT_LBL={uav:'Невизн.',lancet:'«ланцети»',shahed:'шахеди',jet:'реактивні',cruise:'крилаті',ballistic:'балістика',molniya:'«молнії»',kab:'КАБи',geran5:'Герань-5',banderol:'бандеролі',rszv:'РСЗВ',fpv:'FPV',fpvf:'FPV-оптоволокно',recon:'розвідники'};
 // натиск на лічильник, показати всі цілі цього типу
-function focusType(t){const nowS=Date.now()/1000+offset;const LM=(SNAP.counts&&SNAP.counts.live_min)||{};const fr=x=>(((x.ev&&x.ev.age)||0)+Math.max(0,nowS-SNAP.now))<(LM[x.type]||10)*60;const all=SNAP.tracks.filter(x=>x.status==='active'&&x.type===t);const solid=all.filter(fr);const old=all.length-solid.length;const ps=solid.map(x=>(DISP.get(x.id)||{p:[x.lon,x.lat]}).p);if(!all.length)return;if(!ps.length){toast(TYPE_NAME[t]+': 0 (+'+old+' старих)');return;}
-  const b=ps.reduce((a,p)=>a.extend(p),new maplibregl.LngLatBounds(ps[0],ps[0]));map.fitBounds(b,{padding:{top:140,bottom:180,left:60,right:60},maxZoom:9,duration:900});toast(TYPE_NAME[t]+': '+ps.length+(old?' (+'+old+' старих)':''));
+function focusType(t){const nowS=Date.now()/1000+offset;const LM=(SNAP.counts&&SNAP.counts.live_min)||{};const fr=x=>(((x.ev&&x.ev.age)||0)+Math.max(0,nowS-SNAP.now))<(LM[x.type]||10)*60;const all=SNAP.tracks.filter(x=>x.status==='active'&&x.type===t);const ps=all.map(x=>(DISP.get(x.id)||{p:[x.lon,x.lat]}).p);if(!all.length)return;
+  const b=ps.reduce((a,p)=>a.extend(p),new maplibregl.LngLatBounds(ps[0],ps[0]));map.fitBounds(b,{padding:{top:140,bottom:180,left:60,right:60},maxZoom:9,duration:900});toast(TYPE_NAME[t]+': '+ps.length);
   // підсвітка на 3.5 с: цілі цього типу пульсують кільцями, решта тьмяніє; лічильник виділено
   window.FXHL={type:t,t0:performance.now(),until:performance.now()+3500};map.triggerRepaint();
   document.querySelectorAll('#counters .cnt').forEach(c=>c.classList.toggle('hl-off',c.title!==TYPE_NAME[t]));clearTimeout(focusType.t);
@@ -900,13 +900,13 @@ function renderCounters(){
   // 04.11: лічильник рахує ТРЕКИ, а не суму ×N (85 «одиниць» при 48 треках збивало з пантелику); ×N лишається на значках.
   // Цілі, про які не писали 10+ хв, у лічильник не входять (на мапі вони напівпрозорі)
   const nowS=Date.now()/1000+offset;const LM=(SNAP.counts&&SNAP.counts.live_min)||{};const fresh=t=>(((t.ev&&t.ev.age)||0)+Math.max(0,nowS-SNAP.now))<(LM[t.type]||10)*60;// той самий час життя за типом, що й на мапі й в аналітиці (app/count.py)
-  const act=SNAP.tracks.filter(t=>t.status==='active'&&fresh(t));const stale={};SNAP.tracks.filter(t=>t.status==='active'&&!fresh(t)).forEach(t=>stale[t.type]=(stale[t.type]||0)+1);const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+1);
+  const act=SNAP.tracks.filter(t=>t.status==='active');const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+1);
   // компроміс: велике число — оцінка кількості одиниць (як на мапі: той самий тип і пункт призначення = одна група, береться найбільша названа кількість, різні пункти додаються); дрібно — скільки це груп/цілей
   const UN={};{const g={};act.forEach(t=>{const k=t.type+'|'+((t.next||'').trim()||t.id);g[k]=Math.max(g[k]||0,t.count||1);});for(const k in g){const ty=k.split('|')[0];UN[ty]=(UN[ty]||0)+g[k];}}
   const order=['uav','shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','lancet','fpv','fpvf'];
   $('#counters').innerHTML='';
   order.filter(t=>by[t]).forEach(t=>{const d=document.createElement('div');d.className='cnt';d.title=TYPE_NAME[t];if(TAC&&window.App06){const sv=document.createElement('span');sv.className='cs';try{sv.innerHTML=window.App06.svg({type:window.App06.MAP[t]?t:'unknown',affiliation:'hostile',hd:null,size:26});}catch(e){}d.appendChild(sv);}else{const c=(CNTI[t]&&CNTI[t]._sprite?CNTI[t]:(CNTI[t]=drawTarget(t,28)));const cc=document.createElement('canvas');cc.width=c.width;cc.height=c.height;cc.getContext('2d').drawImage(c,0,0);d.appendChild(cc);}const w=document.createElement('div');w.className='cw';const b=document.createElement('b');b.textContent=by[t];if(renderCounters.prev&&renderCounters.prev[t]!==by[t])b.className='pop';
-    const l=document.createElement('small');l.textContent=(CNT_LBL[t]||TYPE_NAME[t])+((UN[t]||by[t])!==by[t]?' · ≈'+UN[t]+' од.':'')+(stale[t]?' · +'+stale[t]+' старих':'');w.appendChild(b);w.appendChild(l);d.appendChild(w);d.style.setProperty('--tc',TYPE_COLOR[t]);d.onclick=()=>focusType(t);$('#counters').appendChild(d);});
+    const l=document.createElement('small');l.textContent=(CNT_LBL[t]||TYPE_NAME[t])+((UN[t]||by[t])!==by[t]?' · ≈'+UN[t]+' од.':'');w.appendChild(b);w.appendChild(l);d.appendChild(w);d.style.setProperty('--tc',TYPE_COLOR[t]);d.onclick=()=>focusType(t);$('#counters').appendChild(d);});
   renderCounters.prev=Object.fromEntries(Object.keys(by).map(k=>[k,by[k]]));
   if(!act.length){const d=document.createElement('div');d.className='cnt';d.innerHTML='<b style="font-size:16px">Цілей не видно</b>';$('#counters').appendChild(d);}
 }
@@ -1439,7 +1439,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=358,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=359,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
