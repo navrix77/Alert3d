@@ -625,9 +625,15 @@ class Tracker:
                 jump = dist_km((tr.last.x, tr.last.y), X.xy) <= TYPES[tr.type]["speed"] * 2.5 * max(30.0, t - tr.last.t) / 3600 + 5
                 if dist_km(e, X.xy) <= reach and jump:
                     prev = tr.last
-                    tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
-                    if dist_km((prev.x, prev.y), X.xy) > 3:
-                        tr.heading = bearing((prev.x, prev.y), X.xy)
+                    bp = _border_start(X.xy, 25.0) if dist_km((prev.x, prev.y), X.xy) > 8 else None
+                    if bp is not None and dist_km((prev.x, prev.y), bp) <= reach:
+                        # пункт біля кордону: ціль летить З кордону до нього, а не повзе вздовж кордону чи стоїть у пункті
+                        tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
+                        tr.heading = bearing(bp, X.xy)
+                    else:
+                        tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
+                        if dist_km((prev.x, prev.y), X.xy) > 3:
+                            tr.heading = bearing((prev.x, prev.y), X.xy)
                     route = route[1:]
                     if not route:
                         # ціль уже в X (оцінка) і нового пункту не названо: «→ X» більше не показуємо,
