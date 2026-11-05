@@ -71,7 +71,7 @@ FOOTER_RX = re.compile(r"(?im)^[^\n]*(?:надіслати\s+новину|наш
 def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bool, typ_hint: str | None = None) -> None:
     """Одне повідомлення каналу може містити кілька цілей, ділимо на сегменти й кожен веде в трекер."""
     text = FOOTER_RX.sub("", text).strip() or text  # підписи каналів («🔴 Захід Головне», «Надіслати новину | Наші медіа») — не місця (05.11: «Головне» ставило шахед)
-    if log and hits.ingest(text, ts, link, getattr(config.SOURCES.get(key), "name", key)):
+    if hits.ingest(text, ts, link, getattr(config.SOURCES.get(key), "name", key)):
         return  # пост про прильот по РФ: це не цілі над Україною, у трекер не віддаємо (раніше «Добрі дрони… у Рязані» давали шахед на «Добру»/«Головне»)
     segs = parser.segments(text)
     # контекст для одноіменних сіл: усі пункти повідомлення разом + що канал називав останні 30 хв
@@ -195,6 +195,8 @@ RESTORED: dict[str, float] = {}  # посилання на пости, вже в
 
 
 def on_message(text: str, key: str, ts: float, link: str | None = None) -> None:
+    # вогники «що вразили наші» — завжди, навіть для постів, відновлених після перезапуску (інакше після оновлення сервера вони б не з'явились)
+    hits.ingest(FOOTER_RX.sub("", text).strip() or text, ts, link, getattr(config.SOURCES.get(key), "name", key))
     if link and link in RESTORED:
         return  # пост уже в стані, відновленому після перезапуску: вдруге не додаємо (інакше дублі спостережень)
     if time.time() - ts < 300:
