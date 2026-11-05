@@ -2125,3 +2125,11 @@ def test_remnants_post_is_not_a_cruise_missile():
     o = p.parse("Замість грибів біля Харкова можна виявити залишки ракет та шахедів😬", "KM")
     assert o.type is None and o.no_target and not any(r.place.name == "Заміст" for r in o.places)
     assert p.parse("Крилата ракета біля Харкова, курс на захід", "KM").type == "cruise"
+
+def test_wildberries_warehouse_flag():
+    from app.strikes_ua import UaStrikes
+    u = UaStrikes()
+    r = u.parse_astra("Беспилотники атаковали склад Wildberries в Электростали, начался пожар")
+    assert r and r[0]["what"] == "Склад Wildberries" and r[0].get("wb") is True
+    r2 = u.parse_astra("Беспилотники атаковали порт Новороссийск")
+    assert r2 and not r2[0].get("wb")
