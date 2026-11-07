@@ -85,3 +85,14 @@ def test_fpv_and_shahed_same_spot_merge():
     m.feed(t, "FPV курсом на П'ятихатки", "M", now - 120, None, log=False)
     m.feed(t, "Шахед курсом на П'ятихатки", "TLK", now - 100, None, log=False)
     assert len(t.snapshot(now)["tracks"]) == 1
+
+
+def test_named_targets_only_fly_inbound_not_to_border():
+    """07.11: «на П'ятихатки → на Лісне → курсом на Лесное» без позиції — носом від кордону, а не на північ до нього."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    for dt, k, x in [(-200, "M", "Ударний БПЛА на П'ятихатки‼️"), (-120, "M", "Ударний БПЛА на Лісне⚠️"), (-30, "CX", "🟧 Ударный курсом на Лесное")]:
+        m.feed(t, x, k, now + dt, None, log=False)
+    hd = t.snapshot(now)["tracks"][0]["hd"]
+    assert hd is not None and 90 < hd < 270, hd  # на південь, до міста
