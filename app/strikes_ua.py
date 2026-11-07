@@ -48,7 +48,7 @@ WHAT = [("wildberries", "Склад Wildberries"), ("вайлдберр", "Ск�
 # ASTRA — незалежне російське медіа: оперативно пише, куди саме прилетіли наші дрони (місто, об'єкт), з фото/відео
 ASTRA = "astrapress"
 # додаткові відкриті канали, що першими пишуть про прильоти по РФ (укр./рос.); власні можна додати через STRIKE_CHANNELS="канал1,канал2" (без @)
-EXTRA_CHANNELS = ["NovynaUKR", "supernova_plus", "exilenova_plus", "ukrpravda_news", "nexta_tv"]
+EXTRA_CHANNELS = ["truexanewsua", "NovynaUKR", "supernova_plus", "exilenova_plus", "ukrpravda_news", "nexta_tv"]
 RU_FORMS = {  # російські форми назв (лише з великої літери в тексті) → ключ RU_CITIES
     "саратов": "саратов", "энгельс": "енгельс", "рязан": "рязан", "новокуйбышевск": "новокуйбишевськ", "сызран": "сизран",
     "самар": "самар", "волгоград": "волгоград", "туапсе": "туапсе", "новороссийск": "новоросійськ", "брянск": "брянськ",
@@ -74,6 +74,13 @@ WHAT_RU = [("нпз", "НПЗ"), ("нафтопереробн", "НПЗ"), ("л�
            ("завод", "Завод"), ("предприят", "Підприємство"), ("склад", "Склад"), ("тэц", "ТЕЦ"), ("электростанц", "Електростанція"), ("нефтепровод", "Нафтопровід")]
 
 
+LAUNCHER = re.compile(r"пускові\w*\s+установ\w*|пускови\w*\s+установ\w*|\bпу\b", re.I)
+LAUNCHER_KILL = re.compile(r"знищен|уражен|уразил|вразил|ліквідовано", re.I)
+LAUNCHER_REG = [("брянщин", "Брянщина", 53.2, 34.4), ("курщин", "Курщина", 51.7, 36.2), ("бєлгородщин|белгородщин|білгородщин", "Бєлгородщина", 50.6, 36.6),
+                ("воронеж", "Воронежчина", 51.7, 39.2), ("ростовщин", "Ростовщина", 47.5, 40.5), ("кримськ|криму|крим\\b", "Крим (окупований)", 45.2, 34.2),
+                ("запорізьк\\w* област", "Запорізька обл. (окупована)", 47.3, 35.5), ("донеччин", "Донеччина (окупована)", 48.0, 37.8)]
+
+
 class UaStrikes:
     def __init__(self, gaz=None) -> None:
         self.gaz = gaz
@@ -96,7 +103,7 @@ class UaStrikes:
     def parse(self, text: str) -> list[dict]:
         if not re.search(r"уражен|урази|вразил|знищен", text.lower()) or "оперативна інформація" in text.lower():
             return []
-        out = []
+        out = self.parse_launchers(text)
         for m in BULLET.finditer(text):
             obj, place = m.group(1).strip(" .:-—"), m.group(2)
             lo_obj = obj.lower()
@@ -111,6 +118,17 @@ class UaStrikes:
                 continue
             out.append({"what": what, "detail": obj[:140], "place": loc[0], "lat": loc[1], "lon": loc[2], **({"wb": True} if what == "Склад Wildberries" else {})})
         return out
+
+    def parse_launchers(self, text: str) -> list[dict]:
+        """«Дві пускові установки «Іскандерів» знищено цієї ночі на Брянщині, — Генштаб»: знищення пускових, місце — область/регіон."""
+        low = text.lower()
+        if not LAUNCHER.search(low) or not LAUNCHER_KILL.search(low):
+            return []
+        for pat, name, la, lo in LAUNCHER_REG:
+            if re.search(pat, low):
+                what = "Пускові установки «Іскандер»" if "іскандер" in low else "Пускові установки"
+                return [{"what": what, "detail": re.sub(r"\s+", " ", text.strip())[:240], "place": name, "lat": la, "lon": lo}]
+        return []
 
     def parse_astra(self, text: str) -> list[dict]:
         low = text.lower().replace("ё", "е")
@@ -177,7 +195,7 @@ class UaStrikes:
         Один об'єкт з різних каналів не дублюється: те саме місце й об'єкт у межах 3 годин — одна подія."""
         n = 0
         try:
-            for ev in self.parse_astra(text):
+            for ev in self.parse_astra(text) + self.parse_launchers(text):
                 n += 1  # розпізнано (навіть якщо це дубль з іншого каналу): пост про прильот по РФ
                 if any(e["place"] == ev["place"] and e["what"] == ev["what"] and abs(e["t"] - ts) < 10800 for e in self.events):
                     continue

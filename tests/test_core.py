@@ -2355,3 +2355,10 @@ def test_kyiv_objects_not_village_kyivske():
     assert names("Полтавський знову на дрони", "ppo_poltava") == ["Полтавський р-н"]
     assert "Полтавський р-н" in names("❗2 крилаті ракети Х-101 з Харківщини на Полтавщину, Полтавський.", "MU")
     assert "Полтавське" not in names("4 реактивних в Полтавську, 1 в Черкаській", "kyiv_airdef")
+
+def test_destroyed_launchers_news_becomes_hit():
+    from app.strikes_ua import UaStrikes
+    u = UaStrikes()
+    ev = u.parse_launchers("🔥Дві пускові установки «Іскандерів» знищено цієї ночі на Брянщині, — Генштаб")
+    assert ev and ev[0]["place"] == "Брянщина" and "Іскандер" in ev[0]["what"]
+    assert u.parse_launchers("Росіяни привезли пускові установки на Брянщину") == []
