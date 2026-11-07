@@ -304,7 +304,8 @@
   const SURL = { ident: 'snd/ident.mp3', news: 'snd/news.mp3', calm: 'snd/calm.mp3', urgent: 'snd/urgent.mp3', outro: 'snd/outro.mp3', outage: 'snd/outage.mp3' }, SB = {};
   function sLoad() { const c = raCtx(); return Promise.all(Object.keys(SURL).map(k => SB[k] ? 0 : fetch(SURL[k]).then(r => r.arrayBuffer())
     .then(ab => new Promise((ok, no) => c.decodeAudioData(ab, ok, no))).then(b => { SB[k] = b; }).catch(() => {}))); }
-  function sPlay(k, vol) { const b = SB[k]; if (LS.get('radio_sig') === '0') return wait(0); if (!b || (window.SKYVOICE && window.SKYVOICE.alerting)) return wait(0);
+  function sPlay(k, vol) { const b = SB[k]; if (LS.get('radio_sig') === '0') return wait(0);
+    if (k !== 'urgent' && k !== 'outage' && window.SKYRADIO && window.SKYRADIO.state() === 'PLAYING_MUSIC') return wait(0);  // під музикою SKY RADIO додаткові сигнали лише додають паузи (07.11) if (!b || (window.SKYVOICE && window.SKYVOICE.alerting)) return wait(0);
     try { const c = raCtx(), src = c.createBufferSource(), g = c.createGain(); g.gain.value = vol; src.buffer = b; src.connect(g).connect(RA.master); src.start(); } catch (e) {}
     return wait(Math.max(0, Math.round(b.duration * 1000) - 120)); }
   const SND = { ident: () => sPlay('ident', 0.6), outro: () => sPlay('outro', 0.45), news: () => sPlay('news', 0.42), calm: () => sPlay('calm', 0.3),
@@ -348,7 +349,7 @@
     radioBusy = true;
     try {
       const r = pre ? await pre : await radioReq(scope, false, scope === 'country' && mode !== 'country');  // «Далі головні зміни по Україні»
-      if (scope === 'country') lastCountry = now;
+      if (scope === 'country' || r.kind === 'brief') lastCountry = now;
       if (!radioOn) return;
       // 04.11 власник: новин і змін немає — радіо, як і ефір, вимикається само (через 10 хв без жодного оновлення)
       // 04.11 власник: радіо не вимикається, поки є тривога в області або цілі до 300 км; лише 15 хв повного затишшя → вимкнення
@@ -404,7 +405,7 @@
     await Promise.race([sLoad(), wait(900)]);
     if ((LS.get('radio_mode') || 'music') === 'music' && window.SKYRADIO && window.SKYRADIO.enabled()) {
       await window.SKYRADIO.start();  // готовий джингл → музика; голосовий випуск після джинглу
-      for (let w = 0; w < 40 && window.SKYRADIO.state() === 'PLAYING_JINGLE'; w++) await wait(500);
+      for (let w = 0; w < 160 && window.SKYRADIO.state() === 'PLAYING_JINGLE'; w++) await wait(125);
     } else {
       const id = SND.ident();
       const IDT = 'Скай. Розумій, що відбувається в небі.';  // фірмова заставка (специфікація радіо), озвучена один раз і з кешу
@@ -413,7 +414,7 @@
     }
     await radioIssue(null, pre);         // зведення в обраному режимі охоплення
     // 04.11 власник: «де зведення по Україні?» — за концепцією: на початку й раз на 15 хв, у будь-якому режимі (із заготовок, безкоштовно)
-    if (radioOn && sc0 !== 'country') await radioIssue('country');
+    if (radioOn && sc0 !== 'country' && !lastCountry) await radioIssue('country');
     // «Поруч зі мною» на заготовках дешеве й миттєве — перевіряємо кожні 15 с; область і Україна (через модель) — раз на 40 с
     let tick = 0; radioT = setInterval(() => { tick++; const md = LS.get('radio_scope') || 'near';
       if (md !== 'country' && NX().now() - lastCountry > 900) radioIssue('country');

@@ -683,7 +683,7 @@ def _strip_id3(b: bytes) -> bytes:
 async def render(frags: list[str], say) -> tuple[bytes | None, str]:
     """Склеює озвучені заготовки в одне mp3. Якщо хоч одна фраза не mp3 (запасний голос) — None, клієнт озвучить текст цілком.
     say(text) -> (bytes, by): озвучка з обліком символів (main._say)."""
-    sem = asyncio.Semaphore(4)  # не більше 4 нових синтезів водночас: 40 паралельних запитів провайдер відкидає (429)
+    sem = asyncio.Semaphore(8)  # не більше 4 нових синтезів водночас: 40 паралельних запитів провайдер відкидає (429)
 
     async def one(x):
         async with sem:
@@ -694,7 +694,7 @@ async def render(frags: list[str], say) -> tuple[bytes | None, str]:
                     r = (None, "error")
                 if r[0]:
                     return r
-                await asyncio.sleep(0.6 * (k + 1))
+                await asyncio.sleep(0.3 * (k + 1))
             return r
     parts = await asyncio.gather(*(one(x) for x in frags))
     out = []
@@ -723,7 +723,34 @@ async def render(frags: list[str], say) -> tuple[bytes | None, str]:
         return None, "wav"
     if wavs:
         return None, "wav"
-    return b"".join(_strip_id3(d) for d in out), "kit"
+    return await tighten(b"".join(_strip_id3(d) for d in out)), "kit"
+
+
+def _ffmpeg() -> str | None:
+    import shutil
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:  # noqa: BLE001
+        return shutil.which("ffmpeg")
+
+
+async def tighten(mp3: bytes) -> bytes:
+    """07.11 власник: «великі паузи між блоками». Кожна коротка заготовка має тишу на початку й у кінці; склеєні, вони дають
+    паузи по секунді. Довгу тишу стискаємо до ~0,14 с. Немає ffmpeg чи збій — віддаємо як є."""
+    ff = _ffmpeg()
+    if not ff or len(mp3) < 2000:
+        return mp3
+    try:
+        pr = await asyncio.create_subprocess_exec(
+            ff, "-v", "error", "-i", "pipe:0", "-af",
+            "silenceremove=start_periods=1:start_silence=0.04:start_threshold=-42dB:stop_periods=-1:stop_duration=0.2:stop_silence=0.14:stop_threshold=-42dB",
+            "-c:a", "libmp3lame", "-q:a", "4", "-f", "mp3", "pipe:1",
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        out, _ = await asyncio.wait_for(pr.communicate(mp3), 10)
+        return out if pr.returncode == 0 and len(out) > 1000 else mp3
+    except Exception:  # noqa: BLE001
+        return mp3
 
 
 _WARM = {"state": "idle", "done": 0, "total": 0}

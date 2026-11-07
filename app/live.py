@@ -595,8 +595,14 @@ async def radio_brief(llm, state, hist, tracker, since, home, obl, sid: str, rad
         head_v, head_t = {"near": ("Поруч із вами.", "Поруч із вами"), "oblast": (f"Ваша область.", f"Ваша область · {obl}"),
                           "country": ("Тепер по Україні.", "Україна")}[sc]
         parts.append((sc, head_v, head_t, frags, r["text"], r.get("level")))
-    if len(parts) < 2:
-        return None  # один блок — нічого склеювати, звичайна відповідь
+    if not parts:
+        return None
+    if len(parts) == 1:
+        # 07.11 власник: «про Україну немає нічого». Блок уже позначено озвученим, тож віддаємо його самого, а не відкидаємо
+        # (раніше повторний запит «Україна» отримував мовчання «вже казали»)
+        sc, hv, ht, frags, tx, lv = parts[0]
+        mem = RADIO_STATE.setdefault((sid or "-", sc if sc != "near" or home else "oblast", obl), {"fp": None, "t": 0.0, "said": []})
+        return _kit_reply(mem, mem.get("fp"), time.time(), "brief", {"voice": list(frags), "text": tx}, "summary", "urgent" if lv == "urgent" else "update")
     voice, text = [], []
     for sc, hv, ht, frags, tx, lv in parts:
         voice += [hv] + [x for x in frags if x not in ("Ви слухаєте Скай.",)]

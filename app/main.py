@@ -717,7 +717,15 @@ async def api_radio(t: float = 0, obl: str = "", lat: float | None = None, lon: 
     since, home, ob = _live_args(t, obl, lat, lon)
     sc = {"region": "near", "neighbors": "oblast"}.get(scope, scope)
     sc = sc if sc in ("near", "oblast", "country") else "near"
-    return await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc, sid[:40], max(5.0, min(100.0, radius)), greeted=bool(g), after=bool(a), brief=bool(b))
+    r = await live.radio(LLMX, state(), HIST, tracker, since, home, ob or "", sc, sid[:40], max(5.0, min(100.0, radius)), greeted=bool(g), after=bool(a), brief=bool(b))
+    try:  # голос збирається вже зараз, поки клієнт готується до відтворення
+        from . import voicekit
+        k = (r.get("audio") or "").rsplit("/", 1)[-1][:16]
+        if k and k in voicekit.SEQ and k not in _VOICE_DONE and k not in _VOICE_JOBS:
+            _VOICE_JOBS[k] = asyncio.ensure_future(voicekit.render(voicekit.SEQ[k][1], _say))
+    except Exception:  # noqa: BLE001
+        pass
+    return r
 
 
 @app.get("/api/health")
@@ -903,11 +911,31 @@ async def api_voice(sid: str):
     item = voicekit.SEQ.get(sid[:16])
     if not item:
         return JSONResponse({"ok": False, "why": "unknown"}, status_code=404)
-    data, why = await voicekit.render(item[1], _say)
-    LLMX.count("tts:" + why)
+    key = sid[:16]
+    hit = _VOICE_DONE.get(key)  # вже зібраний випуск: віддаємо миттєво (повторне прослуховування, друге пристрої)
+    if hit:
+        data, why = hit
+    else:
+        job = _VOICE_JOBS.get(key)
+        if not job:
+            job = _VOICE_JOBS[key] = asyncio.ensure_future(voicekit.render(item[1], _say))
+        try:
+            data, why = await asyncio.shield(job)
+        finally:
+            if job.done():
+                _VOICE_JOBS.pop(key, None)
+        LLMX.count("tts:" + why)
+        if data:
+            _VOICE_DONE[key] = (data, why)
+            while len(_VOICE_DONE) > 40:
+                _VOICE_DONE.pop(next(iter(_VOICE_DONE)), None)
     if not data:
         return JSONResponse({"ok": False, "why": why}, status_code=503)
     return Response(data, media_type="audio/wav" if data[:4] == b"RIFF" else "audio/mpeg", headers={"Cache-Control": "max-age=86400", "X-TTS": why})
+
+
+_VOICE_DONE: dict = {}
+_VOICE_JOBS: dict = {}
 
 
 @app.get("/api/tts")
