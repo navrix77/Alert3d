@@ -978,7 +978,7 @@ class Tracker:
                 best, bs = tr, s
         return best
 
-    MERGE_KM = {"jet": 30, "cruise": 35, "ballistic": 40, "geran5": 30, "banderol": 30, "uav": 7, "shahed": 7, "molniya": 6}
+    MERGE_KM = {"jet": 30, "cruise": 35, "ballistic": 40, "geran5": 30, "banderol": 30, "uav": 7, "shahed": 7, "molniya": 6, "fpv": 25, "fpvf": 25}
 
     def _dedup(self, now: float) -> None:
         """Один і той самий об'єкт різні канали називають різними селами (а то й типами), треки-близнюки зливаємо.
