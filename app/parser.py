@@ -870,6 +870,8 @@ class Parser:
                 else:
                     new.append(r_)
             obs.places = new
+        # «Ланцет далее курсом на Песочин» (TLK, 07.11): «далі» — продовження маршруту від попереднього місця, а не нове положення в пункті
+        obs.further = bool(re.search(r"(?<![а-яіїєa-z])(далее|далі|дальше|потім|потом)(?![а-яіїєa-z])", t))
         if NOT_LIVE.search(t) and not obs.close and not re.search(r"більше не|больше не|зараз|сейчас|щойно|только что|наразі|не\s+\w+,?\s+а\s", t):
             obs.type, obs.no_target, obs.close = None, True, False
         return obs

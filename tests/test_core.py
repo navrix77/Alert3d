@@ -2373,3 +2373,8 @@ def test_locative_plural_is_position():
     o = P.parse("🔴Акустика ФПВ в Дергачах по направлению к Харькову", "CX")
     roles = {r.place.name: r.role for r in o.places}
     assert roles.get("Дергачі") == "p"
+
+
+def test_further_course_keeps_position():
+    o = P.parse("Ланцет далее курсом на Песочин⚠️", "TLK")
+    assert getattr(o, "further", False) and o.places[0].place.name == "Пісочин"

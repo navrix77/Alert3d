@@ -627,6 +627,8 @@ class Tracker:
                         tr.heading, tr.hd_src = lh, "learned"
                     elif d > 3 and plaus and dt >= 90:
                         tr.heading, tr.hd_src = bearing((prev.x, prev.y), pt), "movement"
+            elif route and getattr(obs, "further", False):
+                pass  # «далі курсом на X»: ціль лишається де була, X — лише наступний пункт маршруту (07.11)
             elif route:
                 # «на X» від каналу, що веде ціль щохвилини: ціль уже біля X (так показують провідні сервіси).
                 # Переносимо її в X, якщо X досяжний за час від останньої фіксації; курс — звідки прийшла.
