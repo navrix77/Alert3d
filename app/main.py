@@ -174,6 +174,8 @@ def on_threat(ev: dict) -> None:
     obs = Observation(type=ev["type"], count=ev["count"], places=[PlaceRef(role, place)], course=course)
     obs.raw = ev["text"]
     tracker.ingest(obs, "AIU", ev["t"], "https://alerts.in.ua")
+    if time.time() - ev["t"] < 3600:
+        _fresh(obs, ev["t"])
     brain.log_msg(ev["t"], "AIU", None, obs.kind, obs.type, obs.count, [{"r": role, "n": place.name}], None, ev["text"])
 
 
@@ -315,6 +317,16 @@ def state() -> dict:
     snap["daily"] = daily.ready
     snap["pred_acc"] = brain.pred_acc()
     _ws = webmon.state()
+    try:  # після перезапуску FRESH порожній, хоч відновлені цілі мають свіжі фіксації: беремо останню фіксацію кожної цілі
+        from .geo import oblasts as _oblasts
+        _O = _oblasts()
+        for _tr in snap.get("tracks") or []:
+            _o = _O.of(_tr["lon"], _tr["lat"]) if _tr.get("lon") is not None else None
+            if _o and _tr.get("last"):
+                FRESH["obl"][_o] = max(FRESH["obl"].get(_o, 0), float(_tr["last"]))
+                FRESH["any"] = max(FRESH["any"], float(_tr["last"]))
+    except Exception:
+        pass
     snap["fresh"] = {"any": int(FRESH["any"]), "obl": {k: int(v) for k, v in FRESH["obl"].items() if time.time() - v < 6 * 3600},
                      "alerts": int(off.get("updated") or 0), "alerts_ok": bool(off.get("ok")),
                      "live": _ws.get("live", 0), "channels": _ws.get("channels", 0)}
