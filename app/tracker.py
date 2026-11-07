@@ -1175,6 +1175,9 @@ class Tracker:
                 self.brain.rel_update(next(iter(tr.srcs)), False, 0.5)  # ніхто не підтвердив
         self.tracks = keep
         self._dedup(now)
+        # контекст хвилі: якщо за останню годину джерела прямо назвали шахеди, загальне «БпЛА» без моделі
+        # у цій же хвилі показуємо як «ймовірно шахед» (це переважна більшість), а не як «невизначений тип»
+        wave_shahed = any(t.type == "shahed" and not t.likely and not t.closed and now - t.last.t < 3600 for t in self.tracks)
         for tr in self.tracks:
             if tr.merged:
                 continue
@@ -1237,7 +1240,7 @@ class Tracker:
                         la, lo = from_xy(*p)
                         up(obl.of(lo, la), 1)
             out.append({
-                "id": tr.id, "type": tr.type, "name": TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else ""), "likely": tr.likely, "pair": tr.pair, "ai": tr.ai, "count": tr.count, "status": status,
+                "id": tr.id, "type": ("shahed" if tr.type == "uav" and wave_shahed else tr.type), "name": (TYPES["shahed"]["name"] + " (ймовірно, тип не названо)" if tr.type == "uav" and wave_shahed else TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else "")), "likely": (tr.likely or (tr.type == "uav" and wave_shahed)), "raw_type": tr.type, "pair": tr.pair, "ai": tr.ai, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
                 **self.quality(tr, now, conf),
                 "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "nopos": all(o.est for o in tr.obs),

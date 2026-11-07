@@ -2254,3 +2254,19 @@ def test_air_defence_unit_and_russian_oblast_lists_are_not_targets():
     o = p.parse("🍞 Загроза крилатих ракет:  Брянська Курська Орловська Тульська Калузька Воронезька області рф", "totallzrada")
     assert o.kind != "track" and not o.places
     assert p.parse("Ракета на Мерефу", "KL").type == "cruise"
+
+
+def test_generic_uav_inherits_shahed_in_named_wave():
+    import time
+    from app.parser import Parser
+    from app.tracker import Tracker
+    from app import config
+    p = Parser(); t0 = time.time() - 300
+    tr = Tracker(config.SOURCES, learn=False)
+    tr.ingest(p.parse("Шахед курсом на Полтаву", "x"), "x", t0)
+    tr.ingest(p.parse("БпЛА курсом на Суми", "y"), "y", t0 + 60)
+    types = sorted((x["type"], x["raw_type"]) for x in tr.snapshot(t0 + 120)["tracks"])
+    assert ("shahed", "uav") in types
+    tr2 = Tracker(config.SOURCES, learn=False)
+    tr2.ingest(p.parse("БпЛА курсом на Суми", "y"), "y", t0)
+    assert [x["type"] for x in tr2.snapshot(t0 + 60)["tracks"]] == ["uav"]
