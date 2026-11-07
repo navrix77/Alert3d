@@ -92,7 +92,7 @@
       const url = ready || ttsUrl(text, voice);
       if (window.SKYVOICE) { abortAudio = () => window.SKYVOICE.stop(); await window.SKYVOICE.play(url, Math.max(0.1, Math.min(1, +(LS.get('radio_voice_vol') || 1))), 1.12); return; }
       const a = new Audio(url);try{a.volume=Math.max(0.1,Math.min(1,+(LS.get('radio_voice_vol')||1)));}catch(e){}try{a.preservesPitch=true;a.defaultPlaybackRate=a.playbackRate=1.12;}catch(e){}
-      await new Promise(res => { abortAudio = () => { try { a.pause(); } catch (e) {} res(); }; a.onended = res; a.onerror = res; a.play().catch(res); setTimeout(res, 20000); });
+      await new Promise(res => { abortAudio = () => { try { a.pause(); } catch (e) {} res(); }; a.onended = res; a.onerror = res; a.play().catch(res); setTimeout(res, 120000); });  // 20 с обрізали довгі фрази
     } catch (e) {}
   }
   const wait = ms => new Promise(r => setTimeout(r, ms));

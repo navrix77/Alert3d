@@ -659,16 +659,32 @@ async def api_live(req: Request):
     d = live.diff(state(), HIST, tracker, since, home, ob, bbox)
     q = (b.get("q") or "").strip()[:300] or None
     out = await live.narrate(LLMX, d, q)
-    if not q and out.get("steps"):
-        # як у «Радіо SKY»: спершу структуроване зведення (ваша місцевість → область → Україна), тим самим голосом; далі — що змінилось
+    if not q and out.get("steps") and out.get("by") == "rules":
+        # одне цілісне озвучення замість окремих клаптиків (власник 07.11: «ривки й обрізані фрази»): зведення «місцевість → область → Україна»
+        # (як у «Радіо SKY») + що змінилось, склеєні в ОДИН запис і один текст; без пауз і довантаження між кроками
         try:
             import uuid
+            from . import voicekit
+            frags, texts, ids = [], [], []
             rb = await live.radio_brief(LLMX, state(), HIST, tracker, since, home, ob or "", "live-" + uuid.uuid4().hex[:8], 25.0, True)
             if rb and rb.get("text") and rb.get("audio"):
-                rest = out["steps"][1:] if out["steps"] and out["steps"][0].get("action") == "overview" else out["steps"]
-                out["steps"] = [{"say": rb["text"], "action": "overview", "audio": rb["audio"]}] + rest
+                fr = (voicekit.SEQ.get(rb["audio"].rsplit("/", 1)[-1]) or (0, []))[1]
+                if fr:
+                    frags += list(fr); texts.append(rb["text"])
+            ok = True
+            for st in out["steps"]:
+                fr = (voicekit.SEQ.get((st.get("audio") or "").rsplit("/", 1)[-1]) or (0, []))[1]
+                if not fr:
+                    ok = False
+                    break
+                if not (rb and st is out["steps"][0] and st.get("action") == "overview" and frags):
+                    frags += list(fr); texts.append(st.get("say") or "")
+                ids += st.get("ids") or []
+            if ok and frags:
+                out["steps"] = [{"say": "\n\n".join(t for t in texts if t), "action": "overview", "ids": ids,
+                                 "audio": "/api/voice/" + voicekit.register(frags)}]
         except Exception:
-            logging.getLogger("live").exception("live brief")
+            logging.getLogger("live").exception("live merge")
     return {"diff": d, **out}
 
 
