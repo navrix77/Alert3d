@@ -2378,3 +2378,18 @@ def test_locative_plural_is_position():
 def test_further_course_keeps_position():
     o = P.parse("Ланцет далее курсом на Песочин⚠️", "TLK")
     assert getattr(o, "further", False) and o.places[0].place.name == "Пісочин"
+
+
+def test_boom_closes_nearby_short_range_target():
+    import os
+    from pathlib import Path
+    from app.brain import Brain
+    from app.config import SOURCES
+    from app.tracker import Tracker
+    from scripts.backtest import Feeder
+    trk = Tracker(SOURCES, Brain(Path(":memory:")), learn=False)
+    fd = Feeder(trk)
+    fd.feed("Ланцет на Песочин⚠️", "M", 1000.0, None)
+    assert any(t.type == "lancet" and not t.closed for t in trk.tracks)
+    fd.feed("Вибух в Пісочині", "M", 1100.0, None)
+    assert all(t.closed for t in trk.tracks if t.type == "lancet")

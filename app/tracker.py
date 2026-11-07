@@ -455,6 +455,20 @@ class Tracker:
         places = obs.places
         if obs.kind == "filtered":
             # «збито / вибухи / приліт» не публікуємо (безпека), але ціль після цього прибираємо з карти
+            if obs.type is None and places:
+                # 07.11: «Вибух/приліт у Пісочині» після «Ланцет на Пісочин»: короткодальня ціль біля цього місця вже влучила — знімаємо
+                # (лише найближчу до місця, ≤6 км від її оцінки чи кінця маршруту, щоб не гасити сусідні)
+                best = None
+                for tr in self.tracks:
+                    if tr.closed or tr.merged or tr.type not in NEAR_TYPES or t - tr.last.t > TYPES[tr.type]["life"]:
+                        continue
+                    ends = [tr.est(t), (tr.last.x, tr.last.y)] + ([tr.route[-1].xy] if tr.route else [])
+                    d = min(dist_km(p.place.xy, q) for p in places for q in ends)
+                    if d <= 6 and (best is None or d < best[0]):
+                        best = (d, tr)
+                if best:
+                    best[1].closed = t
+                    rec["closed"] = rec.get("closed", 0) + 1
             fast = FAST_TYPES if obs.type is None else (("shahed", "uav") if obs.type in ("shahed", "uav") else ((obs.type,) if obs.type in TYPES else ()))
             if fast:
                 done = 0
