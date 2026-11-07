@@ -955,3 +955,6 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 
 .sh-head #sh-follow{flex:none;padding:9px 13px;font-size:13px;border-radius:999px;white-space:nowrap}
 .sh-head .sh-title{min-width:0;flex:1}
+/* 07.11: «Наживо · час» — в самому низу по центру, під панеллю кнопок */
+.asof{position:fixed!important;left:50%!important;right:auto!important;top:auto!important;transform:translateX(-50%)!important;bottom:max(6px,env(safe-area-inset-bottom))!important;z-index:5;white-space:nowrap;padding:3px 10px 3px 8px;font-size:12px}
+.dock{bottom:calc(max(6px,env(safe-area-inset-bottom)) + 30px)!important}
