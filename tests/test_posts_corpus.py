@@ -106,3 +106,29 @@ def test_banderol_course_from_origin_oblast():
     m.feed(t, "⚠ 1х малогабаритна крилата ракета Бандероль курсом на Диканьку, Полтавщина з Харківщини.", "UR", now - 240, None, log=False)
     hd = t.snapshot(now)["tracks"][0]["hd"]
     assert hd is not None and 240 < hd < 320, hd
+
+
+def test_launch_zone_fallback_banderol():
+    """Бандероль без курсу: від найближчої зони пуску (Білгородщина) на південний захід, не на північ."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "1х Бандероль курсом на Харків", "UR", now - 60, None, log=False)
+    hd = t.snapshot(now)["tracks"][0]["hd"]
+    assert hd is not None and 120 < hd < 280, hd
+
+
+def test_launch_zones_reach():
+    from app.launch_zones import nearest
+    assert nearest("banderol", 49.9, 36.2)[2].startswith(("Білгород", "Курськ"))
+    assert nearest("banderol", 50.4, 30.5) is None or nearest("banderol", 50.4, 30.5)[3] <= 520
+
+
+@pytest.mark.parametrize("text,side,course", [
+    ("БпЛА на Харків з півночі.", 0.0, 180.0),
+    ("Шахед на Харків зі сходу", 90.0, 270.0),
+    ("на Харків з півдня", 180.0, 0.0),
+])
+def test_approach_side(text, side, course):
+    o = P.parse(text, "MU", None)
+    assert o.side == side and o.course == course
