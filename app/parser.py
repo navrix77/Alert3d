@@ -167,6 +167,9 @@ LOC_OBL = re.compile(r"(?i)(?<![\w])на\s+([А-ЯІЇЄҐ][а-яіїєґ']+(?:�
 REGION_ANY = re.compile(r"(?i)[а-яіїєґ']+(?:щин|ччин)[аиіуою]|запоріжж|област")
 SEG_SPLIT = re.compile(r"\n+|(?<=[.!])\s+(?=⚠️)|(?=🛵)|(?=🚀)|(?=💥)|(?=🟠)|(?=🟡)|(?=🔴)|(?=🟢)|;\s*|\s+-\s+")
 SEA = re.compile(r"(?i)(з |із |с |в |у )?(акваторії |акватории |акваторію )?(чорного|черного|азовського|азовского|чорне|черное|азовське|азовское|чорному|черном) мор\w*|(з |із |с )?акватор\w*")
+# «повз Голубівку на Полтавщину» (shovnebi, Дніпро, 06.11 12:26): область, КУДИ летить ціль. Пункт «повз/біля» лежить
+# у регіоні каналу (Голубівка біля Губинихи), а не в області призначення (тезка за 280 км)
+DEST_OBL = re.compile(r"(^|[^а-яіїє])(?:на|в|у|до|у бік|в бік|в напрямку|у напрямку|в сторону|курсом на|курс на)\s+[а-яіїєы]+(?:щину|ччину|щини|ччини|щину|ську область|ської області)(?![а-яіїє])")
 ORIGIN_OBL = re.compile(r"(^|[^а-яіїє])(з|із|зі|с|со|от|зі сторони)\s+[а-яіїєы]+(щини|ччини|щины|чины|ської області|ской области|ської обл\.?|ской обл\.?)")
 MORE_HINTS = [(re.compile(r"житомирщ|житомирськ\w* обл|житомирск\w* обл"), "Житомирська"),
               (re.compile(r"черкащ|черкаськ\w* обл|черкасск\w* обл"), "Черкаська"),
@@ -622,6 +625,18 @@ class Parser:
         self._chan_bbox = False
         # «… з Чернігівщини» — звідки летить, а не де шукати пункт призначення
         th = ORIGIN_OBL.sub(" ", t)
+        self._pos_hint, dest_bb = None, None
+        if channel and DEST_OBL.search(th):
+            from .config import CHANNEL_REGION
+            th_d = DEST_OBL.sub(" ", th)
+            reg = CHANNEL_REGION.get(channel)
+            if reg and not any(rx.search(th_d) for rx, _n, _b in OBLAST_HINTS) and not any(rx.search(th_d) for rx, _n in MORE_HINTS):
+                # область лише як призначення: позиції («повз», «біля») шукаємо в регіоні каналу, цілі «на X» в обох
+                from .geo import oblasts as _ob
+                for nm, _polys, bb_ in _ob().items:
+                    if nm == reg:
+                        self._pos_hint, dest_bb = reg, (bb_[1] - 0.15, bb_[3] + 0.15, bb_[0] - 0.2, bb_[2] + 0.2)
+                        break
         for rx, name, bb in OBLAST_HINTS:
             if rx.search(th):
                 obs.oblast_hint, bbox = name, bb
@@ -635,6 +650,9 @@ class Parser:
                             obs.oblast_hint, bbox = name, (bb[1] - 0.1, bb[3] + 0.1, bb[0] - 0.15, bb[2] + 0.15)
                             break
                     break
+        if dest_bb is None or bbox is None:
+            self._pos_hint, dest_bb = None, None
+        self._pos_bb = dest_bb
         self._hint = obs.oblast_hint
         self._hint_n = sum(1 for rx, _n, _b in OBLAST_HINTS if rx.search(th)) + sum(1 for rx, _n in MORE_HINTS if rx.search(th))
         # область, явно названа в тексті як «…щина» («(Миколаївщина)», заголовок сегмента); «Харківський масив» не рахується
@@ -851,8 +869,12 @@ class Parser:
             # без контексту: КАБ/FPV/«Молнія» б'ють біля фронту («КАБ на Золочів» — Харківщина, не Львівщина)
             cen = ctx or (((bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2) if bbox else (KH if getattr(self, "_typ", None) in FRONTLINE else UA_CENTER))
         out: list[PlaceRef] = []
+        bbox0, chan0 = bbox, getattr(self, "_chan_bbox", False)
         for role, ids in found:
             cand = ids
+            # позиція («повз», «біля») при області лише як призначенні: шукаємо в регіоні каналу (DEST_OBL)
+            pos_role = role == "p" and bool(getattr(self, "_pos_hint", None))
+            bbox, self._chan_bbox = (self._pos_bb, True) if pos_role else (bbox0, chan0)
             if bbox:
                 inb = [i for i in ids if bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3]]
                 if not inb and getattr(self, "_chan_bbox", False):
@@ -888,6 +910,8 @@ class Parser:
             if _ct and all(P[i].kind == "X" and P[i].pop < 5000 for i in cand):
                 cand = list(cand) + _ct  # у регіоні з тексту лише хутір-тезка, а відоме місто далі: вирішить score
             hint = getattr(self, "_hint", None)
+            if pos_role:
+                hint = self._pos_hint
             if hint and len(cand) > 1:
                 from .geo import oblasts as _ob
                 # точно в області з повідомлення; велике місто поруч (у прямокутнику області) теж лишаємо:
@@ -938,4 +962,5 @@ class Parser:
                     cand = [i for i in cand if P[i].pop == top]
             best = min(cand, key=score)
             out.append(PlaceRef(role, P[best]))
+        self._chan_bbox = chan0
         return out

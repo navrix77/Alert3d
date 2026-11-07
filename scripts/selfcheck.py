@@ -141,7 +141,8 @@ def main() -> None:
     from app.tracker import TYPES as _T
     last, jumps = {}, []
     for t, src, link, kind, typ, pl, track, text in day:
-        if not track or not pl or typ not in _T:
+        # балістика: «позиція» в каналах це названа ЦІЛЬ залпу, а не місце ракети (07.11: Київ ↔ Бровари ↔ Трипілля за хвилину)
+        if not track or not pl or typ not in _T or typ == "ballistic":
             continue
         try:
             pts = [x for x in json.loads(pl) if x.get("r") == "p"]
@@ -149,10 +150,15 @@ def main() -> None:
             continue
         if not pts:
             continue
-        ids = p.gaz.lookup(pts[0]["n"]) or []
-        if not ids:
+        # той самий пункт, який обрав парсер (тезки!): перший у газетирі «Запоріжжя» з 15 — не місто, звідси
+        # 29 з 30 «неможливих» рухів 06.11 (Чернігів → Куликівка «714 км» замість 28)
+        try:
+            got = [r.place for seg in p.segments(text or "") for r in p.parse(seg, src).places if r.place.name == pts[0]["n"]]
+        except Exception:  # noqa: BLE001
+            got = []
+        if not got:
             continue
-        P0 = p.gaz.places[ids[0]]
+        P0 = got[0]
         if track in last:
             t0, q, s0 = last[track]
             dt = max(60.0, t - t0)
