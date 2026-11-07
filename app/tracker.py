@@ -771,6 +771,7 @@ class Tracker:
                     self.brain.rel_update(s_, True)
                     tr.credited.add(s_)
         tr.srcs.add(src)
+        tr.tnames = getattr(tr, "tnames", set()) | {p.name for p in targets}  # 07.11: пункти, на які канали прямо вказали як на ціль атаки
         if course_to:
             tr.course_to = course_to
             tr.course_xy = route[-1].xy if route else None
@@ -1294,7 +1295,12 @@ class Tracker:
             names = [p.name for p in tr.route if dist_km(p.xy, (ex, ey)) > 2 and p.xy in rest] or []
             pred_src, pred_p = ("channels" if rest else tr.pred_src), None
             pred_next = None
-            if not rest and status == "active" and self.brain:
+            # 07.11 «На Харків, а на мапі з Харкова»: ціль уже НАД названим пунктом атаки (свіжа реальна фіксація) — навчений
+            # «ймовірно далі» (Коротич тощо) не показуємо: це виглядає як вихід із міста, а не удар по ньому
+            _la = tr.last
+            at_goal = bool(status == "active" and not _la.est and _la.place is not None and now - _la.t < 900 and not tr.route
+                           and _la.place.name in getattr(tr, "tnames", ()))
+            if not rest and status == "active" and self.brain and not at_goal:
                 base = tr.last.place.name if tr.last.place else None
                 if base:
                     la0, lo0 = from_xy(ex, ey)
@@ -1312,7 +1318,7 @@ class Tracker:
                             tr.pred_moved, tr.pred_naive_hit = 0, False
             # навчений маршрут на 3 кроки вперед від останнього названого пункту — показ «ймовірно далі»
             lpath = []
-            if status == "active" and self.brain and tr.last.place:
+            if status == "active" and self.brain and tr.last.place and not at_goal:
                 la1, lo1 = from_xy(ex, ey)
                 lpath = [[round(lo, 4), round(la, 4), n, p] for n, p, la, lo in self.brain.next_path(tr.type, tr.last.place.name, tr.heading, (la1, lo1))]
             hd = bearing((ex, ey), rest[0]) if rest else tr.heading

@@ -33,3 +33,23 @@ def test_from_place_is_start_not_destination():
     m.feed(t, "Молния ⚠️от Слободское на Харьков, Элитное, Горизонт", "ND", now - 30, None, log=False)
     tr = t.snapshot(now)["tracks"][0]
     assert tr["lon"] > 36.38, tr["lon"]  # східніше центру Харкова (36.27)
+
+
+def test_no_learned_exit_when_over_named_target():
+    """07.11: «БпЛА на Харків… над Харковом» — ціль над містом-метою, «ймовірно далі: Коротич» не показуємо."""
+    import time
+    import app.main as m
+    from app import config
+    from app.tracker import Tracker
+    t = Tracker(config.SOURCES, m.brain)
+    now = time.time()
+    for dt, k, x in [(-300, "KL", "2х БпЛА курсом на Харків (Харківщина)"), (-60, "MK", "БпЛА над Харковом.")]:
+        m.feed(t, x, k, now + dt, None, log=False)
+    orig = (m.brain.next_places, m.brain.next_path)
+    try:
+        m.brain.next_places = lambda *a, **k: [("Коротич", 0.9, 49.89, 36.12)]
+        m.brain.next_path = lambda *a, **k: [("Коротич", 0.9, 49.89, 36.12)]
+        tr = t.snapshot(now)["tracks"][0]
+        assert not tr.get("pred_next") and not tr.get("lpath")
+    finally:
+        m.brain.next_places, m.brain.next_path = orig
