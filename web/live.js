@@ -175,7 +175,8 @@
     } catch (e) { say.textContent = 'Не вдалося отримати дані. Перевірте з’єднання.'; }
   }
   function start(manual) { stop = true; if (abortAudio) abortAudio(); setTimeout(() => live(null, null, manual ? seen : seen), 50); }
-  btn.onclick = () => { btn.classList.remove('new'); btn.querySelector('small').textContent = 'що змінилось'; start(true); };
+  // одночасно працює щось одне: Ефір вимикає Sky Radio (і навпаки)
+  btn.onclick = () => { if (radioOn) rbtn.onclick(); btn.classList.remove('new'); btn.querySelector('small').textContent = 'що змінилось'; start(true); };
   $('#lv-more').onclick = () => { box.classList.toggle('full'); };
   $('#lv-pause2').onclick = () => $('#lv-pause').click();
   try { new MutationObserver(() => { document.body.classList.toggle('live-on', !box.hidden); if (box.hidden) box.classList.remove('full'); })
@@ -392,6 +393,7 @@
   rbtn.onclick = async () => {
     radioOn = !radioOn; rshow();
     if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); window.SKYRADIO && window.SKYRADIO.stop(); return; }
+    if (playing) { stop = true; try { abortAudio && abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); } catch (e) {} box.hidden = true; playing = false; }  // Ефір вимикається, коли вмикається Sky Radio
     audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on');
     raCtx();  // звук розблоковується саме цим дотиком (iPhone)
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
