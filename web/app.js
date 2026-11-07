@@ -452,7 +452,13 @@ function addOverlays(){
   map.addLayer({id:'tac-age',type:'symbol',source:'tac',filter:['==',['get','k'],'age'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-anchor':'left','text-offset':[1.9,0],'text-optional':true},paint:{'text-color':'#E6EBF2','text-halo-color':'rgba(10,12,16,.92)','text-halo-width':1.5,'text-opacity':['get','o']}});
   map.addLayer({id:'tg-n',type:'symbol',source:'targets',filter:['all',['>',['get','count'],1],['!',['!=',['get','next'],null]]],layout:{'text-field':['concat','×',['to-string',['get','count']]],'text-font':['Noto Sans Bold'],'text-size':13,'icon-image':'chip','icon-text-fit':'both','icon-text-fit-padding':[2,6,2,6],'text-anchor':'top','text-offset':['interpolate',['linear'],['zoom'],2,['literal',[0,1.30]],5,['literal',[0,1.68]],7,['literal',[0,2.04]],9.5,['literal',[0,2.48]]],'text-allow-overlap':true,'icon-allow-overlap':true},paint:{'text-color':'#fff'}});
   if(map.getLayer('tg-course'))map.moveLayer('tg-course');
-  map.on('click','tg-hit',e=>{if(MEAS.on)return;const f=e.features[0];openSheet(f.properties.id);});
+  let lastTap={id:null,t:0};
+  map.on('click','tg-hit',e=>{if(MEAS.on)return;const f=e.features[0],id=f.properties.id,now=Date.now();
+    if(lastTap.id===id&&now-lastTap.t<420){lastTap={id:null,t:0};// 2 тапи по цілі: стеження вкл/викл
+      if(follow&&sel===id){stopFollow('Стеження вимкнено');}else{sel=id;startFollow();}
+      try{const b=$('#sh-follow');if(b){b.classList.toggle('on',follow);b.textContent=follow?'Зупинити стеження':'Стежити за ціллю';}}catch(_){}return;}
+    lastTap={id,t:now};openSheet(id);});
+  map.on('dblclick','tg-hit',e=>{e.preventDefault();});// без зуму карти при подвійному тапі по цілі
   if(!map._measClick){map._measClick=1;map.on('click',e=>{if(!MEAS.on)return;MEAS.pts.push([e.lngLat.lng,e.lngLat.lat]);measDraw();});}
   map.on('mouseenter','tg-hit',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg-hit',()=>map.getCanvas().style.cursor='');
   map.addLayer({id:'lpred',type:'line',source:'lpred',filter:['==',['geometry-type'],'LineString'],layout:{'line-cap':'round'},paint:{'line-color':['get','c'],'line-width':2,'line-dasharray':[0.6,2.2],'line-opacity':0.75}});
@@ -1162,26 +1168,28 @@ function fillSheet(first){
 if($('#sh-split'))$('#sh-split').onclick=e=>{const c=e.target.closest('.sp-c');if(!c||!c.dataset.ll)return;const p=c.dataset.ll.split(',').map(Number);TACHL={p,until:Date.now()+6000};map.easeTo({center:p,zoom:Math.max(map.getZoom(),8.5),duration:600});};
 $('#sh-close').onclick=()=>{$('#sheet').hidden=true;if(!follow)sel=null;};
 // «Стежити за ціллю»: камера веде ціль, картка ховається, зверху, компактна плашка з живими даними і «Зупинити»
-let followPrev=null,followSayT=0;
+let followPrev=null,followSayT=0,followThr=false;
 // 04.11 власник: супровід цілі голосом: куди летить, змінила курс, продовжує рух. Лише з даних треку, не частіше раз на 20 с.
 const HD8=['на північ','на північний схід','на схід','на південний схід','на південь','на південний захід','на захід','на північний захід'];
 function followSay(tr,r,kind,force){try{const S=window.NXSound;if(!S||!S.speakOnly)return;const m=S.get().mode;if(m!=='voice'&&m!=='both')return;
+  if(!r||!r.rel)return;// голос лише коли ціль явно загрожує вам (курс/маршрут до дому), інакше мовчимо
   const now=Date.now();if(!force&&now-followSayT<20000)return;followSayT=now;
   const n=TYPE_NAME[tr.type]||'Ціль';
   const where=tr.next?'курс на '+tr.next:(tr.hd!=null?HD8[Math.round((((tr.hd%360)+360)%360)/45)%8]:'');
-  const head=kind==='start'?'Стежу. '+n:kind==='turn'?n+' змінює курс':n+' продовжує рух';const wh=kind==='turn'&&tr.next?'на '+tr.next:where;
+  const head=kind==='start'||kind==='threat'?'Увага. '+n+', загроза вам':kind==='turn'?n+' змінює курс':n+' продовжує рух';const wh=kind==='turn'&&tr.next?'на '+tr.next:where;
   const dist=r?'. '+Math.round(r.d)+' км '+(r.from||'від вас'):'';
   S.speakOnly(head+(wh?(kind==='turn'?' ':', ')+wh:'')+dist);}catch(e){}}
 function startFollow(){if(!sel)return;follow=true;const d=DISP.get(sel);$('#sheet').hidden=true;
   if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),9.2),pitch:tilt?50:0,duration:1400,essential:true});
-  const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);followPrev=tr?{last:tr.last,next:tr.next}:null;renderFollow();toast('Стежу за ціллю, камера рухається разом з нею');if(tr){const dd=DISP.get(sel);followSay(tr,dd&&homeRel(tr,dd.p),'start',true);}}
+  const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);followPrev=tr?{last:tr.last,next:tr.next}:null;followThr=false;renderFollow();toast('Стежу за ціллю. Голосом попереджу, якщо вона загрожуватиме вам');}
 function stopFollow(msg){if(!follow)return;follow=false;$('#follow-pill').hidden=true;if(msg)toast(msg);}
 function renderFollow(){const el=$('#follow-pill');if(!follow||!sel){el.hidden=true;return;}
   const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr||tr.status!=='active'){stopFollow('Ціль більше не фіксується, стеження зупинено');return;}
   const d=DISP.get(sel);const r=d&&homeRel(tr,d.p);
   let ev='',sayK='';if(followPrev&&tr.last!==followPrev.last){ev='нова фіксація '+fmt(tr.last);sayK='go';el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}
   if(followPrev&&tr.next!==followPrev.next&&tr.next){ev='змінила курс → '+tr.next;sayK='turn';}
-  if(sayK)followSay(tr,r,sayK,sayK==='turn');followPrev={last:tr.last,next:tr.next,ev:ev||followPrev.ev};
+  const thrNow=!!(r&&r.rel);if(thrNow&&!followThr)sayK='threat';followThr=thrNow;
+  if(sayK)followSay(tr,r,sayK,sayK==='turn'||sayK==='threat');followPrev={last:tr.last,next:tr.next,ev:ev||followPrev.ev};
   el.innerHTML='<span class="fp-dot" style="background:'+TYPE_COLOR[tr.type]+'"></span><div class="fp-t"><b>'+esc(TYPE_NAME[tr.type])+(tr.count>1?' ×'+tr.count:'')+(tr.next?' → '+esc(tr.next):'')+'</b><span>'+
     (r?Math.round(r.d)+' км '+r.side+' від вас'+(r.eta!=null?' · ~'+Math.max(1,Math.round(r.eta))+' хв до вас':''):'')+(followPrev.ev?' · '+esc(followPrev.ev):'')+' · фіксація '+fmt(tr.last)+'</span></div><button id="fp-card">Картка</button><button id="fp-stop">Зупинити</button>';
   el.hidden=false;$('#fp-stop').onclick=e=>{e.stopPropagation();stopFollow('Стеження зупинено');};$('#fp-card').onclick=e=>{e.stopPropagation();$('#sheet').hidden=false;fillSheet(true);};}
@@ -1443,7 +1451,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=365,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=366,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
