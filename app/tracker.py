@@ -1098,6 +1098,42 @@ class Tracker:
                     keep.count = drop.count
                 if drop is a:
                     break
+        self._dedup_target_echo(act, pos, now)
+
+    @staticmethod
+    def _dest_keys(tr) -> set:
+        """Назви пунктів призначення без дужок і прикметників району: «Північна Салтівка (Харків)» і «Салтівка (Харків)» — одне місце."""
+        out = set()
+        names = [p.name for p in tr.route] + ([tr.course_to] if tr.course_to else []) + ([tr.last.place.name] if getattr(tr.last, "place", None) else [])
+        for n in names:
+            n = _re.sub(r"\s*\(.*?\)", "", n or "").strip().lower()
+            n = _re.sub(r"^(північна|південна|нова|стара|старий|новий)\s+", "", n)
+            if n:
+                out.add(n)
+        return out
+
+    def _dedup_target_echo(self, act: list, pos: dict, now: float) -> None:
+        """07.11 власник: «може це 1 і те ж?». Повідомлення без позиції («Ударный на СС») малює окремий шахед у місті, хоч
+        той самий дрон уже летить із названої точки на цю саму Салтівку. Таку «ціль без місця» (усі фіксації оцінені) від одного
+        повідомлення вливаємо в трек із реальною позицією, що йде на той самий пункт (≤45 км)."""
+        for a in act:
+            if a.merged or a.type not in ("shahed", "uav") or not a.obs or not all(o.est for o in a.obs) or len(a.obs) > 2:
+                continue
+            ka = self._dest_keys(a)
+            if not ka:
+                continue
+            best, bd = None, 1e9
+            for b in act:
+                if b is a or b.merged or b.type not in ("shahed", "uav") or all(o.est for o in b.obs):
+                    continue
+                if not (ka & self._dest_keys(b)) or (a.count or 1) > 1:
+                    continue
+                d = dist_km(pos[a.id], pos[b.id])
+                if d <= 45 and d < bd:
+                    best, bd = b, d
+            if best is not None:
+                a.merged = best.id
+                best.srcs |= a.srcs
 
     RARE = {"molniya", "lancet", "recon", "geran5", "banderol"}
 
