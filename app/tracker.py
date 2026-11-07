@@ -626,7 +626,7 @@ class Tracker:
                 jump = dist_km((tr.last.x, tr.last.y), X.xy) <= TYPES[tr.type]["speed"] * 2.5 * max(30.0, t - tr.last.t) / 3600 + 5
                 if dist_km(e, X.xy) <= reach and jump:
                     prev = tr.last
-                    bp = _border_start(X.xy, 25.0) if dist_km((prev.x, prev.y), X.xy) > 8 else None
+                    bp = _border_start(X.xy, 25.0) if (dist_km((prev.x, prev.y), X.xy) > 8 and tr.type not in ("fpv", "fpvf")) else None  # FPV «на X» уже біля X
                     if bp is not None and dist_km((prev.x, prev.y), bp) <= reach:
                         # пункт біля кордону: ціль летить З кордону до нього, а не повзе вздовж кордону чи стоїть у пункті
                         tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
