@@ -964,3 +964,10 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 #chg.min .chg-sum{display:block}
 #chg.min>*:not(.chg-sum):not(.chg-h){display:none}
 #chg.min .chg-h{position:absolute;top:2px;right:6px;margin:0}#chg.min .chg-h>:not(.chg-x){display:none}
+/* 07.11: Ефір прямо у смузі картки («Тривога у вашій громаді»), видно і в згорнутому стані */
+.me .me-head #live-btn{position:static!important;flex:none;box-shadow:none!important;border-radius:999px;padding:5px 11px;font:700 12.5px var(--f);background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.3);color:#fff;gap:6px;display:inline-flex;align-items:center}
+.me .me-head #live-btn small{display:none}
+.me .me-head #live-btn i{width:8px;height:8px;animation:none;background:#9aa3b0}
+.me .me-head #live-btn.on i{background:#FF4D5E;box-shadow:0 0 8px #FF4D5E;animation:lvp 1.4s infinite}
+.me .me-head #live-btn.on{background:rgba(255,77,94,.28);border-color:rgba(255,160,170,.8)}
+.me.fold .me-head #live-btn,.me:not(.open) .me-head #live-btn{display:inline-flex!important}

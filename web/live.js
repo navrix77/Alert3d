@@ -380,7 +380,8 @@
   // під рядком лічильників цілей (він може перенестись у два рядки), щоб нічого не перекривати
   // варіант А (власник 03.11): Ефір і Радіо в одному ряду з «Що зараз?» у картці «Мій дім»; без картки — зліва вгорі
   const row = document.getElementById('ai-row');
-  if (row) { row.appendChild(btn); row.appendChild(rbtn); }
+  const mh = document.querySelector('#me .me-head');
+  if (row) { if (mh) { btn.classList.add('in-head'); mh.insertBefore(btn, document.getElementById('me-share') || null); } else row.appendChild(btn); row.appendChild(rbtn); }  // 07.11: Ефір — прямо в смузі картки
   else {
     const place = () => { const c = document.getElementById('counters'); const b = c && c.getBoundingClientRect();
       const y = b && b.height ? Math.round(b.bottom + 8) : 60; rbtn.style.top = y + 'px'; btn.style.top = (y + 48) + 'px'; };
