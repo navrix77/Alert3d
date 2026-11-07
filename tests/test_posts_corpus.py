@@ -96,3 +96,13 @@ def test_named_targets_only_fly_inbound_not_to_border():
         m.feed(t, x, k, now + dt, None, log=False)
     hd = t.snapshot(now)["tracks"][0]["hd"]
     assert hd is not None and 90 < hd < 270, hd  # на південь, до міста
+
+
+def test_banderol_course_from_origin_oblast():
+    """07.11: «курсом на Диканьку, Полтавщина з Харківщини» — курс від Харківщини (на захід), а не на північ."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "⚠ 1х малогабаритна крилата ракета Бандероль курсом на Диканьку, Полтавщина з Харківщини.", "UR", now - 240, None, log=False)
+    hd = t.snapshot(now)["tracks"][0]["hd"]
+    assert hd is not None and 240 < hd < 320, hd

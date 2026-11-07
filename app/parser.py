@@ -814,6 +814,21 @@ class Parser:
                         if obs.course is None:
                             obs.course = (az + 180.0) % 360
                         break
+        # 07.11 власник: «курсом на Диканьку, Полтавщина з Харківщини» — звідки пущено, а не куди: курс від області-джерела до пункту
+        # (раніше без курсу ціль малювалась носом на північ). Одна ціль-пункт, область-джерело інша за область пункту.
+        if obs.course is None and obs.type in ("banderol", "cruise", "ballistic", "geran5", "rszv", "shahed", "uav", "jet", "molniya"):
+            mo = ORIGIN_OBL.search(t)
+            tg = [r.place for r in obs.places if r.role == "t"]
+            if mo and len(tg) == 1:
+                from .geo import oblasts as _ob, bearing as _brg, to_xy as _txy
+                ph = mo.group(0)
+                nm = next((n_ for rx_, n_, _b in OBLAST_HINTS if rx_.search(ph)), None) or next((n_ for rx_, n_ in MORE_HINTS if rx_.search(ph)), None)
+                for nm2, _polys, bb2 in _ob().items:
+                    if nm2 == nm:
+                        c_ = (bb2[1] + bb2[3]) / 2, (bb2[0] + bb2[2]) / 2  # (lat, lon) центру області-джерела
+                        if dist_km(_txy(*c_), tg[0].xy) > 40:
+                            obs.course = round(_brg(_txy(*c_), tg[0].xy), 1)
+                        break
         # «на сході від Харкова» — позиція за 20 км у вказаному напрямку від пункту
         mr = REL.search(t)
         if mr:

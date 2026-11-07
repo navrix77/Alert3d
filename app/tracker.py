@@ -1338,6 +1338,13 @@ class Tracker:
                 a_, b_ = tr.obs[-2], tr.obs[-1]
                 if dist_km((a_.x, a_.y), (b_.x, b_.y)) > 2:
                     hd = bearing((a_.x, a_.y), (b_.x, b_.y))
+            if hd is None and tr.type == "banderol":
+                # 07.11 «вивчи, звідки пускають бандеролі»: Крим (Арабатська стрілка, Саки, Бельбек), Білгородська, Курська, Брянська
+                # області, до ~500 км; курс без підказки каналів — від найближчої зони пуску
+                zs = [_gxy(la_, lo_) for la_, lo_ in ((45.9, 34.8), (50.6, 36.6), (51.7, 36.2), (53.2, 34.4), (46.9, 36.0))]
+                zn = min(zs, key=lambda z: dist_km(z, (ex, ey)))
+                if dist_km(zn, (ex, ey)) <= 520:
+                    hd = bearing(zn, (ex, ey))
             if hd is None and (tr.type in NEAR_TYPES or tr.type in ("shahed", "uav", "rszv")):  # без маршруту й курсу: носом від лінії фронту/кордону вглиб, а не на північ за замовчуванням
                 hd = self._learned_heading(tr, None, (ex, ey)) or self._front_bearing((ex, ey))
             # 07.11 власник: «летить з кордону на місто, а не навпаки». Позицію не називали (лише «на X» — усі точки оцінені):
