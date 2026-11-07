@@ -53,3 +53,31 @@ def test_no_learned_exit_when_over_named_target():
         assert not tr.get("pred_next") and not tr.get("lpath")
     finally:
         m.brain.next_places, m.brain.next_path = orig
+
+
+def _tracker():
+    import app.main as m
+    from app import config
+    from app.tracker import Tracker
+    return m, Tracker(config.SOURCES, m.brain)
+
+
+def test_city_target_from_north_is_not_inside_city():
+    """07.11: «БпЛА на Харків з півночі» — ціль на підході з півночі, а не в центрі міста."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    for dt, k, x in [(-300, "KL", "2х БпЛА курсом на Харків (Харківщина)"), (-200, "MU", "БпЛА на Харків з півночі."), (-80, "MK", "БпЛА над Харковом.")]:
+        m.feed(t, x, k, now + dt, None, log=False)
+    tr = t.snapshot(now)["tracks"][0]
+    assert tr["lat"] > 50.03, tr["lat"]  # північніше центру Харкова (49.99)
+
+
+def test_fpv_and_shahed_same_spot_merge():
+    """07.11: FPV і шахед в одній точці від різних каналів — один об'єкт."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "FPV курсом на П'ятихатки", "M", now - 120, None, log=False)
+    m.feed(t, "Шахед курсом на П'ятихатки", "TLK", now - 100, None, log=False)
+    assert len(t.snapshot(now)["tracks"]) == 1

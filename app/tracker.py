@@ -611,6 +611,9 @@ class Tracker:
                 rec["track"] = tr.id
                 rec["copy_of"] = orig["src"]
                 return rec
+            est_fix = False
+            if pt is not None and pos is not None and getattr(tr, "side", None) is not None and pos.place.name in getattr(tr, "tnames", ()) and pos.place.kind in ("M", "city") and t - tr.obs[0].t < 1800:
+                pt, est_fix = move(pt, tr.side, 8), True  # назва міста — не точка: ціль на підході з названого боку
             if pt is not None:
                 d = dist_km((tr.last.x, tr.last.y), pt)
                 dt = t - tr.last.t
@@ -626,7 +629,7 @@ class Tracker:
                     self._score_heading(tr, pt, t)
                     self._log_fc(tr, pt, t)
                     self._score_dir_claims(tr, pt, t)
-                tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
+                tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place, est_fix))
                 # кінематично неможливий «перехід» (той самий пост/хвилина, сусідні села різних дронів групи,
                 # >1.8× номінальної швидкості) — це не рух однієї цілі: не вчимо маршрут і не беремо з нього курс.
                 # Діагностика журналу 26.10–02.11: 21% сусідніх позицій шахедів давали >300 км/год, 43% трійок — «зигзаг» >120°.
@@ -744,7 +747,8 @@ class Tracker:
                     if bp is not None:
                         tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
                     else:
-                        tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
+                        _sx = move(X.xy, obs.side, 14) if getattr(obs, "side", None) is not None else X.xy  # «на місто з півночі»: не в місті, а на підході
+                        tr.obs.append(Point(t, _sx[0], _sx[1], src, X.name, link, X, True))
             tr.route = [p for p in route if dist_km(p.xy, (tr.last.x, tr.last.y)) > 2]
             if tr.route:
                 tr.route_src, tr.route_t = src, t
@@ -771,6 +775,8 @@ class Tracker:
                     self.brain.rel_update(s_, True)
                     tr.credited.add(s_)
         tr.srcs.add(src)
+        if getattr(obs, "side", None) is not None:
+            tr.side = obs.side
         tr.tnames = getattr(tr, "tnames", set()) | {p.name for p in targets}  # 07.11: пункти, на які канали прямо вказали як на ціль атаки
         if course_to:
             tr.course_to = course_to
@@ -1067,6 +1073,9 @@ class Tracker:
                             if near_cand:
                                 self.merge_cands.setdefault(frozenset((a.id, b.id)), now)
                             continue
+                elif {a.type, b.type} <= {"fpv", "fpvf", "shahed", "uav"} and {a.type, b.type} & {"fpv", "fpvf"}:
+                    # 07.11 власник: «це напевно 1 і те ж» — FPV і шахед в одній точці (≤5 км) від різних каналів: той самий об'єкт
+                    lim = 5
                 elif {a.type, b.type} == {"jet", "shahed"}:
                     # «реактивний» і «шахед» в одній точці одним курсом — найчастіше той самий об'єкт, різні канали
                     lim = 8
