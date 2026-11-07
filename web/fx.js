@@ -181,7 +181,7 @@
       for (const f of L) {
         const m = mc(f.p), c = f.col, age = f.age || 0;
         // давність: старе повідомлення тьмяніє, а зона «де ціль може бути» росте, без вигаданого польоту
-        const a = (f.weak ? 0.45 : 1) * (age > 300 ? Math.max(0.3, 1 - (age - 300) / 900) : 1);  // 04.11: 10 хв без згадок → помітно блідне
+        const a = (f.weak ? 0.45 : 1) * (f.sng ? 0.8 : 1) * (age > 300 ? Math.max(0.3, 1 - (age - 300) / 900) : 1);  // 04.11: 10 хв без згадок → помітно блідне
         if (age > 300 && f.spd && z >= 6.5) { const km = Math.min(45, f.spd * age / 3600 * 0.5), mpp = 40075016.686 * Math.cos(f.p[1] * Math.PI / 180) / (512 * Math.pow(2, z));
           const r = Math.max(spr * 1.6, km * 1000 / mpp); glow.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.10], 0]); top.push([m[0], m[1], r, 0, [c[0], c[1], c[2], 0.22], 2, 0, 0]); }
         // хвіст: краплі світла вздовж пройденого шляху, тануть до кінця
@@ -252,7 +252,7 @@
         const ph = ((f.p[0] * 131.7 + f.p[1] * 71.3) % 6.283 + 6.283) % 6.283, tt = (performance.now() - this.t0) / 1000;
         const sw = tac ? 0 : Math.sin(tt * 0.55 + ph), alt = tac ? 0 : Math.sin(tt * 0.37 + ph * 1.7);
         const fast = f.type === 'ballistic' || f.type === 'cruise';
-        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.78 : f.weak ? 0.85 : 1) * ((f.age || 0) > 600 ? Math.max(0.4, 1 - ((f.age || 0) - 600) / 1200) : 1) * (HL && f.type !== HL.type ? 0.22 : 1) * (LV && LV.dim && !LV.ids.has(f.id) ? 0.25 : 1), c = f.col;  // 04.11: давня ціль (10+ хв) напівпрозора, у лічильник не входить
+        const r = (f.hd || 0) * Math.PI / 180 + (fast ? 0.015 : 0.06) * sw, a = (f.est ? 0.78 : f.weak ? 0.85 : 1) * (f.sng ? 0.8 : 1) * ((f.age || 0) > 600 ? Math.max(0.4, 1 - ((f.age || 0) - 600) / 1200) : 1) * (HL && f.type !== HL.type ? 0.22 : 1) * (LV && LV.dim && !LV.ids.has(f.id) ? 0.25 : 1), c = f.col;  // 04.11: давня ціль (10+ хв) напівпрозора, у лічильник не входить
         const bank = Math.max(-1, Math.min(1, Math.cos(tt * 0.55 + ph) * 0.9));
         const sz = spr * (1 + 0.035 * alt), sh = spr * (0.22 + 0.06 * alt);
         const rc = [Math.min(1, c[0] * 1.15 + 0.15), Math.min(1, c[1] * 1.15 + 0.15), Math.min(1, c[2] * 1.15 + 0.15), a];
