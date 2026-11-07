@@ -23,6 +23,8 @@ jobs:
           mkdir -p /tmp/snap
           U=https://sky.navryx.com.ua
           for p in selfcheck daily fusion; do curl -s --max-time 120 "$U/api/$p" -o /tmp/snap/$p.json; done
+          # лічильник відвідувань: лише агреговані числа по днях (без IP і хешів), публічна адреса /api/visits
+          curl -s --max-time 60 "$U/api/visits?days=60" -o /tmp/snap/visits.json
           # журнал: API віддає щонайбільше 5000 найновіших, тож беремо ще й вибірки за видом
           curl -s --max-time 120 "$U/api/journal?hours=$H&limit=5000" -o /tmp/snap/journal.json
           for k in track zone close filtered avia; do curl -s --max-time 120 "$U/api/journal?hours=$H&limit=5000&kind=$k" -o /tmp/snap/journal_$k.json; done
