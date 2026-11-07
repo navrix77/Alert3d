@@ -1075,9 +1075,14 @@ class Tracker:
         if tr.route:
             km = sum(dist_km(a, b) for a, b in itertools.pairwise(tr.path()))
             # ракета долетіла до названого пункту і про неї мовчать — вона впала або збита: прибираємо за 3 хв
-            return min(base, km / tr.speed * 3600 + (180 if fast else 600))
+            lim = km / tr.speed * 3600 + (180 if fast else 600)
+            if tr.type in ("shahed", "uav") and tr.last.est and tr.last.label != "кордон (оцінка)":
+                lim = min(lim, 360)
+            return min(base, lim)
         if fast:
             return min(base, 300)
+        if tr.type in ("shahed", "uav") and tr.last.est and tr.last.label != "кордон (оцінка)":
+            return min(base, 360)  # 07.11: оціночна позиція в пункті/місті без нових повідомлень — прибираємо за 6 хв (конкурент ~5)
         return min(base, 600 if tr.last.est or tr.heading is None else 900)
 
     def _ev_out(self, tr: Track, now: float, here) -> dict:
