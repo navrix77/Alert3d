@@ -706,7 +706,9 @@ class Tracker:
                     tr.obs.append(Point(t, px, py, src, prev[0] + " (оцінка)", link, None, True))
                     tr.pred_src = "learned-origin"
                 else:
-                    bp = _border_start(X.xy)
+                    # 07.11 власник: «FPV на Велику Данилівку» — він уже біля пункту (Циркуни/окружна), а не на кордоні:
+                    # для FPV без поточного місця ставимо ціль у сам названий пункт
+                    bp = None if tr.type in ("fpv", "fpvf") else _border_start(X.xy)
                     if bp is not None:
                         tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
                     else:
