@@ -165,10 +165,16 @@ def on_threat(ev: dict) -> None:
             place = max(P, key=lambda p: p.pop) if len(P) == 1 or not ctx else min(P, key=lambda p: (p.lat - ctx[1]) ** 2 + (p.lon - ctx[2]) ** 2)
     if not place:
         return
-    obs = Observation(type=ev["type"], count=ev["count"], places=[PlaceRef("p", place)], course=ev["heading"])
+    role, course = "p", ev["heading"]
+    # «toward Kharkiv from the north»: місто — це ЦІЛЬ, а ціль іде з півночі (курс на південь), а не стоїть у місті
+    m = re.search(r"toward[s]?\s+[^,.]*?\s+from the (north-east|north-west|south-east|south-west|north|south|east|west)\b", ev["text"].lower())
+    if m:
+        az = {"north": 0, "north-east": 45, "east": 90, "south-east": 135, "south": 180, "south-west": 225, "west": 270, "north-west": 315}[m.group(1)]
+        role, course = "t", (az + 180) % 360
+    obs = Observation(type=ev["type"], count=ev["count"], places=[PlaceRef(role, place)], course=course)
     obs.raw = ev["text"]
     tracker.ingest(obs, "AIU", ev["t"], "https://alerts.in.ua")
-    brain.log_msg(ev["t"], "AIU", None, obs.kind, obs.type, obs.count, [{"r": "p", "n": place.name}], None, ev["text"])
+    brain.log_msg(ev["t"], "AIU", None, obs.kind, obs.type, obs.count, [{"r": role, "n": place.name}], None, ev["text"])
 
 
 _RC: dict = {}
