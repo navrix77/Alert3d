@@ -347,9 +347,9 @@
     sc && sc.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_scope', b.dataset.v); syncS(); if (radioOn) { window.SKYVOICE && window.SKYVOICE.stop(); radioIssue(); } });
     rr && rr.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_radius', b.dataset.v); syncS(); });
     syncS(); })();
-  const radioReq = (scope, greeted, after) => { const w = where(), now = NX().now();
+  const radioReq = (scope, greeted, after) => { const w = where(), now = NX().now(), first = !window.__radBr && !after; window.__radBr = 1;  // перший вихід в ефір: одне зведення «місцевість → область → Україна»
     return fetch('/api/radio?scope=' + scope + '&radius=' + (LS.get('radio_radius') || 25) + '&sid=' + radioSid + '&t=' + Math.round(radioSeen || (now - 1800)) + '&obl=' + encodeURIComponent(w.obl) +
-      (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : '') + (greeted ? '&g=1' : '') + (after ? '&a=1' : '')).then(r => r.json()); };
+      (w.lat != null ? '&lat=' + w.lat + '&lon=' + w.lon : '') + (greeted ? '&g=1' : '') + (after ? '&a=1' : '') + (first ? '&b=1' : '')).then(r => r.json()); };
   async function radioIssue(force, pre) {
     if (!radioOn || playing || radioBusy) return;
     const w = where();

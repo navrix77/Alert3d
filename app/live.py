@@ -100,7 +100,7 @@ def diff(state: dict, hist: list[dict], tracker, since: float, home: tuple | Non
                       "count_was": (o.get("count") or 1) if o else None, "next": t.get("next"), "next_was": o.get("next") if o else None,
                       "lon": t["lon"], "lat": t["lat"], "km": d, "ai": bool(t.get("ai")), "mentions": new_ev[-6:],
                       "srcs": (t.get("ev") or {}).get("prim", [])[:4]})
-    gone = [{"id": i, "type": o["type"], "next": o.get("next")} for i, o in old.items()
+    gone = [{"id": i, "type": o["type"], "next": o.get("next"), "name": o.get("name"), "at": (o.get("at") or [None])[0] if isinstance(o.get("at"), list) else o.get("at")} for i, o in old.items()
             if i not in {t["id"] for t in state.get("tracks", []) if t.get("status") == "active"} and mine(o["lon"], o["lat"])]
     bal = [e for e in state.get("bal", []) if e["t"] > since and (not obl or obl in e.get("obl", []) or "*" in e.get("obl", []))]
     lv_now = (state.get("levels") or {}).get(obl) if obl else None
@@ -127,7 +127,8 @@ def fallback_script(d: dict, question: str | None = None) -> list[dict]:
     if c["changed"]:
         parts.append(f"змінилося {c['changed']}")
     if c["gone"]:
-        parts.append(f"зникло з мапи {c['gone']}")
+        _g = [(g.get("name") or "ціль") + (f" біля {g['at']}" if g.get("at") else "") for g in d.get("gone", [])[:3]]
+        parts.append("зникло з мапи: " + "; ".join(_g) if _g else f"зникло з мапи {c['gone']}")
     if d.get("alert") and d["alert"]["now"] != d["alert"]["was"]:
         parts.append("оголошено тривогу" if d["alert"]["now"] else "тривогу знято")
     steps.append({"say": head + (", ".join(parts) if parts else "суттєвих змін у вашому районі немає") + ".", "action": "overview"})
@@ -574,9 +575,47 @@ RADIO_SYSTEM = RADIO_SYSTEM + """
 наближається. Не перелічуй статистику повідомлень. Для всієї України — щонайбільше два речення."""
 
 
-async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False, after: bool = False) -> dict:
+async def radio_brief(llm, state, hist, tracker, since, home, obl, sid: str, radius: float, greeted: bool) -> dict | None:
+    """Перший вихід слухача в ефір (07.11, власник: «неструктурований, має бути контекст»): ОДНЕ зведення в порядку
+    1) ваша місцевість, 2) ваша область, 3) Україна. Кожен блок — звичайний випуск свого режиму (ті самі заготовки й пам'ять
+    озвученого), тут лише склеюємо їх із короткими заголовками. Якщо блоку немає (немає геомітки/нічого сказати) — пропускаємо."""
+    if not KIT or _outage(state):
+        return None
+    from . import voicekit
+    parts = []
+    scopes = (["near"] if home else []) + (["oblast"] if obl else []) + ["country"]
+    for sc in scopes:
+        r = await _radio(llm, state, hist, tracker, since, home, obl, sc, sid, radius, greeted if sc == "near" else True, after=(sc == "country"))
+        if not r or r.get("quiet") or not r.get("text"):
+            continue
+        aid = (r.get("audio") or "").rsplit("/", 1)[-1]
+        frags = (voicekit.SEQ.get(aid) or (0, []))[1]
+        if not frags:
+            continue
+        head_v, head_t = {"near": ("Поруч із вами.", "Поруч із вами"), "oblast": (f"Ваша область.", f"Ваша область · {obl}"),
+                          "country": ("Тепер по Україні.", "Україна")}[sc]
+        parts.append((sc, head_v, head_t, frags, r["text"], r.get("level")))
+    if len(parts) < 2:
+        return None  # один блок — нічого склеювати, звичайна відповідь
+    voice, text = [], []
+    for sc, hv, ht, frags, tx, lv in parts:
+        voice += [hv] + [x for x in frags if x not in ("Ви слухаєте Скай.",)]
+        text.append(ht + "\n" + tx)
+    mem = RADIO_STATE.setdefault((sid or "-", "near" if home else "oblast" if obl else "country", obl), {"fp": None, "t": 0.0, "said": []})
+    res = {"voice": voice, "text": "\n\n".join(text)}
+    return _kit_reply(mem, mem.get("fp"), time.time(), "brief", res, "summary", "urgent" if any(p[5] == "urgent" for p in parts) else "update")
+
+
+async def radio(llm, state, hist, tracker, since, home, obl, scope, sid: str = "", radius: float = 25, greeted: bool = False, after: bool = False, brief: bool = False) -> dict:
     """Обгортка: прапорець idle для автовимкнення радіо — лише коли немає ні тривоги в області, ні цілей до 300 км."""
-    r = await _radio(llm, state, hist, tracker, since, home, obl, scope, sid, radius, greeted, after)
+    r = None
+    if brief and sid and not any(k[0] == sid for k in RADIO_STATE) and not after:
+        try:
+            r = await radio_brief(llm, state, hist, tracker, since, home, obl, sid, radius, greeted)
+        except Exception:
+            r = None
+    if r is None:
+        r = await _radio(llm, state, hist, tracker, since, home, obl, scope, sid, radius, greeted, after)
     f = near_facts(state, home, obl, since, radius) if home else None
     al = bool(obl) and (obl in (state.get("levels") or {}) or obl in ((state.get("official") or {}).get("alert_obl") or []))
     r["idle"] = not al and not (f and (f["near"] or f.get("far")))
