@@ -305,7 +305,8 @@
   function sLoad() { const c = raCtx(); return Promise.all(Object.keys(SURL).map(k => SB[k] ? 0 : fetch(SURL[k]).then(r => r.arrayBuffer())
     .then(ab => new Promise((ok, no) => c.decodeAudioData(ab, ok, no))).then(b => { SB[k] = b; }).catch(() => {}))); }
   function sPlay(k, vol) { const b = SB[k]; if (LS.get('radio_sig') === '0') return wait(0);
-    if (k !== 'urgent' && k !== 'outage' && window.SKYRADIO && window.SKYRADIO.state() === 'PLAYING_MUSIC') return wait(0);  // під музикою SKY RADIO додаткові сигнали лише додають паузи (07.11) if (!b || (window.SKYVOICE && window.SKYVOICE.alerting)) return wait(0);
+    if (k !== 'urgent' && k !== 'outage' && window.SKYRADIO && window.SKYRADIO.state() === 'PLAYING_MUSIC') return wait(0);  // під музикою SKY RADIO додаткові сигнали лише додають паузи (07.11)
+    if (!b || (window.SKYVOICE && window.SKYVOICE.alerting)) return wait(0);
     try { const c = raCtx(), src = c.createBufferSource(), g = c.createGain(); g.gain.value = vol; src.buffer = b; src.connect(g).connect(RA.master); src.start(); } catch (e) {}
     return wait(Math.max(0, Math.round(b.duration * 1000) - 120)); }
   const SND = { ident: () => sPlay('ident', 0.6), outro: () => sPlay('outro', 0.45), news: () => sPlay('news', 0.42), calm: () => sPlay('calm', 0.3),
