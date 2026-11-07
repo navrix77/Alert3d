@@ -611,9 +611,7 @@ class Tracker:
                 rec["track"] = tr.id
                 rec["copy_of"] = orig["src"]
                 return rec
-            est_fix = False
-            if pt is not None and pos is not None and getattr(tr, "side", None) is not None and pos.place.name in getattr(tr, "tnames", ()) and pos.place.kind in ("M", "city") and t - tr.obs[0].t < 1800:
-                pt, est_fix = move(pt, tr.side, 8), True  # назва міста — не точка: ціль на підході з названого боку
+            est_fix = False  # 07.11: підтверджене «над X» ставимо в X; зсув на підхід лише для «на X з півночі» без підтвердження місця
             if pt is not None:
                 d = dist_km((tr.last.x, tr.last.y), pt)
                 dt = t - tr.last.t
@@ -664,9 +662,10 @@ class Tracker:
                         tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
                         tr.heading = bearing(bp, X.xy)
                     else:
-                        tr.obs.append(Point(t, X.xy[0], X.xy[1], src, X.name, link, X, True))
-                        if dist_km((prev.x, prev.y), X.xy) > 3:
-                            tr.heading = bearing((prev.x, prev.y), X.xy)
+                        _sx = move(X.xy, obs.side, 14) if getattr(obs, "side", None) is not None else X.xy  # «на місто з півночі»
+                        tr.obs.append(Point(t, _sx[0], _sx[1], src, X.name, link, X, True))
+                        if dist_km((prev.x, prev.y), _sx) > 3:
+                            tr.heading = bearing((prev.x, prev.y), _sx) if getattr(obs, "side", None) is None else obs.course
                     route = route[1:]
                     if not route:
                         # ціль уже в X (оцінка) і нового пункту не названо: «→ X» більше не показуємо,

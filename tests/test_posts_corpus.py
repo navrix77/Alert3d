@@ -67,10 +67,14 @@ def test_city_target_from_north_is_not_inside_city():
     import time
     m, t = _tracker()
     now = time.time()
-    for dt, k, x in [(-300, "KL", "2х БпЛА курсом на Харків (Харківщина)"), (-200, "MU", "БпЛА на Харків з півночі."), (-80, "MK", "БпЛА над Харковом.")]:
+    for dt, k, x in [(-300, "KL", "2х БпЛА курсом на Харків (Харківщина)"), (-200, "MU", "БпЛА на Харків з півночі.")]:
         m.feed(t, x, k, now + dt, None, log=False)
     tr = t.snapshot(now)["tracks"][0]
     assert tr["lat"] > 50.03, tr["lat"]  # північніше центру Харкова (49.99)
+    # підтвердження «над Харковом» — ціль у центрі
+    m.feed(t, "БпЛА над Харковом.", "MK", now - 20, None, log=False)
+    tr = t.snapshot(now)["tracks"][0]
+    assert abs(tr["lat"] - 49.992) < 0.04, tr["lat"]
 
 
 def test_fpv_and_shahed_same_spot_merge():
