@@ -958,3 +958,9 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 /* 07.11: «Наживо · час» — в самому низу по центру, під панеллю кнопок */
 .asof{position:fixed!important;left:50%!important;right:auto!important;top:auto!important;transform:translateX(-50%)!important;bottom:max(6px,env(safe-area-inset-bottom))!important;z-index:5;white-space:nowrap;padding:3px 10px 3px 8px;font-size:12px}
 .dock{bottom:calc(max(6px,env(safe-area-inset-bottom)) + 30px)!important}
+/* 07.11: «поки вас не було» стартує згорнутим рядком */
+#chg .chg-sum{display:none;font-size:13px;font-weight:600;padding-right:26px}
+#chg.min{padding:8px 12px;top:calc(env(safe-area-inset-top,0px) + 60px)}
+#chg.min .chg-sum{display:block}
+#chg.min>*:not(.chg-sum):not(.chg-h){display:none}
+#chg.min .chg-h{position:absolute;top:2px;right:6px;margin:0}#chg.min .chg-h>:not(.chg-x){display:none}

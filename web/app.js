@@ -1337,10 +1337,11 @@ async function showChanges(force){
     (j.events.some(e=>e.from||e.to)?'<button class="pill chg-go">Показати '+(j.events.filter(e=>e.from||e.to).length)+' змін на карті →</button>':'');
   el.querySelector('.chg-x').onclick=()=>{el.hidden=true;clearChg();};
   const go=el.querySelector('.chg-go');if(go)go.onclick=()=>{clearTimeout(showChanges.t);el.hidden=true;playChanges(j.events);};
-  // прочитано → закривається саме (≈2,5 с на рядок, 8–20 с); дотик до картки лишає її відкритою
-  clearTimeout(showChanges.t);const rows=Math.min(6,j.events.length);
-  showChanges.t=setTimeout(()=>{if(!el.hidden){el.hidden=true;clearChg();}},Math.max(8000,Math.min(20000,rows*2500+3000)));
-  el.ontouchstart=el.onpointerdown=()=>clearTimeout(showChanges.t);}
+  // 07.11: на старті — згорнутий рядок (не закриває екран), висить 4 с і зникає; дотик розгортає і лишає
+  el.classList.add('min');el.insertAdjacentHTML('afterbegin','<div class="chg-sum">'+j.total+' змін біля вас, поки вас не було · торкніться</div>');
+  clearTimeout(showChanges.t);showChanges.t=setTimeout(()=>{if(!el.hidden){el.hidden=true;clearChg();}},4000);
+  el.onclick=ev=>{if(el.classList.contains('min')&&!ev.target.closest('.chg-x')){el.classList.remove('min');clearTimeout(showChanges.t);
+    showChanges.t=setTimeout(()=>{if(!el.hidden){el.hidden=true;clearChg();}},15000);}};}
 function clearChg(){if(map.getSource('chg'))map.getSource('chg').setData({type:'FeatureCollection',features:[]});}
 function playChanges(evs){
   if(!map.getSource('chg')){map.addSource('chg',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
