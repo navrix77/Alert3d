@@ -2307,3 +2307,18 @@ def test_aiu_heading_westward_not_confused_with_position():
     assert cls._heading(o, "a jet-powered drone from kharkiv region to the east of poltava region on a westward course") == 270
     assert cls._heading(o, "drone heading north-east") == 45
     assert cls._heading(o, "located to the east of kyiv") is None
+
+
+def test_destination_oblast_does_not_move_position_out_of_channel_region():
+    # shovnebi (Дніпро) 06.11 12:26: «повз Голубівку на Полтавщину» — Голубівка біля Губинихи (radar_sich 12:28
+    # «Повз Губиниху на Полтавщину»), а не тезка за 280 км; область тут — куди летить ціль
+    o = P.parse("1 реактив повз Голубівку на Полтавщину", "shovnebi")
+    g = o.places[0].place
+    assert g.name == "Голубівка" and abs(g.lat - 48.89) < 0.1 and abs(g.lon - 35.32) < 0.1
+    # ціль «на X» у області призначення шукаємо як і раніше
+    o2 = P.parse("Шахед на Полтавщину, курс на Решетилівку", "shovnebi")
+    assert o2.places[0].place.name == "Решетилівка"
+    # маршрут PhantomChe не змінився: Куликівка — селище між Сновськом і Кіптями
+    o3 = P.parse("новий реактивнтй повенен так само піти від Сновська до Куликівки, потім до Кіптів/Козельця і на Київщину.", "PhantomChe")
+    k = [r.place for r in o3.places if r.place.name == "Куликівка"][0]
+    assert abs(k.lat - 51.376) < 0.02
