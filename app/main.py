@@ -534,6 +534,37 @@ async def lifespan(app: FastAPI):
                 await tts.speak("Готово", "lada")
                 break
             await asyncio.sleep(10)
+    # ядро тренінгу: параметри з data/params.json (пише app/trainer.py щоночі окремим процесом)
+    def _load_params() -> None:
+        try:
+            from . import trainer
+            pr = trainer.load_params().get("speed_over") or {}
+            if pr:
+                tracker.speed_over.update({k: float(v) for k, v in pr.items()})
+                log.info("тренінг: застосовано швидкості %s", pr)
+        except Exception as e:  # noqa: BLE001
+            log.warning("params: %s", e)
+
+    _load_params()
+
+    async def _nightly_train() -> None:
+        import datetime as _dt
+        from zoneinfo import ZoneInfo
+        while True:
+            now = _dt.datetime.now(ZoneInfo("Europe/Kyiv"))
+            nxt = now.replace(hour=3, minute=40, second=0, microsecond=0)
+            if nxt <= now:
+                nxt += _dt.timedelta(days=1)
+            await asyncio.sleep((nxt - now).total_seconds())
+            try:
+                pr = await asyncio.create_subprocess_exec("nice", "-n", "15", sys.executable, "-m", "app.trainer", cwd=str(Path(__file__).resolve().parent.parent))
+                await asyncio.wait_for(pr.wait(), 2400)
+                _load_params()
+            except Exception as e:  # noqa: BLE001
+                log.warning("нічний тренінг: %s", e)
+
+    if os.getenv("REPLAY") != "1" and os.getenv("NIGHTLY_TRAIN", "1") == "1":
+        tasks.append(asyncio.create_task(_nightly_train()))
     tasks.append(asyncio.create_task(_tts_warm()))
     if os.getenv("REPLAY") != "1" and os.getenv("AUTO_SOURCES", "1") == "1":
         tasks.append(asyncio.create_task(DISCOVER.run()))

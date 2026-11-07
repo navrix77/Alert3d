@@ -142,10 +142,12 @@ def truth_at(obs, t):
     return (near[0].x, near[0].y) if near else None
 
 
-def run(rows, test_from: float | None = None, methods=None, verbose=True) -> dict:
+def run(rows, test_from: float | None = None, methods=None, verbose=True, speed_over: dict | None = None) -> dict:
     methods = methods or METHODS
     brain = Brain(Path(":memory:"))
     trk = Tracker(SOURCES, brain, learn=True)
+    if speed_over:
+        trk.speed_over.update(speed_over)  # кандидат тренажера (app/trainer.py)
     fd = Feeder(trk)
     test_from = test_from or (rows[-1][0] - 86400)
     pending = []  # (track_obj, t0, type, {(метод, h): xy}, has_route)
