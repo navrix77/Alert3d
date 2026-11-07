@@ -136,10 +136,18 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
             if log:
                 brain.log_msg(ts, key, link, obs.kind, obs.type, obs.count, rec.get("places"), rec.get("track"), seg)
     trk.exclude = set()
+    if not useful and FPV_NOTE.search(text.lower()):
+        # загальне попередження про активність FPV/дронів в районі без конкретної цілі: лише у «Стрічку», не на мапу і не в лічильники
+        trk.log.append({"t": ts, "src": key, "kind": "note", "type": "fpv", "count": None, "link": link, "track": None, "places": [], "text": re.sub(r"\s+", " ", text).strip()[:260]})
+        trk.log = trk.log[-400:]
+        useful += 1
     if not useful:
         o_ = parser.parse(text, key)
         o_.raw = text
         trk.ingest(o_, key, ts, link)
+
+
+FPV_NOTE = re.compile(r"(фпв|fpv|фпів).*(пригород|приграничь|прикордон|околиц|передмістя|окраин|пригород)|(пригород|приграничь|прикордон|передмістя).*(фпв|fpv|фпів)", re.S)
 
 
 def on_threat(ev: dict) -> None:
