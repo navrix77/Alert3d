@@ -133,7 +133,7 @@
     if (state === 'INTERRUPTED' && !critical) { /* системне переривання: кнопка ▶ відновить */ }
   }
   function anim() { const c = ui.cv.getContext('2d'), d = new Uint8Array(32);
-    const f = () => { requestAnimationFrame(f); if (ui.bar.hidden || !ana) return; ana.getByteFrequencyData(d); c.clearRect(0, 0, 34, 20); c.fillStyle = state === 'PLAYING_JINGLE' ? '#FFB020' : '#8fb4ff';
+    let lt = 0; const f = (t) => { requestAnimationFrame(f); if (document.hidden || ui.bar.hidden || !ana || t - lt < 50) return; lt = t; ana.getByteFrequencyData(d); c.clearRect(0, 0, 34, 20); c.fillStyle = state === 'PLAYING_JINGLE' ? '#FFB020' : '#8fb4ff';
       for (let i = 0; i < 6; i++) { const v = d[i * 2 + 1] / 255, h = Math.max(2, v * 20); c.fillRect(i * 6, 20 - h, 4, h); } };
     f(); }
   const api = { start: async () => { mkUI(); return start(); }, stop, pause: () => pause(), resume, duck, jingleNow: () => { if (state === 'PLAYING_MUSIC') playJingle(false); },
