@@ -59,6 +59,15 @@ def _ua_ring():
     return _UA_RING
 
 
+def _fkm(tr) -> int | None:
+    """Відстань FPV від лінії фронту/кордону, км (лише для FPV; для підпису «глибше 25 км — носій/оптоволокно»)."""
+    if tr.type not in ("fpv", "fpvf"):
+        return None
+    from .parser import front_km
+    la, lo = from_xy(tr.last.x, tr.last.y)
+    return round(front_km(la, lo))
+
+
 def _border_start(xy, max_km=60.0, out_km=12.0):
     """Ціль «курсом на X» біля кордону: стартує з боку РФ/РБ (найближча точка контуру + out_km назовні)."""
     pts = _ua_ring()
@@ -1250,7 +1259,7 @@ class Tracker:
                 "id": tr.id, "type": ("shahed" if tr.type == "uav" and wave_shahed else tr.type), "name": (TYPES["shahed"]["name"] + " (ймовірно, тип не названо)" if tr.type == "uav" and wave_shahed else TYPES[tr.type]["name"] + (" (ймовірно)" if tr.likely else "")), "likely": (tr.likely or (tr.type == "uav" and wave_shahed)), "raw_type": tr.type, "pair": tr.pair, "ai": tr.ai, "count": tr.count, "status": status,
                 "lat": round(lat, 5), "lon": round(lon, 5), "hd": None if hd is None else round(hd, 1),
                 **self.quality(tr, now, conf),
-                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "nopos": all(o.est for o in tr.obs),
+                "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "fkm": _fkm(tr), "nopos": all(o.est for o in tr.obs),
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
                 "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),
