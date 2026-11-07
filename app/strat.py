@@ -229,5 +229,8 @@ class StratBook:
             res.append({"id": g["id"], "name": g["name"], "icon": g["icon"], "n": g["n"], "stage": st, "lat": pos[0], "lon": pos[1], "hd": round(hd),
                         "site": g["site"], "origin": g["origin"], "dest": g["dest"], "path": path, "trail": trail, "dirs": dirs, "t": int(g["t"]),
                         "t0": int(g["t0"]), "until": int(until), "missiles": g["missiles"], "launch_t": int(g["launch_t"]) if g["launch_t"] else None,
-                        "est": est, "ev": g["ev"], "srcs": g["srcs"]})
+                        "est": est, "ev": g["ev"], "srcs": g["srcs"],
+                        "depart": int(g["depart"]) if g.get("depart") else None,
+                        "eta": int(g["depart"] + _km(o, d) / max(g["speed"], 1) * 3600) if (st == "transit" and o and d and g.get("depart")) else None,
+                        "km": round(_km(o, d)) if (o and d and st == "transit") else None})
         return res

@@ -866,6 +866,7 @@ function stratBuild(){stratImages();
   if(!map._stratClick){map._stratClick=1;map.on('click','strat',e=>{const f=e.features&&e.features[0];if(!f)return;const g=STRAT.find(x=>x.id===f.properties.gid);if(!g)return;
     if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'330px',className:'kab-pop avia-pop',offset:18}).setLngLat([g.lon,g.lat]).setHTML(stratInfo(g)).addTo(map);
     if(g.path&&g.path.length>1){const a=g.path[0],b=g.path[1];map.fitBounds([[Math.min(a[0],b[0]),Math.min(a[1],b[1])],[Math.max(a[0],b[0]),Math.max(a[1],b[1])]],{padding:{top:150,bottom:Math.min(innerHeight*0.45,380),left:50,right:50},maxZoom:7,duration:900});}});
+  map.on('click','strat-rpti',e=>{const f=e.features&&e.features[0];if(!f)return;const g=STRAT.find(x=>x.id===f.properties.gid);if(!g)return;if(kabPop)kabPop.remove();kabPop=new maplibregl.Popup({closeButton:true,maxWidth:'330px',className:'kab-pop avia-pop',offset:18}).setLngLat(f.geometry.coordinates).setHTML(stratInfo(g)).addTo(map);});
   map.on('mouseenter','strat',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','strat',()=>map.getCanvas().style.cursor='');}return true;}
 function stratWhere(g){const s=STRAT_STAGE[g.stage]||g.stage;
   if(g.stage==='transit')return 'переліт '+(g.origin||'?')+' → '+(g.dest||'?');
@@ -874,7 +875,11 @@ function stratWhere(g){const s=STRAT_STAGE[g.stage]||g.stage;
   if(g.stage==='launch')return 'пуск'+(g.site?' · '+g.site:'');
   return s+(g.site?' «'+g.site+'»':'');}
 function stratInfo(g){const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k].name)||k;
+  const cmb=g.stage==='line'||g.stage==='launch',trn=g.stage==='transit';
   return '<div class="kp"><small>СТРАТЕГІЧНА АВІАЦІЯ</small><h4>'+esc(g.name)+(g.n?' ×'+g.n:'')+'</h4>'+
+   '<div class="kp-r"><span>Що</span><b style="color:'+(cmb?'#FF3B3B':'inherit')+'">'+(cmb?'ВИЛІТ БОЙОВИЙ':trn?'ВИЛІТ НЕ БОЙОВИЙ · передислокація':esc(STRAT_TAG[g.stage]||''))+'</b></div>'+
+   (g.origin||g.dest?'<div class="kp-r"><span>Куди</span><b>'+esc(g.origin||'?')+' → '+esc(g.dest||'?')+(g.km?' · ~'+g.km+' км':'')+'</b></div>':'')+
+   (g.depart?'<div class="kp-r"><span>Коли</span><b>вильот ~'+hm(g.depart)+(g.eta?' · прибуття ~'+hm(g.eta)+' (розрахунок)':'')+'</b></div>':'')+
    '<div class="kp-r"><span>Стан</span><b>'+esc(stratWhere(g))+'</b></div>'+
    '<div class="kp-r"><span>Остання згадка</span><b>'+hm(g.t)+'</b></div>'+
    (g.missiles?'<div class="kp-r"><span>Пуски</span><b>'+g.missiles+' ракет (за повідомленням)</b></div>':'')+
@@ -897,8 +902,8 @@ function syncStrat(){if(!SNAP||!stratEnsure())return;STRAT=SNAP.strat||[];const 
       L.push({type:'Feature',properties:{k:'rlabel',l:lbl},geometry:{type:'LineString',coordinates:rem}});
       const nn=g.n?' ×'+g.n:'';
       L.push({type:'Feature',properties:{k:'rarrow'},geometry:{type:'LineString',coordinates:rem}});
-      if(g.origin)L.push({type:'Feature',properties:{k:'rpt',l:'1 · '+g.origin+' (вильот)\n'+(STRAT_TAG[g.stage]||''),ic:g.icon,tc:stratCombat(g)?'#FF3B3B':undefined,r:stratRot(g,g.path[0]),t:g.n?'×'+g.n:''},geometry:{type:'Point',coordinates:g.path[0]}});
-      if(g.dest)L.push({type:'Feature',properties:{k:'rpt',l:'2 · '+g.dest+' (призначення)\n'+(STRAT_TAG[g.stage]||''),ic:g.icon,tc:stratCombat(g)?'#FF3B3B':undefined,r:stratRot(g,g.path[0]),t:g.n?'×'+g.n:''},geometry:{type:'Point',coordinates:g.path[1]}});}
+      if(g.origin)L.push({type:'Feature',properties:{k:'rpt',gid:g.id,l:'1 · '+g.origin+' (вильот)\n'+(STRAT_TAG[g.stage]||''),ic:g.icon,tc:stratCombat(g)?'#FF3B3B':undefined,r:stratRot(g,g.path[0]),t:g.n?'×'+g.n:''},geometry:{type:'Point',coordinates:g.path[0]}});
+      if(g.dest)L.push({type:'Feature',properties:{k:'rpt',gid:g.id,l:'2 · '+g.dest+' (призначення)\n'+(STRAT_TAG[g.stage]||''),ic:g.icon,tc:stratCombat(g)?'#FF3B3B':undefined,r:stratRot(g,g.path[0]),t:g.n?'×'+g.n:''},geometry:{type:'Point',coordinates:g.path[1]}});}
     if(g.trail&&g.trail.length>1)L.push({type:'Feature',properties:{k:'trail'},geometry:{type:'LineString',coordinates:g.trail}});
     (g.dirs||[]).forEach(d=>{L.push({type:'Feature',properties:{k:'dir'},geometry:{type:'LineString',coordinates:[[g.lon,g.lat],[d.lon,d.lat]]}});
       L.push({type:'Feature',properties:{k:'dirpt',l:d.label+' ~'+d.km+' км'},geometry:{type:'Point',coordinates:[d.lon,d.lat]}});});
@@ -1481,7 +1486,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=408,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=409,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
