@@ -2219,3 +2219,26 @@ def test_defense_news_does_not_create_target():
          "Надалі планують захистити частину кільцевої дороги та трасу в напрямку Дергачів.")
     o = p.parse(t, "KL")
     assert o.type is None and o.no_target
+
+
+def test_past_strike_summaries_are_not_live_targets():
+    """07.11: підсумки вже відбутого удару давали балістичну тривогу по Київщині й ракету на карті через години після атаки."""
+    import os
+    os.environ.setdefault("REPLAY", "1")
+    from app.parser import Parser
+    p = Parser()
+    for src, t in (("war_monitor", "По Києву було застосовано 6х Балістичних ракет, ймовірно РМ-48У"),
+                   ("ppo_kiev", "❗️Загалом було застосовано 6 балістичних ракет типу «Іскандер-М» по Києву."),
+                   ("Northern_Sich_ukr", "будем потроху підсумовувати: загалом, за попередньою оцінкою ворог спрямував понад 30 ракет по обʼєктах "
+                                         "в межах Києва та області протягом вечора та ночі"),
+                   ("operativnoZSU", "🚀 Завод \"Протон\" у Орлі прийняв ракетну порцію добра.")):
+        o = p.parse(t, src)
+        assert o.type is None and o.no_target, t
+    # живі повідомлення лишаються ціллю
+    for t in ("Балістика на Київ", "2х Циркони курсом на Кролевець", "Ракета на Мерефу", "Швидкісна ціль на Херсон"):
+        assert p.parse(t, "KL").type in ("ballistic", "cruise"), t
+    from app import main as M
+    nb, nt = len(M.tracker.bal), len(M.tracker.tracks)
+    M.feed(M.tracker, "On the night of 07.11.26 the enemy employed for an attack against the territory of Ukraine:\n"
+           "☄ 16× балістичних ракет 9м723 «Іскандер-М»/РМ-48У по Києву та передмістю", "AIU", 1794000000, None, False)
+    assert len(M.tracker.bal) == nb and len(M.tracker.tracks) == nt

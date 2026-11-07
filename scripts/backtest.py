@@ -69,7 +69,7 @@ class Feeder:
             segs = [s for s in segs if not parser_mod.AFTERMATH.search(s.lower())]
         trk.exclude = set()
         touched = []
-        fc_msg = parser_mod.forecast(parser_mod.norm(text))  # як у main.feed: прогноз на ніч — не цілі
+        fc_msg = parser_mod.forecast(parser_mod.norm(text)) or parser_mod.past_strike(parser_mod.norm(text))  # як у main.feed: прогноз на ніч — не цілі
         for seg in segs:
             o = p.parse(seg, src, ctx)
             if fc_msg and not parser_mod.LIVE.search(parser_mod.norm(seg)):

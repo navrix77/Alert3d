@@ -93,7 +93,7 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     summary = bool(launch.SUMMARY_RX.search(text.lower()))
     # прогноз на ніч («ворог може застосувати: до 22 балістичних з Брянської…», «потенційні цілі: м. Київ…»): рядки
     # такого повідомлення не цілі й не пуски, навіть коли окремий рядок схожий на ціль (04.11, operatyvnohlep, UkraineRadar_24_7)
-    fc_msg = parser_mod.forecast(parser_mod.norm(text))
+    fc_msg = parser_mod.forecast(parser_mod.norm(text)) or parser_mod.past_strike(parser_mod.norm(text))
     useful = 0
     trk.exclude = set()
     # «Далее Алексеевка/Сортировка» — продовження тієї самої цілі, про яку канал писав щойно
