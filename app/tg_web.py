@@ -139,7 +139,8 @@ class WebMonitor:
             fast = [(k, u) for k, u in chans if k in config.FAST]
             slow = [(k, u) for k, u in chans if k not in config.FAST]
             per_cycle_slow = 45
-            sem = asyncio.Semaphore(10)
+            conc = 10  # адаптивно: при 429 знижуємо, чисті цикли повертають до максимуму
+            sem = asyncio.Semaphore(conc)
             si = 0
 
             async def one(key, user):
@@ -150,6 +151,7 @@ class WebMonitor:
                         self.errors[user] = f"HTTP {e.response.status_code}"
                         if e.response.status_code == 429:
                             self.backoff = time.time() + 30
+                            self._hit429 = True
                     except Exception as e:  # noqa: BLE001
                         self.errors[user] = str(e)[:120]
 
@@ -161,6 +163,14 @@ class WebMonitor:
                 if time.time() < getattr(self, "backoff", 0):
                     await asyncio.sleep(5)
                     continue
+                if getattr(self, "_hit429", False):  # резервний режим: м'якший темп, доки Telegram не заспокоїться
+                    self._hit429 = False
+                    per_cycle_slow, conc = max(15, int(per_cycle_slow * 0.6)), max(4, conc - 3)
+                    sem = asyncio.Semaphore(conc)
+                    log.warning("t.me/s: 429 → знижую темп (порція %d, паралельно %d)", per_cycle_slow, conc)
+                elif per_cycle_slow < 45 and time.time() > getattr(self, "backoff", 0) + 60:
+                    per_cycle_slow, conc = min(45, per_cycle_slow + 5), min(10, conc + 1)
+                    sem = asyncio.Semaphore(conc)
                 batch = fast + [slow[(si + n) % len(slow)] for n in range(min(per_cycle_slow, len(slow)))]
                 si = (si + per_cycle_slow) % max(1, len(slow))
                 await asyncio.gather(*(one(k, u) for k, u in batch))
