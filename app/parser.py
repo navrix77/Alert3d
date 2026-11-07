@@ -783,6 +783,8 @@ class Parser:
                     role = "p"  # «Великий Вистороп — шахед»: пункт на початку без прийменника — де ціль зараз
                 elif prev in POS_PREV:
                     role = "p"
+                elif prev in ("в", "у", "во") and re.search(r"(ах|ях)[.,!?]*$", w.lower()):
+                    role = "p"  # 07.11: «Акустика ФПВ в Дергачах» — місцевий відмінок множини: дрон зараз У Дергачах, а не курс на них
                 elif prev in FROM_PREV or (prev == "района" and prev2 in FROM_PREV):
                     role = "f"
                 found.append((role, ids))

@@ -2367,3 +2367,9 @@ def test_destroyed_launchers_news_becomes_hit():
 def test_tyshchenky_kharkiv_neighbourhood():
     names = [r.place.name for r in P.parse("FPV-дрон курсом на Тищенки/Велика Данилівка⚠️", "M").places]
     assert "Тищенки (Харків)" in names and "Велика Данилівка (Харків)" in names
+
+
+def test_locative_plural_is_position():
+    o = P.parse("🔴Акустика ФПВ в Дергачах по направлению к Харькову", "CX")
+    roles = {r.place.name: r.role for r in o.places}
+    assert roles.get("Дергачі") == "p"
