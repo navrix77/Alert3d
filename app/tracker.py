@@ -998,6 +998,10 @@ class Tracker:
                     continue
                 if tr.heading is not None and not tr.last.est and d > 8 and ang_diff(tr.heading, bearing(e, route[0].xy)) > 75:
                     continue
+                # 07.11 власник: «знову з Харкова». Трек із реальною фіксацією й без відомого курсу не перенацілюємо повідомленням
+                # без позиції на пункт далі 12 км («на Дергачі» не тягне групу над Харковом у бік Дергачів): це інша ціль
+                if tr.heading is None and not tr.last.est and d > 12:
+                    continue
             s = d - (40 if shared else 0)
             if s < bs:
                 best, bs = tr, s
