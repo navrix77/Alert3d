@@ -23,6 +23,8 @@
 })()</script>
   <p class="slogan"><span class="s1">Розумій,</span> <span class="s2">що відбувається</span> <em>в&nbsp;небі</em></p>
   <div class="ld"><div class="bar"><i></i></div><small id="intro-st">Підключаюсь до джерел…</small></div>
+  <small id="intro-ver" style="position:absolute;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));text-align:center;font-size:10px;letter-spacing:.04em;color:rgba(200,210,230,.38)"></small>
+  <script>(function(){var e=document.getElementById("intro-ver"),dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),v="Версія "+Math.floor(dd/7)+"."+(dd%7);e.textContent=v;fetch("/sw.js").then(function(r){return r.text()}).then(function(t){var m=t.match(/tryvoga-v(\d+)/);if(m){var b=+m[1];e.textContent=v+" · збірка "+Math.floor(b/100)+"."+String(b%100).padStart(2,"0")}}).catch(function(){})})()</script>
 </div>
 
 <header class="top">
