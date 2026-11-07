@@ -138,8 +138,8 @@ class WebMonitor:
             # Далі — безперервно: усі головні канали щоцикла, решта — широкими порціями; паралельно по 6 запитів
             fast = [(k, u) for k, u in chans if k in config.FAST]
             slow = [(k, u) for k, u in chans if k not in config.FAST]
-            per_cycle_slow = 30
-            sem = asyncio.Semaphore(6)
+            per_cycle_slow = 45
+            sem = asyncio.Semaphore(10)
             si = 0
 
             async def one(key, user):

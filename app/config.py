@@ -22,7 +22,7 @@ ALERTS_TOKEN = os.getenv("ALERTS_IN_UA_TOKEN", "")  # https://alerts.in.ua/api-r
 UKRAINEALARM_KEY = os.getenv("UKRAINEALARM_API_KEY", "")  # https://api.ukrainealarm.com (ключ — через форму на сайті)
 ALERTS_POLL_SEC = int(os.getenv("ALERTS_POLL_SEC", "15"))
 PUSH_SEC = float(os.getenv("PUSH_SEC", "2"))
-TG_WEB_CYCLE_SEC = float(os.getenv("TG_WEB_CYCLE_SEC", "8"))  # цикл: головні канали щоразу, решта — порціями по 30
+TG_WEB_CYCLE_SEC = float(os.getenv("TG_WEB_CYCLE_SEC", "5"))  # цикл: головні канали щоразу, решта — порціями по 30
 MAP_STYLE_VECTOR = os.getenv("MAP_STYLE_VECTOR", "https://tiles.openfreemap.org/styles/liberty")
 MAPTILER_KEY = os.getenv("MAPTILER_KEY", "")
 # Google Map Tiles API (Photorealistic 3D Tiles) — ключ обмежте за HTTP-referrer у Google Cloud Console
