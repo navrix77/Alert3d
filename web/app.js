@@ -655,7 +655,8 @@ function frame(now){
       // пройдений шлях, крапками за позиціями, які назвали канали; лише для вибраної цілі й тих, що летять до вас (інакше «каша»)
       if(active&&!BAL&&tr.trail&&tr.trail.length){const hi=sel===tr.id||(rel&&rel.rel);trails.push({type:'Feature',properties:{c:hi?c:'#E8ECF4',o:hi?0.95:0.22},geometry:{type:'LineString',coordinates:[...tr.trail.map(t=>[t[0],t[1]]),d.p]}});}
       const nearT=['fpv','fpvf','rszv'].includes(tr.type);// ближні цілі: завжди показуємо лінію до пункту призначення і сам пункт
-      if(active&&!BAL&&(sel===tr.id||(rel&&rel.rel)||nearT)&&tr.route.length){preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...tr.route]}});
+      if(active&&!BAL&&(sel===tr.id||(rel&&rel.rel)||nearT)&&tr.route.length){const far=!nearT||dist(xy(d.p),xy(tr.route[0]))>3;// ближня ціль уже біля пункту — лінію не малюємо, лише мітку
+        if(far)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:nearT?[d.p,tr.route[0]]:[d.p,...tr.route]}});
         if(tr.next)preds.push({type:'Feature',properties:{c,l:tr.next},geometry:{type:'Point',coordinates:tr.route[0]}});}
       if(active&&!BAL&&(sel===tr.id||(rel&&rel.rel))&&tr.lpath&&tr.lpath.length&&!tr.route.length){const L=tr.lpath;lpf.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...L.map(x=>[x[0],x[1]])]}});
         L.forEach(x=>lpf.push({type:'Feature',properties:{c,l:'ймовірно '+x[2]+' · '+Math.round(x[3]*100)+'%'},geometry:{type:'Point',coordinates:[x[0],x[1]]}}));}
@@ -1456,7 +1457,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=370,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=371,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
