@@ -579,6 +579,7 @@ class Tracker:
         targets = [p.place for p in places if p.role == "t"]
         only_target = real is None and frm is None  # «курсом на X» без поточного місця
         pos = real or (frm if frm and not targets else None) or (places[0] if not targets else None)
+        from_est = frm if (real is None and frm is not None and targets) else None  # «от Слободское на Харьков»: ціль біля Слободського, а не в Харкові (07.11)
         route = [p for p in targets if not pos or p.name != pos.place.name]
         course_to = route[-1].name if route else None
         names = {p.name for p in route}
@@ -643,7 +644,7 @@ class Tracker:
                         tr.heading, tr.hd_src = bearing((prev.x, prev.y), pt), "movement"
             elif route and getattr(obs, "further", False):
                 pass  # «далі курсом на X»: ціль лишається де була, X — лише наступний пункт маршруту (07.11)
-            elif route:
+            elif route and from_est is None:
                 # «на X» від каналу, що веде ціль щохвилини: ціль уже біля X (так показують провідні сервіси).
                 # Переносимо її в X, якщо X досяжний за час від останньої фіксації; курс — звідки прийшла.
                 X = route[0]
@@ -723,6 +724,9 @@ class Tracker:
             tr.likely = bool(getattr(obs, "likely", False))
             if pos is not None:
                 tr.obs.append(Point(t, pt[0], pt[1], src, pos.place.name, link, pos.place))
+            elif from_est is not None:
+                fx, fy = from_est.place.xy
+                tr.obs.append(Point(t, fx, fy, src, from_est.place.name + " (оцінка)", link, from_est.place, True))
             else:
                 # немає поточного місця: ставимо ціль у найімовірніший попередній пункт (вивчено з історії),
                 # інакше — у сам пункт призначення з невідомим курсом
