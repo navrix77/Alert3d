@@ -2242,3 +2242,15 @@ def test_past_strike_summaries_are_not_live_targets():
     M.feed(M.tracker, "On the night of 07.11.26 the enemy employed for an attack against the territory of Ukraine:\n"
            "☄ 16× балістичних ракет 9м723 «Іскандер-М»/РМ-48У по Києву та передмістю", "AIU", 1794000000, None, False)
     assert len(M.tracker.bal) == nb and len(M.tracker.tracks) == nt
+
+
+def test_air_defence_unit_and_russian_oblast_lists_are_not_targets():
+    """07.11: «інженер зенітної ракетної батареї Вікторія» → крилата ракета в селі Вікторія; «Загроза крилатих ракет: Брянська
+    Курська Орловська … області рф» → ракета на село Орловське в Україні."""
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("Одна з героїнь розповіді — інженер зенітної ракетної батареї Вікторія.", "operativnoZSU")
+    assert o.type is None and o.kind != "track"
+    o = p.parse("🍞 Загроза крилатих ракет:  Брянська Курська Орловська Тульська Калузька Воронезька області рф", "totallzrada")
+    assert o.kind != "track" and not o.places
+    assert p.parse("Ракета на Мерефу", "KL").type == "cruise"

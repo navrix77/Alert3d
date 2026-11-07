@@ -36,6 +36,11 @@ TYPES = [
 ]
 RECON_RX = dict(TYPES)["recon"]
 # «в Чорному морі відсутні ракетоносії», «пусків ракет не зафіксовано»: відсутність не є ціллю, слова після неї не визначають тип (04.11: «ракетоносії» дали «крилату ракету» над Коростенем)
+# «зенітної ракетної батареї», «зенітний ракетний комплекс»: ППО-новина, а не ракета (07.11, operativnoZSU: «інженер зенітної
+# ракетної батареї Вікторія» → крилата ракета в селі Вікторія)
+AD_UNIT = re.compile(r"зенітн\w*\s+ракетн(?:а|ої|ий|ого|і|их|ому|им)\s+(?:батаре|комплекс|полк|дивізіон|бригад|військ)\w*")
+# «Брянська Курська Орловська … області рф»: перелік областей РОСІЇ (totallzrada 07.11: «Орловська» → село Орловське в Україні)
+RU_OBL_LIST = re.compile(r"(?i)(?:[а-яіїєґ']+(?:ськ|цьк|зьк|ск)(?:а|ої|у|ій|ий|ої)\s+){1,10}(?:област\w*|обл\.?|краю|край)\s+(?:рф|росі[їяї]\w*|россии|російськ\w*)")
 ABSENT = re.compile(r"(?:відсутн\w*|отсутств\w*|нема(?:є|ють)?|не зафіксован\w*|не фіксуєтьс\w*|не зафиксирован\w*)\s+(?:[\w'’\-]+\s*){1,2}")
 TYPE_ANY = re.compile("|".join(f"(?:{rx.pattern})" for _n, rx in TYPES))
 LANCET_THREAT = re.compile(r"(?:угроз\w*|загроз\w*|можлив\w*|ймовірн\w*|возможн\w*|вероятн\w*)\s+(?:удар\w*\s+)?ланцет\w*"
@@ -565,6 +570,7 @@ class Parser:
         text = SIDE_PHRASE.sub(" ", text)
         # вулиці й назви організацій: «вул. Світла», «Нова пошта», «Сили добра»
         text = NOT_PLACE.sub(" ", text)
+        text = RU_OBL_LIST.sub(" ", text)
         text = KH_DISTRICT.sub(" Харків ", text)
         text = OBL_LIST.sub(_obl_list, text)
         t = norm(text)
@@ -573,7 +579,7 @@ class Parser:
         pair = None
         if LANCET_THREAT.search(t) and RECON_RX.search(LANCET_THREAT.sub(" ", t)):
             t, pair = LANCET_THREAT.sub(" ", t), "lancet"
-        t_typ = ABSENT.sub(" ", t)
+        t_typ = AD_UNIT.sub(" ", ABSENT.sub(" ", t))
         typ = next((k for k, rx in TYPES if rx.search(t_typ)), None)
         self._typ = typ
         m = COUNT.search(t) or COUNT_PAREN.search(t)
