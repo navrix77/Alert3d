@@ -313,28 +313,16 @@
   // «Атмосфера ефіру» (налаштування): тиха синтезаторна підкладка між повідомленнями, без мелодії, пульсацій і наростання;
   // під голосом стихає приблизно на 20+ дБ; для важливого, виправлення й збою вимикається. За замовчуванням — «Лише повідомлення»
   // 05.11: фон був майже нечутним (гучність 4%) і в багатьох лишився «Тиша»: один раз скидаємо на «Атмосфера» з помітною гучністю
-  if (LS.get('radio_bed_v') !== '3') { LS.set('radio_bed_v', '3'); LS.set('radio_mode', 'msgs'); LS.set('radio_atmo_vol', '0.04'); }  // 05.11: гучний варіант звучав жахливо — повернено «Тиша» і тиху гучність
-  function bedStart() {
-    if (RA.bed || (LS.get('radio_mode') || 'msgs') !== 'atmo') return;
-    try {
-      const c = raCtx(); RA.bedGain = c.createGain(); RA.bedGain.gain.value = 0.0001; RA.bedGain.connect(RA.master);
-      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650; lp.Q.value = 0.3; lp.connect(RA.bedGain);
-      const chords = [[146.83, 220, 293.66], [130.81, 196, 261.63], [110, 164.81, 220], [123.47, 185, 246.94]];
-      const oscs = [0, 1, 2].map(n => { const o = c.createOscillator(); o.type = 'sine'; o.detune.value = n * 4 - 4; const g = c.createGain(); g.gain.value = 0.3; o.connect(g).connect(lp); o.start(); return o; });
-      let k = 0; const step = () => { const ch = chords[k++ % 4], t = c.currentTime; oscs.forEach((o, n) => o.frequency.setTargetAtTime(ch[n], t, 2.5)); };
-      step();
-      RA.bed = { oscs, timer: setInterval(step, 12000), bellT: 0 };
-      RA.bedGain.gain.setTargetAtTime(+(LS.get('radio_atmo_vol') || 0.04), c.currentTime, 2);
-    } catch (e) {}
-  }
-  function bedStop() { if (!RA.bed) return; try { clearInterval(RA.bed.timer); clearInterval(RA.bed.bellT); RA.bedGain.gain.setTargetAtTime(0.0001, RA.ctx.currentTime, 0.5); const o = RA.bed.oscs; setTimeout(() => o.forEach(x => { try { x.stop(); } catch (e) {} }), 2000); } catch (e) {} RA.bed = null; }
-  function duck(on) { try { if (RA.bedGain && RA.bed) RA.bedGain.gain.setTargetAtTime(on ? (+(LS.get('radio_atmo_vol') || 0.04)) * 0.08 : +(LS.get('radio_atmo_vol') || 0.04), RA.ctx.currentTime, 0.3); } catch (e) {} }
+  if (LS.get('radio_bed_v') !== '4') { LS.set('radio_bed_v', '4'); LS.set('radio_mode', 'music'); }  // 07.11: синтезована «атмосфера» прибрана, замість неї готова музика + джингл SKY RADIO  // 05.11: гучний варіант звучав жахливо — повернено «Тиша» і тиху гучність
+  function bedStart() {}  // синтезований фон прибрано (07.11)
+  function bedStop() {}
+  function duck(on) { try { window.SKYRADIO && window.SKYRADIO.duck(on); } catch (e) {} }
 
   // налаштування Sky Radio в розділі «Звук»: тиша чи атмосфера між повідомленнями, гучність атмосфери
   (function () { const seg = document.getElementById('rad-mode'), vol = document.getElementById('rad-atmo'); if (!seg) return;
-    const mode = () => LS.get('radio_mode') || 'msgs';
+    const mode = () => LS.get('radio_mode') || 'music';
     const sync = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === mode()));
-    seg.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_mode', b.dataset.v); sync(); if (radioOn) { if (b.dataset.v === 'atmo') bedStart(); else bedStop(); } });
+    seg.querySelectorAll('button').forEach(b => b.onclick = () => { LS.set('radio_mode', b.dataset.v); sync(); if (radioOn && window.SKYRADIO) { if (b.dataset.v === 'music') window.SKYRADIO.start(); else window.SKYRADIO.stop(); } });
     const vv = document.getElementById('rad-voice'), sg = document.getElementById('rad-sig');
     if (vv) { vv.value = Math.round((+(LS.get('radio_voice_vol') || 1)) * 10); vv.oninput = () => LS.set('radio_voice_vol', String(vv.value / 10)); }
     if (sg) { sg.checked = LS.get('radio_sig') !== '0'; sg.onchange = () => LS.set('radio_sig', sg.checked ? '1' : '0'); }
@@ -403,7 +391,7 @@
   const rsay = () => {};
   rbtn.onclick = async () => {
     radioOn = !radioOn; rshow();
-    if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); bedStop(); return; }
+    if (!radioOn) { clearInterval(radioT); radioT = null; if (abortAudio) abortAudio(); window.SKYVOICE && window.SKYVOICE.stop(); window.SKYRADIO && window.SKYRADIO.stop(); return; }
     audioOn = true; LS.set('live_audio', '1'); $('#lv-audio').classList.add('on');
     raCtx();  // звук розблоковується саме цим дотиком (iPhone)
     try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch (e) {}
@@ -412,10 +400,15 @@
     const sc0 = LS.get('radio_scope') || 'near';
     const pre = radioReq(sc0, true).then(r => { if (r && (r.speech || r.text) && r.level !== 'calm') r.voice = r.audio ? preUrl(r.audio) : preVoice(r.speech || r.text, 'radio'); return r; }).catch(() => ({}));
     await Promise.race([sLoad(), wait(900)]);
-    bedStart(); const id = SND.ident();
-    const IDT = 'Скай. Розумій, що відбувається в небі.';  // фірмова заставка (специфікація радіо), озвучена один раз і з кешу
-    const hi = preVoice(IDT, 'radio');
-    await id; await speak(IDT, 'radio', hi);
+    if ((LS.get('radio_mode') || 'music') === 'music' && window.SKYRADIO && window.SKYRADIO.enabled()) {
+      await window.SKYRADIO.start();  // готовий джингл → музика; голосовий випуск після джинглу
+      for (let w = 0; w < 40 && window.SKYRADIO.state() === 'PLAYING_JINGLE'; w++) await wait(500);
+    } else {
+      const id = SND.ident();
+      const IDT = 'Скай. Розумій, що відбувається в небі.';  // фірмова заставка (специфікація радіо), озвучена один раз і з кешу
+      const hi = preVoice(IDT, 'radio');
+      await id; await speak(IDT, 'radio', hi);
+    }
     await radioIssue(null, pre);         // зведення в обраному режимі охоплення
     // 04.11 власник: «де зведення по Україні?» — за концепцією: на початку й раз на 15 хв, у будь-якому режимі (із заготовок, безкоштовно)
     if (radioOn && sc0 !== 'country') await radioIssue('country');
