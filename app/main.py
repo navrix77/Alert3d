@@ -659,6 +659,16 @@ async def api_live(req: Request):
     d = live.diff(state(), HIST, tracker, since, home, ob, bbox)
     q = (b.get("q") or "").strip()[:300] or None
     out = await live.narrate(LLMX, d, q)
+    if not q and out.get("steps"):
+        # як у «Радіо SKY»: спершу структуроване зведення (ваша місцевість → область → Україна), тим самим голосом; далі — що змінилось
+        try:
+            import uuid
+            rb = await live.radio_brief(LLMX, state(), HIST, tracker, since, home, ob or "", "live-" + uuid.uuid4().hex[:8], 25.0, True)
+            if rb and rb.get("text") and rb.get("audio"):
+                rest = out["steps"][1:] if out["steps"] and out["steps"][0].get("action") == "overview" else out["steps"]
+                out["steps"] = [{"say": rb["text"], "action": "overview", "audio": rb["audio"]}] + rest
+        except Exception:
+            logging.getLogger("live").exception("live brief")
     return {"diff": d, **out}
 
 
