@@ -856,8 +856,8 @@ class Tracker:
             self.brain.pred_score("dir:" + e["src"], ang_diff(bearing(p0, pt), bearing(p0, e["dxy"])) <= 30)
 
     def _learned_heading(self, tr: Track, place, pt) -> float | None:
-        if tr.type in ("fpv", "fpvf"):
-            # FPV (особливо на оптоволокні) завжди летить з боку РФ/окупованої території: напрямок — від найближчої
+        if tr.type in ("fpv", "fpvf", "rszv"):
+            # FPV (особливо на оптоволокні) і РСЗВ завжди летить з боку РФ/окупованої території: напрямок — від найближчої
             # точки лінії фронту/кордону вглиб, а не за навченими «перельотами»
             from .parser import FRONT_PTS
             best = None

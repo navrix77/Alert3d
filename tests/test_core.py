@@ -2270,3 +2270,20 @@ def test_generic_uav_inherits_shahed_in_named_wave():
     tr2 = Tracker(config.SOURCES, learn=False)
     tr2.ingest(p.parse("БпЛА курсом на Суми", "y"), "y", t0)
     assert [x["type"] for x in tr2.snapshot(t0 + 60)["tracks"]] == ["uav"]
+
+
+def test_rszv_dalne_adjective_and_starts_from_border():
+    import time
+    from app.parser import Parser
+    from app.tracker import Tracker
+    from app import config
+    from app.geo import dist_km, to_xy
+    p = Parser(); t0 = time.time() - 120
+    o = p.parse("Дальнє РСЗВ на Руські Тишки ⚠️", "x")
+    assert [r.place.name for r in o.places] == ["Руські Тишки"]
+    tr = Tracker(config.SOURCES, learn=False)
+    tr.ingest(o, "x", t0)
+    t = tr.snapshot(t0 + 5)["tracks"][0]
+    assert t["type"] == "rszv"
+    # старт біля кордону на півночі, а не в селі Дальнє на Донеччині
+    assert dist_km(to_xy(t["lat"], t["lon"]), to_xy(50.1366, 36.4119)) < 40
