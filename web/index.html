@@ -23,12 +23,6 @@
 })()</script>
   <p class="slogan"><span class="s1">Розумій,</span> <span class="s2">що відбувається</span> <em>в&nbsp;небі</em></p>
   <div class="ld"><div class="bar"><i></i></div><small id="intro-st">Підключаюсь до джерел…</small></div>
-  <script>(function(){var A=null,done=false,st=window.__launchStop=function(){if(!A||done)return;done=true;var a=A,v=a.volume,n=0,i=setInterval(function(){n++;try{a.volume=Math.max(0,v*(1-n/8));}catch(e){}if(n>=8){clearInterval(i);try{a.pause();}catch(e){}}},60);};
-try{var off=false;try{off=localStorage.getItem('launch_snd')==='0';}catch(e){}if(off||sessionStorage.getItem('intro')==='1')return;  /* режим звуку тривог (за замовчуванням «Вимк») на звук запуску не впливає */
-A=new Audio("/audio/sky-radio/launch.mp3");A.volume=0.7;A.preload="auto";
-var go=function(){var el=document.getElementById("intro");if(done||!el||el.classList.contains("out"))return;A.play().catch(function(){});};
-A.play().catch(function(){var h=function(){document.removeEventListener("touchstart",h,true);document.removeEventListener("click",h,true);go();};document.addEventListener("touchstart",h,true);document.addEventListener("click",h,true);});
-A.addEventListener("ended",function(){done=true;});}catch(e){}})()</script>
   <small id="intro-ver" style="position:absolute;left:0;right:0;bottom:max(18px,env(safe-area-inset-bottom));text-align:center;font-size:10px;letter-spacing:.04em;color:rgba(200,210,230,.38)"></small>
   <script>(function(){var e=document.getElementById("intro-ver"),dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),v="Версія "+Math.floor(dd/7)+"."+(dd%7);e.textContent=v;fetch("/sw.js").then(function(r){return r.text()}).then(function(t){var m=t.match(/tryvoga-v(\d+)/);if(m){var b=+m[1];e.textContent=v+" · збірка "+Math.floor(b/100)+"."+String(b%100).padStart(2,"0")}}).catch(function(){})})()</script>
 </div>
