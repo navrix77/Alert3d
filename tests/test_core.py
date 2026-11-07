@@ -2362,3 +2362,8 @@ def test_destroyed_launchers_news_becomes_hit():
     ev = u.parse_launchers("🔥Дві пускові установки «Іскандерів» знищено цієї ночі на Брянщині, — Генштаб")
     assert ev and ev[0]["place"] == "Брянщина" and "Іскандер" in ev[0]["what"]
     assert u.parse_launchers("Росіяни привезли пускові установки на Брянщину") == []
+
+
+def test_tyshchenky_kharkiv_neighbourhood():
+    names = [r.place.name for r in P.parse("FPV-дрон курсом на Тищенки/Велика Данилівка⚠️", "M").places]
+    assert "Тищенки (Харків)" in names and "Велика Данилівка (Харків)" in names
