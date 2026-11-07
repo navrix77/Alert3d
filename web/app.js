@@ -1201,7 +1201,7 @@ function followSay(tr,r,kind,force){try{const S=window.NXSound;if(!S||!S.speakOn
   const head=kind==='start'||kind==='threat'?'Увага. '+n+', загроза вам':kind==='turn'?n+' змінює курс':n+' продовжує рух';const wh=kind==='turn'&&tr.next?'на '+tr.next:where;
   const dist=r?'. '+Math.round(r.d)+' км '+(r.from||'від вас'):'';
   S.speakOnly(head+(wh?(kind==='turn'?' ':', ')+wh:'')+dist);}catch(e){}}
-function startFollow(){if(!sel)return;follow=true;const d=DISP.get(sel);try{const b=$('#sh-follow');if(b){b.classList.add('on');b.textContent='Зупинити';}}catch(_){}
+function startFollow(){if(!sel)return;follow=true;const d=DISP.get(sel);$('#sheet').hidden=true;
   if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),9.2),pitch:tilt?50:0,duration:1400,essential:true});
   const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);followPrev=tr?{last:tr.last,next:tr.next}:null;followThr=false;renderFollow();toast('Стежу за ціллю. Голосом попереджу, якщо вона загрожуватиме вам');}
 function stopFollow(msg){if(!follow)return;follow=false;$('#follow-pill').hidden=true;if(msg)toast(msg);}
@@ -1474,7 +1474,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=391,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=392,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
