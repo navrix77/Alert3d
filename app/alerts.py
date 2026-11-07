@@ -87,6 +87,17 @@ class OfficialAlerts:
     DIRW = [("north-east", 45), ("north-west", 315), ("south-east", 135), ("south-west", 225), ("northeast", 45), ("northwest", 315),
             ("southeast", 135), ("southwest", 225), ("north", 0), ("south", 180), ("east", 90), ("west", 270)]
 
+    def _heading(self, d: str):
+        """Курс з англійського тексту. «on a westward course» — курс; «to the east of Poltava region» — це положення,
+        а не напрямок руху (раніше брали його як курс і цілі летіли в протилежний бік)."""
+        for k, az in self.DIRW:  # 1) явний курс: «westward course», «heading west», «towards the west»
+            if re.search(rf"{re.escape(k)}wards?\b|heading {re.escape(k)}\b|towards the {re.escape(k)}\b", d):
+                return az
+        for k, az in self.DIRW:  # 2) «to the east» лише якщо не «to the east of …» (положення)
+            if re.search(rf"to the {re.escape(k)}\b(?!\s+of\b)", d):
+                return az
+        return None
+
     def threats(self, md: str) -> list[dict]:
         """Розділ «THREAT ACTIVITY»: офіційні/моніторингові фіксації цілей із місцем і курсом."""
         import datetime as _dt
@@ -122,7 +133,7 @@ class OfficialAlerts:
             if name.endswith("область"):
                 continue  # уся область — надто неточно для позиції цілі
             n = re.search(r"\((\d+) tracked\)", what)
-            hd = next((az for k, az in self.DIRW if f"heading {k}" in d or f"towards the {k}" in d or f"to the {k}" in d), None)
+            hd = self._heading(d)
             t = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
             if t > now + _dt.timedelta(minutes=5):
                 t -= _dt.timedelta(days=1)

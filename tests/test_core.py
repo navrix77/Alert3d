@@ -2298,3 +2298,12 @@ def test_rszv_does_not_reach_city_only_outskirts():
     # близьке до кордону село лишається як є
     o2 = p.parse("РСЗВ на Руські Тишки", "x")
     assert o2.places[0].place.name == "Руські Тишки"
+
+
+def test_aiu_heading_westward_not_confused_with_position():
+    import app.alerts as A
+    cls = [c for c in vars(A).values() if isinstance(c, type) and hasattr(c, "DIRW")][0]
+    o = object.__new__(cls)
+    assert cls._heading(o, "a jet-powered drone from kharkiv region to the east of poltava region on a westward course") == 270
+    assert cls._heading(o, "drone heading north-east") == 45
+    assert cls._heading(o, "located to the east of kyiv") is None
