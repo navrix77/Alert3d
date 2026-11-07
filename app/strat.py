@@ -224,7 +224,7 @@ class StratBook:
                 continue
             if hd is None:
                 hd = _bearing(pos, (50.45, 30.52)) if st in ("takeoff", "line", "launch") else 0.0
-            dirs = self._dirs(g, pos, hd) if st in ("takeoff", "transit", "line", "launch") else []
+            dirs = self._dirs(g, pos, hd) if st in ("takeoff", "line", "launch") else []  # передислокація (переліт між аеродромами) — не бойовий виліт, «можливих цілей» немає
             until = g["t"] + {"ground": 6, "landed": 6, "takeoff": 9, "transit": 9, "line": 4, "launch": 3}.get(g["stage"], 6) * 3600
             res.append({"id": g["id"], "name": g["name"], "icon": g["icon"], "n": g["n"], "stage": st, "lat": pos[0], "lon": pos[1], "hd": round(hd),
                         "site": g["site"], "origin": g["origin"], "dest": g["dest"], "path": path, "trail": trail, "dirs": dirs, "t": int(g["t"]),
