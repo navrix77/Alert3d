@@ -842,6 +842,8 @@ function stratBuild(){stratImages();
   stratAL({id:'strat-dir',type:'line',source:'strat-l',filter:['==',['get','k'],'dir'],paint:{'line-color':'#F5B83D','line-width':1.6,'line-dasharray':[1.4,1.8],'line-opacity':0.85}});
   stratAL({id:'strat-route',type:'line',source:'strat-l',filter:['==',['get','k'],'route'],paint:{'line-color':'#FF8A1F','line-width':1.8,'line-dasharray':[3,2],'line-opacity':0.85}});
   stratAL({id:'strat-rlabel',type:'symbol',source:'strat-l',filter:['==',['get','k'],'rlabel'],layout:{'symbol-placement':'line','text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,-0.9],'symbol-spacing':420},paint:{'text-color':'#FFB347','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
+  stratAL({id:'strat-rarrow',type:'symbol',source:'strat-l',filter:['==',['get','k'],'rarrow'],layout:{'symbol-placement':'line','text-field':'▶','text-font':['Noto Sans Bold'],'text-size':15,'symbol-spacing':90,'text-keep-upright':false,'text-rotation-alignment':'map','text-allow-overlap':true,'text-ignore-placement':true},paint:{'text-color':'#FF8A1F','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.4}});
+  stratAL({id:'strat-rpti',type:'symbol',source:'strat-l',filter:['all',['==',['get','k'],'rpt'],['has','ic']],layout:{'icon-image':['concat','st-',['get','ic']],'icon-size':['interpolate',['linear'],['zoom'],3,0.35,6,0.55,9,0.8],'icon-allow-overlap':true,'icon-ignore-placement':true,'text-field':['get','t'],'text-font':['Noto Sans Bold'],'text-size':12,'text-anchor':'bottom','text-offset':[0,-1.6],'text-allow-overlap':true},paint:{'icon-opacity':0.8,'text-color':'#FFB347','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   stratAL({id:'strat-rpt',type:'circle',source:'strat-l',filter:['==',['get','k'],'rpt'],paint:{'circle-radius':4,'circle-color':'#0b0f16','circle-stroke-color':'#FF8A1F','circle-stroke-width':2}});
   stratAL({id:'strat-rptl',type:'symbol',source:'strat-l',filter:['==',['get','k'],'rpt'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'top','text-offset':[0,0.8],'text-optional':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   stratAL({id:'strat-trail',type:'line',source:'strat-l',filter:['==',['get','k'],'trail'],layout:{'line-cap':'round'},paint:{'line-color':'#FFB347','line-width':2.6,'line-opacity':0.9}});
@@ -883,8 +885,10 @@ function syncStrat(){if(!SNAP||!stratEnsure())return;STRAT=SNAP.strat||[];const 
       const rem=g.stage==='transit'?[[g.lon,g.lat],g.path[1]]:g.path,lbl=(g.name||'Літак')+': '+(g.origin||'?')+' → '+(g.dest||'?')+' · розрахунковий маршрут';
       L.push({type:'Feature',properties:{k:'route'},geometry:{type:'LineString',coordinates:rem}});
       L.push({type:'Feature',properties:{k:'rlabel',l:lbl},geometry:{type:'LineString',coordinates:rem}});
-      if(g.origin)L.push({type:'Feature',properties:{k:'rpt',l:g.origin+' (вильот)'},geometry:{type:'Point',coordinates:g.path[0]}});
-      if(g.dest)L.push({type:'Feature',properties:{k:'rpt',l:g.dest+' (призначення)'},geometry:{type:'Point',coordinates:g.path[1]}});}
+      const nn=g.n?' ×'+g.n:'';
+      L.push({type:'Feature',properties:{k:'rarrow'},geometry:{type:'LineString',coordinates:rem}});
+      if(g.origin)L.push({type:'Feature',properties:{k:'rpt',l:'1 · '+g.origin+' (вильот)',ic:g.icon,t:g.n?'×'+g.n:''},geometry:{type:'Point',coordinates:g.path[0]}});
+      if(g.dest)L.push({type:'Feature',properties:{k:'rpt',l:'2 · '+g.dest+' (призначення)',ic:g.icon,t:g.n?'×'+g.n:''},geometry:{type:'Point',coordinates:g.path[1]}});}
     if(g.trail&&g.trail.length>1)L.push({type:'Feature',properties:{k:'trail'},geometry:{type:'LineString',coordinates:g.trail}});
     (g.dirs||[]).forEach(d=>{L.push({type:'Feature',properties:{k:'dir'},geometry:{type:'LineString',coordinates:[[g.lon,g.lat],[d.lon,d.lat]]}});
       L.push({type:'Feature',properties:{k:'dirpt',l:d.label+' ~'+d.km+' км'},geometry:{type:'Point',coordinates:[d.lon,d.lat]}});});
@@ -1467,7 +1471,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=385,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=386,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
