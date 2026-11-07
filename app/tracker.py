@@ -68,6 +68,9 @@ def _fkm(tr) -> int | None:
     return round(front_km(la, lo))
 
 
+NEAR_TYPES = ("fpv", "fpvf", "molniya", "lancet")  # короткодальні: названі каналами «на X» — уже біля X (07.11, власник)
+
+
 def _border_start(xy, max_km=60.0, out_km=12.0):
     """Ціль «курсом на X» біля кордону: стартує з боку РФ/РБ (найближча точка контуру + out_km назовні)."""
     pts = _ua_ring()
@@ -635,7 +638,7 @@ class Tracker:
                 jump = dist_km((tr.last.x, tr.last.y), X.xy) <= TYPES[tr.type]["speed"] * 2.5 * max(30.0, t - tr.last.t) / 3600 + 5
                 if dist_km(e, X.xy) <= reach and jump:
                     prev = tr.last
-                    bp = _border_start(X.xy, 25.0) if (dist_km((prev.x, prev.y), X.xy) > 8 and tr.type not in ("fpv", "fpvf")) else None  # FPV «на X» уже біля X
+                    bp = _border_start(X.xy, 25.0) if (dist_km((prev.x, prev.y), X.xy) > 8 and tr.type not in NEAR_TYPES) else None  # FPV/Молнія/Ланцет «на X» уже біля X
                     if bp is not None and dist_km((prev.x, prev.y), bp) <= reach:
                         # пункт біля кордону: ціль летить З кордону до нього, а не повзе вздовж кордону чи стоїть у пункті
                         tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
@@ -717,7 +720,7 @@ class Tracker:
                 else:
                     # 07.11 власник: «FPV на Велику Данилівку» — він уже біля пункту (Циркуни/окружна), а не на кордоні:
                     # для FPV без поточного місця ставимо ціль у сам названий пункт
-                    bp = None if tr.type in ("fpv", "fpvf") else _border_start(X.xy)
+                    bp = None if tr.type in NEAR_TYPES else _border_start(X.xy)
                     if bp is not None:
                         tr.obs.append(Point(t, bp[0], bp[1], src, "кордон (оцінка)", link, None, True))
                     else:
