@@ -183,6 +183,14 @@ class StratBook:
                     best = g
         return best
 
+    def sanitize(self) -> None:
+        """Групи, збережені до виправлення (07.11): «переліт» без жодної згадки руху в доказах — це стан «на аеродромі»."""
+        for g in self.groups:
+            if g.get("stage") == "transit" and g.get("ev") and not any(MOVE_RX.search(norm(e.get("text") or "")) for e in g["ev"]):
+                g["stage"] = "ground"
+                g["site"] = g.get("site") or g.get("origin") or g.get("dest")
+                g["origin"] = g["dest"] = g["depart"] = None
+
     def prune(self, now: float) -> None:
         keep = []
         for g in self.groups:
@@ -210,6 +218,7 @@ class StratBook:
         return [{"lon": lo, "lat": la, "label": nm, "km": int(d)} for _, nm, lo, la, d in out[:3]]
 
     def snapshot(self, now: float) -> list[dict]:
+        self.sanitize()
         self.prune(now)
         res = []
         for g in self.groups:
