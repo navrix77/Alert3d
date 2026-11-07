@@ -3,6 +3,8 @@ name: Нічний знімок журналу (для аналізу)
 # і кладе їх окремим комітом у службову гілку night-data. Хмарні сесії аналізу не мають прямого доступу до сайту,
 # а гілку з GitHub можуть забрати. main не змінюється; ключів не потрібно (лише вбудований GITHUB_TOKEN).
 on:
+  # щодня о 06:07 UTC (08:07 Київ), до щоденного самоаналізу о 09:37: аналіз не залежить від ПК користувача
+  schedule: [{ cron: '7 6 * * *' }]
   workflow_dispatch:
     inputs:
       hours: { description: "Скільки годин журналу", default: "72" }
@@ -18,7 +20,7 @@ jobs:
         with: { fetch-depth: 1 }
       - name: Знімок публічних адрес
         shell: bash
-        env: { H: "${{ github.event.inputs.hours }}" }
+        env: { H: "${{ github.event.inputs.hours || '72' }}" }
         run: |
           mkdir -p /tmp/snap
           U=https://sky.navryx.com.ua
