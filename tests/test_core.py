@@ -2287,3 +2287,14 @@ def test_rszv_dalne_adjective_and_starts_from_border():
     assert t["type"] == "rszv"
     # старт біля кордону на півночі, а не в селі Дальнє на Донеччині
     assert dist_km(to_xy(t["lat"], t["lon"]), to_xy(50.1366, 36.4119)) < 40
+
+
+def test_rszv_does_not_reach_city_only_outskirts():
+    from app.parser import Parser, front_km
+    p = Parser()
+    o = p.parse("РСЗВ на Харків", "x")
+    pl = o.places[0].place
+    assert pl.name == "Харків (околиці)" and front_km(pl.lat, pl.lon) <= 31
+    # близьке до кордону село лишається як є
+    o2 = p.parse("РСЗВ на Руські Тишки", "x")
+    assert o2.places[0].place.name == "Руські Тишки"

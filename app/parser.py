@@ -349,6 +349,9 @@ FRONT_PTS = [(33.4, 52.3), (34.4, 51.3), (35.6, 50.4), (36.6, 50.3), (37.6, 49.9
              (37.7, 48.5), (37.2, 48.3), (36.8, 47.85), (36.25, 47.66), (35.78, 47.57), (35.4, 47.5), (34.4, 47.2), (33.4, 46.8), (32.6, 46.6)]
 
 
+RSZV_CAP_KM = 30.0  # макс. глибина ураження РСЗВ від лінії фронту/кордону для показу на мапі
+
+
 def front_km(lat: float, lon: float) -> float:
     import math
     best = 1e9
@@ -813,6 +816,25 @@ class Parser:
         # «Мопед продаю», «Вчора було три шахеди»). Виправлення «не шахед, а розвідник» сюди не потрапляє
         if DEFENSE_NEWS.search(t) and not MOVING.search(t) and not obs.close:
             obs.type, obs.no_target, obs.close = None, True, False
+        # РСЗВ б'є на десятки км від фронту (Град ~20, Смерч ~70): «на Харків» = околиці/область, а не саме місто.
+        # Пункт далі за RSZV_CAP_KM від лінії фронту підміняємо точкою на межі досяжності, підписаною «(околиці)»
+        if obs.type == "rszv":
+            import math
+            new = []
+            for r_ in obs.places:
+                pl = r_.place
+                if r_.role == "t" and front_km(pl.lat, pl.lon) > RSZV_CAP_KM and "(околиці)" not in pl.name:
+                    best = None
+                    for (x1, y1) in FRONT_PTS:
+                        d_ = math.hypot((pl.lon - x1) * 74, (pl.lat - y1) * 111)
+                        if best is None or d_ < best[0]:
+                            best = (d_, x1, y1)
+                    d_, x1, y1 = best
+                    k = RSZV_CAP_KM / d_ if d_ else 0
+                    new.append(PlaceRef(r_.role, Place(pl.name + " (околиці)", y1 + (pl.lat - y1) * k, x1 + (pl.lon - x1) * k, "X", 0)))
+                else:
+                    new.append(r_)
+            obs.places = new
         if NOT_LIVE.search(t) and not obs.close and not re.search(r"більше не|больше не|зараз|сейчас|щойно|только что|наразі|не\s+\w+,?\s+а\s", t):
             obs.type, obs.no_target, obs.close = None, True, False
         return obs
