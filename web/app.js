@@ -458,7 +458,7 @@ function addOverlays(){
   map.on('click','tg-hit',e=>{if(MEAS.on)return;const f=e.features[0],id=f.properties.id,now=Date.now();
     if(lastTap.id===id&&now-lastTap.t<420){lastTap={id:null,t:0};// 2 тапи по цілі: стеження вкл/викл
       if(follow&&sel===id){stopFollow('Стеження вимкнено');}else{sel=id;startFollow();}
-      try{const b=$('#sh-follow');if(b){b.classList.toggle('on',follow);b.textContent=follow?'Зупинити стеження':'Стежити за ціллю';}}catch(_){}return;}
+      try{const b=$('#sh-follow');if(b){b.classList.toggle('on',follow);b.textContent=follow?'Зупинити':'Стежити';}}catch(_){}return;}
     lastTap={id,t:now};openSheet(id);});
   map.on('dblclick','tg-hit',e=>{e.preventDefault();});// без зуму карти при подвійному тапі по цілі
   if(!map._measClick){map._measClick=1;map.on('click',e=>{if(!MEAS.on)return;MEAS.pts.push([e.lngLat.lng,e.lngLat.lat]);measDraw();});}
@@ -1094,7 +1094,7 @@ function renderBanner(threats){
 // навчений прогноз траєкторії: куди такі цілі з цього місця летіли раніше + власна точність прогнозу
 function lpHtml(tr){const L=tr.lpath||[];if(!L.length)return '';const A=(SNAP.pred_acc||{})[tr.type];
   return '<h4>Ймовірно далі <small>· навчено на попередніх перельотах'+(A?' · точність '+Math.round(A.acc*100)+'% з '+A.n:'')+'</small></h4><ol class="lp">'+L.map(x=>'<li><b>'+Math.round(x[3]*100)+'%</b> '+esc(x[2])+'</li>').join('')+'</ol>';}
-function openSheet(id){if(XRAY){sel=id;const d=DISP.get(id);if(d)map.easeTo({center:d.p,zoom:Math.max(map.getZoom(),9),duration:700});xrPanel().dataset.k='';syncXray();return;}if(follow&&id!==sel)stopFollow();sel=id;$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити стеження':'Стежити за ціллю';$('#sheet').hidden=false;fillSheet(true);const d=DISP.get(id);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),8.5),curve:1.3,speed:1.1,essential:true});}
+function openSheet(id){if(XRAY){sel=id;const d=DISP.get(id);if(d)map.easeTo({center:d.p,zoom:Math.max(map.getZoom(),9),duration:700});xrPanel().dataset.k='';syncXray();return;}if(follow&&id!==sel)stopFollow();sel=id;$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити':'Стежити';$('#sheet').hidden=false;fillSheet(true);const d=DISP.get(id);if(d)map.flyTo({center:d.p,zoom:Math.max(map.getZoom(),8.5),curve:1.3,speed:1.1,essential:true});}
 /* докази цілі (список публікацій), за запитом, кеш 15 с; у знімку їх більше немає (були >50% трафіку) */
 const EVC=new Map();function evItems(id,cb){const c=EVC.get(id);const now=Date.now();if(c&&now-c.t<15000)return c.items;
   if(c&&c.pending)return c.items||null;EVC.set(id,{t:c?c.t:0,items:c?c.items:null,pending:true});
@@ -1223,7 +1223,7 @@ if($('#sh-then'))$('#sh-then').onclick=async()=>{const tr=SNAP&&SNAP.tracks.find
   const id=tr.id;$('#sheet').hidden=true;$('#timebar').hidden=false;const r=$('#tb-range');r.max=HISTF.length-1;showFrame(i);play(true);
   const ft=(HISTF[i].tracks||[]).find(x=>x.id===id);if(ft){map.flyTo({center:[ft.lon,ft.lat],zoom:Math.max(map.getZoom(),9),duration:900});}
   toast('Програю з '+fmt(HISTF[i].t)+' до зараз'+(ft?', ціль у центрі':'')+'. «Наживо», вийти');};
-$('#sh-follow').onclick=()=>{if(follow)stopFollow('Стеження зупинено');else startFollow();$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити стеження':'Стежити за ціллю';};
+$('#sh-follow').onclick=()=>{if(follow)stopFollow('Стеження зупинено');else startFollow();$('#sh-follow').classList.toggle('on',follow);$('#sh-follow').textContent=follow?'Зупинити':'Стежити';};
 map.on('dragstart',e=>{if(follow&&e.originalEvent)stopFollow('Ви зсунули карту, стеження зупинено');});
 setInterval(()=>{if(follow)renderFollow();},1000);
 
@@ -1471,7 +1471,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=388,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=389,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows

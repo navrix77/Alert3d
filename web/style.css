@@ -951,3 +951,6 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 /* велика кнопка «Закрити» у вікнах на мапі */
 .kp-close{display:block;width:100%;margin-top:10px;padding:11px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:rgba(255,255,255,.08);color:inherit;font:700 14px var(--f);cursor:pointer}
 :root[data-theme="day"] .kp-close{border-color:rgba(10,20,40,.2);background:rgba(10,20,40,.06)}
+
+.sh-head #sh-follow{flex:none;padding:9px 13px;font-size:13px;border-radius:999px;white-space:nowrap}
+.sh-head .sh-title{min-width:0;flex:1}
