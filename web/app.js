@@ -840,7 +840,10 @@ function stratEnsure(){if(map.getLayer('strat'))return true;try{return stratBuil
 function stratBuild(){stratImages();
   ['strat','strat-l','strat-fx','strat-ring'].forEach(id=>{if(!map.getSource(id))map.addSource(id,{type:'geojson',data:EMPTY});});
   stratAL({id:'strat-dir',type:'line',source:'strat-l',filter:['==',['get','k'],'dir'],paint:{'line-color':'#F5B83D','line-width':1.6,'line-dasharray':[1.4,1.8],'line-opacity':0.85}});
-  stratAL({id:'strat-route',type:'line',source:'strat-l',filter:['==',['get','k'],'route'],paint:{'line-color':'#FF8A1F','line-width':1.4,'line-dasharray':[3,2],'line-opacity':0.6}});
+  stratAL({id:'strat-route',type:'line',source:'strat-l',filter:['==',['get','k'],'route'],paint:{'line-color':'#FF8A1F','line-width':1.8,'line-dasharray':[3,2],'line-opacity':0.85}});
+  stratAL({id:'strat-rlabel',type:'symbol',source:'strat-l',filter:['==',['get','k'],'rlabel'],layout:{'symbol-placement':'line','text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,-0.9],'symbol-spacing':420},paint:{'text-color':'#FFB347','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
+  stratAL({id:'strat-rpt',type:'circle',source:'strat-l',filter:['==',['get','k'],'rpt'],paint:{'circle-radius':4,'circle-color':'#0b0f16','circle-stroke-color':'#FF8A1F','circle-stroke-width':2}});
+  stratAL({id:'strat-rptl',type:'symbol',source:'strat-l',filter:['==',['get','k'],'rpt'],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'top','text-offset':[0,0.8],'text-optional':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
   stratAL({id:'strat-trail',type:'line',source:'strat-l',filter:['==',['get','k'],'trail'],layout:{'line-cap':'round'},paint:{'line-color':'#FFB347','line-width':2.6,'line-opacity':0.9}});
   stratAL({id:'strat-ring',type:'circle',source:'strat-ring',paint:{'circle-radius':['interpolate',['linear'],['zoom'],4,14,8,30],'circle-color':'rgba(255,60,60,.12)','circle-stroke-color':'#FF4D4D','circle-stroke-width':1.6,'circle-stroke-opacity':0.9}});
   stratAL({id:'strat-dirt',type:'symbol',source:'strat-l',filter:['all',['==',['get','k'],'dirpt']],layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':10.5,'text-anchor':'left','text-offset':[0.6,0],'text-allow-overlap':false},paint:{'text-color':'#F5B83D','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
@@ -876,7 +879,12 @@ function syncStrat(){if(!SNAP||!stratEnsure())return;STRAT=SNAP.strat||[];const 
       const key=tacImg({type:mk,affiliation:A6.affiliationOf({indep:(g.srcs||[]).length}),hd:mv?g.hd:null,count:g.n||null});
       P.push({type:'Feature',properties:{gid:g.id,img:key,o:act?1:0.6*ageF+0.2,l:(g.name||A6.MODEL[mk]||'')+' · '+(STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)},geometry:{type:'Point',coordinates:[g.lon,g.lat]}});}
     else o.forEach((off,i)=>P.push({type:'Feature',properties:{gid:g.id,ic:g.icon,r:g.hd||0,off,o:act?1:0.6*ageF+0.2,l:i===0?(g.name+(g.n>9?' ×'+g.n:'')+' · '+(STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)):''},geometry:{type:'Point',coordinates:[g.lon,g.lat]}}));
-    if(g.path&&g.path.length>1)L.push({type:'Feature',properties:{k:'route'},geometry:{type:'LineString',coordinates:g.path}});
+    if(g.path&&g.path.length>1){// маршрут перельоту: пройдене — суцільна лінія (trail), попереду — пунктир до аеродрому призначення, з підписом уздовж лінії й назвами кінців
+      const rem=g.stage==='transit'?[[g.lon,g.lat],g.path[1]]:g.path,lbl=(g.name||'Літак')+': '+(g.origin||'?')+' → '+(g.dest||'?')+' · розрахунковий маршрут';
+      L.push({type:'Feature',properties:{k:'route'},geometry:{type:'LineString',coordinates:rem}});
+      L.push({type:'Feature',properties:{k:'rlabel',l:lbl},geometry:{type:'LineString',coordinates:rem}});
+      if(g.origin)L.push({type:'Feature',properties:{k:'rpt',l:g.origin+' (вильот)'},geometry:{type:'Point',coordinates:g.path[0]}});
+      if(g.dest)L.push({type:'Feature',properties:{k:'rpt',l:g.dest+' (призначення)'},geometry:{type:'Point',coordinates:g.path[1]}});}
     if(g.trail&&g.trail.length>1)L.push({type:'Feature',properties:{k:'trail'},geometry:{type:'LineString',coordinates:g.trail}});
     (g.dirs||[]).forEach(d=>{L.push({type:'Feature',properties:{k:'dir'},geometry:{type:'LineString',coordinates:[[g.lon,g.lat],[d.lon,d.lat]]}});
       L.push({type:'Feature',properties:{k:'dirpt',l:d.label+' ~'+d.km+' км'},geometry:{type:'Point',coordinates:[d.lon,d.lat]}});});
@@ -1459,7 +1467,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=384,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=385,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
