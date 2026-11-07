@@ -879,9 +879,18 @@ async def api_tts(text: str, voice: str = "lada", rate: float = 1.0):
 
 
 @app.get("/api/msgs")
-def api_msgs(kind: str | None = None, type: str | None = None, hours: float = 3, q: str | None = None, limit: int = 200):
+def _booms_allowed(key: str | None) -> bool:
+    """Вибухи/приліти (kind='filtered') не публікуємо: лише для аналітики за ключем ANALYTICS_KEY і в «За добу»."""
+    import hmac
+    want = os.environ.get("ANALYTICS_KEY", "")
+    return bool(want) and bool(key) and hmac.compare_digest(want, key)
+
+
+def api_msgs(kind: str | None = None, type: str | None = None, hours: float = 3, q: str | None = None, limit: int = 200, key: str | None = None):
     """Журнал розібраних повідомлень, докази для самоаналізу (що написав канал і як ми це зрозуміли)."""
     sql, args = "SELECT t, src, link, kind, type, places, text FROM msg WHERE t >= ?", [time.time() - hours * 3600]
+    if not _booms_allowed(key):
+        sql += " AND kind != 'filtered'"
     if kind:
         sql += " AND kind = ?"; args.append(kind)
     if type:
@@ -1112,10 +1121,12 @@ def api_selfcheck():
 
 
 @app.get("/api/journal")
-def api_journal(hours: float = 24, q: str | None = None, src: str | None = None, kind: str | None = None, limit: int = 300):
+def api_journal(hours: float = 24, q: str | None = None, src: str | None = None, kind: str | None = None, limit: int = 300, key: str | None = None):
     """Журнал публічних повідомлень каналів (як розібрав SKY) — докази для виправлень і перевірки регресій."""
     since = time.time() - max(0.1, min(hours, 24 * 14)) * 3600
     sql, args = "SELECT t, src, link, kind, type, places, text FROM msg WHERE t > ?", [since]
+    if not _booms_allowed(key):
+        sql += " AND kind != 'filtered'"
     if src:
         sql += " AND src = ?"; args.append(src)
     if kind:
