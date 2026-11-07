@@ -833,7 +833,7 @@ const STRAT_PATH={tu95:'M0,-42 L3,-36 L4,-8 L40,2 L40,8 L4,6 L3,26 L14,34 L14,38
   tu160:'M0,-44 L3,-34 L5,-14 L38,22 L36,28 L6,14 L4,30 L12,38 L12,42 L0,38 L-12,42 L-12,38 L-4,30 L-6,14 L-36,28 L-38,22 L-5,-14 L-3,-34 Z',
   tu22:'M0,-42 L3,-30 L4,-10 L32,18 L30,24 L5,12 L4,28 L12,36 L12,40 L0,36 L-12,40 L-12,36 L-4,28 L-5,12 L-30,24 L-32,18 L-4,-10 L-3,-30 Z',
   mig31:'M0,-44 L3,-32 L5,-14 L34,10 L34,16 L6,10 L7,30 L16,40 L2,38 L0,34 L-2,38 L-16,40 L-7,30 L-6,10 L-34,16 L-34,10 L-5,-14 L-3,-32 Z'};
-const STRAT_TAG={ground:'НА АЕРОДРОМІ',landed:'ПОСАДКА',takeoff:'ЗЛІТ · можливий бойовий',transit:'ПЕРЕДИСЛОКАЦІЯ · не бойовий',line:'БОЙОВИЙ · на рубежі пуску',launch:'БОЙОВИЙ · ПУСК'};
+const STRAT_TAG={ground:'НА АЕРОДРОМІ',landed:'ПОСАДКА',takeoff:'ЗЛІТ · можливий бойовий',transit:'ВИЛІТ (виліт не бойовий)\nПЕРЕДИСЛОКАЦІЯ',line:'БОЙОВИЙ · на рубежі пуску',launch:'БОЙОВИЙ · ПУСК'};
 const STRAT_STAGE={ground:'на аеродромі',landed:'посадка',takeoff:'зліт',transit:'передислокація (переліт між аеродромами, не бойовий)',line:'на пусковому рубежі',launch:'пуск'};
 let STRAT=[];const STRAT_SEEN=new Set();let stratFx=[];let stratRaf=0;
 function stratImages(){for(const k in STRAT_PATH){const id='st-'+k;if(map.hasImage(id))continue;const c=document.createElement('canvas');c.width=c.height=192;const x=c.getContext('2d');x.translate(96,96);x.scale(2,2);
@@ -1480,7 +1480,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV=403,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV=404,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
