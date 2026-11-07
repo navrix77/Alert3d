@@ -79,6 +79,14 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     pctx = (prev[1], prev[2]) if prev and 0 <= ts - prev[0] < 1800 else None
     whole = parser.parse(text, key, pctx)
     ctx = pctx
+    if trk is tracker and log and whole.type and not whole.places and not whole.no_target and not whole.close and not whole.oblast_hint:
+        # 07.11 «Нескорених»: ціль названа, а місце не розпізнано. Невідомі слова збираємо, щоб газетир дорости (/api/audit → top_places)
+        try:
+            from .audit import AUDIT
+            ws = re.findall(r"(?:на|над|біля|возле|у|в|по|повз|к|курс\w*(?:\s+на)?)\s+([А-ЯІЇЄҐ][а-яіїєґ'’\-]{3,})", text)
+            AUDIT.add("no_place", key, text, ts, place=(ws[0] if ws else "?"))
+        except Exception:  # noqa: BLE001
+            pass
     if whole.places:
         la = sum(r.place.lat for r in whole.places) / len(whole.places)
         lo = sum(r.place.lon for r in whole.places) / len(whole.places)
