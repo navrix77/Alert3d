@@ -70,7 +70,7 @@ _SLOW = {
     "Черкаська": "cherkasy_monitor cherkasy_nebbo",
     "Чернігівська": "Northern_Sich_ukr PhantomChe RadarChernihiv ShahedChernihiv horizon_of_war_Official my_safety_Chernigiv taktychna_rukavuchkaa",
     "Чернівецька": "goodchernivtsi",
-    "Дніпропетровська": "Radar_Dnipra dnipromonitor pavlograd_radar nikalert dnepr_nagladach shovnebi svoikr truexakrivojrog",
+    "Дніпропетровська": "Radar_Dnipra dnipromonitor pavlograd_radar nikalert dnepr_nagladach shovnebi svoikr truexakrivojrog yevtushenko_e",
     "Донецька": "operatyvnyi_donbas",
     "Запорізька": "radar_zp eyes_everywhere_ua operatyvnohlep gnilayachereha info_zp zaborzp",
     "Миколаївська": "vanek_nikolaev korabely_media pivden_FPV",
