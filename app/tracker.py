@@ -885,6 +885,22 @@ class Tracker:
             e["sc"] = 1
             self.brain.pred_score("dir:" + e["src"], ang_diff(bearing(p0, pt), bearing(p0, e["dxy"])) <= 30)
 
+    @staticmethod
+    def _front_bearing(pt) -> float | None:
+        """Курс «від найближчої точки лінії фронту/кордону вглиб» для цілей без власного курсу."""
+        from .parser import FRONT_PTS
+        best = None
+        for (lo1, la1), (lo2, la2) in zip(FRONT_PTS, FRONT_PTS[1:]):
+            a, b = _gxy(la1, lo1), _gxy(la2, lo2)
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            l2 = dx * dx + dy * dy
+            u = max(0.0, min(1.0, ((pt[0] - a[0]) * dx + (pt[1] - a[1]) * dy) / l2)) if l2 else 0.0
+            q = (a[0] + u * dx, a[1] + u * dy)
+            d = dist_km(q, pt)
+            if best is None or d < best[0]:
+                best = (d, q)
+        return bearing(best[1], pt) if best and best[0] > 0.5 else None
+
     def _learned_heading(self, tr: Track, place, pt) -> float | None:
         if tr.type in ("fpv", "fpvf", "rszv", "molniya", "lancet"):
             # FPV (особливо на оптоволокні) і РСЗВ завжди летить з боку РФ/окупованої території: напрямок — від найближчої
@@ -1264,8 +1280,8 @@ class Tracker:
                 a_, b_ = tr.obs[-2], tr.obs[-1]
                 if dist_km((a_.x, a_.y), (b_.x, b_.y)) > 2:
                     hd = bearing((a_.x, a_.y), (b_.x, b_.y))
-            if hd is None and tr.type in NEAR_TYPES:  # без маршруту: носом від лінії фронту/кордону вглиб, а не на північ за замовчуванням
-                hd = self._learned_heading(tr, None, (ex, ey))
+            if hd is None and (tr.type in NEAR_TYPES or tr.type in ("shahed", "uav", "rszv")):  # без маршруту й курсу: носом від лінії фронту/кордону вглиб, а не на північ за замовчуванням
+                hd = self._learned_heading(tr, None, (ex, ey)) or self._front_bearing((ex, ey))
             conf = self.conf(tr)
             if status == "active":
                 up(obl.of(lon, lat), 2 if conf >= 0.5 else 1)
