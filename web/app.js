@@ -1596,7 +1596,10 @@ let lanDone=false;function loadLan(){if(!$('#st-qr'))return;fetch('/api/lan').th
 let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.type='sine';o.frequency.value=880;o.connect(g);g.connect(actx.destination);
   const t=actx.currentTime;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.3,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+0.5);o.start(t);o.stop(t+0.55);
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
-window.__beep=(txt)=>{if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
+// 08.11: голос читав заголовок картки як є («×2 · ~10 хв до «X» → Y»). Тепер: окрема коротка фраза n.say або очищений текст без значків і службових символів
+const NUMW=['','одна','дві','три','чотири','п’ять','шість','сім','вісім','дев’ять','десять'];
+function sayClean(t){return String(t||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'').replace(/×\s*(\d+)/g,(m,n)=>'. '+(NUMW[+n]||n)+' цілей. ').replace(/~\s*/g,'приблизно ').replace(/→/g,'курс на ').replace(/[«»]/g,'').replace(/\s*[·|]\s*/g,'. ').replace(/\b(\d{1,2}):(\d{2})\b/g,'о $1 $2').replace(/\s+/g,' ').replace(/\.\s*\./g,'.').trim();}
+window.__beep=(txt)=>{txt=sayClean(txt);if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
 applyTheme(false);document.body.classList.toggle('tac',TAC);tacScaleBars();enemyLoad();if(TAC){loadApp06();}tacBarSync();
 fetch('/api/state').then(r=>r.json()).then(onSnap).catch(()=>{});
@@ -1623,7 +1626,7 @@ function note(n){
   // на екрані щонайбільше 5, найстаріші прибираються самі
   const cs=box.querySelectorAll('.note-c');for(let i=5;i<cs.length;i++)cs[i].remove();
   notesAll();
-  if(n.lvl==='red'||n.lvl==='orange'){window.__beep&&window.__beep((n.title||'')+(n.sub?'. '+String(n.sub).replace(/~/g,'приблизно ').replace(/·/g,','):''));if(navigator.vibrate)try{navigator.vibrate([120,60,120]);}catch(e){}}
+  if(n.lvl==='red'||n.lvl==='orange'){window.__beep&&window.__beep(n.say||((n.title||'')+(n.sub?'. '+n.sub:'')));if(navigator.vibrate)try{navigator.vibrate([120,60,120]);}catch(e){}}
   if(PREF.sys&&document.hidden&&'Notification' in window&&Notification.permission==='granted'){
     try{const sn=new Notification(n.title,{body:n.sub||'',tag:n.k,icon:'brand/icon-192.png',renotify:false});sn.onclick=()=>{window.focus();n.go&&n.go();sn.close();};}catch(e){}}
 }
@@ -1667,7 +1670,7 @@ function notesCheck(s){
   const first=!NBASE;NBASE=true;const now=s.now||Date.now()/1000;
   // 1) пуски, за налаштуванням (типово так: пуск стосується всієї країни)
   for(const L of (s.launches||[])){const k='L:'+L.site+':'+Math.round((L.t||0)/60)+(isTO(L)?':to':'');if(first||now-(L.t||now)>1200||PREF.nLaunch===false){NSEEN.add(k);continue;}
-    note({k,t:L.t,lvl:'red',ic:'🚀',title:(isTO(L)?'Носії в повітрі: ':'Пуск: ')+L.site,sub:[isTO(L)?'про пуски ракет ще не повідомлено':L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',cntL(L),L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
+    note({k,say:(isTO(L)?'Носії в повітрі. ':'Пуск. ')+L.site+'.'+(L.type&&!isTO(L)?' '+(TNAME_PL[L.type]||TYPE_NAME[L.type])+'.':''),t:L.t,lvl:'red',ic:'🚀',title:(isTO(L)?'Носії в повітрі: ':'Пуск: ')+L.site,sub:[isTO(L)?'про пуски ракет ще не повідомлено':L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',cntL(L),L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
   // 2) нові цілі, лише ті, що в моїх громадах/областях або летять туди протягом 30 хв (або всі, якщо так обрано)
   const serverT=Date.now()/1000+offset;
   for(const t of (s.tracks||[])){if(t.status!=='active')continue;const k='T:'+t.id;
@@ -1678,7 +1681,9 @@ function notesCheck(s){
     if(!z){for(let m=5;m<=30;m+=5){const q=posAt(t,serverT+m*60).p;z=zoneOf(q);if(z){eta=m;break;}}}
     if(!z&&!(PREF.nAll&&fast))continue;   // не моя зона, мовчимо
     if(window.__wpOK){NSEEN.add(k);continue;}// push увімкнено: про цілі попереджає телефон (екран блокування), у застосунку не дублюємо
-    note({k,type:t.type,lvl:z?(eta?'orange':'red'):(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
+    const _nm=(TYPE_NAME[t.type]||'Ціль'),_cnt=t.count>1?(', '+(NUMW[t.count]||t.count)+' цілей'):'';
+    const _say=_nm+_cnt+'. '+(t.next?'Курс на '+t.next+'. ':(t.hd!=null?'Летить '+SIDE[Math.round(t.hd/45)%8]+'. ':''))+(z?(eta?'Приблизно через '+eta+' хвилин буде біля '+z+'.':'Уже в зоні '+z+'. Укриття.'):'');
+    note({k,say:_say,type:t.type,lvl:z?(eta?'orange':'red'):(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
       title:(z?(eta?'🟠 ':'🔴 '):'')+(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(z?(eta?' · ~'+eta+' хв до «'+z+'»':' · у межах «'+z+'»'):'')+(t.next?' → '+t.next:''),
       sub:[t.at?'останнє місце: '+t.at[0]+' о '+fmt(t.at[1]):'',
            t.hd!=null?(t.next?'':'ймовірно ')+SIDE[Math.round(t.hd/45)%8]:'',
@@ -1686,13 +1691,13 @@ function notesCheck(s){
   // 3) тривога / відбій у моїх областях і громадах
   const Z=myZones();
   for(const o of Z.obl){const lv=(s.levels||{})[o]||0,pv=NZLV.get('o:'+o);
-    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'A:'+o+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Повітряна тривога: '+o+' обл.',sub:'офіційна тривога'});
-      else if(pv&&!lv)note({k:'O:'+o+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій тривоги: '+o+' обл.',sub:'У межах окремих громад тривога може ще тривати'});}
+    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'A:'+o+':'+Math.round(now),lvl:'red',ic:'🔴',say:'Повітряна тривога. '+o+' область.',title:'Повітряна тривога: '+o+' обл.',sub:'офіційна тривога'});
+      else if(pv&&!lv)note({k:'O:'+o+':'+Math.round(now),lvl:'green',ic:'🟢',say:'Відбій. '+o+' область.',title:'Відбій тривоги: '+o+' обл.',sub:'У межах окремих громад тривога може ще тривати'});}
     NZLV.set('o:'+o,lv);}
   const HL=((s.official||{}).hromadas)||{};
   for(const h of Z.hrom){const lv=HL[h.id]||((s.levels||{})[h.o]?1:0),pv=NZLV.get('h:'+h.id);
-    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'AH:'+h.id+':'+Math.round(now),lvl:'red',ic:'🔴',title:'Тривога: '+h.n+' громада',sub:h.o+' обл.'});
-      else if(pv&&!lv)note({k:'OH:'+h.id+':'+Math.round(now),lvl:'green',ic:'🟢',title:'Відбій: '+h.n+' громада',sub:h.o+' обл.'});}
+    if(pv!==undefined&&!first){if(!pv&&lv)note({k:'AH:'+h.id+':'+Math.round(now),lvl:'red',ic:'🔴',say:'Тривога. '+h.n+' громада.',title:'Тривога: '+h.n+' громада',sub:h.o+' обл.'});
+      else if(pv&&!lv)note({k:'OH:'+h.id+':'+Math.round(now),lvl:'green',ic:'🟢',say:'Відбій. '+h.n+' громада.',title:'Відбій: '+h.n+' громада',sub:h.o+' обл.'});}
     NZLV.set('h:'+h.id,lv);}
   // 0) мапа доби о 09:00
   if(s.daily){let seen=null;try{seen=localStorage.getItem('dailySeen');}catch(e){}
