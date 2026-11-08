@@ -159,7 +159,7 @@ class AI:
                    + (f" Повідомлень про балістику за 30 хв: {len(bal)}." if bal else "") + (f" Зон загрози КАБ: {len(kab)}." if kab else ""))
             by = "rules"
         out = {"ok": True, "text": txt.strip(), "by": by, "t": int(time.time()), "n": len(tr),
-               "note": ("Оцінка ШІ за даними SKY" if by != "rules" else "Зведення з даних SKY (ШІ зараз недоступний)") + "; не замінює офіційних повідомлень"}
+               "note": ("Оцінка ШІ за даними SKY" if by != "rules" else "Коротке зведення з даних SKY") + "; не замінює офіційних повідомлень"}
         self.cache[obl] = (time.time(), out)
         return out
 
