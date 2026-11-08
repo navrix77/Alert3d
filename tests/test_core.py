@@ -2393,3 +2393,49 @@ def test_boom_closes_nearby_short_range_target():
     assert any(t.type == "lancet" and not t.closed for t in trk.tracks)
     fd.feed("Вибух в Пісочині", "M", 1100.0, None)
     assert all(t.closed for t in trk.tracks if t.type == "lancet")
+
+
+# --- нічний розбір 08.11: реальні тексти журналу 07–08.11 ---
+def _pl(text, src):
+    return [(r.place.name, round(r.place.lat, 2), round(r.place.lon, 2)) for seg in P.segments(text) for r in P.parse(seg, src).places]
+
+
+def test_ru_ica_and_ee_forms_kupiansk_area():
+    got = _pl("⚠️от Приколотное на Подсреднее, Гнилицу", "ND")
+    names = [n for n, _a, _b in got]
+    assert "Підсереднє" in names and "Гнилиця" in names
+    assert all(lat > 49.9 and lon > 37.0 for _n, lat, lon in got)  # не Гнилець на Черкащині
+
+
+def test_ripky_genitive_plural():
+    assert "Ріпки" in [n for n, _a, _b in _pl("реактивний від Ріпок до Любеча/Славутича.", "PhantomChe")]
+
+
+def test_lesia_serdiuka_street_is_kharkiv():
+    assert [n for n, _a, _b in _pl("Ударний БПЛА на Леся Сердюка‼️", "M")] == ["Салтівка (Харків)"]
+
+
+def test_zaporizhzhia_city_with_other_oblast_hint():
+    got = _pl("БпЛА курсом на Запоріжжя (Харківщина)", "KL")
+    assert got and got[0][1] == 47.85
+
+
+def test_kab_homonym_near_unique_place():
+    got = dict((n, (a, b)) for n, a, b in _pl("❗❗ БОМБЫ курсом дальше на Купянск-Узловой, Березовку,  Сподобовку", "ND"))
+    assert "Куп’янськ-Вузловий" in got and got["Березівка"][0] < 49.8
+    got = dict((n, (a, b)) for n, a, b in _pl("‼️ КАБи від ДКУ у напрямку Біловоди/Олексіївка", "ochyma_rozvidky"))
+    assert got["Олексіївка"][0] > 51
+
+
+def test_cherkasy_genitive_and_chp():
+    assert [n for n, _a, _b in _pl("‼️Бандероль в напрямку Черкас.", "radar_raketaa")] == ["Черкаси"]
+    assert [n for n, _a, _b in _pl("⚠️Ракета Герань-5 падає на Черкаську ТЕЦ.", "MU")] == ["Черкаси"]
+
+
+def test_khmelnytskyi_typo():
+    assert [n for n, _a, _b in _pl("⚠️ 1х реактив Герань-5 наближається до Хмельницього зі сходу. Увага!", "UkraineRadar_24_7")] == ["Хмельницький"]
+
+
+def test_course_direction_word_not_village():
+    assert _pl("У всіх курс Західний.", "war_monitor") == []
+    assert [n for n, _a, _b in _pl("Реактив курс Південне", "Shturval_media")] == ["Південне"]
