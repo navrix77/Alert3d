@@ -957,7 +957,7 @@ class Tracker:
     @staticmethod
     def _front_dist(pt) -> float:
         """Відстань (км) до найближчої точки лінії фронту/кордону."""
-        from .parser import FRONT_PTS
+        from .parser import FRONT_FULL as FRONT_PTS
         best = 1e9
         for (lo1, la1), (lo2, la2) in zip(FRONT_PTS, FRONT_PTS[1:]):
             a, b = _gxy(la1, lo1), _gxy(la2, lo2)
@@ -970,7 +970,7 @@ class Tracker:
     @staticmethod
     def _front_bearing(pt) -> float | None:
         """Курс «від найближчої точки лінії фронту/кордону вглиб» для цілей без власного курсу."""
-        from .parser import FRONT_PTS
+        from .parser import FRONT_FULL as FRONT_PTS
         best = None
         for (lo1, la1), (lo2, la2) in zip(FRONT_PTS, FRONT_PTS[1:]):
             a, b = _gxy(la1, lo1), _gxy(la2, lo2)
@@ -1002,7 +1002,7 @@ class Tracker:
         if tr.type in ("fpv", "fpvf", "rszv", "molniya", "lancet"):
             # FPV (особливо на оптоволокні) і РСЗВ завжди летить з боку РФ/окупованої території: напрямок — від найближчої
             # точки лінії фронту/кордону вглиб, а не за навченими «перельотами»
-            from .parser import FRONT_PTS
+            from .parser import FRONT_FULL as FRONT_PTS
             best = None
             for (lo1, la1), (lo2, la2) in zip(FRONT_PTS, FRONT_PTS[1:]):
                 a, b = _gxy(la1, lo1), _gxy(la2, lo2)
