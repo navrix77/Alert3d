@@ -61,7 +61,7 @@ _C = [
     ("ODO", "odesaoda", "Одеська ОВА", 0.85, True, "Одеська", False),
     ("IZY", "izyum_official", "Ізюм (офіційний)", 0.8, True, "Харківська", False),
     ("BAL", "balakleyamer", "Балаклія (мер)", 0.8, True, "Харківська", False),
-    ("ZSG", "Zelenskiy_Sergiy", "Сергій Зеленський", 0.7, False, None, False),
+    ("ZSG", "Zelenskiy_Sergiy", "Лозова (Сергій Зеленський)", 0.85, True, "Харківська", False),
     ("CKH", "citykharkivua", "Харківська міська рада", 0.85, True, "Харківська", False),
     ("DSK", "DSNS_Kharkiv", "ДСНС Харківщина", 0.85, True, "Харківська", False),
     ("SPK", "suspilne_kharkiv", "Суспільне Харків", 0.7, False, "Харківська", False),
