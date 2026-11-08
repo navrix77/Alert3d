@@ -1017,9 +1017,44 @@ class Parser:
             obs.type, obs.no_target, obs.close = None, True, False
         return obs
 
-    def _disambiguate(self, found, bbox, ctx=None) -> list[PlaceRef]:
+    def _compact(self, found, bbox, lim_km: float = 25.0):
+        """Точка, біля якої є тезка кожної названої в повідомленні назви (середня відстань ≤ lim_km), або None."""
         import math
         P = self.gaz.places
+        groups = []
+        for _, ids in found:
+            ids = [i for i in ids if not bbox or bbox[0] <= P[i].lat <= bbox[1] and bbox[2] <= P[i].lon <= bbox[3]] or ids
+            big = [i for i in ids if P[i].pop >= 20000]
+            if big:  # «із Запоріжжя на Солоне»: місто важить більше за село-тезку, кластер будуємо від міста
+                ids = big
+            if len(ids) > 60:
+                return None
+            groups.append(ids)
+        if len({tuple(g) for g in groups}) < 2:
+            return None
+
+        def d(a, b):
+            return math.hypot((P[a].lat - P[b].lat) * 111, (P[a].lon - P[b].lon) * 72)
+        sc = []
+        for gi, g in enumerate(groups):
+            for a in g:
+                others = [min(d(a, b) for b in h) for hj, h in enumerate(groups) if hj != gi and set(h) != set(g)]
+                if others:
+                    sc.append((sum(others) / len(others), a))
+        if not sc:
+            return None
+        sc.sort()
+        m1, a1 = sc[0]
+        # інший, віддалений (>50 км) кластер майже такий самий щільний — неоднозначно, не вгадуємо
+        m2 = next((m for m, a in sc[1:] if d(a, a1) > 50), None)
+        if m1 <= lim_km and (m2 is None or m2 >= max(2 * m1, m1 + 15)):
+            return (P[a1].lat, P[a1].lon)
+        return None
+
+    def _disambiguate(self, found, bbox, ctx=None, _plain: bool = False) -> list[PlaceRef]:
+        import math
+        P = self.gaz.places
+        self._anchor = None
         uniq = [P[ids[0]] for _, ids in found if len(ids) == 1]
         if uniq:
             cen = (sum(p.lat for p in uniq) / len(uniq), sum(p.lon for p in uniq) / len(uniq))
@@ -1028,6 +1063,19 @@ class Parser:
         else:
             # без контексту: КАБ/FPV/«Молнія» б'ють біля фронту («КАБ на Золочів» — Харківщина, не Львівщина)
             cen = ctx or (((bbox[0] + bbox[1]) / 2, (bbox[2] + bbox[3]) / 2) if bbox else (KH if getattr(self, "_typ", None) in FRONTLINE else UA_CENTER))
+            # 08.11: усі назви повідомлення мають тезок («Довжик/Рудку», horizon_of_war): якщо одна з тезок кожної назви
+            # лежить поруч з іншими (у середньому ≤25 км), це і є місце. Раніше обирався найбільший Довжик області (під
+            # Семенівкою, 110 км), хоча Довжик Чернігівського району за 7 км від Рудки
+            anchor = self._compact(found, bbox) if len(found) >= 2 and not _plain else None
+            if anchor:
+                # лише коли звичайний вибір розкидає назви одного повідомлення далі ніж на 60 км у середньому
+                dflt = self._disambiguate(found, bbox, ctx, _plain=True)
+                pts = [(r.place.lat, r.place.lon) for r in dflt]
+                ds = [math.hypot((a[0] - b[0]) * 111, (a[1] - b[1]) * 72) for k, a in enumerate(pts) for b in pts[k + 1:]]
+                if not ds or sum(ds) / len(ds) <= 60:
+                    return dflt
+                cen, uniq = anchor, [None]
+                self._anchor = anchor
         out: list[PlaceRef] = []
         bbox0, chan0 = bbox, getattr(self, "_chan_bbox", False)
         for role, ids in found:
@@ -1111,6 +1159,12 @@ class Parser:
             # 08.11: є однозначний пункт у тому ж повідомленні — тезок обираємо біля нього, а не «найближчу до фронту»
             # («БОМБЫ на Купянск-Узловой, Березовку» — Березівка під Куп'янськом, а не під Золочевом)
             front = not ctx and not uniq and getattr(self, "_typ", None) in FRONTLINE
+
+            anc = getattr(self, "_anchor", None)
+            if anc:
+                near_a = [i for i in cand if math.hypot((P[i].lat - anc[0]) * 111, (P[i].lon - anc[1]) * 72) <= 40]
+                if near_a:
+                    cand = near_a
 
             def score(i: int) -> float:
                 p = P[i]

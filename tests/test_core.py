@@ -2493,3 +2493,22 @@ def test_hyphen_before_name_is_route_separator():
     assert [(r.place.name, round(r.place.lat, 1)) for r in o.places] == [("Довжик", 51.6), ("Пльохів", 51.5), ("Пакуль", 51.4)]
     o = P.parse("🛵 на Березну -Куликівку -Смолянку -Олишівку /Кіпті -водосховище", "horizon_of_war_Official")
     assert [r.place.name for r in o.places] == ["Березна", "Куликівка", "Смолянка", "Олишівка", "Кіпті"]
+
+
+def test_desna_chernihiv_settlement_preferred():
+    # 08.11: усі згадки «Десна» з відомою областю в журналі 05–08.11 — селище на Чернігівщині; без області ставило Вінниччину
+    for t, c in [("🛵 Реактивний повз Десну", "eRadarrua"), ("⟐1 Десна", "monikppy"), ("4 ракети пролітають Десну на Київ.", "MK")]:
+        assert [(r.place.name, round(r.place.lat, 1)) for r in P.parse(t, c).places][0] == ("Десна", 50.9)
+
+
+def test_all_ambiguous_names_pick_compact_cluster():
+    # horizon_of_war_Official 07.11 18:57 «Довжик/Рудку»: Довжик обирався під Семенівкою (110 км від Рудки)
+    o = P.parse("Довжик /Рудку", "horizon_of_war_Official")
+    assert [(r.place.name, round(r.place.lat, 2), round(r.place.lon, 2)) for r in o.places] == [("Довжик", 51.61, 31.02), ("Рудка", 51.57, 31.12)]
+    # radar_sich (Запоріжжя): «від Лисогірки до Розумівки» — обидва під Запоріжжям, а не на Вінниччині й Кіровоградщині
+    o = P.parse("Ⓜ️⚔️ Зпрж: Реактив/Бандероль від Лисогірки до Розумівки  Може піти до мостів також !", "radar_sich")
+    assert all(47.5 < r.place.lat < 47.9 for r in o.places)
+    # місто важить більше за кластер сіл-тезок: «із Запоріжжя на Солоне» — Солоне під Дніпром
+    o = P.parse("Два дрона із Запоріжжя на Солоне, на півдні Дніпровський район", "DN")
+    assert ("Солоне", 48.2) in [(r.place.name, round(r.place.lat, 1)) for r in o.places]
+    assert all(r.place.lon < 35.5 for r in o.places if r.place.name == "Солоне")
