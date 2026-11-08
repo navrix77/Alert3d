@@ -1511,7 +1511,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 458,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 459,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
@@ -1675,7 +1675,7 @@ function notesCheck(s){
   const first=!NBASE;NBASE=true;const now=s.now||Date.now()/1000;
   // 1) пуски, за налаштуванням (типово так: пуск стосується всієї країни)
   for(const L of (s.launches||[])){const k='L:'+L.site+':'+Math.round((L.t||0)/60)+(isTO(L)?':to':'');if(first||now-(L.t||now)>1200||PREF.nLaunch===false){NSEEN.add(k);continue;}
-    note({k,say:(isTO(L)?'Носії в повітрі. ':'Пуск. ')+L.site+'.'+(L.type&&!isTO(L)?' '+(TNAME_PL[L.type]||TYPE_NAME[L.type])+'.':''),t:L.t,lvl:'red',ic:'🚀',title:(isTO(L)?'Носії в повітрі: ':'Пуск: ')+L.site,sub:[isTO(L)?'про пуски ракет ще не повідомлено':L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',cntL(L),L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
+    note({k,say:isTO(L)?'Носії в повітрі. '+L.site+'.':(L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type])+' в повітрі. Старт з району: '+L.site+'.':'Зафіксовано старт з району: '+L.site+'.'),t:L.t,lvl:'red',ic:'🚀',title:(isTO(L)?'Носії в повітрі: ':'Пуск: ')+L.site,sub:[isTO(L)?'про пуски ракет ще не повідомлено':L.type?(TNAME_PL[L.type]||TYPE_NAME[L.type]):'',cntL(L),L.carrier||''].filter(Boolean).join(' · ')||'деталі уточнюються',go:()=>flyP([L.lon,L.lat],6)});}
   // 2) нові цілі, лише ті, що в моїх громадах/областях або летять туди протягом 30 хв (або всі, якщо так обрано)
   const serverT=Date.now()/1000+offset;
   for(const t of (s.tracks||[])){if(t.status!=='active')continue;const k='T:'+t.id;
