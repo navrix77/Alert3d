@@ -35,7 +35,7 @@ let SHADOW_TEX=null;
 function shadowTex(){if(SHADOW_TEX)return SHADOW_TEX;const cv=document.createElement('canvas');cv.width=cv.height=128;const x=cv.getContext('2d');const gr=x.createRadialGradient(64,64,4,64,64,62);gr.addColorStop(0,'rgba(0,0,0,0.55)');gr.addColorStop(0.6,'rgba(0,0,0,0.18)');gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.fillRect(0,0,128,128);SHADOW_TEX=new THREE.CanvasTexture(cv);return SHADOW_TEX;}
 
 const ALT={shahed:1800,jet:3500,molniya:900,cruise:1200,ballistic:12000,kab:2500};
-const SIZE={shahed:30,jet:34,molniya:22,cruise:32,ballistic:36,kab:24};
+const SIZE={shahed:30,jet:40,molniya:22,cruise:32,ballistic:36,kab:24};
 const layer={id:'t3d',type:'custom',renderingMode:'3d',
   onAdd(map,gl){this.map=map;this.camera=new THREE.Camera();this.scene=new THREE.Scene();
     const hemi=new THREE.HemisphereLight(0xeef3ff,0x202634,0.55);hemi.position.set(0,0,1);this.scene.add(hemi);

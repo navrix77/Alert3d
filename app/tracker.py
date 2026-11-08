@@ -202,8 +202,13 @@ class Track:
         if mapm and self.type in SHORT_RANGE:  # 08.11: короткодальня ціль не відходить від останньої названої позиції далі за свій «показ» (кілька км)
             cap_km = map_disp(self.type, self.speed, cap_min * 60)
             a = (self.last.x, self.last.y)
-            if dist_km(a, r) > cap_km:
-                r = move(a, bearing(a, r), cap_km)
+            d_ = min(dist_km(a, r), cap_km)
+            if d_ > 0.2:
+                b_ = bearing(a, r)
+                fb_ = Tracker._front_bearing(a)  # курс «від лінії пуску»: рух між названими пунктами не може вести до кордону/в РФ
+                if fb_ is not None and ang_diff(b_, fb_) > 90:
+                    b_ = fb_
+                r = move(a, b_, d_)
         return r
 
     def _est(self, now: float, cap_min: float = 4, k: float = 1.0, mapm: bool = False) -> tuple[float, float]:
