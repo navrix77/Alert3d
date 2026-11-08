@@ -284,3 +284,11 @@ def test_saltivka_microdistrict_numbers():
     assert [n for n, _a, _b in _pl("ФПВ со стороны Бобровки на 533", "KHN")][0].startswith("мкр Салтівка")
     assert [n for n, _a, _b in _pl("ФПВ на 602", "KHN")] == ["мкр Салтівка 600-х (Харків)"]
     assert not _pl("3 шахеди на 600 метрів", "KHN") and not _pl("на 5 шахедів", "KHN")
+
+
+def test_credit_line_not_a_place():
+    """08.11: «Відео/фото: Труха, СТО Харків» (Де у Харкові) — підпис, а не ціль FPV на Харків."""
+    t = "Перші кадри з місця прильоту FPV по Київському району.\nБуло влучання двох ФПВ дронів по автівкам.\n\nВідео/фото: Труха, СТО Харків"
+    for seg in P.segments(t):
+        assert P.parse(seg, "place_kharkiv").kind == "filtered"
+    assert "Харків" not in " ".join(P.segments(t))
