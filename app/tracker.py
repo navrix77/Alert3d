@@ -500,7 +500,7 @@ class Tracker:
             if obs.type is None and not places:
                 # 08.11: «Упал» / «Взрыв» без місця — відповідь каналу на його ж пост про FPV: знімаємо найсвіжішу короткодальню ціль цього каналу (≤6 хв)
                 for tr in sorted(self.tracks, key=lambda x: -x.last.t):
-                    if tr.closed or tr.merged or tr.type not in NEAR_TYPES or src not in tr.srcs or t - tr.last.t > 360:
+                    if tr.closed or tr.merged or not (tr.type in NEAR_TYPES or (tr.type in ("shahed", "uav") and not obs.count)) or src not in tr.srcs or t - tr.last.t > 360:
                         continue
                     tr.closed = t
                     self._boom_add(tr, t)

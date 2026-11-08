@@ -217,3 +217,15 @@ def test_boom_event_on_fall():
     m.feed(t, "Взрыв в районе Дафи", "KHN", now - 30, None, log=False)
     fx = t.snapshot(now)["fx"]
     assert fx and fx[0]["type"] == "fpv" and 49.9 < fx[0]["lat"] < 50.2
+
+
+@pytest.mark.parametrize("reply", ["Не наблюдается ⚠️", "Упал😔", "Збили", "Ціль знищена", "Ціль припинила існування", "Пропал", "Відпрацювало ППО"])
+def test_target_removed_by_end_synonyms(reply):
+    """08.11: «не наблюдается / впав / збили / знищено / пропала» — відповідь каналу на його ж пост знімає ціль."""
+    import time
+    now = time.time()
+    m, t = _tracker()
+    m.feed(t, "Ударный на Дергачи⚠️", "TLK", now - 120, None, log=False)
+    assert any(x["status"] == "active" for x in t.snapshot(now)["tracks"])
+    m.feed(t, reply, "TLK", now - 20, None, log=False)
+    assert not any(x["status"] == "active" for x in t.snapshot(now)["tracks"]), reply
