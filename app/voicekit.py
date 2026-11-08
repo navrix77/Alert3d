@@ -680,7 +680,7 @@ def _strip_id3(b: bytes) -> bytes:
     return b[i:] if n else b
 
 
-async def render(frags: list[str], say) -> tuple[bytes | None, str]:
+async def render(frags: list[str], say, say_free=None) -> tuple[bytes | None, str]:
     """Склеює озвучені заготовки в одне mp3. Якщо хоч одна фраза не mp3 (запасний голос) — None, клієнт озвучить текст цілком.
     say(text) -> (bytes, by): озвучка з обліком символів (main._say)."""
     sem = asyncio.Semaphore(8)  # не більше 4 нових синтезів водночас: 40 паралельних запитів провайдер відкидає (429)
@@ -696,7 +696,17 @@ async def render(frags: list[str], say) -> tuple[bytes | None, str]:
                     return r
                 await asyncio.sleep(0.3 * (k + 1))
             return r
+    async def one_free(x):
+        async with sem:
+            try:
+                return await say_free(x)
+            except Exception:  # noqa: BLE001
+                return (None, "error")
     parts = await asyncio.gather(*(one(x) for x in frags))
+    if say_free and any(d for d, _ in parts) and len({bool(d and d[:4] == b"RIFF") for d, _ in parts if d}) > 1:
+        # 08.11 (власник: «різними голосами все»): частина фраз платним голосом (mp3), частина запасним (WAV) — звучить як різні люди.
+        # Тоді озвучуємо ВСЕ одним запасним голосом.
+        parts = await asyncio.gather(*(one_free(x) for x in frags))
     out = []
     wavs = 0
     for data, _by in parts:

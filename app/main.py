@@ -928,6 +928,11 @@ async def _say(text: str, voice: str = "radio", rate: float = 1.0):
     return data, why
 
 
+async def _say_free(text: str, voice: str = "radio", rate: float = 1.0):
+    from . import tts
+    return await tts.speak(text, voice, rate, piper_only=True)
+
+
 @app.get("/api/voice/alert")
 async def api_voice_alert(text: str, voice: str = "lada", rate: float = 1.0):
     """Голосове сповіщення із заготовок: картка розбивається на короткі фрази з округленими числами; кожна фраза озвучується
@@ -939,7 +944,7 @@ async def api_voice_alert(text: str, voice: str = "lada", rate: float = 1.0):
         return JSONResponse({"ok": False, "why": "empty"}, status_code=400)
     v = voice if voice in ("lada", "tetiana", "mykyta", "oleksa", "radio") else "lada"
     r = max(0.7, min(1.5, rate))
-    data, why = await voicekit.render(fr, lambda x: _say(x, v, r))
+    data, why = await voicekit.render(fr, lambda x: _say(x, v, r), lambda x: _say_free(x, v, r))
     LLMX.count("tts:alert-" + why)
     if not data:
         return JSONResponse({"ok": False, "why": why}, status_code=503)

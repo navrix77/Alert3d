@@ -558,12 +558,35 @@ def _say_form(text: str) -> str:
 _PIPER_SEM = asyncio.Semaphore(1)
 
 
-async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True, google: bool = True) -> tuple[bytes | None, str]:
+async def _piper_say(text: str, key: str, rate: float):
+    if not piper_ok():
+        _install_bg()
+        return None, "installing" if _install["state"] == "running" else f"no-piper:{_install['state']}"
+    cache = BASE / "cache" / f"{hashlib.sha1(f'v2|{bool(_stressifier())}|{key}|{rate}|{text}'.encode()).hexdigest()}.wav"
+    if cache.exists():
+        return cache.read_bytes(), "cache"
+    try:
+        path = await _ensure_model(key)
+        if not path:
+            return None, "no-model"
+        async with _PIPER_SEM:  # 04.11: локальний синтез — по одному, щоб не гальмував сайт
+            data = await asyncio.to_thread(_synth, path, text, rate)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(data)
+        return data, "ok"
+    except Exception as e:  # noqa: BLE001
+        log.warning("tts: %s", e)
+        return None, f"error:{str(e)[:120]}"
+
+
+async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = True, google: bool = True, piper_only: bool = False) -> tuple[bytes | None, str]:
     ident = key == "radio" and _is_ident(text)
     text0 = " ".join((text or "").split())[:600]
     text = say_form(_spec.brand_say(text0))
     if not text:
         return None, "empty"
+    if piper_only:  # 08.11: одним запасним голосом усю фразу (щоб не змішувати голоси)
+        return await _piper_say(text, key, rate)
     if ident and os.getenv("TTS_GEMINI_IDENTS", "1") != "0":  # заставка: кращий голос один раз, далі лише кеш
         if _gkey():  # ключ Gemini API (AI Studio): працює з текстовим промптом голосу
             async def _ai(t, k, r):
@@ -621,24 +644,7 @@ async def speak(text: str, key: str = "lada", rate: float = 1.0, paid: bool = Tr
                 return data, "google"
         except Exception as e:  # noqa: BLE001 — недоступний Google → локальний Piper
             log.warning("google tts: %s", e)
-    if not piper_ok():
-        _install_bg()
-        return None, "installing" if _install["state"] == "running" else f"no-piper:{_install['state']}"
-    cache = BASE / "cache" / f"{hashlib.sha1(f'v2|{bool(_stressifier())}|{key}|{rate}|{text}'.encode()).hexdigest()}.wav"
-    if cache.exists():
-        return cache.read_bytes(), "cache"
-    try:
-        path = await _ensure_model(key)
-        if not path:
-            return None, "no-model"
-        async with _PIPER_SEM:  # 04.11: локальний синтез — по одному, щоб не гальмував сайт
-            data = await asyncio.to_thread(_synth, path, text, rate)
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_bytes(data)
-        return data, "ok"
-    except Exception as e:  # noqa: BLE001
-        log.warning("tts: %s", e)
-        return None, f"error:{str(e)[:120]}"
+    return await _piper_say(text, key, rate)
 
 
 def codes() -> dict:
