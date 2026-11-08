@@ -245,3 +245,13 @@ def test_city_districts(text, ch, place):
 def test_airport_not_odesa_port():
     o = P.parse("аеропорт Бориспіль", "M")
     assert not any("Одеський порт" in r.place.name for r in o.places)
+
+
+def test_tg_web_reply_preview_not_taken_as_text():
+    """08.11: у t.me/s цитоване повідомлення стоїть першим (js-message_reply_text) — його текст не має підміняти справжній."""
+    from app import tg_web
+    page = ('<div class="tgme_widget_message_wrap"><div class="tgme_widget_message js-widget_message" data-post="TLK/1">'
+            '<a class="tgme_widget_message_reply js-message_reply" href="x"><div class="tgme_widget_message_text js-message_reply_text">Далее МД⚠️</div></a>'
+            '<div class="tgme_widget_message_text js-message_text" dir="auto">Не наблюдается ⚠️</div>'
+            '<time datetime="2026-11-08T13:36:00+02:00"></time></div></div>')
+    assert [x[2] for x in tg_web.parse_page(page)] == ["Не наблюдается ⚠️"]

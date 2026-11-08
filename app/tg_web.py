@@ -15,7 +15,7 @@ from . import config
 
 log = logging.getLogger("tg_web")
 MSG = re.compile(r'<div class="tgme_widget_message[^"]*"[^>]*data-post="([^"/]+)/(\d+)"(.*?)(?=<div class="tgme_widget_message_wrap|\Z)', re.S)
-TEXT = re.compile(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', re.S)
+TEXT = re.compile(r'<div class="tgme_widget_message_text(?![^"]*js-message_reply_text)[^"]*"[^>]*>(.*?)</div>', re.S)  # 08.11: не текст цитованого повідомлення (reply-прев'ю)
 TIME = re.compile(r'<time[^>]*datetime="([^"]+)"')
 # зображення поста (мапа зі стрілками, схема): t.me/s віддає його як background-image (03.11 — для моделі із зором)
 PHOTO = re.compile(r"tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)")
