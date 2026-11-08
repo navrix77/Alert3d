@@ -292,3 +292,10 @@ def test_credit_line_not_a_place():
     for seg in P.segments(t):
         assert P.parse(seg, "place_kharkiv").kind == "filtered"
     assert "Харків" not in " ".join(P.segments(t))
+
+
+def test_past_fpv_report_is_not_a_target():
+    """08.11: «російські війська завдали ударів FPV-дронами по Київському району Харкова» (прокуратура) — звіт, не ціль."""
+    o = P.parse("8 листопада російські війська завдали ударів FPV-дронами по Київському району Харкова.", "KM")
+    assert o.kind != "track" and o.no_target
+    assert P.parse("FPV курсом на Харків", "KM").kind == "track"
