@@ -506,6 +506,11 @@ class Tracker:
                     self._boom_add(tr, t)
                     rec["closed"] = rec.get("closed", 0) + 1
                     break
+            if obs.type == "kab" and places:  # 08.11: «КАБ курсом на Старий Салтів — Впав 💥»: КАБ влучив, зону біля цього місця знімаємо
+                for z in list(self.zones):
+                    if any(dist_km(p.place.xy, q.xy) < 15 for p in places for q in z.places):
+                        self.zones.remove(z)
+                        rec["closed"] = rec.get("closed", 0) + 1
             fast = FAST_TYPES if obs.type is None else (("shahed", "uav") if obs.type in ("shahed", "uav") else ((obs.type,) if obs.type in TYPES else ()))
             if fast:
                 done = 0

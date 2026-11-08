@@ -16,6 +16,7 @@ from . import config
 log = logging.getLogger("tg_web")
 MSG = re.compile(r'<div class="tgme_widget_message[^"]*"[^>]*data-post="([^"/]+)/(\d+)"(.*?)(?=<div class="tgme_widget_message_wrap|\Z)', re.S)
 TEXT = re.compile(r'<div class="tgme_widget_message_text(?![^"]*js-message_reply_text)[^"]*"[^>]*>(.*?)</div>', re.S)  # 08.11: не текст цитованого повідомлення (reply-прев'ю)
+REPLYQ = re.compile(r'<div class="tgme_widget_message_text js-message_reply_text"[^>]*>(.*?)</div>', re.S)
 TIME = re.compile(r'<time[^>]*datetime="([^"]+)"')
 # зображення поста (мапа зі стрілками, схема): t.me/s віддає його як background-image (03.11 — для моделі із зором)
 PHOTO = re.compile(r"tgme_widget_message_photo_wrap[^>]*background-image:url\('([^']+)'\)")
@@ -43,7 +44,13 @@ def parse_page(page: str) -> list[tuple[int, float, str]]:
             if len(PHOTOS) > 3000:
                 for k in list(PHOTOS)[:1000]:
                     PHOTOS.pop(k, None)
-        out.append((int(mid), ts, _clean(x.group(1))))
+        txt = _clean(x.group(1))
+        q = REPLYQ.search(body)
+        if q and len(txt) <= 40:  # 08.11: короткий коментар-відповідь («Впав», «Далі Веселе») без місця стосується цитованої цілі — підставляємо її
+            qt = _clean(q.group(1)).replace("\n", " ")
+            if qt:
+                txt = f"{qt[:160]} — {txt}"
+        out.append((int(mid), ts, txt))
     return out
 
 

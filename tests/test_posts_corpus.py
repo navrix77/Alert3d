@@ -254,4 +254,24 @@ def test_tg_web_reply_preview_not_taken_as_text():
             '<a class="tgme_widget_message_reply js-message_reply" href="x"><div class="tgme_widget_message_text js-message_reply_text">Далее МД⚠️</div></a>'
             '<div class="tgme_widget_message_text js-message_text" dir="auto">Не наблюдается ⚠️</div>'
             '<time datetime="2026-11-08T13:36:00+02:00"></time></div></div>')
-    assert [x[2] for x in tg_web.parse_page(page)] == ["Не наблюдается ⚠️"]
+    assert [x[2] for x in tg_web.parse_page(page)] == ["Далее МД⚠️ — Не наблюдается ⚠️"]  # 08.11: короткий коментар отримує контекст цитати
+
+
+def test_reply_context_kab_fell():
+    """08.11: «Впав 💥» у відповідь на «КАБ курсом на Старий Салтів» знімає цю зону (монітор 1654)."""
+    from app.tg_web import parse_page
+    from app.tracker import Tracker
+    pg = ('<div class="tgme_widget_message x" data-post="M/5"><a class="tgme_widget_message_reply js-message_reply" href="x">'
+          '<div class="tgme_widget_message_text js-message_reply_text">КАБ курсом на Старий Салтів⚠️</div></a>'
+          '<div class="tgme_widget_message_text js-message_text">Впав 💥</div><time datetime="2026-11-08T14:38:00+02:00"></time></div>')
+    txt = parse_page(pg)[0][2]
+    assert "Старий Салтів" in txt
+    import time
+    import app.main as m
+    from app import config
+    trk = Tracker(config.SOURCES, m.brain)
+    now = time.time()
+    m.feed(trk, "КАБ курсом на Старий Салтів⚠️", "M", now - 120, None, log=False)
+    assert trk.zones
+    m.feed(trk, txt, "M", now - 60, None, log=False)
+    assert not trk.zones
