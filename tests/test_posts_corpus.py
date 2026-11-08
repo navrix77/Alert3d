@@ -189,3 +189,20 @@ def test_molniya_does_not_drift_far_from_last_named_place():
     tr = t.snapshot(now)["tracks"][0]
     assert dist_km(to_xy(50.3368, 36.1904), to_xy(tr["lat"], tr["lon"])) <= 10
     assert 120 < tr["hd"] < 250
+
+
+def test_fpv_closed_by_fall_replies():
+    """08.11: «Упал» (відповідь каналу) і «Взрыв в районе Дафи» знімають FPV; Дафі/Ужвій/Северка/Студентська розпізнаються."""
+    import time
+    now = time.time()
+    m, t = _tracker()
+    m.feed(t, "FPV СС/БД⚠️", "TLK", now - 200, None, log=False)
+    m.feed(t, "Упал😔", "TLK", now - 30, None, log=False)
+    assert all(x["status"] == "closed" for x in t.snapshot(now)["tracks"])
+    m, t = _tracker()
+    m.feed(t, "FPV-дрон курсом на ТРЦ Дафі ‼️", "M", now - 200, None, log=False)
+    m.feed(t, "Взрыв в районе Дафи", "KHN", now - 30, None, log=False)
+    assert all(x["status"] == "closed" for x in t.snapshot(now)["tracks"])
+    for txt, nm in [("FPV-дрон курсом вул. Наталії Ужвій", "Ужвій"), ("ФПВ над Северкой", "Салтівка"), ("FPV-дрон курсом на метро Студентська", "Студентська")]:
+        o = P.parse(txt, "M")
+        assert any(nm in r.place.name for r in o.places), (txt, o.places)

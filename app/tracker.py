@@ -487,6 +487,14 @@ class Tracker:
                 if best:
                     best[1].closed = t
                     rec["closed"] = rec.get("closed", 0) + 1
+            if obs.type is None and not places:
+                # 08.11: «Упал» / «Взрыв» без місця — відповідь каналу на його ж пост про FPV: знімаємо найсвіжішу короткодальню ціль цього каналу (≤6 хв)
+                for tr in sorted(self.tracks, key=lambda x: -x.last.t):
+                    if tr.closed or tr.merged or tr.type not in NEAR_TYPES or src not in tr.srcs or t - tr.last.t > 360:
+                        continue
+                    tr.closed = t
+                    rec["closed"] = rec.get("closed", 0) + 1
+                    break
             fast = FAST_TYPES if obs.type is None else (("shahed", "uav") if obs.type in ("shahed", "uav") else ((obs.type,) if obs.type in TYPES else ()))
             if fast:
                 done = 0
