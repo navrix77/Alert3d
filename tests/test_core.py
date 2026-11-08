@@ -2512,3 +2512,12 @@ def test_all_ambiguous_names_pick_compact_cluster():
     o = P.parse("Два дрона із Запоріжжя на Солоне, на півдні Дніпровський район", "DN")
     assert ("Солоне", 48.2) in [(r.place.name, round(r.place.lat, 1)) for r in o.places]
     assert all(r.place.lon < 35.5 for r in o.places if r.place.name == "Солоне")
+
+
+def test_district_match_cut_and_own_city_first():
+    # D 07.11 19:44: «над Северной Салтовкой» давало ще й окрему «Салтівку» (хибний курс на 2 км)
+    assert [r.place.name for r in P.parse("Бпла над Харьковом, над Северной Салтовкой", "D").places] == ["Північна Салтівка (Харків)"]
+    assert [r.place.name for r in P.parse("Ударний на Північну Салтівку❗️", "M").places] == ["Північна Салтівка (Харків)"]
+    # PL: Подільський район Полтави, а не київський Поділ
+    names = [r.place.name for r in P.parse("Над Подільським районом курсом на Київський.", "PL").places]
+    assert "Подільський (Полтава)" in names and "Поділ (Київ)" not in names

@@ -811,7 +811,9 @@ class Parser:
         tl = norm(text)
         from .config import CHANNEL_REGION
         creg = CHANNEL_REGION.get(channel or "", "")
-        for rx, dn, la, lo in DISTRICT_RX:
+        # райони міста свого каналу — першими: «Над Подільським районом…» (PL) — Подільський район Полтави, а не київський Поділ
+        own = [e for e in DISTRICT_RX if creg and creg in CITY_CFG.get(e[1][e[1].rfind("(") + 1:-1], ((),))[0]]
+        for rx, dn, la, lo in own + [e for e in DISTRICT_RX if e not in own]:
             city = dn[dn.rfind("(") + 1:-1]
             # мікрорайон рахуємо лише в каналах цього міста/області або коли місто назване в тексті
             cfg = CITY_CFG.get(city)
@@ -827,6 +829,8 @@ class Parser:
                 role = "p" if before and before[-1] in POS_PREV else "t"
                 dist_found.append((m_.start(), PlaceRef(role, Place(dn, la, lo, "D", 30000))))
                 text = text[:m_.start()] + " " * (m_.end() - m_.start()) + text[m_.end():] if len(text) == len(tl) else text
+                # 08.11: вирізаємо й із tl, інакше «над Северной Салтовкой» давало ще й окрему «Салтівку» (хибний курс на 2 км)
+                tl = tl[:m_.start()] + " " * (m_.end() - m_.start()) + tl[m_.end():]
         arrow = re.search(r"\s(?:>|→|->|=>|➡️?)\s", text)
         cut = len([w for w in (re.sub(r"[^\w'’\-]", "", x) for x in WORD_SPLIT.split(text[:arrow.start()])) if w]) if arrow else None
         words = [re.sub(r"[^\w'’\-]", "", w) for w in WORD_SPLIT.split(text)]
