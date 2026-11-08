@@ -308,3 +308,17 @@ def test_own_forces_strike_report_not_a_target():
         o = P.parse(t, "PL")
         assert o.no_target and o.kind not in ("track", "zone")
     assert P.parse("Шахед курсом на Запоріжжя", "PL").kind == "track"
+
+
+def test_not_tracked_reply_closes_jet():
+    """08.11: «Реактивний БпЛА курсом на Барвінкове» → відповідь «Не відстежується» знімає ціль (monitor 1654)."""
+    import time
+    import app.main as m
+    from app import config
+    from app.tracker import Tracker
+    trk = Tracker(config.SOURCES, m.brain)
+    now = time.time()
+    m.feed(trk, "Реактивний БпЛА курсом на Барвінкове ⚠️", "M", now - 120, None, log=False)
+    assert any(t["status"] == "active" for t in trk.snapshot(now)["tracks"])
+    m.feed(trk, "Реактивний БпЛА курсом на Барвінкове ⚠️ — Не відстежується ⚠️", "M", now - 60, None, log=False)
+    assert not [t for t in trk.snapshot(now)["tracks"] if t.get("type") == "jet" and t["status"] == "active"]
