@@ -978,3 +978,4 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 .boom b{position:absolute;left:-16px;top:-18px;font-size:32px;font-weight:400;opacity:0;animation:boomE 1.7s ease-out forwards}
 @keyframes boomR{0%{transform:scale(.2);opacity:1}100%{transform:scale(2.4);opacity:0}}
 @keyframes boomE{0%{transform:scale(.3);opacity:0}20%{transform:scale(1.3);opacity:1}100%{transform:scale(1.1) translateY(-6px);opacity:0}}
+.note.online{text-align:center;opacity:.8;font-weight:600;margin-top:6px}

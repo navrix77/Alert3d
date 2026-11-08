@@ -877,6 +877,12 @@ async def api_llm_check(request: Request) -> dict:
     return _llm_check
 
 
+@app.get("/api/online")
+def api_online():
+    """Скільки користувачів зараз підключено (WebSocket) — лічильник унизу налаштувань."""
+    return JSONResponse({"online": len(clients)}, headers={"Cache-Control": "no-store"})
+
+
 @app.get("/api/visits")
 def api_visits(days: int = 30):
     st = VISITS.stats(max(1, min(days, 365)))
