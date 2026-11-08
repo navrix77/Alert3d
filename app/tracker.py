@@ -265,7 +265,7 @@ def map_disp(typ: str, speed: float, sec: float) -> float:
     return speed * 10 / 60 * k10 * (h / 10) ** b
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
-SHOW_BY_TYPE = {"uav": 25, "shahed": 25, "molniya": 4, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 2, "fpvf": 3, "recon": 15, "lancet": 4}  # 08.11: короткодальні не «летять» на мапі далі кількох км від названої позиції
+SHOW_BY_TYPE = {"uav": 25, "shahed": 25, "molniya": 4, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 1, "fpvf": 2, "recon": 15, "lancet": 4}  # 08.11: короткодальні не «летять» на мапі далі кількох км від названої позиції
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:

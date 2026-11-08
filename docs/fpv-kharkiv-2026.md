@@ -24,3 +24,8 @@
 - [Objectiv, 03.08](https://www.objectiv.tv/uk/objectively/2026/08/03/bili-fpv-shahedi-molnii-i-lantset-terehov-pro-tizhden-u-harkovi)
 - [Objectiv, 08.11](https://www.objectiv.tv/uk/objectively/2026/11/08/sinyegubov-u-harkovi-poshkodzheni-4-sto-ta-trolejbusi-u-zlatopoli-elektromerezhi/)
 - [Суспільне Харків, липень 2026](https://suspilne.media/kharkiv/1350132-dosit-serjozna-i-visokotocna-zbroa-u-comu-osoblivist-fpv-droniv-akimi-rosiani-atakuut-harkiv/)
+
+## Алгоритм атаки FPV → правила SKY (08.11)
+- Працюють парами/трійками: один зависає, другий маневрує, третій б'є → ціль не «летить лінією», а полює навколо названої точки; прогноз руху FPV обмежено ≈1 хв (оптоволокно ≈2), решта — зона ризику.
+- Пріоритет цілей: транспорт і АЗС, рухомі авто, шляхи евакуації, повторний удар по тому ж місцю → зона ризику найважливіша вздовж доріг (дорожній шар — наступний крок).
+- Дальність: радіо ≤15–20 км, оптоволокно 30–70 км від лінії пуску; швидкість до ≈97 км/год.
