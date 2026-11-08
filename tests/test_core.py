@@ -2475,3 +2475,13 @@ def test_city_header_line_joins_next_line():
     assert [r.place.name for r in P.parse(segs[0], "MU").places if r.role == "p"] == ["Лука-Мелешківська"]
     # «Запорізька:» (область, eRadarrua) не зливається з наступним рядком
     assert len(P.segments("Запорізька:\nНа Очаків з коси\nРБпЛА Марʼївка")) == 3
+
+
+def test_kyiv_zhytomyr_districts_nyvky_bortnychi_smolianka():
+    # 08.11 (kyiv_nebo, tryvoga_chomu, KL): «Нивки» ставились у село Нивки за 50–100 км від Києва, «Бортничі» губились
+    assert [r.place.name for r in P.parse("Реактивний на Нивки", "kyiv_nebo").places] == ["Нивки (Київ)"]
+    assert [r.place.name for r in P.parse("❗️❗️Реактивний на Бортничі, Київ.", "tryvoga_chomu").places][0] == "Бортничі (Київ)"
+    # Смолянка — мікрорайон Житомира лише з Житомиром у тексті; інакше село на Чернігівщині
+    assert [r.place.name for r in P.parse("Житомир: Реактивний БпЛА курсом на Смолянку", "KL").places] == ["Смолянка (Житомир)"]
+    o = P.parse("реактивний Куликівка на Смолянка.", "Northern_Sich_ukr")
+    assert ("Смолянка", 51.2) in [(r.place.name, round(r.place.lat, 1)) for r in o.places]
