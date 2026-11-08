@@ -2460,3 +2460,18 @@ def test_typo_nova_heleshchyna():
     # ppopoltavanightfighters 07.11 17:09: було село Нова (≈190 км) і Власівка на Харківщині
     o = P.parse("Нова гелещина курс власівка кременчук", "ppopoltavanightfighters")
     assert [(r.place.name, round(r.place.lat, 1)) for r in o.places][:2] == [("Нова Галещина", 49.2), ("Власівка", 49.1)]
+
+
+def test_city_header_line_joins_next_line():
+    # kudy_letyt 08.11 (t.me/kudy_letyt/129695): «Київ:» окремим рядком ставив реактивний у центр Києва окремою ціллю,
+    # а наступний рядок без міста вів ціль на Харків замість Харківського масиву Києва
+    segs = P.segments("Київ:\nРеактивний БпЛА курсом на Харківський масив")
+    assert len(segs) == 1
+    o = P.parse(segs[0], "KL")
+    assert [(r.role, r.place.name) for r in o.places] == [("t", "Харківський масив (Київ)")]
+    assert P.segments("Житомир:\nРеактивний БпЛА курсом на Озерне") == ["Житомир: Реактивний БпЛА курсом на Озерне"]
+    # рядок сам каже, де ціль (MU 08.11): заголовок-місто не додає хибну позицію в центрі Вінниці
+    segs = P.segments("❗️Вінниця:\n⚠️Ракета Герань-5 над Лука-Мелешківська курсом на Сабарів, Царина.")
+    assert [r.place.name for r in P.parse(segs[0], "MU").places if r.role == "p"] == ["Лука-Мелешківська"]
+    # «Запорізька:» (область, eRadarrua) не зливається з наступним рядком
+    assert len(P.segments("Запорізька:\nНа Очаків з коси\nРБпЛА Марʼївка")) == 3
