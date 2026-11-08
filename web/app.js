@@ -348,7 +348,7 @@ function addOverlays(){
   map.addLayer({id:'zones',type:'circle',source:'zones',paint:{'circle-radius':['interpolate',['linear'],['zoom'],5,5,9,13,12,18],'circle-color':TYPE_COLOR.kab,'circle-opacity':0.16,'circle-stroke-color':TYPE_COLOR.kab,'circle-stroke-width':1.6,'circle-stroke-opacity':0.9,'circle-blur':0.1}});
   // загроза КАБ: маленький значок авіабомби над пунктом і підпис, замість великих помаранчевих кіл
   if(!map.hasImage('kab-mini')){const im=new Image();im.onload=()=>{if(!map.hasImage('kab-mini'))map.addImage('kab-mini',im,{pixelRatio:Math.max(1,im.naturalWidth/40)});};im.src='sprites/t-kab.png?v=ref17';}
-  map.addLayer({id:'zones-t',type:'symbol',source:'zones',layout:{'icon-image':'kab-mini','icon-size':['interpolate',['linear'],['zoom'],5,0.5,9,0.9],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',7,'загроза КАБ'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.6],'text-anchor':'top','text-optional':true},paint:{'text-color':TYPE_COLOR.kab,'text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4}});
+  map.addLayer({id:'zones-t',type:'symbol',source:'zones',layout:{'icon-image':'kab-mini','icon-rotate':['get','r'],'icon-rotation-alignment':'map','icon-size':['interpolate',['linear'],['zoom'],5,0.5,9,0.9],'icon-allow-overlap':true,'text-field':['step',['zoom'],'',7,'загроза КАБ'],'text-font':['Noto Sans Bold'],'text-size':11,'text-offset':[0,1.6],'text-anchor':'top','text-optional':true},paint:{'text-color':TYPE_COLOR.kab,'text-halo-color':'rgba(0,0,0,.85)','text-halo-width':1.4}});
   // ворожа тактична авіація (носії КАБ) і зона пусків
   ['avia','avia-z','avia-l'].forEach(id=>{if(!map.getSource(id))map.addSource(id,{type:'geojson',data:EMPTY});});
   if(!map.hasImage('su34')){const c=document.createElement('canvas');c.width=c.height=96;const x=c.getContext('2d');x.translate(48,48);
@@ -939,7 +939,7 @@ function stratTick(){stratRaf=0;if(!map.getSource('strat-fx')){stratFx=[];return
     const tl=Math.min(d,0.5);F.push({type:'Feature',properties:{w:2.4*(1-k)+0.6,o:o*0.8},geometry:{type:'LineString',coordinates:[[lon-dx*tl/cl,lat-dy*tl],[lon,lat]]}});}
   map.getSource('strat-fx').setData({type:'FeatureCollection',features:F});if(stratFx.length)stratRaf=requestAnimationFrame(stratTick);}
 
-function syncZones(){syncAvia();try{syncStrat();}catch(e){console.warn(e);}if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap((z,zi)=>z.places.map(([lo,la])=>({type:'Feature',properties:{zi},geometry:{type:'Point',coordinates:[lo,la]}})))});}
+function syncZones(){syncAvia();try{syncStrat();}catch(e){console.warn(e);}if(!SNAP||!map.getSource('zones'))return;map.getSource('zones').setData({type:'FeatureCollection',features:SNAP.zones.flatMap((z,zi)=>z.places.map(([lo,la])=>({type:'Feature',properties:{zi,r:(z.launch&&z.launch.lat!=null)?Math.atan2((lo-z.launch.lon)*Math.cos(la*Math.PI/180),la-z.launch.lat)*180/Math.PI:180},geometry:{type:'Point',coordinates:[lo,la]}})))});}
 
 /* ---------- лічильники, статус ---------- */
 const CNTI={};
@@ -1511,7 +1511,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 455,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 456,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
