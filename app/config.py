@@ -46,6 +46,8 @@ _C = [
     ("CX", "cxidua", "СХІD", 0.65, False, "Харківська", True),
     ("SG", "synegubov", "Синєгубов (Харківська ОВА)", 0.90, True, "Харківська", True),
     ("TRH", "ihor_terekhov", "Терехов (мер Харкова)", 0.90, True, "Харківська", True),
+    ("ZAD", "zadorenko_v", "Задоренко (Дергачівська МВА)", 0.85, True, "Харківська", True),
+    ("MIN", "GalinaMinaeva", "Мінаєва (мер Чугуєва)", 0.85, True, "Харківська", True),
     ("HK", "huyovy_kharkiv", "Хуйовий Харків", 0.65, False, "Харківська", True),
     ("HS", "hs_kharkiv", "HS Харків", 0.60, False, "Харківська", True),
     ("TXK", "truexakharkiv", "Труха Харків", 0.55, False, "Харківська", True),
