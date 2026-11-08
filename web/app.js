@@ -807,7 +807,7 @@ function syncHolo(lv){if(!map.getSource('holo')||!RA)return;const F=[];
 let OBLN=null;function fetchOblNames(){if(OBLN)return Promise.resolve(OBLN);return fetch('/data/oblasts.geojson').then(r=>r.json()).then(j=>OBLN=j.features.map(f=>f.properties.n));}
 function syncHome(){clearTimeout(window.__wpT);window.__wpT=setTimeout(()=>window.webPushSync&&webPushSync(false),1500);if(map.getSource('home'))map.getSource('home').setData(realHome()?{type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:realHome()}}]}:EMPTY);}
 function syncAvia(){if(!SNAP||!map.getSource('avia'))return;const A=SNAP.avia||[];const P=[],Z=[],L=[];
-  A.forEach(a=>{const c=[a.lon,a.lat];const tgt=a.to&&a.to[0]||[31.5,49];const r=Math.atan2((tgt[0]-a.lon)*Math.cos(a.lat*Math.PI/180),tgt[1]-a.lat)*180/Math.PI;
+  A.forEach(a=>{const c=[a.lon,a.lat];const _d=t=>Math.hypot((t[0]-a.lon)*Math.cos(a.lat*Math.PI/180),t[1]-a.lat);const _c=(a.to&&a.to.length?a.to:(SNAP.zones||[]).flatMap(z=>z.places.map(q=>[q[0],q[1]])));const tgt=_c.length?_c.reduce((b,t)=>_d(t)<_d(b)?t:b):[31.5,49];const r=Math.atan2((tgt[0]-a.lon)*Math.cos(a.lat*Math.PI/180),tgt[1]-a.lat)*180/Math.PI;
     P.push({type:'Feature',properties:{ai:A.indexOf(a),r,f:a.fade||0,l:(a.kab?'пуски КАБ':'тактична авіація')+' · '+hm(a.t)+'\n'+a.area},geometry:{type:'Point',coordinates:c}});
     const ring=[];for(let i=0;i<=40;i++){const g=i/40*2*Math.PI,R=38;ring.push([a.lon+R/111/Math.cos(a.lat*Math.PI/180)*Math.sin(g),a.lat+R/111*Math.cos(g)]);}
     Z.push({type:'Feature',properties:{f:a.fade||0},geometry:{type:'Polygon',coordinates:[ring]}});
@@ -1511,7 +1511,7 @@ function syncHits(){if(!SNAP||!map.getSource('hits'))return;
 setInterval(syncHits,10000);
 $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   const h=SNAP&&SNAP.health||{},c=h.channels||{};if(c.channels)$('#st-tech').textContent='SKY збирає повідомлення '+c.channels+' моніторингових каналів (зараз оновлюються '+(c.live||0)+') і офіційні тривоги, звіряє їх між собою й показує, наскільки підтверджена кожна ціль і наскільки точно відоме її місце. Роботу ППО та влучання в Україні не показуємо.';
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 431,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 455,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
