@@ -299,3 +299,12 @@ def test_past_fpv_report_is_not_a_target():
     o = P.parse("8 листопада російські війська завдали ударів FPV-дронами по Київському району Харкова.", "KM")
     assert o.kind != "track" and o.no_target
     assert P.parse("FPV курсом на Харків", "KM").kind == "track"
+
+
+def test_own_forces_strike_report_not_a_target():
+    """08.11: «Генштаб: уражено пункти управління БпЛА… Запоріжжя, Бердянськ» — наші удари, не ворожа ціль."""
+    for t in ["Під удар потрапили об'єкти на Запоріжжі, Херсонщині, Донеччині та в Росії.",
+              "У Бердянську також уражено місце дислокації та пункт управління безпілотниками підрозділу «Рубікон»."]:
+        o = P.parse(t, "PL")
+        assert o.no_target and o.kind not in ("track", "zone")
+    assert P.parse("Шахед курсом на Запоріжжя", "PL").kind == "track"
