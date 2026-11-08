@@ -492,7 +492,26 @@ DISTRICTS += [
     (r"сихів|сыхов", "Сихів (Львів)", 49.7900, 24.0700), (r"левандівк|левандовк", "Левандівка (Львів)", 49.8100, 24.0600), (r"винники|винники", "Винники (Львів)", 49.8400, 24.1300),
     (r"рясне|рясне-?2", "Рясне (Львів)", 49.8700, 23.9900), (r"збоїщ|збоища", "Збоїща (Львів)", 49.8200, 24.0600), (r"форум\s+львів|king\s*cross|кінг\s*кросс", "ТРЦ King Cross (Львів)", 49.8650, 24.0170),
 ]
+def reload_learned() -> int:
+    """08.11: підхоплює data/learned_places.json (app/dictlearn.py): нові райони/вулиці/ТРЦ без перезапуску."""
+    global DISTRICT_RX
+    base = [(re.compile(rx), n, la, lo) for rx, n, la, lo in DISTRICTS]
+    n = 0
+    try:
+        import json as _j
+        from pathlib import Path as _P
+        from .dictlearn import LEARNED
+        for e in _j.loads(_P(LEARNED).read_text(encoding="utf-8")):
+            base.append((re.compile(e["rx"]), e["name"], float(e["lat"]), float(e["lon"])))
+            n += 1
+    except Exception:  # noqa: BLE001
+        pass
+    DISTRICT_RX = base
+    return n
+
+
 DISTRICT_RX = [(re.compile(rx), n, la, lo) for rx, n, la, lo in DISTRICTS]
+reload_learned()
 WORD_SPLIT = re.compile(r"[\s,.;:!?()«»\"/]+")
 
 

@@ -560,6 +560,10 @@ async def lifespan(app: FastAPI):
                 pr = await asyncio.create_subprocess_exec("nice", "-n", "15", sys.executable, "-m", "app.trainer", cwd=str(Path(__file__).resolve().parent.parent))
                 await asyncio.wait_for(pr.wait(), 2400)
                 _load_params()
+                # самонавчання словника: невпізнані слова з постів → геокодування → data/learned_places.json → гаряче підвантаження
+                pd = await asyncio.create_subprocess_exec("nice", "-n", "15", sys.executable, "-m", "app.dictlearn", cwd=str(Path(__file__).resolve().parent.parent))
+                await asyncio.wait_for(pd.wait(), 900)
+                parser_mod.reload_learned()
             except Exception as e:  # noqa: BLE001
                 log.warning("нічний тренінг: %s", e)
 
