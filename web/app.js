@@ -1598,7 +1598,7 @@ let actx=null;function beep(){try{actx=actx||new (window.AudioContext||window.we
   const o2=actx.createOscillator();o2.frequency.value=660;o2.connect(g);o2.start(t+0.6);o2.stop(t+1.1);g.gain.setValueAtTime(0.3,t+0.6);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);}catch(e){}}
 // 08.11: голос читав заголовок картки як є («×2 · ~10 хв до «X» → Y»). Тепер: окрема коротка фраза n.say або очищений текст без значків і службових символів
 const NUMW=['','одна','дві','три','чотири','п’ять','шість','сім','вісім','дев’ять','десять'];
-function sayClean(t){return String(t||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'').replace(/×\s*(\d+)/g,(m,n)=>'. '+(NUMW[+n]||n)+' цілей. ').replace(/~\s*/g,'приблизно ').replace(/→/g,'курс на ').replace(/[«»]/g,'').replace(/\s*[·|]\s*/g,'. ').replace(/\b(\d{1,2}):(\d{2})\b/g,'о $1 $2').replace(/\s+/g,' ').replace(/\.\s*\./g,'.').trim();}
+function sayClean(t){return String(t||'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu,'').replace(/×\s*(\d+)/g,(m,n)=>'. '+(NUMW[+n]||n)+(+n<5?' цілі. ':' цілей. ')).replace(/~\s*/g,'приблизно ').replace(/→/g,'курс на ').replace(/[«»]/g,'').replace(/\s*[·|]\s*/g,'. ').replace(/(\bо\s+)?\b\d{1,2}:\d{2}\b/g,'').replace(/\bхв\b/g,'хвилин').replace(/\bкм\b/g,'кілометрів').replace(/\s+/g,' ').replace(/\.\s*\./g,'.').trim();}
 window.__beep=(txt)=>{txt=sayClean(txt);if(window.NXSound)NXSound.alert(txt);else if(PREF.sound)beep();};
 setInterval(()=>{if(PREF.theme==='auto'&&effTheme()!==document.documentElement.dataset.theme)applyTheme(true);},60000);
 applyTheme(false);document.body.classList.toggle('tac',TAC);tacScaleBars();enemyLoad();if(TAC){loadApp06();}tacBarSync();
@@ -1681,7 +1681,7 @@ function notesCheck(s){
     if(!z){for(let m=5;m<=30;m+=5){const q=posAt(t,serverT+m*60).p;z=zoneOf(q);if(z){eta=m;break;}}}
     if(!z&&!(PREF.nAll&&fast))continue;   // не моя зона, мовчимо
     if(window.__wpOK){NSEEN.add(k);continue;}// push увімкнено: про цілі попереджає телефон (екран блокування), у застосунку не дублюємо
-    const _nm=(TYPE_NAME[t.type]||'Ціль'),_cnt=t.count>1?(', '+(NUMW[t.count]||t.count)+' цілей'):'';
+    const _nm=(TYPE_NAME[t.type]||'Ціль'),_cnt=t.count>1?(', '+(NUMW[t.count]||t.count)+(t.count<5?' цілі':' цілей')):'';
     const _say=_nm+_cnt+'. '+(t.next?'Курс на '+t.next+'. ':(t.hd!=null?'Летить '+SIDE[Math.round(t.hd/45)%8]+'. ':''))+(z?(eta?'Приблизно через '+eta+' хвилин буде біля '+z+'.':'Уже в зоні '+z+'. Укриття.'):'');
     note({k,say:_say,type:t.type,lvl:z?(eta?'orange':'red'):(t.type==='jet'?'orange':'red'),ic:t.type==='ballistic'?'🔺':t.type==='cruise'?'✈️':t.type==='jet'?'🔥':'⚠️',
       title:(z?(eta?'🟠 ':'🔴 '):'')+(TYPE_NAME[t.type]||'Ціль')+(t.count>1?' ×'+t.count:'')+(z?(eta?' · ~'+eta+' хв до «'+z+'»':' · у межах «'+z+'»'):'')+(t.next?' → '+t.next:''),
