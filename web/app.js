@@ -467,8 +467,8 @@ function addOverlays(){
    const start=e=>{cancel();lpP=e.point;lpT=setTimeout(()=>{lpT=null;const fs=map.queryRenderedFeatures([[lpP.x-24,lpP.y-24],[lpP.x+24,lpP.y+24]],{layers:['tg-hit']});if(!fs.length||!SNAP)return;
       const tr=SNAP.tracks.find(t=>t.id===fs[0].properties.id);if(!tr||!tr.zone){toast('Зона ризику є лише для FPV, «Молнії» та «Ланцета»');return;}
       if(!map.getSource('fpvz')){map.addSource('fpvz',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-        map.addLayer({id:'fpvz-f',type:'fill',source:'fpvz',paint:{'fill-color':'#FF3B3B','fill-opacity':0.2}},'tg-hit');
-        map.addLayer({id:'fpvz-l',type:'line',source:'fpvz',paint:{'line-color':'#FF5A5A','line-width':2,'line-dasharray':[2,1.5]}},'tg-hit');}
+        map.addLayer({id:'fpvz-f',type:'fill',source:'fpvz',paint:{'fill-color':'#19D3FF','fill-opacity':0.22}},'tg-hit');
+        map.addLayer({id:'fpvz-l',type:'line',source:'fpvz',paint:{'line-color':'#5CE1FF','line-width':2.5,'line-dasharray':[2,1.5]}},'tg-hit');}
       map.getSource('fpvz').setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[tr.zone.poly]}}]});
       try{navigator.vibrate&&navigator.vibrate(25);}catch(_){}
       toast('Зона ризику: ціль летить від лінії пуску, ще до ~'+tr.zone.km+' км уздовж курсу');
