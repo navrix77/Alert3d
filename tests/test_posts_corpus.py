@@ -278,6 +278,8 @@ def test_reply_context_kab_fell():
 
 
 def test_saltivka_microdistrict_numbers():
+    def _pl(t, src):
+        return [(r.place.name, 0, 0) for seg in P.segments(t) for r in P.parse(seg, src).places]
     """08.11: «ФПВ на 533» — мікрорайон Салтівки; число без прийменника чи з «метрів/шт» — не місце."""
     assert [n for n, _a, _b in _pl("ФПВ со стороны Бобровки на 533", "KHN")][0].startswith("мкр Салтівка")
     assert [n for n, _a, _b in _pl("ФПВ на 602", "KHN")] == ["мкр Салтівка 600-х (Харків)"]
