@@ -597,7 +597,7 @@ function posAt(tr,serverT){
   const dm=tr.dm||[ (tr.vmap||tr.speed)/tr.speed,1];const D=sec=>{const h=Math.max(0,sec)/60;return (h<=10||dm[1]===1)?tr.speed*h/60*dm[0]:tr.speed*10/60*dm[0]*Math.pow(h/10,dm[1]);};
   const done=D(tr.ts-tr.last);
   let km=Math.max(0,D(serverT-tr.last)-done);
-  const SHOW={shahed:25,molniya:20,jet:6,cruise:2,ballistic:1}[tr.type]??25;// хв: ціль рухається курсом, доки не прийде нове повідомлення (зона «де може бути» росте)
+  const SHOW={shahed:25,molniya:4,fpv:2,fpvf:3,lancet:4,jet:6,cruise:2,ballistic:1}[tr.type]??25;// хв: ціль рухається курсом, доки не прийде нове повідомлення (зона «де може бути» росте)
   const cap=Math.max(0,D(SHOW*60)-done);
   if(!tr.route.length)km=Math.min(km,cap);
   const pts=[xy([tr.lon,tr.lat]),...tr.route.map(xy)];

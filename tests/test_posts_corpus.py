@@ -175,3 +175,17 @@ def test_short_range_zone_and_heading_away_from_front():
     if fb is not None:
         from app.tracker import ang_diff
         assert ang_diff(tr["hd"], fb) <= 90
+
+
+def test_molniya_does_not_drift_far_from_last_named_place():
+    """08.11: пости «Молнія на Прудянку → маневрує біля Козачої Лопані» — не ≥15 км від останнього пункту й не на північ."""
+    import time
+    from app.geo import to_xy
+    from app.tracker import dist_km
+    m, t = _tracker()
+    now = time.time()
+    for dt, k, x in [(-1700, "M", "Молнія на Козачу Лопань⚠️"), (-1100, "M", "Молнія на Прудянку⚠️"), (-700, "M", "Молнія маневрує біля Козачої Лопані⚠️")]:
+        m.feed(t, x, k, now + dt, None, log=False)
+    tr = t.snapshot(now)["tracks"][0]
+    assert dist_km(to_xy(50.3368, 36.1904), to_xy(tr["lat"], tr["lon"])) <= 10
+    assert 120 < tr["hd"] < 250

@@ -198,6 +198,15 @@ class Track:
         return pts
 
     def est(self, now: float, cap_min: float = 4, k: float = 1.0, mapm: bool = False) -> tuple[float, float]:
+        r = self._est(now, cap_min, k, mapm)
+        if mapm and self.type in SHORT_RANGE:  # 08.11: короткодальня ціль не відходить від останньої названої позиції далі за свій «показ» (кілька км)
+            cap_km = map_disp(self.type, self.speed, cap_min * 60)
+            a = (self.last.x, self.last.y)
+            if dist_km(a, r) > cap_km:
+                r = move(a, bearing(a, r), cap_km)
+        return r
+
+    def _est(self, now: float, cap_min: float = 4, k: float = 1.0, mapm: bool = False) -> tuple[float, float]:
         km = self.speed * k * max(0.0, now - self.last.t) / 3600
         if mapm:  # модель показу на мапі: зміщення за часом (map_disp), ліміт — зміщення за cap_min
             km = map_disp(self.type, self.speed, now - self.last.t)
@@ -251,7 +260,7 @@ def map_disp(typ: str, speed: float, sec: float) -> float:
     return speed * 10 / 60 * k10 * (h / 10) ** b
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
-SHOW_BY_TYPE = {"uav": 25, "shahed": 25, "molniya": 20, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 5, "fpvf": 5, "recon": 15, "lancet": 10}
+SHOW_BY_TYPE = {"uav": 25, "shahed": 25, "molniya": 4, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 2, "fpvf": 3, "recon": 15, "lancet": 4}  # 08.11: короткодальні не «летять» на мапі далі кількох км від названої позиції
 
 
 def along(pts: list[tuple[float, float]], km: float) -> tuple[float, float]:
