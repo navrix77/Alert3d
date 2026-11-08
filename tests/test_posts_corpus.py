@@ -143,3 +143,19 @@ def test_molniya_at_border_points_inland():
     m.feed(t, "🟧Молния курсом на Казачью Лопань", "CXID", now - 60, None, log=False)
     hd = t.snapshot(now)["tracks"][0]["hd"]
     assert hd is not None and 120 < hd < 250, hd
+
+
+def test_fpv_route_never_backwards_or_beyond_range():
+    """08.11: маршрут FPV не веде назад до кордону й не виходить за дальність від лінії пуску."""
+    import time
+    from app.tracker import Tracker, SHORT_RANGE
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "FPV на Велику Данилівку", "M", now - 240, None, log=False)
+    m.feed(t, "FPV курсом на Руську Лозову", "M", now - 60, None, log=False)
+    for tr in t.snapshot(now)["tracks"]:
+        if tr["type"] in ("fpv", "fpvf"):
+            d0 = Tracker._front_dist(__import__("app.geo", fromlist=["x"]).to_xy(tr["lat"], tr["lon"]))
+            for la, lo in tr["route"]:
+                dd = Tracker._front_dist(__import__("app.geo", fromlist=["x"]).to_xy(la, lo))
+                assert dd >= d0 - 0.6 and dd <= SHORT_RANGE[tr["type"]] + 0.1

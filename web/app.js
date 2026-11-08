@@ -735,7 +735,7 @@ function frame(now){
     if(follow&&sel&&!map.isMoving()){const d=DISP.get(sel);if(d){const c=map.getCenter();const k=0.12;map.jumpTo({center:[c.lng+(d.p[0]-c.lng)*k,c.lat+(d.p[1]-c.lat)*k]});}}
     if(slow)renderBanner(threats);
     if(map.getSource('ticks')&&now-(frame.tk||0)>800){frame.tk=now;const tk=[];const serverT=Date.now()/1000+offset;
-      for(const tr of SNAP.tracks){if(tr.status!=='active'||sel!==tr.id)continue;const c=TYPE_COLOR[tr.type];
+      for(const tr of SNAP.tracks){if(tr.status!=='active'||sel!==tr.id||['fpv','fpvf','lancet','molniya'].includes(tr.type))continue;const c=TYPE_COLOR[tr.type];  // 08.11: у короткодальніх жодних «+5 хв»
         let last=map.project(posAt(tr,serverT).p);
         for(const m of [5,10,15]){const q=posAt(tr,serverT+m*60).p,P=map.project(q);if(Math.hypot(P.x-last.x,P.y-last.y)<46)continue;last=P;tk.push({type:'Feature',properties:{c,l:'+'+m+' хв'},geometry:{type:'Point',coordinates:q}});}}
       map.getSource('ticks').setData({type:'FeatureCollection',features:tk});}

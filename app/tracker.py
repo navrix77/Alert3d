@@ -68,6 +68,7 @@ def _fkm(tr) -> int | None:
     return round(front_km(la, lo))
 
 
+SHORT_RANGE = {"fpv": 15.0, "fpvf": 40.0, "lancet": 45.0, "molniya": 45.0}  # км від лінії пуску: звичайний FPV ≈10–15, оптоволоконний/«Молнія»/«Ланцет» ≈40
 NEAR_TYPES = ("fpv", "fpvf", "molniya", "lancet")  # короткодальні: названі каналами «на X» — уже біля X (07.11, власник)
 
 
@@ -902,6 +903,19 @@ class Tracker:
             self.brain.pred_score("dir:" + e["src"], ang_diff(bearing(p0, pt), bearing(p0, e["dxy"])) <= 30)
 
     @staticmethod
+    def _front_dist(pt) -> float:
+        """Відстань (км) до найближчої точки лінії фронту/кордону."""
+        from .parser import FRONT_PTS
+        best = 1e9
+        for (lo1, la1), (lo2, la2) in zip(FRONT_PTS, FRONT_PTS[1:]):
+            a, b = _gxy(la1, lo1), _gxy(la2, lo2)
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            l2 = dx * dx + dy * dy
+            u = max(0.0, min(1.0, ((pt[0] - a[0]) * dx + (pt[1] - a[1]) * dy) / l2)) if l2 else 0.0
+            best = min(best, dist_km((a[0] + u * dx, a[1] + u * dy), pt))
+        return best
+
+    @staticmethod
     def _front_bearing(pt) -> float | None:
         """Курс «від найближчої точки лінії фронту/кордону вглиб» для цілей без власного курсу."""
         from .parser import FRONT_PTS
@@ -1325,6 +1339,9 @@ class Tracker:
                     acc += dist_km(a, b)
                     if acc > km + 0.5:
                         rest.append(b)
+            if tr.type in SHORT_RANGE and rest:  # 08.11 власник: FPV не летить назад до кордону і далі за свою дальність від лінії пуску
+                _d0 = self._front_dist((ex, ey))
+                rest = [q for q in rest if self._front_dist(q) >= _d0 - 0.5 and self._front_dist(q) <= SHORT_RANGE[tr.type]]
             names = [p.name for p in tr.route if dist_km(p.xy, (ex, ey)) > 2 and p.xy in rest] or []
             pred_src, pred_p = ("channels" if rest else tr.pred_src), None
             pred_next = None
