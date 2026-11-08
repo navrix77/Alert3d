@@ -368,6 +368,15 @@ class Zone:
 
 
 class Tracker:
+    def _boom_add(self, tr, t: float) -> None:
+        """08.11: ціль збито/вибухнула — запам'ятовуємо місце, клієнт показує вибух і знімає значок."""
+        try:
+            ex, ey = tr.est(t, SHOW_BY_TYPE.get(tr.type, SHOW_MIN), MAP_K.get(tr.type, 1.0), mapm=True)
+            la, lo = from_xy(ex, ey)
+            self.booms = [b for b in getattr(self, "booms", []) if t - b["t"] < 120] + [{"id": tr.id, "t": int(t), "lat": round(la, 5), "lon": round(lo, 5), "type": tr.type}]
+        except Exception:  # noqa: BLE001
+            pass
+
     def __init__(self, sources: dict[str, Source], brain=None, learn: bool = True, audit: bool = False) -> None:
         self.speed_over: dict[str, float] = {}  # навчені швидкості (лише живий трекер; повтори доби — паспортні)
         self.audit = audit  # самоаналіз лише для живого трекера (не для повторів доби/історії)
@@ -486,6 +495,7 @@ class Tracker:
                         best = (d, tr)
                 if best:
                     best[1].closed = t
+                    self._boom_add(best[1], t)
                     rec["closed"] = rec.get("closed", 0) + 1
             if obs.type is None and not places:
                 # 08.11: «Упал» / «Взрыв» без місця — відповідь каналу на його ж пост про FPV: знімаємо найсвіжішу короткодальню ціль цього каналу (≤6 хв)
@@ -493,6 +503,7 @@ class Tracker:
                     if tr.closed or tr.merged or tr.type not in NEAR_TYPES or src not in tr.srcs or t - tr.last.t > 360:
                         continue
                     tr.closed = t
+                    self._boom_add(tr, t)
                     rec["closed"] = rec.get("closed", 0) + 1
                     break
             fast = FAST_TYPES if obs.type is None else (("shahed", "uav") if obs.type in ("shahed", "uav") else ((obs.type,) if obs.type in TYPES else ()))
@@ -509,6 +520,7 @@ class Tracker:
                     elif src not in tr.srcs or tr.type in ("shahed", "uav"):
                         continue  # без місця — лише ракета, яку вів цей самий канал
                     tr.closed = t
+                    self._boom_add(tr, t)
                     done += 1
                     if not places or tr.type in ("shahed", "uav"):
                         break  # дрон у групі — лише один, найсвіжіший
@@ -1496,5 +1508,5 @@ class Tracker:
                          "targets": [z.places[0].name for z in kz][:6]})
         from . import count as _count
         counts = {"live": _count.live(out, now, now), "live_min": _count.LIVE_MIN}
-        return {"now": now, "counts": counts, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "strat": self.strat.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
+        return {"now": now, "fx": [b for b in getattr(self, "booms", []) if now - b["t"] < 90], "counts": counts, "tracks": out, "zones": zones, "avia": avia, "launches": self.launches.snapshot(now), "strat": self.strat.snapshot(now), "levels_tracker": levels, "last_update": self.last_update,
                 "log": self.log[-60:], "bal": [e for e in self.bal if now - e["t"] < 3600]}

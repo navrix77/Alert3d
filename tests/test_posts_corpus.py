@@ -206,3 +206,14 @@ def test_fpv_closed_by_fall_replies():
     for txt, nm in [("FPV-дрон курсом вул. Наталії Ужвій", "Ужвій"), ("ФПВ над Северкой", "Салтівка"), ("FPV-дрон курсом на метро Студентська", "Студентська")]:
         o = P.parse(txt, "M")
         assert any(nm in r.place.name for r in o.places), (txt, o.places)
+
+
+def test_boom_event_on_fall():
+    """08.11: коли ціль знято «Упал»/«Взрыв», у снапшоті є fx з її координатами (клієнт малює вибух)."""
+    import time
+    now = time.time()
+    m, t = _tracker()
+    m.feed(t, "FPV-дрон курсом на ТРЦ Дафі ‼️", "M", now - 200, None, log=False)
+    m.feed(t, "Взрыв в районе Дафи", "KHN", now - 30, None, log=False)
+    fx = t.snapshot(now)["fx"]
+    assert fx and fx[0]["type"] == "fpv" and 49.9 < fx[0]["lat"] < 50.2

@@ -1297,7 +1297,12 @@ $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 
 /* ---------- живий потік ---------- */
-function onSnap(s){window.__snapOK=true;LIVE=s;if(REPLAY)return;SNAP=s;if(!introDone&&map.isStyleLoaded&&map.isStyleLoaded())setTimeout(()=>introFly(false),0);try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
+// 08.11: ціль збито/вибухнула — на її місці коротка анімація вибуху, значок зникає (сервер віддає s.fx)
+const BOOMED=new Set();
+function showBooms(s){for(const b of (s.fx||[])){if(BOOMED.has(b.id+':'+b.t))continue;BOOMED.add(b.id+':'+b.t);if(Date.now()/1000-b.t>40)continue;
+  try{const el=document.createElement('div');el.className='boom';el.innerHTML='<i></i><i></i><b>💥</b>';
+    new maplibregl.Marker({element:el,pointerEvents:'none'}).setLngLat([b.lon,b.lat]).addTo(map);setTimeout(()=>{try{el.remove();}catch(e){}},2200);}catch(e){}}}
+function onSnap(s){window.__snapOK=true;LIVE=s;if(REPLAY)return;SNAP=s;try{showBooms(s);}catch(e){}if(!introDone&&map.isStyleLoaded&&map.isStyleLoaded())setTimeout(()=>introFly(false),0);try{notesCheck(s);}catch(e){console.warn(e);}recvAt=Date.now();offset=s.now-Date.now()/1000;renderCounters();renderAsOf();syncLevels();syncZones();syncRaions();renderForecast();if(!$('#drawer').hidden)renderFeed();}
 let LIVE=null,REPLAY=null;
 // «зараз» за сервером, не залежить від того, на який кадр машини часу перемкнуто offset
 const liveNow=()=>LIVE&&LIVE.now?LIVE.now+(REPLAY?0:Math.max(0,(Date.now()-recvAt)/1000)):Date.now()/1000;
