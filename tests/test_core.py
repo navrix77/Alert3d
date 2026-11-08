@@ -2439,3 +2439,24 @@ def test_khmelnytskyi_typo():
 def test_course_direction_word_not_village():
     assert _pl("У всіх курс Західний.", "war_monitor") == []
     assert [n for n, _a, _b in _pl("Реактив курс Південне", "Shturval_media")] == ["Південне"]
+
+
+def test_jet_map_displacement_flattens_after_10min():
+    # 08.11: бектест 05–08.11 — реактивні після 10 хв без повідомлення просуваються повільніше (розвороти, кружляння)
+    from app.tracker import map_disp
+    assert abs(map_disp("jet", 450, 600) - 450 * 10 / 60 * 0.6) < 0.1  # до 10 хв — як і було (k=0.6)
+    assert abs(map_disp("jet", 450, 1200) - 45 * 2 ** 0.3) < 0.1  # 20 хв — лише ×1.23 від 10 хв
+
+
+def test_two_word_genitive_plural_kinski_rozdory():
+    # eyes_everywhere_ua / radar_sich 06.11 13:37: було село Роздори (Дніпропетровщина, ≈100 км північніше)
+    o = P.parse("Пуски КАБ з-під Кінських Роздорів курс Оріхів.")
+    names = [r.place.name for r in o.places]
+    assert names[0] == "Кінські Роздори" and abs(o.places[0].place.lat - 47.41) < 0.05 and "Роздори" not in names
+    assert [r.place.name for r in P.parse("Шахед біля Великих Сорочинців").places] == ["Великі Сорочинці"]
+
+
+def test_typo_nova_heleshchyna():
+    # ppopoltavanightfighters 07.11 17:09: було село Нова (≈190 км) і Власівка на Харківщині
+    o = P.parse("Нова гелещина курс власівка кременчук", "ppopoltavanightfighters")
+    assert [(r.place.name, round(r.place.lat, 1)) for r in o.places][:2] == [("Нова Галещина", 49.2), ("Власівка", 49.1)]
