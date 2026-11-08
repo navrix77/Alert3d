@@ -68,7 +68,7 @@ def _fkm(tr) -> int | None:
     return round(front_km(la, lo))
 
 
-SHORT_RANGE = {"fpv": 15.0, "fpvf": 40.0, "lancet": 45.0, "molniya": 45.0}  # км від лінії пуску: звичайний FPV ≈10–15, оптоволоконний/«Молнія»/«Ланцет» ≈40
+SHORT_RANGE = {"fpv": 15.0, "fpvf": 40.0, "lancet": 35.0, "molniya": 35.0}  # км від лінії пуску (docs/fpv-rubikon.md): копter ≈10–15, оптоволокно ≈30–40 (мер Харкова: 40), «Молнія»/«Ланцет» ≈25–35
 NEAR_TYPES = ("fpv", "fpvf", "molniya", "lancet")  # короткодальні: названі каналами «на X» — уже біля X (07.11, власник)
 
 
