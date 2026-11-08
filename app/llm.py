@@ -278,11 +278,12 @@ class LLM:
         ch = ([("anthropic", self.key, "", self.model)] if self.key else []) + self.others
         return sorted(ch, key=lambda p_: COST.get(p_[0], 2))
 
-    def _budget(self) -> bool:
+    def _budget(self, prio: bool = False) -> bool:
         d = time.strftime("%Y-%m-%d")
         if d != self.day:
             self.day, self.used = d, 0
-        if self.used >= self.daily_max:
+        # 08.11: останні 15% добового ліміту — лише для запитів користувача («Що зараз?»), фонова розмітка їх не з'їдає
+        if self.used >= (self.daily_max if prio else int(self.daily_max * 0.85)):
             return False
         self.used += 1
         return True
@@ -331,9 +332,9 @@ class LLM:
         return {}
 
     async def call(self, system: str, user: str, tool: dict | None = None, image: str | None = None, max_tokens: int = 600,
-                   skip: str | None = None, vision: bool = False):
+                   skip: str | None = None, vision: bool = False, prio: bool = False):
         """Повертає (результат, хто відповів) або (None, None). Пробує провайдерів по черзі; для картинок — лише ті, що бачать зображення."""
-        if self.cli is None or not self._budget():
+        if self.cli is None or not self._budget(prio):
             return None, None
         for prov in self._chain():
             tag = prov[0] + ":" + prov[3]

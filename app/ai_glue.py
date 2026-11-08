@@ -152,7 +152,7 @@ class AI:
                (f"\nПовідомлень про балістику/МіГ-31К/«Бандероль» за 30 хв: {len(bal)}" if bal else "") +
                (f"\nЗон загрози КАБ: {len(kab)}" if kab else ""))
         # 900, а не 350: у «думаючих» моделей (gpt-oss на Groq, grok-mini) ліміт з'їдали міркування, і відповідь обривалась на пів слові
-        txt, by = await self.llm.call(EXPLAIN_SYSTEM, ctx, None, max_tokens=900)
+        txt, by = await self.llm.call(EXPLAIN_SYSTEM, ctx, None, max_tokens=900, prio=True)
         if not txt:  # усі моделі недоступні — чесне зведення з даних SKY, без вигадок
             txt = (f"Офіційна тривога в області: {'є' if alert else 'немає'}. "
                    + (f"За повідомленнями каналів цілей в області: {len(tr)}. " + "; ".join(lines[:5]) + "." if tr else "Цілей в області за повідомленнями каналів зараз немає.")
