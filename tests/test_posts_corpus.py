@@ -229,3 +229,19 @@ def test_target_removed_by_end_synonyms(reply):
     assert any(x["status"] == "active" for x in t.snapshot(now)["tracks"])
     m.feed(t, reply, "TLK", now - 20, None, log=False)
     assert not any(x["status"] == "active" for x in t.snapshot(now)["tracks"]), reply
+
+
+@pytest.mark.parametrize("text,ch,place", [
+    ("Одеса: шахед на Молдаванку", "M", "Молдаванка"), ("Дніпро, ударний на Діївку", "M", "Діївка"), ("Суми: БпЛА на Ковпаківський район", "M", "Ковпаків"),
+    ("ФПВ на Ліски, Миколаїв", "M", "Ліски"), ("Кривий Ріг, шахед на Інгулець", "M", "Інгулець"), ("Херсон: дрон на Корабельний", "M", "Корабельний"),
+    ("Львів, шахед на Сихів", "M", "Сихів"), ("шахед на Салтівку", "M", "Салтівка"),
+])
+def test_city_districts(text, ch, place):
+    """08.11: райони й орієнтири не лише Харкова: Дніпро, Одеса, Суми, Миколаїв, Херсон, Кривий Ріг, Львів…"""
+    o = P.parse(text, ch)
+    assert any(place in r.place.name for r in o.places), (text, o.places)
+
+
+def test_airport_not_odesa_port():
+    o = P.parse("аеропорт Бориспіль", "M")
+    assert not any("Одеський порт" in r.place.name for r in o.places)
