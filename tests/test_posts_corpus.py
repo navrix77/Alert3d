@@ -159,3 +159,19 @@ def test_fpv_route_never_backwards_or_beyond_range():
             for la, lo in tr["route"]:
                 dd = Tracker._front_dist(__import__("app.geo", fromlist=["x"]).to_xy(la, lo))
                 assert dd >= d0 - 0.6 and dd <= SHORT_RANGE[tr["type"]] + 0.1
+
+
+def test_short_range_zone_and_heading_away_from_front():
+    """08.11: у «Молнії» є зона ризику (віяло), а курс ніколи не веде до лінії пуску."""
+    import time
+    from app.tracker import Tracker
+    from app.geo import to_xy
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "Молнія на Козачу Лопань⚠️", "M", now - 120, None, log=False)
+    tr = t.snapshot(now)["tracks"][0]
+    assert tr["zone"] and len(tr["zone"]["poly"]) > 10
+    fb = Tracker._front_bearing(to_xy(tr["lat"], tr["lon"]))
+    if fb is not None:
+        from app.tracker import ang_diff
+        assert ang_diff(tr["hd"], fb) <= 90

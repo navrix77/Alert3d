@@ -462,6 +462,18 @@ function addOverlays(){
       if(follow&&sel===id){stopFollow('Стеження вимкнено');}else{sel=id;startFollow();}
       try{const b=$('#sh-follow');if(b){b.classList.toggle('on',follow);b.textContent=follow?'Зупинити':'Стежити';}}catch(_){}return;}
     lastTap={id,t:now};openSheet(id);});
+  // 08.11: довге натискання на короткодальню ціль (FPV/«Молнія»/«Ланцет») — зона ризику: віяло вперед на залишок дальності від лінії пуску
+  {let lpT=null,lpP=null;const cancel=()=>{clearTimeout(lpT);lpT=null;};
+   const start=e=>{cancel();lpP=e.point;lpT=setTimeout(()=>{lpT=null;const fs=map.queryRenderedFeatures([[lpP.x-24,lpP.y-24],[lpP.x+24,lpP.y+24]],{layers:['tg-hit']});if(!fs.length||!SNAP)return;
+      const tr=SNAP.tracks.find(t=>t.id===fs[0].properties.id);if(!tr||!tr.zone){toast('Зона ризику є лише для FPV, «Молнії» та «Ланцета»');return;}
+      if(!map.getSource('fpvz')){map.addSource('fpvz',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+        map.addLayer({id:'fpvz-f',type:'fill',source:'fpvz',paint:{'fill-color':'#FF3B3B','fill-opacity':0.2}},'tg-hit');
+        map.addLayer({id:'fpvz-l',type:'line',source:'fpvz',paint:{'line-color':'#FF5A5A','line-width':2,'line-dasharray':[2,1.5]}},'tg-hit');}
+      map.getSource('fpvz').setData({type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[tr.zone.poly]}}]});
+      try{navigator.vibrate&&navigator.vibrate(25);}catch(_){}
+      toast('Зона ризику: ціль летить від лінії пуску, ще до ~'+tr.zone.km+' км уздовж курсу');
+      clearTimeout(window.__fpvzT);window.__fpvzT=setTimeout(()=>{try{map.getSource('fpvz').setData({type:'FeatureCollection',features:[]});}catch(_){}},20000);},550);};
+   map.on('mousedown',start);map.on('touchstart',start);['mouseup','touchend','touchcancel','dragstart','move'].forEach(ev=>map.on(ev,cancel));}
   map.on('dblclick','tg-hit',e=>{e.preventDefault();});// без зуму карти при подвійному тапі по цілі
   if(!map._measClick){map._measClick=1;map.on('click',e=>{if(!MEAS.on)return;MEAS.pts.push([e.lngLat.lng,e.lngLat.lat]);measDraw();});}
   map.on('mouseenter','tg-hit',()=>map.getCanvas().style.cursor='pointer');map.on('mouseleave','tg-hit',()=>map.getCanvas().style.cursor='');
