@@ -2485,3 +2485,11 @@ def test_kyiv_zhytomyr_districts_nyvky_bortnychi_smolianka():
     assert [r.place.name for r in P.parse("Житомир: Реактивний БпЛА курсом на Смолянку", "KL").places] == ["Смолянка (Житомир)"]
     o = P.parse("реактивний Куликівка на Смолянка.", "Northern_Sich_ukr")
     assert ("Смолянка", 51.2) in [(r.place.name, round(r.place.lat, 1)) for r in o.places]
+
+
+def test_hyphen_before_name_is_route_separator():
+    # horizon_of_war_Official 07.11: «-Пльохів», «-Пакуль» губились, Довжик обирався під Семенівкою (≈110 км), а не біля Пльохова
+    o = P.parse("Довжик -Пльохів -Пакуль -водосховище", "horizon_of_war_Official")
+    assert [(r.place.name, round(r.place.lat, 1)) for r in o.places] == [("Довжик", 51.6), ("Пльохів", 51.5), ("Пакуль", 51.4)]
+    o = P.parse("🛵 на Березну -Куликівку -Смолянку -Олишівку /Кіпті -водосховище", "horizon_of_war_Official")
+    assert [r.place.name for r in o.places] == ["Березна", "Куликівка", "Смолянка", "Олишівка", "Кіпті"]
