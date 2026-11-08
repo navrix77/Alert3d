@@ -132,3 +132,14 @@ def test_launch_zones_reach():
 def test_approach_side(text, side, course):
     o = P.parse(text, "MU", None)
     assert o.side == side and o.course == course
+
+
+def test_molniya_at_border_points_inland():
+    """08.11: «Молнія курсом на Козачу Лопань» (за кілька км від кордону): носом на південь, вглиб, а не без курсу."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "Молнія на Козачу Лопань⚠️", "M", now - 120, None, log=False)
+    m.feed(t, "🟧Молния курсом на Казачью Лопань", "CXID", now - 60, None, log=False)
+    hd = t.snapshot(now)["tracks"][0]["hd"]
+    assert hd is not None and 120 < hd < 250, hd

@@ -915,7 +915,22 @@ class Tracker:
             d = dist_km(q, pt)
             if best is None or d < best[0]:
                 best = (d, q)
-        return bearing(best[1], pt) if best and best[0] > 0.5 else None
+        if best and best[0] > 0.5:
+            return bearing(best[1], pt)
+        if best:  # 08.11: ціль прямо на лінії (Козача Лопань біля кордону) — перпендикуляр до лінії в бік глибини країни (Київ)
+            q, (dx, dy) = best[1], (0.0, 0.0)
+            for (lo1, la1), (lo2, la2) in zip(FRONT_PTS, FRONT_PTS[1:]):
+                a, b = _gxy(la1, lo1), _gxy(la2, lo2)
+                if dist_km(a, pt) + dist_km(pt, b) <= dist_km(a, b) + 1.0:
+                    dx, dy = b[0] - a[0], b[1] - a[1]
+                    break
+            if dx or dy:
+                n = (-dy, dx)
+                ref = _gxy(50.45, 30.52)
+                if n[0] * (ref[0] - pt[0]) + n[1] * (ref[1] - pt[1]) < 0:
+                    n = (dy, -dx)
+                return bearing(pt, (pt[0] + n[0], pt[1] + n[1]))
+        return None
 
     def _learned_heading(self, tr: Track, place, pt) -> float | None:
         if tr.type in ("fpv", "fpvf", "rszv", "molniya", "lancet"):
