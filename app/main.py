@@ -877,10 +877,18 @@ async def api_llm_check(request: Request) -> dict:
     return _llm_check
 
 
+_SEEN: dict[str, float] = {}
+
+
 @app.get("/api/online")
-def api_online():
-    """Скільки користувачів зараз підключено (WebSocket) — лічильник унизу налаштувань."""
-    return JSONResponse({"online": len(clients)}, headers={"Cache-Control": "no-store"})
+def api_online(request: Request):
+    """Скільки користувачів зараз онлайн: усі, хто за останні 90 с відкривав застосунок (пульс з клієнта кожні 30 с) або тримає WebSocket."""
+    now = time.time()
+    h = hashlib.sha256(((_client_ip(request.client, request.headers) or "") + "|" + (request.headers.get("user-agent") or "")).encode()).hexdigest()[:16]
+    _SEEN[h] = now
+    for k in [k for k, t in _SEEN.items() if now - t > 90]:
+        _SEEN.pop(k, None)
+    return JSONResponse({"online": max(len(clients), len(_SEEN))}, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/visits")
