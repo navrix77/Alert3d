@@ -6,6 +6,7 @@ import json
 import re
 import os
 import logging
+import hashlib
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
