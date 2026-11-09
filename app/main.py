@@ -889,7 +889,7 @@ def _send_mail(subject: str, body: str) -> bool:
     if not (user and pw):
         return False
     m = EmailMessage()
-    m["Subject"], m["From"], m["To"] = subject, user, os.getenv("FEEDBACK_TO", "sikalenko82@gmail.com")
+    m["Subject"], m["From"], m["To"] = subject, user, os.getenv("FEEDBACK_TO", "sikalenko@ukr.net")
     m.set_content(body)
     with smtplib.SMTP_SSL(host, int(os.getenv("SMTP_PORT", "465")), timeout=15) as sm:
         sm.login(user, pw)
