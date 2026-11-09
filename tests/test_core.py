@@ -2577,3 +2577,32 @@ def test_morning_0911_forecast_news_not_targets():
     assert not fc("Реактивний на Оржицю, висота 5000. Можливе оголошення тривоги найближчим часом.")
     assert not fc("Краснопілля/Боромля БпЛА, ймовірно ударний")
     assert not fc("Наразі чисто чекаємо на відбій найближчим часом")
+
+
+def test_day_0911_reactor_slang_and_ballistic_inherit():
+    """Shturval_media 08.11: «реактор» = реактивний (канал сам: «То реактив  Не звичайний»); «Швидкісна ціль курс Одеса»
+    о 17:19, далі пів години «… курс» по селах ставали балістикою. Ядерний реактор — не ціль."""
+    from app.parser import Parser
+    p = Parser()
+    assert p.parse("З Кіровограда реактор  Курс Єланець", "Shturval_media").type == "jet"
+    assert p.parse("+1 реактор з Криму", "Shturval_media").type == "jet"
+    assert p.parse("2 реактора з Криму курс Тендер", "Shturval_media").type == "jet"
+    assert p.parse("Реактор ЗАЕС переведено в холодний стан", "suspilnenews").type is None
+    assert p.parse("ядерний реактор у Курчатові", "suspilnenews").type is None
+    # рівень каналу: успадкований тип «балістика» не тягнеться понад 15 хв після останньої явної згадки
+    from app import main as M
+    from app import config
+    from app.tracker import Tracker
+    trk = Tracker(config.SOURCES)
+    seen = []
+    orig = trk.ingest
+    trk.ingest = lambda o, k, ts, l: (seen.append((o.raw, o.type)), orig(o, k, ts, l))[1]
+    t0 = 1793985540  # 08.11 17:19 UTC
+    M.LASTC.pop("Shturval_media", None)
+    M.LASTB.pop("Shturval_media", None)
+    for dt, txt in ((0, "Швидкісна ціль курс Одеса"), (180, "Курс Єланець"), (480, "Таборівка курс"),
+                    (840, "Олександрівка курс"), (1200, "Червоний Яр курс"), (1440, "Кочкувате курс")):
+        M.feed(trk, txt, "Shturval_media", t0 + dt, None, False)
+    ty = dict(seen)
+    assert ty["Курс Єланець"] == "ballistic" and ty["Олександрівка курс"] == "ballistic"
+    assert ty["Червоний Яр курс"] is None and ty["Кочкувате курс"] is None

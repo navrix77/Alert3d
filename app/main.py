@@ -51,6 +51,11 @@ started = time.time()
 
 CTX: dict[str, tuple[float, float, float]] = {}
 LASTC: dict[str, tuple[float, str, str]] = {}
+# коли канал востаннє прямо назвав балістику (до неї в нас і «Циркон», «Кинджал»): ракета летить хвилини, тож «курс …»
+# через пів години це вже інша ціль (09.11, Shturval_media: «Швидкісна ціль курс Одеса», далі 30 хв сіл «Таборівка курс»…
+# як балістика). Поріг 15 хв: у журналі «Циркони з Курська» 23:04 → «2х Циркони курсом на Трипілля» 23:17 (06.11, ppo_kiev)
+LASTB: dict[str, float] = {}
+BAL_INHERIT_S = 900
 
 
 FRESH: dict = {"any": 0.0, "obl": {}}  # коли востаннє були повідомлення про цілі: загалом і по кожній області
@@ -111,17 +116,20 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
     trk.prefer = last[2] if cont and last and ts - last[0] < 420 else None
     for seg in segs:
         obs = parser.parse(seg, key, ctx)
+        if obs.type == "ballistic":
+            LASTB[key] = ts
+        bal_old = bool(last and last[1] == "ballistic" and ts - LASTB.get(key, 0) > BAL_INHERIT_S)
         if fc_msg and not parser_mod.LIVE.search(parser_mod.norm(seg)):
             obs.type, obs.no_target, obs.close = None, True, False
         if obs.type and not obs.close and parser_mod.is_junk(seg):
             obs.type, obs.no_target = None, True  # довгий текст без ознак руху: новина, підсумок, реклама
         if obs.type is None and msg_type and obs.places and not obs.close and not obs.no_target and (len(segs) > 1 or typ_hint):
             obs.type = msg_type
-        if obs.type is None and obs.places and not obs.close and not obs.no_target and trk.prefer and last:
+        if obs.type is None and obs.places and not obs.close and not obs.no_target and trk.prefer and last and not bal_old:
             obs.type = last[1]
         # «Заїченці курс Вʼязівок» без типу: канал щойно (≤20 хв) писав про цілі певного типу — це продовження
         # (ppopoltavanightfighters пише тип лише в першому пості хвилі)
-        if obs.type is None and obs.places and not obs.close and not obs.no_target and last and ts - last[0] < 1200 and re.search(r"курс|→|вектор", seg.lower()):
+        if obs.type is None and obs.places and not obs.close and not obs.no_target and last and not bal_old and ts - last[0] < 1200 and re.search(r"курс|→|вектор", seg.lower()):
             obs.type = last[1]
         # ланцюжок «звідки запущено»: пуск / зліт носіїв / напрямок старту
         sites, ltyp, carrier, _s = launch.detect(seg, obs.type or msg_type) if not (fc_msg and obs.no_target) else ([], None, None, False)
@@ -279,7 +287,7 @@ from .discover import Discover, apply as _apply_auto, load as _load_auto  # noqa
 
 DISCOVER = Discover(parser)
 _apply_auto(_load_auto())  # джерела, знайдені раніше, — одразу в моніторинг
-daily = Daily(brain, feed, parser, lambda: Tracker(config.SOURCES), [CTX, LASTC], pushsvc)
+daily = Daily(brain, feed, parser, lambda: Tracker(config.SOURCES), [CTX, LASTC, LASTB], pushsvc)
 _FC = (0.0, {})
 HIST: list[dict] = brain.hist_load(time.time() - 12 * 3600)
 
