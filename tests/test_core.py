@@ -2521,3 +2521,25 @@ def test_district_match_cut_and_own_city_first():
     # PL: Подільський район Полтави, а не київський Поділ
     names = [r.place.name for r in P.parse("Над Подільським районом курсом на Київський.", "PL").places]
     assert "Подільський (Полтава)" in names and "Поділ (Київ)" not in names
+
+
+def test_night_0911_local_names_and_geran5_dot():
+    # 09.11 нічний журнал: «ракета Герань-5.» з крапкою (Lutsk_monitor) ставала крилатою ракетою
+    assert P.parse("❗️Вишків, Гуща — до вас ракета Герань-5.", "Lutsk_monitor").type == "geran5"
+    assert P.parse("герань 5 штук", "Lutsk_monitor").type == "shahed"
+    names = lambda t, c: [r.place.name for r in P.parse(t, c).places]  # noqa: E731
+    # харківські скорочення: Бурлук = Великий Бурлук, Мерчик = Старий Мерчик
+    assert names("2 ударных Приколотное/Бурлук⚠️", "TLK") == ["Приколотне", "Великий Бурлук"]
+    assert names("КАБ на Бурлук⚠️", "TLK") == ["Великий Бурлук"]
+    assert "Старий Мерчик" in names("1 Ударный на Мерчик/Валки⚠️", "R")
+    # Київ: «Троя» = Троєщина, Печерськ, ВДНГ — і з каналу іншої області
+    assert "Троєщина (Київ)" in names("Вишгород/Троя вже увага по реактивному", "Northern_Sich_ukr")
+    assert names("🏍 Київ: Реактивний БпЛА курсом на Печерськ.", "shahedradar") == ["Печерськ (Київ)"]
+    assert "ВДНГ (Київ)" in names("Цимбалів Яр — реактивний далі на ВДНГ", "Northern_Sich_ukr")
+    # Дніпро: «Придніка» = Придніпровськ
+    assert "Придніпровськ (Дніпро)" in names("⚠️ новий мопед від Павлограда —> Ігрень —> схід від Придніка —> аеропорт.", "dnipromonitor")
+    # рос. форми: «Солёное» → Солоне (Дніпропетровщина), «Константиновку» → Костянтинівка (Донеччина)
+    o = P.parse("Новый реактив через Томаковку дальше на Солёное", "dnepr_nagladach")
+    assert [(r.place.name, round(r.place.lat, 1)) for r in o.places][-1] == ("Солоне", 48.2)
+    o = P.parse("❗❗  БОМБЫ курсом на Константиновку,  Дружковку, Райское, Краматорск", "D")
+    assert [(r.place.name, round(r.place.lat, 1)) for r in o.places][0] == ("Костянтинівка", 48.5)
