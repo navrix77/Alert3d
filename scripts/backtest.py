@@ -27,7 +27,7 @@ from app import parser as parser_mod  # noqa: E402
 from app.brain import Brain  # noqa: E402
 from app.config import SOURCES  # noqa: E402
 from app.geo import bearing, dist_km, move  # noqa: E402
-from app.tracker import TYPES, Tracker, along  # noqa: E402
+from app.tracker import MAP_K, SHOW_BY_TYPE, SHOW_MIN, TYPES, Tracker, along  # noqa: E402
 
 HORIZONS = (10, 20, 30)
 
@@ -128,7 +128,13 @@ def m_learned(tr, brain, h):
     return move(pts[-1], bearing(pts[-2], pts[-1]), km - tot)
 
 
-METHODS = {"stay": m_stay, "dr": m_dr, "route": m_route, "learned": m_learned}
+def m_map(tr, brain, h):
+    """Як мапа SKY показує ціль зараз: модель зміщення map_disp (MAP_K/MAP_POW) і ліміт показу SHOW_BY_TYPE
+    (Track.est(mapm=True)), а не паспортна швидкість, як у dr/route/learned."""
+    return tr.est(tr.last.t + h * 60, SHOW_BY_TYPE.get(tr.type, SHOW_MIN), MAP_K.get(tr.type, 1.0), mapm=True)
+
+
+METHODS = {"stay": m_stay, "dr": m_dr, "route": m_route, "learned": m_learned, "map": m_map}
 
 
 def truth_at(obs, t):
@@ -142,7 +148,9 @@ def truth_at(obs, t):
     return (near[0].x, near[0].y) if near else None
 
 
-def run(rows, test_from: float | None = None, methods=None, verbose=True, speed_over: dict | None = None) -> dict:
+def run(rows, test_from: float | None = None, methods=None, verbose=True, speed_over: dict | None = None,
+        samples: list | None = None) -> dict:
+    """samples (якщо передано): сюди дописуються сирі зразки (t0, тип, хв, метод, похибка км) для власних розрізів."""
     methods = methods or METHODS
     brain = Brain(Path(":memory:"))
     trk = Tracker(SOURCES, brain, learn=True)
@@ -186,6 +194,8 @@ def run(rows, test_from: float | None = None, methods=None, verbose=True, speed_
         truth = (nxt.x, nxt.y)
         for m, f in methods.items():
             e = dist_km(f(snap, brain, h), truth)
+            if samples is not None:
+                samples.append((t0, typ, h, m, e))
             for g in (typ, "ALL", "route" if has_route else "noroute"):
                 err[(g, m, b)].append(e)
         hd = snap.heading
