@@ -883,11 +883,11 @@ _SEEN: dict[str, float] = {}
 
 @app.get("/api/online")
 def api_online(request: Request):
-    """Скільки користувачів зараз онлайн: усі, хто за останні 90 с відкривав застосунок (пульс з клієнта кожні 30 с) або тримає WebSocket."""
+    """Скільки користувачів зараз онлайн: усі, хто за останні 5 хв відкривав застосунок (пульс з клієнта кожні 30 с) або тримає WebSocket."""
     now = time.time()
     h = hashlib.sha256(((_client_ip(request.client, request.headers) or "") + "|" + (request.headers.get("user-agent") or "")).encode()).hexdigest()[:16]
     _SEEN[h] = now
-    for k in [k for k, t in _SEEN.items() if now - t > 90]:
+    for k in [k for k, t in _SEEN.items() if now - t > 300]:
         _SEEN.pop(k, None)
     return JSONResponse({"online": max(len(clients), len(_SEEN))}, headers={"Cache-Control": "no-store"})
 
