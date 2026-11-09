@@ -878,6 +878,56 @@ async def api_llm_check(request: Request) -> dict:
     return _llm_check
 
 
+_FB_LAST: dict[str, float] = {}
+
+
+def _send_mail(subject: str, body: str) -> bool:
+    """Лист власнику через SMTP (SMTP_HOST/SMTP_USER/SMTP_PASS у змінних сервера; для Gmail — пароль застосунку). Адреса отримувача ніде не віддається клієнту."""
+    import smtplib
+    from email.message import EmailMessage
+    host, user, pw = os.getenv("SMTP_HOST", "smtp.gmail.com"), os.getenv("SMTP_USER"), os.getenv("SMTP_PASS")
+    if not (user and pw):
+        return False
+    m = EmailMessage()
+    m["Subject"], m["From"], m["To"] = subject, user, os.getenv("FEEDBACK_TO", "sikalenko82@gmail.com")
+    m.set_content(body)
+    with smtplib.SMTP_SSL(host, int(os.getenv("SMTP_PORT", "465")), timeout=15) as sm:
+        sm.login(user, pw)
+        sm.send_message(m)
+    return True
+
+
+@app.post("/api/feedback")
+async def api_feedback(request: Request):
+    """«Написати розробникам»: повідомлення користувача → файл data/feedback.jsonl і лист власнику з темою «Лист від Sky»."""
+    try:
+        j = await request.json()
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"ok": False}, status_code=400)
+    text = str(j.get("text") or "").strip()[:2000]
+    contact = str(j.get("contact") or "").strip()[:120]
+    if len(text) < 3:
+        return JSONResponse({"ok": False, "why": "short"}, status_code=400)
+    ip = _client_ip(request.client, request.headers) or "?"
+    now = time.time()
+    if now - _FB_LAST.get(ip, 0) < 30:
+        return JSONResponse({"ok": False, "why": "rate"}, status_code=429)
+    _FB_LAST[ip] = now
+    rec = {"t": int(now), "text": text, "contact": contact, "ua": (request.headers.get("user-agent") or "")[:160], "v": str(j.get("v") or "")[:20]}
+    try:
+        with open(Path(os.getenv("PERSIST_DIR") or Path(__file__).resolve().parent.parent / "data") / "feedback.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+    sent = False
+    try:
+        sent = await asyncio.to_thread(_send_mail, "Лист від Sky", f"{text}\n\n— Контакт: {contact or 'не вказано'}\n— Версія: {rec['v']}\n— {rec['ua']}")
+    except Exception as e:  # noqa: BLE001
+        log.warning("feedback mail: %s", e)
+    return JSONResponse({"ok": True, "mailed": sent})
+
+
+
 _SEEN: dict[str, float] = {}
 
 
