@@ -2642,3 +2642,17 @@ def test_night_1011_close_type_and_ru_forms():
     M.LASTC.pop("TLK", None)
     M.feed(trk, "1 Изюм⚠️\n1 Барвенково ⚠️\nПо Р. Шаболдам", "TLK", 1794259038, None, False)
     assert ("1 Изюм⚠️", "track", "jet") in seen
+
+
+def test_morning_1011_new_adj_not_village():
+    """10.11 журнал 07–10.11: «Нові бандеролі на півдні залітають біля Славгорода» (radar_sich) — село Нове на Кіровоградщині
+    ставало першою позицією бандеролі (стрибок 274 км за 1 хв у selfcheck), так само «Новий з криму на Очаків»
+    (Ukrainian_Intelligence), «Нова турба повз Васильківку» (radar_sich), «Нові у бік Броварів» (kiev_nebo),
+    «Нові заходять через Марчишину-Буду» (krolevetsnews). Справжнє «на Нове/Питомник» (M) лишається селом."""
+    names = lambda t, c: [r.place.name for r in P.parse(t, c).places]  # noqa: E731
+    assert names("Нові бандеролі на півдні залітають біля Славгорода.", "radar_sich") == ["Славгород"]
+    assert names("Новий з криму на Очаків", "Ukrainian_Intelligence") == ["Очаків"]
+    assert names("Нова турба повз Васильківку у бік Синельникове зі сходу.", "radar_sich") == ["Васильківка", "Синельникове"]
+    assert names("Нові у бік Броварів", "kiev_nebo") == ["Бровари"]
+    assert names("Новий зі сходу курсом на Софіівку", "radar_sich") == ["Софіївка"]
+    assert "Нове" in names("Ударний БПЛА на Нове/Питомник‼️", "M")
