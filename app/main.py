@@ -622,7 +622,7 @@ def _client_ip(scope_client, headers) -> str | None:
 # ---------- захист (04.11, незалежна оцінка): ліміти на платні ендпоінти, службове лише для власника, заголовки безпеки
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
 RATE = {"/api/tts": (30, 60), "/api/stt": (6, 60), "/api/live": (8, 60), "/api/ask": (8, 60), "/api/radio": (12, 60), "/api/voice": (20, 60),
-        "/api/tts/check": (3, 60), "/api/brief": (6, 60), "/api/llm/check": (3, 60), "/api/llm/report": (6, 60)}
+        "/api/tts/check": (3, 60), "/api/brief": (6, 60), "/api/llm/check": (3, 60), "/api/llm/report": (6, 60), "/api/feedback": (5, 60), "/api/online": (120, 60)}
 _hits: dict = {}
 
 
@@ -637,7 +637,7 @@ async def guard(request, call_next):
     path = request.url.path
     lim = RATE.get(path) or (RATE.get("/api/voice") if path.startswith("/api/voice/") else None)
     if lim and not _is_admin(request):
-        ip = request.headers.get("cf-connecting-ip") or _client_ip(request.client, request.headers) or "?"
+        ip = _client_ip(request.client, request.headers) or "?"  # cf-connecting-ip не довіряємо: Cloudflare перед сервером немає, заголовок підробляється
         now = time.time()
         q = [x for x in _hits.get((ip, path), []) if now - x < lim[1]]
         if len(q) >= lim[0]:
@@ -930,7 +930,15 @@ async def api_feedback(request: Request):
     if now - _FB_LAST.get(ip, 0) < 30:
         return JSONResponse({"ok": False, "why": "rate"}, status_code=429)
     _FB_LAST[ip] = now
+    if len(_FB_LAST) > 5000:
+        _FB_LAST.clear()
     rec = {"t": int(now), "text": text, "contact": contact, "ua": (request.headers.get("user-agent") or "")[:160], "v": str(j.get("v") or "")[:20]}
+    try:
+        fp = Path(os.getenv("PERSIST_DIR") or Path(__file__).resolve().parent.parent / "data") / "feedback.jsonl"
+        if fp.exists() and fp.stat().st_size > 5_000_000:  # захист диска від спаму
+            return JSONResponse({"ok": False, "why": "full"}, status_code=503)
+    except Exception:  # noqa: BLE001
+        pass
     try:
         with open(Path(os.getenv("PERSIST_DIR") or Path(__file__).resolve().parent.parent / "data") / "feedback.jsonl", "a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
