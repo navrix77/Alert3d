@@ -2608,3 +2608,37 @@ def test_day_0911_reactor_slang_and_ballistic_inherit():
     ty = dict(seen)
     assert ty["Курс Єланець"] == "ballistic" and ty["Олександрівка курс"] == "ballistic"
     assert ty["Червоний Яр курс"] is None and ty["Кочкувате курс"] is None
+
+
+def test_night_1011_close_type_and_ru_forms():
+    """10.11 нічний журнал. DN 23:17: «…жовтий 🟨 / Кривий Ріг червоний 🟥 / … / По балістиці відбій» — тип «балістика»
+    з рядка-відбою переносився на рядки без типу (дві хибні балістичні цілі, ще й у копіях nikalert, radar_sich).
+    Рос. форми D/ND: «Орехов» ставав Оріхове на Луганщині, «Золотой Колодезь» — Золоте, «Великую Гомольшу» і
+    «над Бобровкой» не знаходились; dnipromonitor «Підгородне» (без «є») і «Лівобережний-3»."""
+    names = lambda t, c: [(r.place.name, round(r.place.lat, 1)) for r in P.parse(t, c).places]  # noqa: E731
+    assert names("❗❗ БОМБЫ курсом на Орехов", "D") == [("Оріхів", 47.6)]
+    assert ("Золотий Колодязь", 48.5) in names("❗❗ БОМБЫ курсом на Софиевку, Райское,  Новониколаевку, Золотой Колодезь, Белозерское", "D")
+    assert names("Реактивные шахеды: ⚠️на Великую Гомольшу, Тройчатое, Первомайский", "ND")[0] == ("Велика Гомільша", 49.6)
+    assert ("Бобрівка", 50.0) in names("⚠️над Бобровкой на Харьков, Салтовку", "ND")
+    n = [x[0] for x in names("⚠️ мопед йде на Підгородне/Слобожанське/Лівобережний-3.", "dnipromonitor")]
+    assert "Підгороднє" in n and "Лівобережний (Дніпро)" in n
+    # рос. «-ов» лишається містом на «-ів»
+    assert names("1 на Харьков с Чугуева", "R") == [("Харків", 50.0), ("Чугуїв", 49.8)]
+    from app import main as M
+    from app import config
+    from app.tracker import Tracker
+    trk = Tracker(config.SOURCES)
+    seen = []
+    orig = trk.ingest
+    trk.ingest = lambda o, k, ts, l: (seen.append((o.raw, o.kind, o.type)), orig(o, k, ts, l))[1]
+    M.LASTC.pop("DN", None)
+    M.LASTB.pop("DN", None)
+    M.feed(trk, "Дніпро,  Кам'янське тимчасово жовтий 🟨\nКривий  Ріг червоний 🟥\nреактивних залітає в область з півночі повз Перещепине\n"
+           "зграя мопедів на Кривий Ріг від Апостолове,  Зеленодольськ\nПо балістиці відбій.", "DN", 1794259038, None, False)
+    assert not [s for s in seen if s[2] == "ballistic" and s[1] == "track"]
+    assert ("зграя мопедів на Кривий Ріг від Апостолове,  Зеленодольськ", "track", "shahed") in seen
+    # TLK: «По Р. Шаболдам» — заголовок списку, тип і далі переходить на рядки
+    seen.clear()
+    M.LASTC.pop("TLK", None)
+    M.feed(trk, "1 Изюм⚠️\n1 Барвенково ⚠️\nПо Р. Шаболдам", "TLK", 1794259038, None, False)
+    assert ("1 Изюм⚠️", "track", "jet") in seen

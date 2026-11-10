@@ -99,6 +99,15 @@ def feed(trk: Tracker, text: str, key: str, ts: float, link: str | None, log: bo
         ctx = (la, lo)
         CTX[key] = (ts, la, lo)
     msg_type = whole.type if len(segs) > 1 else None
+    if msg_type:
+        # 10.11 DN 23:17: «Дніпро, Кам'янське тимчасово жовтий / Кривий Ріг червоний / … / По балістиці відбій» — тип
+        # «балістика» узято з рядка-відбою і перенесено на рядки без типу: дві хибні балістичні цілі. Тип повідомлення
+        # переносимо лише тоді, коли він є в живому (не відбійному) сегменті
+        # «По Р. Шаболдам» окремим рядком (TLK) — це й заголовок списку, і відбій (TYPE_CLOSE): такий рядок тип не відкидає
+        live = {o.type for sg in segs for o in [parser.parse(sg, key, pctx)]
+                if o.type and (not o.close or parser_mod.TYPE_CLOSE.match(parser_mod.norm(sg)))}
+        if msg_type not in live:
+            msg_type = next(iter(live)) if len(live) == 1 else None
     if len(segs) > 1 and parser_mod.AFTERMATH.search(text.lower()):
         msg_type = None  # підсумок/наслідки — тип із заголовка не переносимо на перелічені пункти
         segs = [sg for sg in segs if not parser_mod.AFTERMATH.search(sg.lower())]
