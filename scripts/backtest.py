@@ -149,8 +149,11 @@ def truth_at(obs, t):
 
 
 def run(rows, test_from: float | None = None, methods=None, verbose=True, speed_over: dict | None = None,
-        samples: list | None = None) -> dict:
-    """samples (якщо передано): сюди дописуються сирі зразки (t0, тип, хв, метод, похибка км) для власних розрізів."""
+        samples: list | None = None, dedup: bool = False) -> dict:
+    """samples (якщо передано): сюди дописуються сирі зразки (t0, тип, хв, метод, похибка км) для власних розрізів.
+    dedup: один зразок на (трек, позиція ±5 км, наступна позиція-істина): копії того самого поста іншими каналами за секунди
+    (alarmua, shahedradar, trevogaa_radar…) не рахуються окремими прогнозами (журнал 09.11: 4 із 7 зразків «без маршруту»
+    були однією ціллю)."""
     methods = methods or METHODS
     brain = Brain(Path(":memory:"))
     trk = Tracker(SOURCES, brain, learn=True)
@@ -182,6 +185,7 @@ def run(rows, test_from: float | None = None, methods=None, verbose=True, speed_
     # повтори того самого пункту (підтвердження іншими каналами) прогнозом не перевіряються
     err = collections.defaultdict(list)
     angs = collections.defaultdict(list)
+    used = set()
     for tr, t0, typ, snap, has_route in pending:
         if tr.merged:
             continue
@@ -189,6 +193,11 @@ def run(rows, test_from: float | None = None, methods=None, verbose=True, speed_
         nxt = next((o for o in tr.obs if not o.est and 180 <= o.t - t0 <= 2400 and dist_km(p0, (o.x, o.y)) > 5), None)
         if nxt is None:
             continue
+        if dedup:
+            key = (id(tr), round(p0[0] / 5), round(p0[1] / 5), nxt.t)  # та сама позиція (±5 км) і та сама істина
+            if key in used:
+                continue
+            used.add(key)
         h = (nxt.t - t0) / 60
         b = "≤10хв" if h <= 10 else ("≤20хв" if h <= 20 else "≤40хв")
         truth = (nxt.x, nxt.y)
@@ -230,7 +239,8 @@ if __name__ == "__main__":
     ap.add_argument("src")
     ap.add_argument("--test-from", type=float)
     ap.add_argument("--json")
+    ap.add_argument("--dedup", action="store_true", help="один зразок на (трек, позицію-істину)")
     a = ap.parse_args()
-    r = run(load(a.src), a.test_from)
+    r = run(load(a.src), a.test_from, dedup=a.dedup)
     if a.json:
         Path(a.json).write_text(json.dumps(r, ensure_ascii=False, indent=1), encoding="utf-8")
