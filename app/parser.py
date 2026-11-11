@@ -425,6 +425,16 @@ FRONT_FULL = BELARUS_PTS + FRONT_PTS
 RSZV_CAP_KM = 30.0  # макс. глибина ураження РСЗВ від лінії фронту/кордону для показу на мапі
 
 
+def _south_of_front(lat: float, lon: float, margin_km: float = 5.0) -> bool:
+    """Точка південніше грубої лінії фронту (ділянка FRONT_PTS від Донеччини до Херсонщини) більш ніж на margin_km."""
+    pts = [p for p in FRONT_PTS if p[1] <= 47.9]
+    pts.sort()
+    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+        if x1 <= lon <= x2:
+            return lat < y1 + (y2 - y1) * (lon - x1) / ((x2 - x1) or 1e-9) - margin_km / 111
+    return False
+
+
 def front_km(lat: float, lon: float) -> float:
     import math
     best = 1e9
@@ -1169,10 +1179,43 @@ class Parser:
         def _off(i):
             q = P[i]
             return math.hypot(max(hb[1] - q.lat, 0, q.lat - hb[3]) * 111, max(hb[0] - q.lon, 0, q.lon - hb[2]) * 72)
+        from .geo import oblasts as _ob
+
+        def _inpoly(i):
+            return _ob().of(P[i].lon, P[i].lat) == hdr_bb[0]
+
+        def _in(i):
+            # тезка у своїй області, що не за грубою лінією фронту на півдні (FRONT_PTS; для ланцетів/FPV/КАБ запас 15 км,
+            # для решти 5): лише така є підставою відкинути тезку сусідньої області. Запорізьке Покровське на окупованому
+            # півдні не «перемагає» Покровське Дніпропетровщини біля межі. Тезки в самій області не відкидаються ніколи
+            # (цілі заходять і з півдня: «Реактивний від Михайлівки повернув через Приморське на Запоріжжя»)
+            q = P[i]
+            return _inpoly(i) and not _south_of_front(q.lat, q.lon, 15.0 if getattr(self, "_typ", None) in FRONTLINE else 5.0)
+
+        def _d(a, b):
+            return math.hypot((P[a].lat - P[b].lat) * 111, (P[a].lon - P[b].lon) * 72)
+        groups = [[i for i in ids if _off(i) <= 60 or (P[i].kind in ("M", "K") and P[i].pop >= 20000)] for _, ids in found]
         out = []
-        for role, ids in found:
+        for gi, (role, ids) in enumerate(found):
             # лише відкидаємо далекі тезки; місто ≥20 тис. лишається завжди («Днпр+: від Запоріжжя в бік Солоного»)
-            ins = [i for i in ids if _off(i) <= 60 or (P[i].kind in ("M", "K") and P[i].pop >= 20000)]
+            ins = groups[gi]
+            # 11.11: «Ⓜ️⚔️ Зпрж: Реактивний повз Софіївку на Максимівку» (radar_sich) — та сама фраза в eyes_everywhere_ua
+            # дає Софіївку й Максимівку Запорізького району, а в radar_sich ставали Софіївка під Кривим Рогом і Максимівка під
+            # Нікополем (у 60-км смузі прямокутника області). Є тезка в самій області заголовка — сусідню не беремо (місто
+            # ≥20 тис. лишається). Сусідню лишаємо, якщо поруч (≤25 км, ближче за тезки в області) є тезка іншої назви того ж
+            # повідомлення в області заголовка: «Зпрж: Група КАБ через Покровське в бік Новомиколаївки/Софіївки» — Покровське Дніпропетровщини
+            # за 23 км від Новомиколаївки Запорізького району, а запорізьке Покровське на окупованому півдні
+            near = {j for gj, g in enumerate(groups) if gj != gi and set(g) != set(ins) for j in g if _in(j)}
+            own = [k for k in ins if _in(k)]
+            inobl = [i for i in ins if _inpoly(i) or (P[i].kind in ("M", "K") and P[i].pop >= 20000)
+                     or any(_d(i, j) <= 25 and all(_d(i, j) < _d(k, j) for k in own) for j in near)]
+            if inobl and len(inobl) < len(ins) and any(_in(i) for i in inobl):
+                ins = inobl
+            # тезка сусідньої області біля іншої назви повідомлення проти тезки своєї області лише за лінією фронту: беремо першу
+            # (вона ж стає опорою для сусідніх назв: Новомиколаївка біля Покровського, а не ближча до фронту)
+            nb = [i for i in ins if not _inpoly(i) and any(_d(i, j) <= 25 for j in near)]
+            if nb and own == [] and any(_inpoly(i) for i in ins):
+                ins = nb
             if ins:
                 out.append((role, ins))
             # інакше: «Кроп:» → Кропи на Львівщині, «Бере курс» → Бір: тезка-слово за сотні км від регіону заголовка
