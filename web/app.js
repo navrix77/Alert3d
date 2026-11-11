@@ -1563,20 +1563,27 @@ window.webPushSync=webPushSync;setTimeout(()=>webPushSync(false),4000);
 function pushCard(){if(document.getElementById('push-card'))return;
   const ios=/iPhone|iPad/.test(navigator.userAgent),standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
   const can='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
-  // картка показується ОДИН раз (перший запуск після встановлення); далі лише з налаштувань: «Сповіщення → Увімкнути»
-  let shown=null;try{shown=localStorage.getItem('push_card_once')||localStorage.getItem('push_card_x');}catch(e){shown='1';}
-  if(shown)return;
-  let txt,btn;
-  if(can&&Notification.permission==='granted')return;
+  // не частіше за раз на 3 дні, максимум 3 рази; лічильник росте лише від натискання кнопки (автозникнення відмовою не вважається)
+  const DAY=864e5,GAP=3*DAY,MAX=3;let n=0,last=0;
+  try{n=+localStorage.getItem('push_card_n')||0;last=+localStorage.getItem('push_card_t')||0;
+    if(!n&&(localStorage.getItem('push_card_once')||localStorage.getItem('push_card_x'))){n=1;last=+localStorage.getItem('push_card_once')||Date.now();}}catch(e){return;}
+  if(n>=MAX||(last&&Date.now()-last<GAP))return;
+  if(can&&Notification.permission==='granted'&&PREF.sys!==false&&window.__wpOK!==false)return;// push уже увімкнено
   if(can&&Notification.permission==='denied')return;
+  let txt,btn;
   if(!can&&ios&&!standalone){txt='Щоб SKY попереджав навіть із закритим телефоном: «Поділитися» → «На початковий екран», і відкрийте SKY звідти.';btn=null;}
   else if(can){txt=H0?'Попереджати про загрози для вашого дому й області навіть із закритим застосунком?':'Позначте свій дім, і SKY попереджатиме про загрози для нього навіть із закритим застосунком.';btn=H0?'Увімкнути сповіщення':'Позначити дім';}
   else return;
-  const el=document.createElement('div');el.id='push-card';el.className='push-card';
-  el.innerHTML='<b>🔔 Сповіщення</b><span>'+esc(txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>';
-  document.body.appendChild(el);try{localStorage.setItem('push_card_once',Date.now());}catch(e){}
-  $('#pc-x').onclick=()=>{el.remove();toast('Увімкнути можна будь-коли: Налаштування → Сповіщення');};
-  const on=$('#pc-on');if(on)on.onclick=async()=>{el.remove();if(!H0){armHome();return;}await pushEnable();};}
+  let alarm=false;try{alarm=!!(typeof SNAP!=='undefined'&&SNAP&&SNAP.levels&&Object.keys(SNAP.levels).some(k=>SNAP.levels[k]));}catch(e){}
+  const el=document.createElement('div');el.id='push-card';el.className='push-card'+(alarm?' compact':'');
+  el.innerHTML=alarm?'<span>🔔 Триває тривога. '+esc(btn?'Увімкніть сповіщення, щоб не пропустити наступну.':txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>'
+    :'<b>🔔 Сповіщення</b><span>'+esc(txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>';
+  document.body.appendChild(el);
+  const mark=()=>{try{localStorage.setItem('push_card_n',String(n+1));localStorage.setItem('push_card_t',String(Date.now()));}catch(e){}};
+  // автозникнення (поза тривогою) нічого не запамʼятовує, картка зʼявиться знову згідно з графіком
+  if(!alarm)setTimeout(()=>{if(el.isConnected)el.remove();},25000);
+  $('#pc-x').onclick=()=>{mark();el.remove();toast('Увімкнути можна будь-коли: Налаштування → Сповіщення');};
+  const on=$('#pc-on');if(on)on.onclick=async()=>{mark();el.remove();if(!H0){armHome();return;}await pushEnable();};}
 async function pushEnable(){
   {
     if(!H0){toast('Спершу позначте свій дім');armHome();return;}
@@ -1586,7 +1593,7 @@ async function pushEnable(){
     try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
       if(sub)fetch('/api/webpush/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});}catch(e){}
     toast('Готово. Зараз прийде тестове сповіщення');};}
-setTimeout(pushCard,6000);
+setTimeout(pushCard,6000);setInterval(()=>{try{pushCard();}catch(e){}},60000);// під час тривоги з'являється компактний банер
 // облік встановлень: запуск з іконки (встановлений застосунок) і подія встановлення; без cookies, сервер не зберігає IP
 try{if(matchMedia('(display-mode: standalone)').matches||navigator.standalone)fetch('/api/visits/app?k=app',{method:'POST'}).catch(()=>{});
   addEventListener('appinstalled',()=>fetch('/api/visits/app?k=install',{method:'POST'}).catch(()=>{}));}catch(e){}

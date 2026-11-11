@@ -573,6 +573,7 @@ body.xray #me,body.xray #banner,body.xray #chg{display:none!important}
 .push-card{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 120px);z-index:60;width:min(460px,calc(100vw - 24px));
   background:rgba(12,17,28,.97);border:1px solid rgba(255,255,255,.16);border-radius:18px;padding:14px 16px;box-shadow:0 18px 50px rgba(0,0,0,.55);color:#E8ECF4;display:flex;flex-direction:column;gap:6px}
 .push-card b{font-size:16px}.push-card span{font-size:14px;line-height:1.4;color:#C9D2E3}.push-card div{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.push-card.compact{top:calc(env(safe-area-inset-top,0px) + 64px);padding:8px 12px;border-radius:14px;flex-direction:row;align-items:center;gap:8px}.push-card.compact span{font-size:13px;flex:1}.push-card.compact div{margin:0;flex-wrap:nowrap}
 .push-card .primary{background:#2B6BFF;color:#fff;border-color:#2B6BFF}
 /* сповіщення в застосунку: скло, кольорове світіння рівня, силует цілі, деталі чіпами */
 .note-c{background:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,.02)),rgba(10,14,22,.92)!important;border:1px solid rgba(255,255,255,.10);
