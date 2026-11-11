@@ -721,7 +721,16 @@ class Tracker:
                 # і не швидше за 2.5× номінальної від останньої фіксації: «курсом на X» щохвилини від кількох каналів
                 # інакше «стрибає» ціль на 25–40 км за пів хвилини (аудит: Васильків→Борщагівка 2195 км/год)
                 jump = dist_km((tr.last.x, tr.last.y), X.xy) <= TYPES[tr.type]["speed"] * 2.5 * max(30.0, t - tr.last.t) / 3600 + 5
-                if dist_km(e, X.xy) <= reach and jump:
+                pv_ = tr.last
+                # 11.11: «на Харків» одразу після району («курс на Москалівку») — те саме місто, а не рух до центру:
+                # точніший район лишається, курс «Москалівка → центр» не виводимо (мітка летіла на Михайлівку)
+                same_city_ = (pv_.place is not None and getattr(pv_.place, "kind", "") == "D" and getattr(X, "kind", "") != "D"
+                              and t - pv_.t <= 600 and dist_km((pv_.x, pv_.y), X.xy) <= 15)
+                if same_city_:
+                    route = route[1:]
+                    if not route:
+                        course_to, tr.course_to, tr.course_xy = None, None, None
+                elif dist_km(e, X.xy) <= reach and jump:
                     prev = tr.last
                     bp = _border_start(X.xy, 25.0) if (dist_km((prev.x, prev.y), X.xy) > 8 and False) else None  # 07.11: «на X» без місця — не вигадуємо старт на кордоні (з кордону не визначити, на Дергачі чи на Малу Данилівку)
                     if bp is not None and dist_km((prev.x, prev.y), bp) <= reach:

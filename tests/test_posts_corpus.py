@@ -322,3 +322,16 @@ def test_not_tracked_reply_closes_jet():
     assert any(t["status"] == "active" for t in trk.snapshot(now)["tracks"])
     m.feed(trk, "Реактивний БпЛА курсом на Барвінкове ⚠️ — Не відстежується ⚠️", "M", now - 60, None, log=False)
     assert not [t for t in trk.snapshot(now)["tracks"] if t.get("type") == "jet" and t["status"] == "active"]
+
+
+def test_city_after_district_keeps_district_no_false_course():
+    """11.11: «курс на Москалівку» + «на Харків» — те саме місто: ціль у Москалівці, без курсу «район → центр» (мітка летіла на Михайлівку)."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "Реактивний БпЛА. Далі курс на Москалівку", "CX", now - 90, None, log=False)
+    m.feed(t, "Реактивний БпЛА на Харків", "AL", now - 60, None, log=False)
+    tr = t.tracks[0]
+    s = t.snapshot(now)["tracks"][0]
+    assert abs(s["lat"] - 49.97) < 0.02 and abs(s["lon"] - 36.21) < 0.03, (s["lat"], s["lon"])
+    assert tr.heading is None
