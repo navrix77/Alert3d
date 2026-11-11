@@ -670,6 +670,11 @@ async def count_visits(request, call_next):
     return resp
 
 
+from . import public_api  # noqa: E402
+public_api.init(lambda: state())
+app.include_router(public_api.router)
+
+
 @app.get("/api/admin/envkey")
 async def api_envkey():
     """ПУБЛІЧНИЙ ключ сервера: ним дія GitHub шифрує ключі власника (розшифрувати може лише цей сервер)."""

@@ -2739,3 +2739,25 @@ def test_day_1111_hdr_abbr_prefers_own_oblast():
     assert ll("Ⓜ️⚔️ Зпрж: Пуск 💣КАБів з під Солодководне в напрямку Покровське/перетин")[1] == ("Покровське", 47.98, 36.22)
     assert ll("Ⓜ️⚔️ Зпрж: Реактивний від Михайлівки повернув через Приморське на Запоріжжя !")[0] == ("Михайлівка", 47.27, 35.22)
     assert ll("Ⓜ️👁 Снкв: Покровское 💣КАБы") == [("Покровське", 47.98, 36.22)]
+
+def test_public_api_v1_auth_and_shape(monkeypatch):
+    from fastapi.testclient import TestClient
+    import app.main as m
+    from app import public_api
+    c = TestClient(m.app)
+    monkeypatch.delenv("PUBLIC_API_KEYS", raising=False)
+    assert c.get("/api/public/v1/state").status_code == 503  # без ключів API вимкнено
+    monkeypatch.setenv("PUBLIC_API_KEYS", "neighbor:" + "k" * 32)
+    assert c.get("/api/public/v1/state").status_code == 401
+    assert c.get("/api/public/v1/state", headers={"X-API-Key": "x" * 32}).status_code == 401
+    r = c.get("/api/public/v1/state", headers={"X-API-Key": "k" * 32})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["v"] == 1 and "targets" in j and "disclaimer" in j and "fresh" in j
+    n = c.get("/api/public/v1/near?lat=49.99&lon=36.27&r=50", headers={"X-API-Key": "k" * 32}).json()
+    assert n["v"] == 1 and "nearest_km" in n
+    public_api._calls.clear()
+    for _ in range(public_api.LIMIT):
+        c.get("/api/public/v1/state", headers={"X-API-Key": "k" * 32})
+    assert c.get("/api/public/v1/state", headers={"X-API-Key": "k" * 32}).status_code == 429
+    public_api._calls.clear()
