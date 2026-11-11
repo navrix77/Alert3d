@@ -376,3 +376,15 @@ def test_banderol_nose_from_front_not_launch_zone_far_away():
     s = t.snapshot(now)["tracks"][0]
     fb = Tracker._front_bearing(__import__("app.geo", fromlist=["to_xy"]).to_xy(s["lat"], s["lon"]))
     assert s["hd"] is not None and fb is not None and abs(((s["hd"] - fb + 180) % 360) - 180) < 15, (s["hd"], fb)
+
+
+def test_target_named_in_big_city_is_not_displaced_far_from_it():
+    """11.11: «Валки → Харків», потім 10 хв: мітка не «їде» на Старий Салтів — лишається біля міста (≤ ~7 км)."""
+    import time
+    from app.geo import dist_km, to_xy
+    m, t = _tracker()
+    now = time.time()
+    for dt, k, x in [(-1300, "RT", "БпЛА → Валки/Полтавщина. (Харківщина)"), (-650, "MK", "Шахед Харків"), (-640, "AL", "Шахед над Харковом")]:
+        m.feed(t, x_ := x, k, now + dt, None, log=False)
+    for s in t.snapshot(now)["tracks"]:
+        assert dist_km(to_xy(s["lat"], s["lon"]), to_xy(49.9922, 36.2724)) < 12, (s["lat"], s["lon"])

@@ -263,6 +263,9 @@ def map_disp(typ: str, speed: float, sec: float) -> float:
     if h <= 10 or b == 1.0:
         return speed * h / 60 * k10
     return speed * 10 / 60 * k10 * (h / 10) ** b
+_BIG_CITIES = {"Харків", "Київ", "Запоріжжя", "Дніпро", "Одеса", "Суми", "Миколаїв", "Херсон", "Чернігів", "Полтава", "Кривий Ріг", "Львів", "Житомир"}
+
+
 def _at_named_goal(tr, now: float) -> bool:
     """Ціль — над/біля пункту, на який прямо вказують канали (місто або його район), свіжа фіксація: 11.11 власник —
     ціль, що летить на місто, показуємо В місті, а не виводимо за нього навчним шляхом чи курсом."""
@@ -286,6 +289,13 @@ def map_xy(tr, now: float, brain=None) -> tuple[float, float]:
     cap = SHOW_BY_TYPE.get(tr.type, SHOW_MIN)
     base = tr.est(now, cap, MAP_K.get(tr.type, 1.0), mapm=True)
     la_ = tr.last
+    # 11.11 власник: «летить на Старий Салтів, а мала бути над Харковом». Ціль, названа В місті (обласні центри та великі міста), свіжа
+    # фіксація: мітка не відходить від міста далі за ~7 км (інакше за 10 хв шахед «виїжджає» на 25 км з міста, яке атакує)
+    if (tr.type not in ("ballistic", "banderol", "cruise") and la_.place is not None and la_.place.name in _BIG_CITIES
+            and not tr.route and now - la_.t < 900):
+        d_ = dist_km((la_.x, la_.y), base)
+        if d_ > 7:
+            base = move((la_.x, la_.y), bearing((la_.x, la_.y), base), 7)
     if _at_named_goal(tr, now) and tr.type not in SHORT_RANGE and tr.type not in ("ballistic", "banderol"):
         return (la_.x, la_.y)
     if tr.route or brain is None or la_.place is None or tr.type in SHORT_RANGE or not hasattr(brain, "next_path"):
