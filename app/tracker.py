@@ -1489,7 +1489,8 @@ class Tracker:
             hd = bearing((ex, ey), rest[0]) if rest else tr.heading
             if hd is None and len(tr.obs) >= 2:  # курс за останніми двома точками
                 a_, b_ = tr.obs[-2], tr.obs[-1]
-                if dist_km((a_.x, a_.y), (b_.x, b_.y)) > 2:
+                # 11.11: для ракет «на X» — це ціль (пункт призначення), а не позиція: «Полтава» → «Зміїв» (різні групи) — не рух
+                if dist_km((a_.x, a_.y), (b_.x, b_.y)) > 2 and not (tr.type in ("banderol", "ballistic", "cruise") and (a_.est or b_.est)):
                     hd = bearing((a_.x, a_.y), (b_.x, b_.y))
             if hd is None and tr.type in ("banderol", "ballistic", "cruise", "geran5", "rszv"):
                 from .launch_zones import nearest as _nz  # звідки пускають цей тип; курс від найближчої досяжної зони (07.11)
