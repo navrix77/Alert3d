@@ -364,3 +364,15 @@ def test_goal_city_not_led_out_by_learned_path():
         m.brain.next_path, m.brain.next_places = orig
     assert abs(s["lat"] - 49.97) < 0.03 and abs(s["lon"] - 36.21) < 0.05, (s["lat"], s["lon"])
     assert not s["pred_next"] and not s["lpath"]
+
+
+def test_banderol_nose_from_front_not_launch_zone_far_away():
+    """11.11: бандероль повітряного пуску — курс від найближчої ділянки фронту/кордону вглиб (ніс = напрямок руху)."""
+    import time
+    from app.tracker import Tracker
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "Ракета (бандероль) курсом на Зміїв", "RT", now - 120, None, log=False)
+    s = t.snapshot(now)["tracks"][0]
+    fb = Tracker._front_bearing(__import__("app.geo", fromlist=["to_xy"]).to_xy(s["lat"], s["lon"]))
+    assert s["hd"] is not None and fb is not None and abs(((s["hd"] - fb + 180) % 360) - 180) < 15, (s["hd"], fb)

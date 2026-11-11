@@ -1485,7 +1485,11 @@ class Tracker:
                 from .launch_zones import nearest as _nz  # звідки пускають цей тип; курс від найближчої досяжної зони (07.11)
                 la_z, lo_z = from_xy(ex, ey)
                 z_ = _nz(tr.type, la_z, lo_z)
-                if z_ and z_[3] > 5:
+                if tr.type == "banderol" and self._front_dist((ex, ey)) <= 250:
+                    # 11.11 власник: «ніс — напрямок із зони пуску». Бандероль — повітряний пуск з «Оріона» над своєю стороною
+                    # (довідники: дальність до ~500 км), не з фіксованої точки: курс від найближчої ділянки лінії фронту/кордону вглиб
+                    hd = self._front_bearing((ex, ey))
+                if hd is None and z_ and z_[3] > 5:
                     hd = bearing(_gxy(z_[0], z_[1]), (ex, ey))
             if hd is None and (tr.type in NEAR_TYPES or tr.type in ("shahed", "uav", "rszv")):  # без маршруту й курсу: носом від лінії фронту/кордону вглиб, а не на північ за замовчуванням
                 hd = self._learned_heading(tr, None, (ex, ey)) or self._front_bearing((ex, ey))
