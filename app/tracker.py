@@ -263,6 +263,18 @@ def map_disp(typ: str, speed: float, sec: float) -> float:
     if h <= 10 or b == 1.0:
         return speed * h / 60 * k10
     return speed * 10 / 60 * k10 * (h / 10) ** b
+def _at_named_goal(tr, now: float) -> bool:
+    """Ціль — над/біля пункту, на який прямо вказують канали (місто або його район), свіжа фіксація: 11.11 власник —
+    ціль, що летить на місто, показуємо В місті, а не виводимо за нього навчним шляхом чи курсом."""
+    la = tr.last
+    if la.place is None or tr.route or now - la.t >= 900:
+        return False
+    tn = getattr(tr, "tnames", ())
+    nm = la.place.name
+    city = nm[nm.rfind("(") + 1:-1] if getattr(la.place, "kind", "") == "D" and "(" in nm else None
+    return nm in tn or (city is not None and city in tn)
+
+
 def map_xy(tr, now: float, brain=None) -> tuple[float, float]:
     """Де мапа показує активну ціль у момент now. Без маршруту від каналів (лише курс) — уздовж навченого ланцюжка
     пунктів brain.next_path, з тим самим зміщенням і лімітом показу (map_disp, SHOW_BY_TYPE), а не прямо за курсом.
@@ -274,10 +286,14 @@ def map_xy(tr, now: float, brain=None) -> tuple[float, float]:
     cap = SHOW_BY_TYPE.get(tr.type, SHOW_MIN)
     base = tr.est(now, cap, MAP_K.get(tr.type, 1.0), mapm=True)
     la_ = tr.last
+    if _at_named_goal(tr, now) and tr.type not in SHORT_RANGE and tr.type not in ("ballistic", "banderol"):
+        return (la_.x, la_.y)
     if tr.route or brain is None or la_.place is None or tr.type in SHORT_RANGE or not hasattr(brain, "next_path"):
         return base
     if not la_.est and now - la_.t < 900 and la_.place.name in getattr(tr, "tnames", ()):
         return base
+    if _at_named_goal(tr, now) and tr.type not in SHORT_RANGE:
+        return (la_.x, la_.y)
     from .geo import to_xy
     la, lo = from_xy(la_.x, la_.y)
     chain = brain.next_path(tr.type, la_.place.name, tr.heading, (la, lo), steps=4)
@@ -1438,9 +1454,7 @@ class Tracker:
             # 07.11 «На Харків, а на мапі з Харкова»: ціль уже НАД названим пунктом атаки (свіжа реальна фіксація) — навчений
             # «ймовірно далі» (Коротич тощо) не показуємо: це виглядає як вихід із міста, а не удар по ньому
             _la = tr.last
-            at_goal = bool(status == "active" and (not _la.est or getattr(_la.place, "kind", "") == "D") and _la.place is not None and now - _la.t < 900 and not tr.route
-                           and (_la.place.name in getattr(tr, "tnames", ())
-                                or (getattr(_la.place, "kind", "") == "D" and _la.place.name[_la.place.name.rfind("(") + 1:-1] in getattr(tr, "tnames", ()))))
+            at_goal = bool(status == "active" and _at_named_goal(tr, now))
             if not rest and status == "active" and self.brain and not at_goal:
                 base = tr.last.place.name if tr.last.place else None
                 if base:

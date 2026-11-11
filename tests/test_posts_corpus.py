@@ -346,3 +346,21 @@ def test_goal_city_district_no_learned_exit():
     m.feed(t, "Реактивний БпЛА на Харків", "AL", now - 60, None, log=False)
     s = t.snapshot(now)["tracks"][0]
     assert s["hd"] is None and not s["pred_next"] and not s["lpath"]
+
+
+def test_goal_city_not_led_out_by_learned_path():
+    """11.11: навчений шлях/курс не виводить ціль за місто-мету («на Харків»): мітка лишається в місті, курс не від кордону."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "Реактивний БпЛА. Далі курс на Москалівку", "CX", now - 600, None, log=False)
+    m.feed(t, "Реактивний БпЛА на Харків", "AL", now - 590, None, log=False)
+    orig = (m.brain.next_path, m.brain.next_places)
+    m.brain.next_path = lambda *a, **k: [("Коротич", 0.6, 50.1, 36.5, 0.6)]
+    m.brain.next_places = lambda *a, **k: [("Коротич", 0.6, 50.1, 36.5)]
+    try:
+        s = t.snapshot(now)["tracks"][0]
+    finally:
+        m.brain.next_path, m.brain.next_places = orig
+    assert abs(s["lat"] - 49.97) < 0.03 and abs(s["lon"] - 36.21) < 0.05, (s["lat"], s["lon"])
+    assert not s["pred_next"] and not s["lpath"]
