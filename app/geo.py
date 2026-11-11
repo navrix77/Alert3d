@@ -315,6 +315,12 @@ class Gazetteer:
         # norm() зводить «ё» до «е», і «Соленое» не знаходилось. Лише запасний шлях: «Зелёное» лишається Зелене
         if hit is None and "ё" in word.lower():
             hit = self._lookup(word.lower().replace("ё", "о"))
+        # 11.11 ніч: те саме без «ё»: «Реактив на Соленое от Славгорода» (dnepr_nagladach) → Солоне
+        if hit is None and re.match(r"(?i)солен", word):
+            hit = self._lookup("солон" + word[5:].lower())
+        # рос. «-олье» = укр. «-ілля»: «на Доброволье, Верхнюю Самару» (ND 11.11) → Добровілля (Лозівщина)
+        if hit is None and re.search(r"(?i)олье$|олья$|олью$", word):
+            hit = self._lookup(word[:-4].lower() + "ілля")
         return hit
 
     def _lookup(self, word: str) -> list[int] | None:
@@ -350,6 +356,11 @@ class Gazetteer:
             if len(w) >= 5 and w[-1] in "иі" and w[-2] not in "аеиіоуюяєї":
                 alt = [i for c in (w[:-1] + "а", w[:-1] + "я") for i in self.idx.get(c, [])]
                 if alt and max(self.places[i].pop for i in alt) >= max(self.places[i].pop for i in self.idx[w]):
+                    return self.idx[w] + [i for i in alt if i not in self.idx[w]]
+                # 11.11 ніч: «реактивний від Рудки до М.К.» (PhantomChe) — родовий від села Рудка під Черніговом, а не
+                # містечко Рудки на Львівщині (550 км). Точна назва лише в одній-двох областях, а форма «-а/-я» є в інших:
+                # беремо обидві, вибір робить регіон каналу/контекст (місто більшого розміру однаково важить у score)
+                if alt and len({self.places[i].lat // 1 for i in self.idx[w]}) <= 2 and len(self.idx[w]) <= 2:
                     return self.idx[w] + [i for i in alt if i not in self.idx[w]]
             # 10.11: «на Підгородне/Слобожанське» (dnipromonitor) — укр. «-нє» без «є»; точна назва «Підгородне» є лише на
             # Донеччині, тож місто Підгороднє під Дніпром губилось. Додаємо форму на «-є», вибір робить контекст
@@ -413,6 +424,8 @@ class Gazetteer:
             if A.startswith(ru) and end in ("", "ая", "ую", "ой", "ей", "ья", "ью", "яя", "юю", "ый", "ий", "ое", "ее", "ые", "ие", "ого", "его", "ом", "ем", "ую", "их", "ых", "а", "ий", "е", "і", "ої", "у"):
                 fem = end in ("ая", "ую", "ой", "ей", "ья", "ью", "яя", "юю") or end == ""
                 ca = ca + [uk + e for e in (("а", "ий", "е") if fem else ("ий", "е", "а", "і"))]
+                if uk in ("верхн", "нижн", "середн"):  # м'які прикметники: «Верхнюю Самару» → Верхня Самара (ND 11.11), а не місто Самар
+                    ca = ca + [uk + e for e in (("я", "ій", "є") if fem else ("ій", "є", "я", "і"))]
         cb = cb + [c.replace("ов", "ів").replace("ев", "ів") for c in cb if "ов" in c or "ев" in c]
         if A.endswith(("их", "іх")) and B.endswith("ів") and len(B) >= 5:  # «з-під Кінських Роздорів» → Кінські Роздори
             cb = cb + [B[:-2] + "и", B[:-2] + "і"]  # (eyes_everywhere_ua, radar_sich 06.11 13:37; без цього — село Роздори)
