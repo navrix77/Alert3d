@@ -413,3 +413,52 @@ def test_english_air_force_posts_parse():
     o = P.parse("🛵 Jet-powered drone heading toward Kharkiv", "AIU")
     assert [r.place.name for r in o.places] == ["Харків"] and o.type == "jet"
     assert P.parse("Увага! Харків", "x").type is None or True
+
+
+# 11.11: прогалини розбору, знайдені прогоном по корпусу формулювань
+def _roles(text, ch="M"):
+    o = P.parse(text, ch, (49.99, 36.23))
+    return o, [(r.role, r.place.name) for r in o.places]
+
+
+@pytest.mark.parametrize("text,place", [
+    ("Mопеди на Пісочин", "Пісочин"),  # латинська M усередині кириличного слова
+    ("БпЛА над Основою", "Основа"),  # орудний відмінок мікрорайону
+    ("БпЛА Новобаварський район", "Нова Баварія"),
+    ("БпЛА по Слобідському району", "Слобідський р-н"),
+    ("БпЛА Холодногірський район", "Холодна Гора"),
+    ("БпЛА в Основ'янському районі", "Основа"),
+])
+def test_parser_gaps_places(text, place):
+    o, rp = _roles(text)
+    assert o.type in ("uav", "shahed"), o
+    assert any(place in n for _r, n in rp), rp
+
+
+@pytest.mark.parametrize("text", [
+    "Герань-2 курсом на Харьков со стороны Чугуева",
+    "Шахед на Харків з боку Чугуєва",
+])
+def test_side_phrase_is_origin(text):
+    _o, rp = _roles(text)
+    assert ("f", "Чугуїв") in rp and ("t", "Харків") in rp, rp
+
+
+@pytest.mark.parametrize("text,names", [
+    ("БпЛА Чугуїв–Харків", ["Чугуїв", "Харків"]),
+    ("БпЛА Мерефа-Харків", ["Мерефа", "Харків"]),
+    ("БпЛА Балаклія-Ізюм", ["Балаклія", "Ізюм"]),
+])
+def test_hyphen_route_splits(text, names):
+    _o, rp = _roles(text)
+    assert [n for _r, n in rp] == names, rp
+
+
+def test_hyphen_compound_names_kept():
+    _o, rp = _roles("дрони на Куп'янськ-Вузловий")
+    assert [n for _r, n in rp] == ["Куп’янськ-Вузловий"], rp
+
+
+def test_fpv_latin_not_mangled_by_homoglyph_fix():
+    o, _rp = _roles("FPV-дрон курсом на ТРЦ Дафі")
+    assert o.type == "fpv", o
