@@ -632,6 +632,29 @@ def _is_admin(request) -> bool:
     return bool(ADMIN_TOKEN) and hmac.compare_digest(tok, ADMIN_TOKEN)
 
 
+# CSP. Фронт має inline-скрипти/стилі (Meta Pixel, заставка, style=""), воркери MapLibre (blob:), CDN unpkg (deck.gl, jsPDF),
+# тайли/стилі карт. Тому 'unsafe-inline' лишається, а політика йде як Report-Only (нічого не ламає, помилки видно в консолі).
+# Увімкнути блокування: CSP_ENFORCE=1 (після перевірки консолі на реальних пристроях і PWA).
+_CSP = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://unpkg.com https://connect.facebook.net",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' data: blob:",
+    "connect-src 'self' ws: wss: blob: data: https://tiles.openfreemap.org https://server.arcgisonline.com "
+    "https://gibs.earthdata.nasa.gov https://s3.amazonaws.com https://tile.googleapis.com https://unpkg.com "
+    "https://www.facebook.com https://connect.facebook.net",
+    "worker-src 'self' blob:",
+    "child-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+])
+_CSP_HEADER = "Content-Security-Policy" if os.getenv("CSP_ENFORCE") == "1" else "Content-Security-Policy-Report-Only"
+
+
 @app.middleware("http")
 async def guard(request, call_next):
     path = request.url.path
@@ -653,6 +676,8 @@ async def guard(request, call_next):
     h.setdefault("X-Frame-Options", "SAMEORIGIN")
     h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     h.setdefault("Permissions-Policy", "microphone=(self), geolocation=(self), camera=(self)")
+    if not path.startswith("/api/"):
+        h.setdefault(_CSP_HEADER, _CSP)
     if path.startswith("/api/") and "cache-control" not in h:
         h["Cache-Control"] = "no-store"
     return resp
