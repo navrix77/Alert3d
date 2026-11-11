@@ -1477,7 +1477,7 @@ class Tracker:
                 hd = self._learned_heading(tr, None, (ex, ey)) or self._front_bearing((ex, ey))
             # 07.11 власник: «летить з кордону на місто, а не навпаки». Позицію не називали (лише «на X» — усі точки оцінені):
             # послідовність «П'ятихатки → Лісне → Лесное» — це перелік цілей, а не рух углиб кордону. Носом від фронту, не до нього
-            if hd is not None and tr.type in ("shahed", "uav", "molniya", "rszv") and tr.obs and all(o.est for o in tr.obs):
+            if hd is not None and tr.type in ("shahed", "uav", "molniya", "rszv", "jet") and tr.obs and all(o.est for o in tr.obs):
                 _fb = self._front_bearing((ex, ey))
                 if _fb is not None and ang_diff(hd, _fb) > 100:
                     hd = _fb
