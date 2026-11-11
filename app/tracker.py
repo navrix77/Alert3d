@@ -221,6 +221,8 @@ class Track:
                 tot = sum(dist_km(pts[i - 1], pts[i]) for i in range(1, len(pts)))
                 if km <= tot or self.heading is None:
                     return along(pts, km)
+                if self.route[-1].name in getattr(self, "tnames", ()):
+                    return pts[-1]  # 11.11: пункт, на який прямо вказали канали, — кінець показу: ціль не «пролітає» місто й не веде за нього
                 hd = bearing(pts[-2], pts[-1]) if len(pts) > 1 else self.heading
                 return move(pts[-1], hd, min(km - tot, cap_km))
             if self.heading is None:
@@ -292,10 +294,11 @@ def map_xy(tr, now: float, brain=None) -> tuple[float, float]:
     # 11.11 власник: «летить на Старий Салтів, а мала бути над Харковом». Ціль, названа В місті (обласні центри та великі міста), свіжа
     # фіксація: мітка не відходить від міста далі за ~7 км (інакше за 10 хв шахед «виїжджає» на 25 км з міста, яке атакує)
     if (tr.type not in ("ballistic", "banderol", "cruise") and la_.place is not None and la_.place.name in _BIG_CITIES
-            and not tr.route and now - la_.t < 900):
+            and not tr.route and now - la_.t < (1500 if tr.type in SHORT_RANGE else 900)):
         d_ = dist_km((la_.x, la_.y), base)
-        if d_ > 7:
-            base = move((la_.x, la_.y), bearing((la_.x, la_.y), base), 7)
+        lim_ = 3 if tr.type in SHORT_RANGE else 7  # короткодальня («Молнія над Харковом») — біля названої точки, а не за 8 км у бік
+        if d_ > lim_:
+            base = move((la_.x, la_.y), bearing((la_.x, la_.y), base), lim_)
     if _at_named_goal(tr, now) and tr.type not in SHORT_RANGE and tr.type not in ("ballistic", "banderol"):
         return (la_.x, la_.y)
     if tr.route or brain is None or la_.place is None or tr.type in SHORT_RANGE or not hasattr(brain, "next_path"):
@@ -507,8 +510,43 @@ class Tracker:
         self.bal = [e for e in self.bal if t - e["t"] < 3600][-60:]
 
     # ---------------- прийом повідомлення
-    def ingest(self, obs: Observation, src: str, t: float | None = None, link: str | None = None) -> dict:
+    BANDEROL_SPLIT_KM = 50.0  # пункти призначення «Бандероль» далі одне від одного — різні групи (Полтава ≠ Харківщина)
+
+    def _split_banderol(self, obs: Observation, src: str, t: float, link: str | None) -> dict | None:
+        """11.11: «Бандероль на Харків, Полтаву» — це не одна ракета з маршрутом через обидва міста, а групи на різні цілі.
+        Пункти призначення, далекі одне від одного (>50 км, зв'язність за ланцюжком), розділяємо: окреме повідомлення й окремий
+        трек на кожне. Поточну позицію (якщо є) отримує лише група, найближча до неї."""
+        import copy
+        tg = [r for r in obs.places if r.role == "t"]
+        if len(tg) < 2:
+            return None
+        groups: list[list] = []
+        for r in tg:
+            near = [g for g in groups if any(dist_km(r.place.xy, q.place.xy) <= self.BANDEROL_SPLIT_KM for q in g)]
+            merged_ = [r] + [q for g in near for q in g]
+            groups = [g for g in groups if g not in near] + [merged_]
+        if len(groups) < 2:
+            return None
+        groups.sort(key=lambda g: min(tg.index(q) for q in g))
+        cur = next((r for r in obs.places if r.role == "p"), None) or next((r for r in obs.places if r.role == "f"), None)
+        owner = min(range(len(groups)), key=lambda i: min(dist_km(cur.place.xy, q.place.xy) for q in groups[i])) if cur else None
+        n = len(groups)
+        cnt = obs.count
+        recs = []
+        for i, g in enumerate(groups):
+            o2 = copy.copy(obs)
+            keep = [r for r in obs.places if r.role == "t" and r in g]
+            o2.places = ([r for r in obs.places if r.role != "t"] if i == owner else []) + keep
+            o2.count = (max(1, cnt // n) if cnt and cnt >= n else 1) if cnt else None
+            recs.append(self.ingest(o2, src, t, link, _split=True))
+        return recs[0]
+
+    def ingest(self, obs: Observation, src: str, t: float | None = None, link: str | None = None, _split: bool = False) -> dict:
         t = t or time.time()
+        if obs.type == "banderol" and not _split and obs.kind == "track" and not obs.safety and not (obs.no_target and not obs.close):
+            r_ = self._split_banderol(obs, src, t, link)
+            if r_ is not None:
+                return r_
         self.last_update = max(self.last_update, t)
         rec = {"t": t, "src": src, "kind": obs.kind, "type": obs.type, "count": obs.count, "link": link, "track": None,
                "places": [{"r": r.role, "n": r.place.name} for r in obs.places] if not obs.safety else []}
@@ -678,7 +716,7 @@ class Tracker:
         names = {p.name for p in route}
         if pos is not None:
             pt = pos.place.xy
-            tr = self._best(obs.type, pt, t, names)
+            tr = self._best(obs.type, pt, t, names, [p.xy for p in route])
         else:
             pt = None
             self._split_from = None
@@ -1164,10 +1202,22 @@ class Tracker:
             return tr
         return best
 
-    def _best(self, typ: str, pt, t: float, names: set | None = None) -> Track | None:
+    @staticmethod
+    def _dest_xys(tr) -> list:
+        """Координати пунктів призначення, які назвали канали (маршрут + «курс на X»)."""
+        return [p.xy for p in tr.route] + ([tr.course_xy] if tr.course_xy else [])
+
+    def _banderol_far_dest(self, tr, dxy) -> bool:
+        """Бандеролі з пунктами призначення, далекими один від одного, — різні групи (Полтава ≠ Харківщина)."""
+        da = self._dest_xys(tr)
+        return bool(da and dxy and min(dist_km(a, b) for a in da for b in dxy) > self.BANDEROL_SPLIT_KM)
+
+    def _best(self, typ: str, pt, t: float, names: set | None = None, dxy=None) -> Track | None:
         best, bs = None, 1e9
         for tr in self.tracks:
             if tr.type != typ or tr.closed or tr.merged or tr.id in self.exclude:
+                continue
+            if typ == "banderol" and self._banderol_far_dest(tr, dxy):
                 continue
             dt = t - tr.last.t
             if dt > TYPES[typ]["life"] * 1.2:
@@ -1209,6 +1259,8 @@ class Tracker:
             for b in act[i + 1:]:
                 if b.merged:
                     continue
+                if a.type == b.type == "banderol" and self._banderol_far_dest(a, self._dest_xys(b)):
+                    continue  # 11.11: Полтава окремо від Харківщини — не зливаємо в один трек ×2
                 d = dist_km(pos[a.id], pos[b.id])
                 ai_same = frozenset((a.id, b.id)) in self.ai_merge
                 near_cand = d <= 25 and (a.type == b.type or {a.type, b.type} <= {"jet", "shahed", "uav", "recon", "molniya"})
@@ -1520,6 +1572,17 @@ class Tracker:
                 _fb2 = self._front_bearing((ex, ey))
                 if _fb2 is not None and ang_diff(hd, _fb2) > 90:
                     hd = _fb2
+            if hd is not None and tr.type in ("shahed", "uav", "molniya", "jet", "rszv", "banderol") and status == "active":
+                # 11.11: на Харківщині цілі йдуть З боку кордону/окупованих територій вглиб. Курс, що вказує до лінії фронту
+                # (пункт «курсу» ближчий до кордону, ніж ціль, відфільтровано вище, але tr.heading ще міг його нести), — носом від неї
+                _fd = self._front_dist((ex, ey))
+                if 15 <= _fd <= 120:
+                    _fb3 = self._front_bearing((ex, ey))
+                    if _fb3 is not None and ang_diff(hd, _fb3) > 120:
+                        hd = _fb3
+            # 11.11: ракета, про яку відомий лише пункт призначення («Бандероль на Полтаву»): перша точка — ціль, а не місце пуску;
+            # «Звідки летить» не показує її як пуск і не оцінює пуск від неї
+            dest_only = tr.type in ("banderol", "ballistic", "cruise", "geran5") and all(o.est for o in tr.obs) and not tr.from_place
             conf = self.conf(tr)
             if status == "active":
                 up(obl.of(lon, lat), 2 if conf >= 0.5 else 1)
@@ -1541,11 +1604,12 @@ class Tracker:
                 "links": [o.link for o in tr.obs[-5:] if o.link],
                 "ev": {k: v for k, v in self._ev_out(tr, now, (ex, ey)).items() if k != "items"},  # докази — /api/track/{id}
                 "from": tr.from_place.name if tr.from_place else None, "ts": now,
-                "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4), tr.obs[0].label, int(tr.obs[0].t)],
+                "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4),
+                          (f"ціль: {tr.obs[0].label}, не місце пуску" if dest_only else tr.obs[0].label), int(tr.obs[0].t)],
                 # останній пункт, який назвали самі канали (не оцінка SKY): «де ціль зараз» у картці
                 "at": next(([o.label, int(o.t)] for o in reversed(tr.obs) if not o.est and o.label), None),
                 "at_ll": next(([round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4)] for o in reversed(tr.obs) if not o.est), None),
-                "launch": self.launches.link(tr, now, hd) if status != "closed" or age < 1800 else None,
+                "launch": self.launches.link(tr, now, hd) if (status != "closed" or age < 1800) and not dest_only else None,
             })
         zones = []
         self.avia = {o: a for o, a in self.avia.items() if now - a["t"] < AVIA_LIFE}
