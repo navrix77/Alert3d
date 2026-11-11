@@ -388,3 +388,17 @@ def test_target_named_in_big_city_is_not_displaced_far_from_it():
         m.feed(t, x_ := x, k, now + dt, None, log=False)
     for s in t.snapshot(now)["tracks"]:
         assert dist_km(to_xy(s["lat"], s["lon"]), to_xy(49.9922, 36.2724)) < 12, (s["lat"], s["lon"])
+
+
+def test_shahed_course_never_points_back_to_border():
+    """11.11: «Ещё 1 ударный на Слатино» + «курсом на Дергачі»: курс/«next» не веде назад до кордону (Слатине ближче до кордону)."""
+    import time
+    from app.tracker import Tracker
+    m, t = _tracker()
+    now = time.time()
+    for dt, k, x in [(-120, "TL", "Ещё 1 ударный на Слатино"), (-100, "CX", "Ударный БпЛА курсом на Дергачи, следом еще 1"),
+                     (-80, "RK", "Дергачі"), (-70, "KI", "2 ударних БпЛА курсом на Дергачі")]:
+        m.feed(t, x, k, now + dt, None, log=False)
+    for s in t.snapshot(now)["tracks"]:
+        if s["type"] == "shahed" and s["next"]:
+            assert s["next"] != "Слатине", s["next"]

@@ -1458,6 +1458,12 @@ class Tracker:
             if tr.type in SHORT_RANGE and rest:  # 08.11 власник: FPV не летить назад до кордону і далі за свою дальність від лінії пуску
                 _d0 = self._front_dist((ex, ey))
                 rest = [q for q in rest if self._front_dist(q) >= _d0 - 0.5 and self._front_dist(q) <= SHORT_RANGE[tr.type]]
+            if tr.type in ("shahed", "uav", "molniya", "jet") and rest:
+                # 11.11 власник: на Харківщині цілі йдуть ВІД кордону вглиб, а не назад до нього («Курс → Слатине» з Дергачів вів у РФ).
+                # Пункт «курсу» ближчий до фронту/кордону, ніж ціль зараз, — вважаємо назвою місця, а не призначенням: у напрямок не беремо
+                _d1 = self._front_dist((ex, ey))
+                if _d1 <= 120:
+                    rest = [q for q in rest if self._front_dist(q) >= _d1 - 3]
             names = [p.name for p in tr.route if dist_km(p.xy, (ex, ey)) > 2 and p.xy in rest] or []
             pred_src, pred_p = ("channels" if rest else tr.pred_src), None
             pred_next = None
