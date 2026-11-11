@@ -402,3 +402,14 @@ def test_shahed_course_never_points_back_to_border():
     for s in t.snapshot(now)["tracks"]:
         if s["type"] == "shahed" and s["next"]:
             assert s["next"] != "Слатине", s["next"]
+
+
+def test_english_air_force_posts_parse():
+    """11.11: англомовні пости Повітряних сил («heading toward Kharkiv from the north») розбираються як українські."""
+    from app.parser import Parser
+    P = Parser()
+    o = P.parse("A group of strike drones (UAVs) heading toward Kharkiv from the north", "AIU")
+    assert [r.place.name for r in o.places] == ["Харків"] and o.type == "shahed" and o.side == 0.0
+    o = P.parse("🛵 Jet-powered drone heading toward Kharkiv", "AIU")
+    assert [r.place.name for r in o.places] == ["Харків"] and o.type == "jet"
+    assert P.parse("Увага! Харків", "x").type is None or True

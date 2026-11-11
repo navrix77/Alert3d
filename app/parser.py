@@ -684,6 +684,39 @@ def is_junk(text: str) -> bool:
 CREDIT = re.compile(r"^(?:[\W_]*)(?:відео|видео|фото|джерело|источник|автор|читайте|підписуйтесь|подписывайтесь)(?:\s*[/,и]\s*(?:відео|видео|фото))?\s*[:\-–]", re.I)
 
 
+_EN_CITIES = {"Kharkiv": "Харків", "Poltava": "Полтава", "Sumy": "Суми", "Kyiv": "Київ", "Dnipro": "Дніпро", "Zaporizhzhia": "Запоріжжя",
+              "Chernihiv": "Чернігів", "Odesa": "Одеса", "Odessa": "Одеса", "Mykolaiv": "Миколаїв", "Kherson": "Херсон", "Lviv": "Львів",
+              "Kryvyi Rih": "Кривий Ріг", "Zhytomyr": "Житомир", "Cherkasy": "Черкаси", "Kropyvnytskyi": "Кропивницький",
+              "Vinnytsia": "Вінниця", "Rivne": "Рівне", "Lutsk": "Луцьк", "Ternopil": "Тернопіль", "Khmelnytskyi": "Хмельницький",
+              "Chernivtsi": "Чернівці", "Uzhhorod": "Ужгород", "Ivano-Frankivsk": "Івано-Франківськ", "Kramatorsk": "Краматорськ",
+              "Sloviansk": "Слов'янськ", "Kupiansk": "Куп'янськ", "Izium": "Ізюм", "Lozova": "Лозова", "Merefa": "Мерефа",
+              "Zmiiv": "Зміїв", "Chuhuiv": "Чугуїв", "Balakliia": "Балаклія", "Derhachi": "Дергачі", "Dergachi": "Дергачі",
+              "Bohodukhiv": "Богодухів", "Pavlohrad": "Павлоград", "Kremenchuk": "Кременчук", "Myrhorod": "Миргород", "Lubny": "Лубни"}
+_EN_SIDES = [("north-east", "північного сходу"), ("north-west", "північного заходу"), ("south-east", "південного сходу"),
+             ("south-west", "південного заходу"), ("north", "півночі"), ("south", "півдня"), ("east", "сходу"), ("west", "заходу")]
+
+
+def en_to_ua(text: str) -> str:
+    """Англомовний пост (Повітряні сили / alerts.in.ua: «A group of strike drones heading toward Kharkiv from the north»)
+    → українська фраза, яку розуміє парсер. Кирилічні тексти не чіпає."""
+    if re.search(r"[А-Яа-яІіЇїЄє]", text) or not re.search(r"[A-Za-z]{4,}", text):
+        return text
+    t = text
+    t = re.sub(r"jet[- ]powered (?:drones?|UAVs?)", "реактивний БпЛА", t, flags=re.I)
+    t = re.sub(r"(?:a )?groups? of strike (?:drones?|UAVs?)(?: \(UAVs?\))?|strike (?:drones?|UAVs?)(?: \(UAVs?\))?", "ударні БпЛА", t, flags=re.I)
+    t = re.sub(r"cruise missiles?", "крилата ракета", t, flags=re.I)
+    t = re.sub(r"ballistic missiles?", "балістична ракета", t, flags=re.I)
+    t = re.sub(r"guided aerial bombs?|KABs?", "КАБ", t, flags=re.I)
+    t = re.sub(r"\b(?:UAVs?|drones?)\b", "БпЛА", t, flags=re.I)
+    for en, ua in sorted(_EN_CITIES.items(), key=lambda kv: -len(kv[0])):
+        t = re.sub(rf"\b{re.escape(en)}\b", ua, t)
+    for en, ua in _EN_SIDES:
+        t = re.sub(rf"from the {en}\b", f"з {ua}", t, flags=re.I)
+    t = re.sub(r"heading (?:toward|towards|to)\s+", "курсом на ", t, flags=re.I)
+    t = re.sub(r"\bin the direction of\s+", "курсом на ", t, flags=re.I)
+    return t
+
+
 class Parser:
     def __init__(self, gaz: Gazetteer | None = None) -> None:
         self.gaz = gaz or Gazetteer.load()
@@ -759,6 +792,7 @@ class Parser:
         return out or [text]
 
     def parse(self, text: str, channel: str | None = None, ctx: tuple[float, float] | None = None) -> Observation:
+        text = en_to_ua(text)  # 11.11: англомовні пости Повітряних сил / alerts.in.ua
         level_status = bool(LEVEL_STATUS.search(norm(text)))
         # «Дальнє РСЗВ…», «дальні ракети» — «далекобійне», а не село Дальнє
         text = DALNE_ADJ.sub(lambda m_: m_.group(1) + m_.group(3), text)
