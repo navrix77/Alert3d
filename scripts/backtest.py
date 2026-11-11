@@ -27,7 +27,7 @@ from app import parser as parser_mod  # noqa: E402
 from app.brain import Brain  # noqa: E402
 from app.config import SOURCES  # noqa: E402
 from app.geo import bearing, dist_km, move  # noqa: E402
-from app.tracker import MAP_K, SHOW_BY_TYPE, SHOW_MIN, TYPES, Tracker, along  # noqa: E402
+from app.tracker import MAP_K, SHOW_BY_TYPE, SHOW_MIN, TYPES, Tracker, along, map_xy  # noqa: E402
 
 HORIZONS = (10, 20, 30)
 
@@ -131,10 +131,15 @@ def m_learned(tr, brain, h):
 def m_map(tr, brain, h):
     """Як мапа SKY показує ціль зараз: модель зміщення map_disp (MAP_K/MAP_POW) і ліміт показу SHOW_BY_TYPE
     (Track.est(mapm=True)), а не паспортна швидкість, як у dr/route/learned."""
+    return map_xy(tr, tr.last.t + h * 60, brain)
+
+
+def m_map0(tr, brain, h):
+    """Мапа до 11.11: без маршруту — прямо за курсом (для порівняння)."""
     return tr.est(tr.last.t + h * 60, SHOW_BY_TYPE.get(tr.type, SHOW_MIN), MAP_K.get(tr.type, 1.0), mapm=True)
 
 
-METHODS = {"stay": m_stay, "dr": m_dr, "route": m_route, "learned": m_learned, "map": m_map}
+METHODS = {"stay": m_stay, "dr": m_dr, "route": m_route, "learned": m_learned, "map": m_map, "map0": m_map0}
 
 
 def truth_at(obs, t):

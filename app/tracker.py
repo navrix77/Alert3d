@@ -263,6 +263,30 @@ def map_disp(typ: str, speed: float, sec: float) -> float:
     if h <= 10 or b == 1.0:
         return speed * h / 60 * k10
     return speed * 10 / 60 * k10 * (h / 10) ** b
+def map_xy(tr, now: float, brain=None) -> tuple[float, float]:
+    """Де мапа показує активну ціль у момент now. Без маршруту від каналів (лише курс) — уздовж навченого ланцюжка
+    пунктів brain.next_path, з тим самим зміщенням і лімітом показу (map_disp, SHOW_BY_TYPE), а не прямо за курсом.
+    Бектест 11.11 (night-data 08.11 06:18 – 11.11 06:18 UTC, --dedup, параметрів не підбирали; scripts/backtest.py map проти map0):
+    перевірка 09.11 18:00 – 11.11 06:18, усі типи ≤10 хв мед. 19,8 → 19,1 км (≤15 км 37% → 39%), ≤20 хв 40,8 → 38,4 (7% → 10%),
+    без маршруту ≤20 хв 36,7 → 32,3 (11% → 19%); окреме вікно 08.11 18:00 – 09.11 18:00: ≤10 хв 21,9 → 21,7 (39% → 41%),
+    ≤20 хв 48,9 → 43,1 (9% → 11%). Курс у відповіді (hd) і попередження не змінюються, лише показана позиція.
+    Ціль над названим пунктом атаки (свіжа реальна фіксація) не «виводимо» з міста (07.11), короткодальні — як було."""
+    cap = SHOW_BY_TYPE.get(tr.type, SHOW_MIN)
+    base = tr.est(now, cap, MAP_K.get(tr.type, 1.0), mapm=True)
+    la_ = tr.last
+    if tr.route or brain is None or la_.place is None or tr.type in SHORT_RANGE or not hasattr(brain, "next_path"):
+        return base
+    if not la_.est and now - la_.t < 900 and la_.place.name in getattr(tr, "tnames", ()):
+        return base
+    from .geo import to_xy
+    la, lo = from_xy(la_.x, la_.y)
+    chain = brain.next_path(tr.type, la_.place.name, tr.heading, (la, lo), steps=4)
+    if not chain:
+        return base
+    pts = [(la_.x, la_.y)] + [to_xy(c[2], c[3]) for c in chain]
+    return along(pts, min(map_disp(tr.type, tr.speed, now - la_.t), map_disp(tr.type, tr.speed, cap * 60)))
+
+
 SHOW_MIN = 25  # скільки хвилин ціль «летить» на карті без нового повідомлення (дрони)
 # ракети летять швидко і падають/збиваються за хвилини: далі назваого пункту — лише трохи
 SHOW_BY_TYPE = {"uav": 25, "shahed": 25, "molniya": 4, "jet": 6, "cruise": 2, "ballistic": 1, "geran5": 5, "banderol": 2, "rszv": 1, "fpv": 1, "fpvf": 2, "recon": 15, "lancet": 4}  # 08.11: короткодальні не «летять» на мапі далі кількох км від названої позиції
@@ -1385,7 +1409,7 @@ class Tracker:
             if status != "active" and age > life + 900:
                 continue
             mk = MAP_K.get(tr.type, 1.0)
-            ex, ey = tr.est(now, SHOW_BY_TYPE.get(tr.type, SHOW_MIN), mk, mapm=True) if status == "active" else (tr.last.x, tr.last.y)
+            ex, ey = map_xy(tr, now, self.brain) if status == "active" else (tr.last.x, tr.last.y)
             lat, lon = from_xy(ex, ey)
             km = map_disp(tr.type, tr.speed, min(age, life))
             rest = []
