@@ -335,3 +335,14 @@ def test_city_after_district_keeps_district_no_false_course():
     s = t.snapshot(now)["tracks"][0]
     assert abs(s["lat"] - 49.97) < 0.02 and abs(s["lon"] - 36.21) < 0.03, (s["lat"], s["lon"])
     assert tr.heading is None
+
+
+def test_goal_city_district_no_learned_exit():
+    """11.11: ціль над районом міста-мети («курс на Москалівку», «на Харків») не отримує курсу/«ймовірно далі» з міста."""
+    import time
+    m, t = _tracker()
+    now = time.time()
+    m.feed(t, "Реактивний БпЛА. Далі курс на Москалівку", "CX", now - 90, None, log=False)
+    m.feed(t, "Реактивний БпЛА на Харків", "AL", now - 60, None, log=False)
+    s = t.snapshot(now)["tracks"][0]
+    assert s["hd"] is None and not s["pred_next"] and not s["lpath"]

@@ -1438,8 +1438,9 @@ class Tracker:
             # 07.11 «На Харків, а на мапі з Харкова»: ціль уже НАД названим пунктом атаки (свіжа реальна фіксація) — навчений
             # «ймовірно далі» (Коротич тощо) не показуємо: це виглядає як вихід із міста, а не удар по ньому
             _la = tr.last
-            at_goal = bool(status == "active" and not _la.est and _la.place is not None and now - _la.t < 900 and not tr.route
-                           and _la.place.name in getattr(tr, "tnames", ()))
+            at_goal = bool(status == "active" and (not _la.est or getattr(_la.place, "kind", "") == "D") and _la.place is not None and now - _la.t < 900 and not tr.route
+                           and (_la.place.name in getattr(tr, "tnames", ())
+                                or (getattr(_la.place, "kind", "") == "D" and _la.place.name[_la.place.name.rfind("(") + 1:-1] in getattr(tr, "tnames", ()))))
             if not rest and status == "active" and self.brain and not at_goal:
                 base = tr.last.place.name if tr.last.place else None
                 if base:
