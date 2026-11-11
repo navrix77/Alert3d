@@ -160,3 +160,11 @@ def test_banderol_destination_is_not_shown_as_launch_place():
     # а канал з позицією лишає звичайний підпис
     tr, out = _snap([("Бандероль в районі Мерефи курсом на Полтаву", 0, "M")])
     assert out[0]["entry"][2] == "Мерефа"
+
+
+def test_front_bearing_vovchansk_kupiansk_inland():
+    """Вовчанськ/Куп'янськ: курс від фронту вглиб (на південь/захід), а не на схід."""
+    from app.tracker import Tracker, _gxy
+    for la, lo in ((50.29, 36.94), (49.71, 37.62)):
+        b = Tracker._front_bearing(_gxy(la, lo))
+        assert b is not None and 150 <= b <= 290
