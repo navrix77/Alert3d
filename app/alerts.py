@@ -364,7 +364,7 @@ class OfficialAlerts:
                     log.warning("alerts.in.ua md failed: %s", e)
                     if fails >= 2 and not await self.ualarm_once(cli):
                         await self.ubilling_once(cli)
-                await asyncio.sleep(7)  # зведення оновлюється приблизно щохвилини — ловимо зміни якнайшвидше
+                await asyncio.sleep(4)  # зведення оновлюється приблизно щохвилини — ловимо зміни якнайшвидше (12.11: було 7 с)
 
     async def ubilling_once(self, cli) -> None:
         try:

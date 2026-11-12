@@ -119,7 +119,11 @@ def official_home(area: tuple, off: dict, levels: dict) -> str | None:
 
 from . import radio_spec as _spec  # noqa: E402
 
-OFF_STABLE = 45  # с: тривога/відбій мають протриматися стільки, щоб «відбій і знову тривога за 20 с» не давали двох сповіщень
+# 12.11 (скрін: наш «Відбій» прийшов на хвилину пізніше за офіційний застосунок): було 45 с очікування в обидва боки.
+# Тривога — негайно (безпека важливіша за можливе зайве сповіщення); відбій — після підтвердження другим опитуванням (хибний
+# «відбій» через збій зведення небезпечніший за 10 с затримки)
+OFF_STABLE_ON = 0
+OFF_STABLE_OFF = 10
 
 
 def zone_of(lon: float, lat: float, zones: dict) -> str | None:
@@ -375,7 +379,7 @@ class Push:
     async def run(self, get_state) -> None:
         async with httpx.AsyncClient(timeout=15) as cli:
             while True:
-                await asyncio.sleep(5)
+                await asyncio.sleep(2)  # 12.11: було 5 с — офіційна тривога/відбій мають іти без зайвих секунд
                 try:
                     await self.tick(cli, get_state())
                 except Exception as e:  # noqa: BLE001
@@ -443,9 +447,10 @@ class Push:
                 st = self.offst.get(token)  # [поточний стан, з якого моменту, стан, про який уже повідомили, назва]
                 if st is None:
                     self.offst[token] = [on, now, on, where]  # перший погляд: не сповіщаємо про поточний стан
-                elif st[0] != on:
-                    st[0], st[1], st[3] = on, now, where or st[3]
-                elif st[2] != on and now - st[1] >= OFF_STABLE:
+                else:
+                    if st[0] != on:
+                        st[0], st[1], st[3] = on, now, where or st[3]
+                if st is not None and self.offst[token] is st and st[2] != on and st[0] == on and now - st[1] >= (OFF_STABLE_ON if on else OFF_STABLE_OFF):
                     st[2] = on
                     nm = st[3] or "ваш район"
                     if on:

@@ -1270,10 +1270,9 @@ def test_official_alert_push_home(monkeypatch):
     monkeypatch.setattr(pm.time, "time", lambda: t[0])
     snap = lambda h: {"tracks": [], "levels": {}, "official": {"ok": True, "updated": t[0], "hromadas": {7: 2} if h else {}, "raion_levels": {}}}
     asyncio.run(pu.tick(Cli(), snap(False)))          # перший погляд: тиша
-    t[0] += 10; asyncio.run(pu.tick(Cli(), snap(True)))   # тривога почалась
-    t[0] += 20; asyncio.run(pu.tick(Cli(), snap(True)))   # ще не 45 с
-    assert sent == []
-    t[0] += 30; asyncio.run(pu.tick(Cli(), snap(True)))
+    t[0] += 10; asyncio.run(pu.tick(Cli(), snap(True)))   # тривога почалась — сповіщення одразу (12.11: було 45 с очікування)
+    assert len(sent) == 1
+    t[0] += 50; asyncio.run(pu.tick(Cli(), snap(True)))
     assert len(sent) == 1 and sent[0]["title"].startswith("🔴 Повітряна тривога")
     t[0] += 10; asyncio.run(pu.tick(Cli(), snap(False)))  # відбій…
     t[0] += 15; asyncio.run(pu.tick(Cli(), snap(True)))   # …і знову тривога за 15 с
@@ -2811,3 +2810,37 @@ def test_day_1112_harpiya_is_shahed():
     o = P.parse("Гарпія на Веселянку", "radar_sich")
     assert o.type == "shahed" and o.kind == "track" and o.places[0].place.name == "Веселянка"
     assert P.parse("реактивна Гарпія на Запоріжжя", "radar_sich").type == "jet"
+
+
+def test_official_alert_push_is_immediate_and_clear_after_short_confirm(monkeypatch):
+    """12.11 (скрін): «Відбій» ішов на хвилину пізніше за офіційний застосунок — 45 с очікування. Тривога негайно, відбій ≤10 с."""
+    import asyncio
+    from pathlib import Path as P_
+    from app import push as pm
+    sent = []
+
+    class Cli:
+        async def post(self, url, json=None, headers=None):
+            sent.extend(json)
+
+            class R:
+                def json(self_):
+                    return {"data": []}
+            return R()
+    pu = pm.Push(P_(":memory:"))
+    pu.db.execute("INSERT INTO subs VALUES('ExponentPushToken[abcdefghijkl]', 36.23, 50.0, 0)")
+    clk = [1_794_000_000.0]
+    monkeypatch.setattr(pm.time, "time", lambda: clk[0])
+    state = {"on": False}
+    monkeypatch.setattr(pm, "official_home", lambda area, off, lv: ("Харківська" if state["on"] else None))
+    snap = lambda: {"tracks": [], "official": {"ok": True, "updated": clk[0]}, "levels": {}}
+    asyncio.run(pu.tick(Cli(), snap()))          # перший погляд: без сповіщення
+    state["on"] = True; clk[0] += 2
+    asyncio.run(pu.tick(Cli(), snap()))
+    assert [m["title"] for m in sent if "тривога" in m["title"].lower()][:1] == ["🔴 Повітряна тривога · Харківська"]  # у той самий такт
+    sent.clear(); state["on"] = False; clk[0] += 60
+    asyncio.run(pu.tick(Cli(), snap()))
+    assert not [m for m in sent if "Відбій" in m["title"]]  # чекаємо підтвердження
+    clk[0] += 11
+    asyncio.run(pu.tick(Cli(), snap()))
+    assert [m["title"] for m in sent if "Відбій" in m["title"]] == ["🟢 Відбій тривоги · Харківська"]
