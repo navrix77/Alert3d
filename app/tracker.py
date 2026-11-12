@@ -751,6 +751,12 @@ class Tracker:
                     meas = d / dt * 3600
                     if nom * 0.5 < meas < nom * 1.6:
                         tr.speed = tr.speed * 0.5 + meas * 0.5
+                # 12.11 (живий selfcheck: «Новомиколаївка → Новомиколаївка 130 км за хвилину», «Богуслав → Богуслав 395 км»):
+                # та сама назва, що й у попередній точці треку, але інший тезка за сотні км — це те саме село; лишаємо попередню точку
+                if (tr.last.label == pos.place.name and not tr.last.est and d > 25
+                        and d > nom * 2.5 * max(60.0, dt) / 3600 + 25):
+                    pt = (tr.last.x, tr.last.y)
+                    d = 0.0
                 prev = tr.last
                 if tr.last_pred and self.brain and self.learn:
                     self._score_pred(tr, pt, t)

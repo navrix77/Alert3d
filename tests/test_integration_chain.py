@@ -97,3 +97,20 @@ def test_first_never_after_last_even_with_late_older_post():
     tr.ingest(P.parse("Шахед від Мерефи на Харків", "M"), "M", T0 + 90)
     for t in tr.snapshot(T0 + 200)["tracks"]:
         assert t["first"] <= t["last"]
+
+
+def test_same_name_far_namesake_does_not_teleport_track():
+    """12.11 (живий selfcheck): однойменний тезка за 130 км не «телепортує» трек (Новомиколаївка → Новомиколаївка)."""
+    import copy
+    tr = Tracker(SOURCES, learn=False)
+    o1 = P.parse("Реактивний біля Мерефи", "M")
+    tr.ingest(o1, "M", T0)
+    o2 = P.parse("Реактивний біля Мерефи", "M")
+    pl = o2.places[0].place
+    far = copy.copy(pl)
+    far.lat, far.lon = pl.lat + 1.2, pl.lon - 0.8
+    o2.places[0].place = far
+    tr.ingest(o2, "M", T0 + 60)
+    for trk in tr.tracks:  # жодного «стрибка» всередині треку: сусідні точки не далі 60 км
+        for a, b in zip(trk.obs, trk.obs[1:]):
+            assert dist_km((a.x, a.y), (b.x, b.y)) < 60, (trk.id, a.label, b.label)

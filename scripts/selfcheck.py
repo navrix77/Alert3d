@@ -130,7 +130,7 @@ def main() -> None:
             continue
         for m in _re.finditer(r"(?:на|над|курс(?:ом)?(?:\s+на)?|в\s+район[еі]|біля|около|от|від|через|повз|мимо|/)\s*([А-ЯІЇЄҐ][\w'’\-]+)", text):
             w = m.group(1)
-            if phon(w)[:4] in got or len(w) < 2 or _re.search(r"(?i)щин|ччин|чин[іиу]|област|бпла|шахед|^схі", w):
+            if phon(w)[:4] in got or len(w) < 2 or _re.search(r"(?i)щин|ччин|чин[іиу]|област|бпла|шахед|^схі|^(?:брянськ|курськ|орловськ|бєлгородськ|белгородськ|воронезьк|ростовськ|липецьк|краснодарськ|смоленськ|тверськ|рязанськ|тульськ|калузьк|нижегородськ)", w):
                 continue
             unk[(reg, w)] += 1
             unk_ex.setdefault((reg, w), (kyiv(t), src, text[:120]))
@@ -163,7 +163,7 @@ def main() -> None:
             t0, q, s0 = last[track]
             dt = max(60.0, t - t0)
             v = dist_km(q.xy, P0.xy) / dt * 3600
-            if v > _T[typ]["speed"] * 2.5 and dist_km(q.xy, P0.xy) > 25:
+            if v > _T[typ]["speed"] * 2.5 and dist_km(q.xy, P0.xy) > 25 and q.name != P0.name:  # однойменні — тезки, їх гасить трекер
                 jumps.append({"track": track, "type": typ, "from": q.name, "to": P0.name, "km": round(dist_km(q.xy, P0.xy)),
                               "min": round(dt / 60, 1), "src": src, "t": kyiv(t), "text": (text or "")[:120]})
         last[track] = (t, P0, src)
