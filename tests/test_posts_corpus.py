@@ -473,3 +473,20 @@ def test_night_1112_rocket_arrow_and_yellow_alert():
     assert p.parse("🚀 Підписатись на канал Харків", "M").type is None
     o2 = p.parse("🟡🚨 Рівне — жовта тривога (дронова небезпека)!", "zahid_golovne_ua")
     assert o2.kind != "track"
+
+
+def test_borova_is_oskil_settlement_for_kharkiv_channels():
+    """12.11 (скрін): «Ударный БпЛА курсом на Боровую» (CXID) — селище Борова на Осколі, а не село під Змієвом; ціль заходить зі сходу."""
+    from app.config import SOURCES
+    from app.parser import Parser
+    from app.tracker import Tracker
+    p = Parser()
+    o = p.parse("Ударный БпЛА курсом на Боровую", "CX")
+    assert abs(o.places[0].place.lon - 37.62) < 0.05
+    o2 = p.parse("БпЛА біля Зміїва курсом на Борову", "CX")  # поруч названо Зміїв — тоді це село під Змієвом
+    assert abs(o2.places[-1].place.lon - 36.31) < 0.05
+    tr = Tracker(SOURCES, learn=False)
+    tr.ingest(o, "CX", 1_793_700_000.0)
+    x = tr.snapshot(1_793_700_240.0)["tracks"][0]
+    assert 200 <= x["hd"] <= 340  # носом на захід: летить з боку Луганщини
+    assert (x.get("launch") or {}).get("site") != "Курськ (Халіно)"
