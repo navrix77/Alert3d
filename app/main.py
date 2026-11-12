@@ -837,8 +837,18 @@ async def api_live(req: Request):
                     frags += list(fr); texts.append(st.get("say") or "")
                 ids += st.get("ids") or []
             if ok and frags:
-                out["steps"] = [{"say": "\n\n".join(t for t in texts if t), "action": "overview", "ids": ids,
-                                 "audio": "/api/voice/" + voicekit.register(frags)}]
+                full = "\n\n".join(t for t in texts if t)
+                # 12.11 (власник: «дуже довго стартує Ефір»): один великий запис грає лише після повного синтезу всіх фраз.
+                # Ділимо на дві частини: перша (3 фрази) готується швидко й починає грати, друга синтезується паралельно
+                # і до кінця першої вже готова. Тексти однакові, мапа не смикається (друга частина без дії)
+                cut = 3 if len(frags) >= 5 else 0
+                parts_ = [frags[:cut], frags[cut:]] if cut else [frags]
+                out["steps"] = []
+                for n_, fr_ in enumerate(parts_):
+                    k_ = voicekit.register(list(fr_))
+                    if k_ not in _VOICE_DONE and k_ not in _VOICE_JOBS:
+                        _VOICE_JOBS[k_] = asyncio.ensure_future(voicekit.render(voicekit.SEQ[k_][1], _say))  # синтез стартує зараз, а не коли клієнт попросить
+                    out["steps"].append({"say": full, "action": "overview" if n_ == 0 else "keep", "ids": ids if n_ == 0 else [], "audio": "/api/voice/" + k_})
         except Exception:
             logging.getLogger("live").exception("live merge")
     return {"diff": d, **out}

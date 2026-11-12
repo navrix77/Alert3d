@@ -142,7 +142,7 @@
       if (stop) break;
       say.textContent = s.say || ''; act(s);
       const t0 = Date.now(); await speak(s.say, 'radio', pre[k]);
-      const rest = audioOn ? 600 : Math.max(0, Math.min(6500, 1800 + (s.say || '').length * 45) - (Date.now() - t0));  // з голосом — без зайвих пауз
+      const rest = audioOn ? (steps[k + 1] && steps[k + 1].say === s.say ? 0 : 600) : Math.max(0, Math.min(6500, 1800 + (s.say || '').length * 45) - (Date.now() - t0));  // з голосом — без зайвих пауз
       for (let k = 0; k < rest && !stop; k += 200) await wait(200);
       while (paused && !stop) await wait(200);
     }
