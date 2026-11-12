@@ -88,3 +88,12 @@ def test_unknown_noise_post_creates_no_target():
     tr = Tracker(SOURCES, learn=False)
     tr.ingest(P.parse("Доброго ранку, друзі! Підписуйтесь на канал", "M"), "M", T0)
     assert tr.snapshot(T0 + 5)["tracks"] == []
+
+
+def test_first_never_after_last_even_with_late_older_post():
+    """12.11 (живий /api/state): first > last у кількох треків — запізніла публікація зі старішим часом."""
+    tr = Tracker(SOURCES, learn=False)
+    tr.ingest(P.parse("Шахед від Мерефи на Харків", "M"), "M", T0 + 100)
+    tr.ingest(P.parse("Шахед від Мерефи на Харків", "M"), "M", T0 + 90)
+    for t in tr.snapshot(T0 + 200)["tracks"]:
+        assert t["first"] <= t["last"]

@@ -1600,7 +1600,7 @@ class Tracker:
                 "speed": round(tr.speed), "conf": round(conf, 2), "next": names[0] if names else tr.course_to, "route_names": names[:8], "vmap": round(tr.speed * MAP_K.get(tr.type, 1.0)), "dm": list(MAP_POW.get(tr.type, (MAP_K.get(tr.type, 1.0), 1.0))), "pred": pred_src, "pred_p": pred_p, "hd_src": "channels" if rest else tr.hd_src, "pred_next": pred_next, "lpath": lpath, "pos_est": tr.last.est, "fkm": _fkm(tr), "nopos": all(o.est for o in tr.obs),
                 "route": [[round(from_xy(*p)[1], 4), round(from_xy(*p)[0], 4)] for p in rest[:8]],
                 "trail": [[round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4), int(o.t)] for o in tr.obs[-6:]],
-                "first": int(tr.obs[0].t), "last": int(tr.last.t), "srcs": sorted(tr.srcs),
+                "first": int(min(o.t for o in tr.obs)), "last": int(max(tr.last.t, max(o.t for o in tr.obs))), "srcs": sorted(tr.srcs),
                 "links": [o.link for o in tr.obs[-5:] if o.link],
                 "ev": {k: v for k, v in self._ev_out(tr, now, (ex, ey)).items() if k != "items"},  # докази — /api/track/{id}
                 "from": tr.from_place.name if tr.from_place else None, "ts": now,
