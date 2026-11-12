@@ -39,9 +39,9 @@ def _check_dir(x):
     fd, fb = _front(pos)
     if x["hd"] is not None and fb is not None and 15 <= fd <= 120:
         assert ang_diff(x["hd"], fb) <= 120, (x["id"], x["hd"], fb)
-    if 15 <= fd <= 120:
+    if 15 <= fd <= 120 and x.get("type") != "banderol":  # бандероль (повітряний пуск) може йти й до пункту ближче до фронту
         for r in x["route"]:
-            assert Tracker._front_dist(to_xy(r[0], r[1])) >= fd - 3, (x["id"], r)
+            assert Tracker._front_dist(to_xy(r[1], r[0])) >= fd - 3, (x["id"], r)
 
 
 @pytest.mark.parametrize("typ", TYPES)
