@@ -476,6 +476,19 @@ async def lifespan(app: FastAPI):
             since = time.time() - 2 * 3600
             for (lk,) in brain.db.execute("SELECT DISTINCT link FROM msg WHERE t > ? AND t <= ? AND link IS NOT NULL", (since, tracker.restored_at)):
                 RESTORED[lk] = 1
+            # 12.11 (скрін): після виправлення розбору (новини міськради про FPV) хибні цілі, створені ДО оновлення, жили далі —
+            # стан відновлюється з диска. Ціль, усі пости якої чинний парсер прямо вважає новиною/статусом (no_target), прибираємо
+            try:
+                drop = []
+                for tr_ in tracker.tracks:
+                    rows = brain.db.execute("SELECT src, text FROM msg WHERE track = ? AND t > ? AND text IS NOT NULL", (tr_.id, since)).fetchall()
+                    if rows and all(all(parser.parse(seg, src_).no_target for seg in (parser.segments(tx) or [tx])) for src_, tx in rows):
+                        drop.append(tr_)
+                if drop:
+                    tracker.tracks = [t_ for t_ in tracker.tracks if t_ not in drop]
+                    log.info("відновлення: прибрано %d цілей, чиї пости тепер розбираються як новини/статус", len(drop))
+            except Exception as e:  # noqa: BLE001
+                log.warning("перевірка відновлених цілей: %s", e)
             log.info("стан трекера відновлено: %d цілей, %d постів позначено як враховані", len(tracker.tracks), len(RESTORED))
     except Exception as e:  # noqa: BLE001
         log.warning("відновлення стану трекера: %s", e)
