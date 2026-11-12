@@ -1418,6 +1418,13 @@ class Parser:
             # («БОМБЫ на Купянск-Узловой, Березовку» — Березівка під Куп'янськом, а не під Золочевом)
             front = not ctx and not uniq and getattr(self, "_typ", None) in FRONTLINE
 
+            # 12.11: РСЗВ не долітає вглиб: «РСЗО на Терновую» — Тернова біля кордону (13 км), а не однойменне село під Чугуєвом,
+            # навіть коли свіжий контекст каналу поруч із другою. Якщо серед тезок є досяжні (≤ RSZV_CAP_KM від фронту), решту відкидаємо
+            if getattr(self, "_typ", None) == "rszv" and len(cand) > 1:
+                reach = [i for i in cand if front_km(P[i].lat, P[i].lon) <= RSZV_CAP_KM]
+                if reach and len(reach) < len(cand):
+                    cand = reach
+
             anc = getattr(self, "_anchor", None)
             if anc:
                 near_a = [i for i in cand if math.hypot((P[i].lat - anc[0]) * 111, (P[i].lon - anc[1]) * 72) <= 40]

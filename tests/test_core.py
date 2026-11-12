@@ -2844,3 +2844,13 @@ def test_official_alert_push_is_immediate_and_clear_after_short_confirm(monkeypa
     clk[0] += 11
     asyncio.run(pu.tick(Cli(), snap()))
     assert [m["title"] for m in sent if "Відбій" in m["title"]] == ["🟢 Відбій тривоги · Харківська"]
+
+
+def test_rszv_namesake_near_border_beats_context_namesake():
+    # 12.11: «РСЗО на Терновую» біля кордону, а не однойменне село під Чугуєвом (РСЗВ вглиб не долітає)
+    from app.parser import Parser, front_km
+    p = Parser()
+    for ctx in (None, (49.84, 36.69), (49.95, 36.3)):
+        o = p.parse("🟧РСЗО на Терновую", "x", ctx=ctx)
+        pl = o.places[0].place
+        assert pl.name == "Тернова" and front_km(pl.lat, pl.lon) <= 30
