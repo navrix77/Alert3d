@@ -562,6 +562,8 @@ async def lifespan(app: FastAPI):
         tasks.append(asyncio.create_task(_snap()))
     tasks.append(asyncio.create_task(LEARNER.run()))
     tasks.append(asyncio.create_task(LLMX.run()))
+    from .social import Threads
+    tasks.append(asyncio.create_task(Threads(daily).run(state)))  # автопости Threads, лише з THREADS_TOKEN
     global AIX
     from .ai_glue import AI
     AIX = AI(LLMX, parser, tracker, state)
