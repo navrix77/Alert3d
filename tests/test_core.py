@@ -2766,3 +2766,13 @@ def test_public_api_v1_auth_and_shape(monkeypatch):
         c.get("/api/public/v1/state", headers={"X-API-Key": "k" * 32})
     assert c.get("/api/public/v1/state", headers={"X-API-Key": "k" * 32}).status_code == 429
     public_api._calls.clear()
+
+
+def test_day_1112_sakhnovshchyna_typo():
+    """12.11: Nablydatel_Dozor і NochnojDozorKh чотири ночі поспіль пишуть «Сахновшину/Сахновшины» (ш замість щ):
+    «Реактивный шахед от Краснопавловки на Сахновшину, Зачепиловку». Назва губилась, ціль «стрибала» з Краснопавлівки
+    одразу до Зачепилівки."""
+    o = P.parse("Реактивный шахед от  Краснопавловки на Сахновшину,  Зачепиловку", "ND")
+    assert [r.place.name for r in o.places] == ["Краснопавлівка", "Сахновщина", "Зачепилівка"]
+    o = P.parse("Реактивный шахед южнее Сахновшины на Бердянку, Зачепиловку, Кобеляки Полтавской области", "D")
+    assert o.places[0].place.name == "Сахновщина"

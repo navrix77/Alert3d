@@ -321,6 +321,10 @@ class Gazetteer:
         # рос. «-олье» = укр. «-ілля»: «на Доброволье, Верхнюю Самару» (ND 11.11) → Добровілля (Лозівщина)
         if hit is None and re.search(r"(?i)олье$|олья$|олью$", word):
             hit = self._lookup(word[:-4].lower() + "ілля")
+        # 12.11: «на Сахновшину», «южнее Сахновшины» (ш замість щ) у Nablydatel_Dozor і NochnojDozorKh ночами 09, 10, 11 і
+        # 12.11 (12 постів: «от Краснопавловки на Сахновшину, Зачепиловку»): назва губилась. Лише ця основа
+        if hit is None and re.match(r"(?i)сахновшин", word):
+            hit = self._lookup("сахновщин" + word[9:].lower())
         return hit
 
     def _lookup(self, word: str) -> list[int] | None:
