@@ -462,3 +462,14 @@ def test_hyphen_compound_names_kept():
 def test_fpv_latin_not_mangled_by_homoglyph_fix():
     o, _rp = _roles("FPV-дрон курсом на ТРЦ Дафі")
     assert o.type == "fpv", o
+
+
+def test_night_1112_rocket_arrow_and_yellow_alert():
+    """12.11 (журнал ночі): «🚀→Київ» — ракета, а не успадкований «БпЛА»; «Рівне — жовта тривога (дронова небезпека)» — статус, не ціль."""
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("🚀→Київ", "povitryanatrivogaaa")
+    assert o.type == "cruise" and [r.place.name for r in o.places] == ["Київ"]
+    assert p.parse("🚀 Підписатись на канал Харків", "M").type is None
+    o2 = p.parse("🟡🚨 Рівне — жовта тривога (дронова небезпека)!", "zahid_golovne_ua")
+    assert o2.kind != "track"
