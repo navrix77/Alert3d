@@ -1514,7 +1514,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 495,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 496,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
@@ -1824,4 +1824,40 @@ fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const b
     try{const r=await (await fetch('/api/ask?obl='+encodeURIComponent(ob))).json();
       a.innerHTML='<button class=ai-x aria-label="Закрити">✕</button>'+esc(r.text||'Немає відповіді')+'<small class=ai-note>'+esc(r.note||'Оцінка ШІ за даними SKY')+(r.t?' · '+fmt(r.t):'')+'</small>';}
     catch(x){a.innerHTML='Не вдалося отримати відповідь';}};}).catch(()=>{});
+})();
+
+/* 12.11: закриття свайпом. Бічні панелі (налаштування, арсенал, стрічка) — вправо; нижня картка цілі й картки-підказки — вниз.
+   Свайп ігнорується, якщо палець почав рух на прокручуваному списку, що ще не доскролений до краю, на повзунку або у стрічці з горизонтальним скролом. */
+(function(){
+  function scrollableAncestor(t,root,axis){for(let n=t;n&&n!==root;n=n.parentElement){if(!n||n.nodeType!==1)break;const cs=getComputedStyle(n);
+      if(axis==='y'&&/(auto|scroll)/.test(cs.overflowY)&&n.scrollHeight>n.clientHeight+2&&n.scrollTop>0)return true;
+      if(axis==='x'&&/(auto|scroll)/.test(cs.overflowX)&&n.scrollWidth>n.clientWidth+2)return true;
+      if(n.tagName==='INPUT'&&n.type==='range')return true;}return false;}
+  function swipeClose(el,dir,closeFn){
+    if(!el||el._swc)return;el._swc=1;let x0=0,y0=0,t0=0,mode=0,dx=0,dy=0;// mode: 0 очікування, 1 тягнемо, -1 ігноруємо
+    const horiz=dir==='right';el.style.touchAction=horiz?'pan-y':'pan-x pan-y';
+    el.addEventListener('touchstart',e=>{if(e.touches.length!==1){mode=-1;return;}const t=e.touches[0];x0=t.clientX;y0=t.clientY;t0=Date.now();dx=dy=0;
+      mode=(horiz?scrollableAncestor(e.target,el,'x'):scrollableAncestor(e.target,el,'y')||(el.scrollTop>0))?-1:0;},{passive:true});
+    el.addEventListener('touchmove',e=>{if(mode<0)return;const t=e.touches[0];dx=t.clientX-x0;dy=t.clientY-y0;
+      if(mode===0){if(Math.abs(dx)<10&&Math.abs(dy)<10)return;
+        const ok=horiz?(dx>0&&Math.abs(dx)>Math.abs(dy)*1.4):(dy>0&&Math.abs(dy)>Math.abs(dx)*1.4);
+        if(!ok){mode=-1;return;}mode=1;el.style.animation='none';el.style.transition='none';}
+      if(mode===1){if(e.cancelable)e.preventDefault();const d=Math.max(0,horiz?dx:dy);el.style.transform=horiz?'translateX('+d+'px)':'translateY('+d+'px)';}},{passive:false});
+    const end=()=>{if(mode!==1){mode=0;return;}mode=0;const d=Math.max(0,horiz?dx:dy),v=d/Math.max(1,Date.now()-t0),W=horiz?el.offsetWidth:el.offsetHeight;
+      el.style.transition='transform .22s ease-out';
+      if(d>Math.min(110,W*0.3)||(v>0.5&&d>40)){el.style.transform=horiz?'translateX(110%)':'translateY(110%)';
+        setTimeout(()=>{try{closeFn();}catch(_){}el.style.transition='';el.style.transform='';el.style.animation='';},200);}
+      else{el.style.transform='';setTimeout(()=>{el.style.transition='';el.style.animation='';},230);}};
+    el.addEventListener('touchend',end,{passive:true});el.addEventListener('touchcancel',end,{passive:true});}
+  window.swipeClose=swipeClose;
+  const btn=id=>()=>{const b=document.getElementById(id);if(b)b.click();};
+  function wire(){
+    swipeClose(document.getElementById('settings'),'right',btn('st-close'));
+    swipeClose(document.getElementById('arsenal'),'right',btn('ars-close'));
+    swipeClose(document.getElementById('drawer'),'right',btn('dr-close'));
+    swipeClose(document.getElementById('sheet'),'down',btn('sh-close'));
+  }
+  wire();
+  // картки, що створюються на льоту (підказка встановлення, картка сповіщень): свайп вниз = «Пізніше»
+  new MutationObserver(()=>{for(const [id,b] of [['inst-hint','ih-x'],['push-card','pc-x']]){const el=document.getElementById(id);if(el&&!el._swc)swipeClose(el,'down',()=>{const x=document.getElementById(b);if(x)x.click();else el.remove();});}}).observe(document.body,{childList:true});
 })();
