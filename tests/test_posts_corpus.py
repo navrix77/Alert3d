@@ -505,3 +505,15 @@ def test_city_council_news_about_fpv_protection_is_not_a_target():
     # справжні повідомлення про цілі не зачеплені (на журналі 09–12.11: з 34 тис. повідомлень про цілі фільтр зняв 8, усі — новини)
     assert p.parse("🛸 Невстановлений БпЛА курсом на Музичні / Білогородку / Боярку", "K").kind == "track"
     assert p.parse("FPV на оптоволокні курсом на Харків з півночі", "CKH").kind == "track"
+
+
+def test_fresh_sample_1211_fixes():
+    # вимір 12.11 на 110 свіжих повідомленнях: три хибні прив'язки
+    from app.parser import Parser
+    p = Parser()
+    o = p.parse("❗️Поточний курс КАБ — знову Корабельний район! — ❗️Також загроза для центру Херсона!", "x")
+    assert "Поточани" not in [r.place.name for r in o.places]
+    o = p.parse("Загроза балістики з Вороніжу", "x")
+    assert not [r for r in o.places if r.place.name == "Вороніж"]
+    o = p.parse("Найкращі показники впровадження — на Івано-Франківщині та Закарпатті, де наглядові ради є в усіх коледжах. У Запорізькій області вони працюють у 81% закладів, Полтавській — у 79%, Рівненській — у 71%.", "TRK")
+    assert o.no_target or not o.places or o.kind == "info"
