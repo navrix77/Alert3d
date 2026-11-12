@@ -1220,6 +1220,7 @@ class Tracker:
 
     def _best(self, typ: str, pt, t: float, names: set | None = None, dxy=None) -> Track | None:
         best, bs = None, 1e9
+        fd_pt = None
         for tr in self.tracks:
             if tr.type != typ or tr.closed or tr.merged or tr.id in self.exclude:
                 continue
@@ -1232,6 +1233,14 @@ class Tracker:
             d = dist_km(last, pt)
             if d > tr.speed * dt / 3600 * 1.15 + 18:
                 continue
+            if typ in ("shahed", "jet", "uav") and d > 60:
+                # 12.11 (денна сесія): ціль біля кордону/фронту не приєднуємо до треку, що вже глибоко в тилу, якщо це «повернення»
+                # на 100+ км до кордону: rdsprostir 11.11 13:10 «Путивль > Конотоп реактивний» (нова ціль з «болота», Курщини)
+                # дописувалась до РБ-2067 з Полтавщини (Кобеляки → Білики → Путивль, 190 км за 18 хв). Дрони з боку РФ входять від кордону
+                if fd_pt is None:
+                    fd_pt = self._front_dist(pt)
+                if fd_pt < 40 and self._front_dist(last) - fd_pt > 100:
+                    continue
             pen = 0.0
             if tr.heading is not None and d > 15:
                 a = ang_diff(tr.heading, bearing(last, pt))

@@ -2776,3 +2776,38 @@ def test_day_1112_sakhnovshchyna_typo():
     assert [r.place.name for r in o.places] == ["Краснопавлівка", "Сахновщина", "Зачепилівка"]
     o = P.parse("Реактивный шахед южнее Сахновшины на Бердянку, Зачепиловку, Кобеляки Полтавской области", "D")
     assert o.places[0].place.name == "Сахновщина"
+
+
+def test_day_1112_border_target_not_joined_to_deep_track():
+    """12.11 (денна сесія): rdsprostir 11.11 13:10 «Путивль > Конотоп реактивний» (нова ціль з «болота», тобто з Курщини)
+    дописувалась до реактивного треку з Полтавщини (Кобеляки 12:28 → «курсом на Білики» 12:52, оцінена позиція 49.99/33.67,
+    → Путивль: 150 км за 18 хв, на 100+ км назад до кордону)."""
+    from pathlib import Path
+    from app.brain import Brain
+    from app.config import SOURCES
+    from app.geo import bearing, to_xy
+    from app.tracker import Point, Track, Tracker
+    from scripts.backtest import Feeder
+    trk = Tracker(SOURCES, Brain(Path(":memory:")), learn=False)
+    t0 = 1794400000.0
+    kx, ex = to_xy(49.15, 34.20), to_xy(49.989, 33.669)  # Кобеляки (названа) і оцінена позиція треку в журналі
+    tr = Track(id="РБ-1", type="jet", speed=450, heading=bearing(kx, ex))
+    tr.obs += [Point(t0, *kx, "admiralbukhta", "Кобеляки", None), Point(t0 + 24 * 60, *ex, "KL", "Білики", None, None, True)]
+    trk.tracks.append(tr)
+    put = to_xy(51.34, 33.87)
+    assert trk._best("jet", put, t0 + 42 * 60) is None
+    # ціль, що лишається в тилу, як і раніше підхоплюється: далі на північ на 70 км
+    assert trk._best("jet", to_xy(50.6, 33.55), t0 + 34 * 60) is tr
+    fd = Feeder(trk)
+    fd.feed("Путивль > Конотоп реактивний", "rdsprostir", t0 + 42 * 60, None)
+    assert tr.last.label == "Білики"
+
+
+def test_day_1112_harpiya_is_shahed():
+    """12.11: Zp-канали (eyes_everywhere_ua, radar_sich, nikalert) пишуть «шахедів/Гарпій», «ймовірно Гарпія/Шахед».
+    «Гарпія-А1» («Купол») — аналог Шахеда (ГУР через militarnyi.com, 29.09.2026): сама назва теж дає тип «Шахед»."""
+    o = P.parse("Група шахедів/Гарпій з ТОТ Скельок на Приморське", "radar_sich")
+    assert o.type == "shahed" and o.kind == "track"
+    o = P.parse("Гарпія на Веселянку", "radar_sich")
+    assert o.type == "shahed" and o.kind == "track" and o.places[0].place.name == "Веселянка"
+    assert P.parse("реактивна Гарпія на Запоріжжя", "radar_sich").type == "jet"
