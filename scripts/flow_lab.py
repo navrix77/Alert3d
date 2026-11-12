@@ -62,7 +62,11 @@ class BaseAlgo:
 
 
 def run(path, algos, t_from=None, verbose=False):
-    rows = sorted(load(path), key=lambda r: r[0])
+    if os.path.isdir(path):  # архів по днях (гілка night-data, archive/*.json.gz — scripts/journal_archive.py)
+        import glob
+        rows = sorted((r for f in sorted(glob.glob(os.path.join(path, "*.json.gz"))) for r in load(f)), key=lambda r: r[0])
+    else:
+        rows = sorted(load(path), key=lambda r: r[0])
     base = next((a for a in algos if a.name == "base"), None) or BaseAlgo()
     feeder = Feeder(base.trk)
     others = [a for a in algos if a.name != "base"]
