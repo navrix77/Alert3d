@@ -429,6 +429,7 @@ BELARUS_PTS = [(23.6, 51.5), (24.1, 51.65), (25.5, 51.95), (27.0, 51.7), (28.5, 
 FRONT_FULL = BELARUS_PTS + FRONT_PTS
 
 
+REACH_KM = {"rszv": 30.0, "fpv": 25.0, "fpvf": 30.0, "molniya": 25.0, "lancet": 45.0}  # досяжність від фронту/кордону: тезку далі відкидаємо, якщо є ближча
 RSZV_CAP_KM = 30.0  # макс. глибина ураження РСЗВ від лінії фронту/кордону для показу на мапі
 
 
@@ -1420,8 +1421,9 @@ class Parser:
 
             # 12.11: РСЗВ не долітає вглиб: «РСЗО на Терновую» — Тернова біля кордону (13 км), а не однойменне село під Чугуєвом,
             # навіть коли свіжий контекст каналу поруч із другою. Якщо серед тезок є досяжні (≤ RSZV_CAP_KM від фронту), решту відкидаємо
-            if getattr(self, "_typ", None) == "rszv" and len(cand) > 1:
-                reach = [i for i in cand if front_km(P[i].lat, P[i].lon) <= RSZV_CAP_KM]
+            _cap = REACH_KM.get(getattr(self, "_typ", None))
+            if _cap and len(cand) > 1:
+                reach = [i for i in cand if front_km(P[i].lat, P[i].lon) <= _cap]
                 if reach and len(reach) < len(cand):
                     cand = reach
 

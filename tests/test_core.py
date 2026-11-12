@@ -2854,3 +2854,12 @@ def test_rszv_namesake_near_border_beats_context_namesake():
         o = p.parse("🟧РСЗО на Терновую", "x", ctx=ctx)
         pl = o.places[0].place
         assert pl.name == "Тернова" and front_km(pl.lat, pl.lon) <= 30
+
+
+def test_short_range_namesake_near_front_beats_far_namesake():
+    from app.parser import Parser, front_km, REACH_KM
+    p = Parser()
+    for typ, word in (("fpv", "FPV"), ("molniya", "Молнія"), ("lancet", "Ланцет")):
+        o = p.parse(f"{word} на Терновую", "x", ctx=(49.84, 36.69))
+        pl = o.places[0].place
+        assert front_km(pl.lat, pl.lon) <= REACH_KM[typ], (typ, pl.name)
