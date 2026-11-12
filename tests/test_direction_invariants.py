@@ -199,3 +199,19 @@ def test_saltivka_dafi_nose_into_city_not_east():
         for x in tr.snapshot(T0 + 120)["tracks"]:
             fb = Tracker._front_bearing(to_xy(x["lat"], x["lon"]))
             assert x["hd"] is not None and ang_diff(x["hd"], fb) <= 60, (posts[0][0], x["hd"], fb)
+
+
+def test_aiu_jet_from_dnipro_region_to_kharkiv_not_reverse():
+    """12.11 (скрін): Повітряні сили «Jet-powered drone north of Dnipropetrovsk region, from Kharkiv region», місце — Харківський район.
+    Ціль іде З Дніпропетровщини НА Харків (ніс на північний схід), а малювалась із Харкова на південь."""
+    from app.main import _aiu_region_course
+    from app.parser import Observation, PlaceRef
+    pl = P.parse("Шахед над Харковом", "K").places[0].place
+    txt = "Jet-powered drone (jet UAV) north of Dnipropetrovsk region, from Kharkiv region"
+    course = _aiu_region_course(txt, pl)
+    assert course is not None and 15 <= course <= 70
+    tr = Tracker(SOURCES, learn=False)
+    tr.ingest(Observation(type="jet", count=None, places=[PlaceRef("p", pl)], course=course), "AIU", T0)
+    x = tr.snapshot(T0 + 60)["tracks"][0]
+    assert ang_diff(x["hd"], course) <= 20, x["hd"]
+    assert _aiu_region_course("UAV in Kharkiv region", pl) is None

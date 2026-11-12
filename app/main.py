@@ -198,6 +198,8 @@ def on_threat(ev: dict) -> None:
     if m:
         az = {"north": 0, "north-east": 45, "east": 90, "south-east": 135, "south": 180, "south-west": 225, "west": 270, "north-west": 315}[m.group(1)]
         role, course = "t", (az + 180) % 360
+    if course is None:
+        course = _aiu_region_course(ev["text"], place)
     obs = Observation(type=ev["type"], count=ev["count"], places=[PlaceRef(role, place)], course=course)
     obs.raw = ev["text"]
     tracker.ingest(obs, "AIU", ev["t"], "https://alerts.in.ua")
@@ -207,6 +209,43 @@ def on_threat(ev: dict) -> None:
 
 
 _RC: dict = {}
+
+
+_EN_OBL = {"dnipropetrovsk": (48.45, 35.0), "kharkiv": (49.6, 36.6), "poltava": (49.6, 34.0), "sumy": (50.9, 34.2), "chernihiv": (51.3, 32.0),
+           "kyiv": (50.3, 30.6), "zaporizhzhia": (47.5, 35.6), "zaporizhia": (47.5, 35.6), "donetsk": (48.2, 37.6), "luhansk": (48.9, 38.9),
+           "kherson": (46.7, 33.5), "mykolaiv": (47.3, 32.0), "odesa": (46.9, 30.3), "odessa": (46.9, 30.3), "kirovohrad": (48.5, 32.3),
+           "cherkasy": (49.2, 31.6), "vinnytsia": (49.0, 28.7), "zhytomyr": (50.5, 28.6), "kursk": (51.7, 36.2), "belgorod": (50.6, 36.6),
+           "bryansk": (53.0, 33.6), "voronezh": (51.0, 39.5), "rostov": (47.8, 40.3), "crimea": (45.3, 34.4)}
+_EN_AZ = {"north": 0, "north-east": 45, "northeast": 45, "east": 90, "south-east": 135, "southeast": 135, "south": 180,
+          "south-west": 225, "southwest": 225, "west": 270, "north-west": 315, "northwest": 315}
+
+
+def _aiu_region_course(text: str, place):
+    """12.11 (скрін): «Jet-powered drone north of Dnipropetrovsk region, from Kharkiv region», рядок зведення — Харківський район.
+    Ціль у названому місці, а ІНША згадана область — звідки (або куди, якщо «toward»). Малювалось навпаки: з Харкова на південь.
+    Повертає курс у градусах або None."""
+    from .geo import bearing, dist_km, move, to_xy
+    low = text.lower()
+    here = to_xy(place.lat, place.lon)
+    dest = origin = None
+    for m in re.finditer(r"(?:(toward[s]?|heading to|in the direction of)\s+)?(?:the\s+)?(?:(north-east|north-west|south-east|south-west|northeast|northwest|southeast|southwest|north|south|east|west)(?:ern part)?\s+of\s+)?(?:the\s+)?([a-z]+)\s+(?:region|oblast)", low):
+        c = _EN_OBL.get(m.group(3))
+        if not c:
+            continue
+        pt = to_xy(*c)
+        if m.group(2):
+            pt = move(pt, _EN_AZ[m.group(2)], 60.0)  # «північ Дніпропетровщини»: зсув від центру області
+        if dist_km(pt, here) < 90 and not m.group(1):
+            continue  # це область самого місця — не напрямок
+        if m.group(1):
+            dest = dest or pt
+        else:
+            origin = origin or pt
+    if dest is not None and dist_km(here, dest) > 15:
+        return bearing(here, dest)
+    if origin is not None:
+        return bearing(origin, here)
+    return None
 
 
 def raion_centroid(n: str):
