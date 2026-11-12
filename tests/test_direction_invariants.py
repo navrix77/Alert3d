@@ -37,10 +37,13 @@ def _check_dir(x):
     """hd не вказує в бік фронту; маршрут не веде ближче до кордону (там, де лінія далеко від міста ≥15 км)."""
     pos = to_xy(x["lat"], x["lon"])
     fd, fb = _front(pos)
-    if x["hd"] is not None and fb is not None and 15 <= fd <= 120:
+    # 12.11: курс до названого каналом пункту (є маршрут) правило «від фронту» не перебиває
+    if x["hd"] is not None and fb is not None and 15 <= fd <= 120 and not x["route"]:
         assert ang_diff(x["hd"], fb) <= 120, (x["id"], x["hd"], fb)
     if 15 <= fd <= 120 and x.get("type") != "banderol":  # бандероль (повітряний пуск) може йти й до пункту ближче до фронту
         for r in x["route"]:
+            if any(dist_km(to_xy(r[1], r[0]), to_xy(*c[4])) < 6 for c in CITY.values()) or dist_km(to_xy(r[1], r[0]), to_xy(49.9, 35.93)) < 6:
+                continue  # місто як названа ціль лишається в маршруті (Харків, Чугуїв, Люботин…)
             assert Tracker._front_dist(to_xy(r[1], r[0])) >= fd - 3, (x["id"], r)
 
 
@@ -95,15 +98,6 @@ def test_from_border_to_city_not_back(typ):
                     assert x["lat"] < 50.4  # не на кордоні й не за ним
 
 
-def test_merefa_to_kharkiv_course_does_not_lead_to_front():
-    """Баг 11.11: шахед біля Мерефи «курсом на Харків» мав hd 38° (на північ, до кордону): курс до пункту ближчого до фронту
-    не береться в напрямок — носом від лінії фронту."""
-    tr = _run("Шахед у районі Мерефи курсом на Харків")
-    x = tr.snapshot(T0 + 60)["tracks"][0]
-    pos = to_xy(x["lat"], x["lon"])
-    assert ang_diff(x["hd"], Tracker._front_bearing(pos)) <= 120
-
-
 def test_jet_course_to_city_stops_in_city():
     """Баг 11.11: реактивний «Дергачі → Харків» через 5 хв був за містом (на 4,5 км далі), через 10 хв — на 27 км."""
     tr = _run("Реактивний БпЛА у районі Дергачів курсом на Харків")
@@ -156,7 +150,7 @@ def test_banderol_destination_is_not_shown_as_launch_place():
     tr, out = _snap([("Бандероль на Полтаву", 0, "M")])
     x = out[0]
     assert x["launch"] is None
-    assert "не місце пуску" in x["entry"][2]
+    assert x["entry"][2].startswith("невідомо; ціль")
     # а канал з позицією лишає звичайний підпис
     tr, out = _snap([("Бандероль в районі Мерефи курсом на Полтаву", 0, "M")])
     assert out[0]["entry"][2] == "Мерефа"
@@ -168,3 +162,27 @@ def test_front_bearing_vovchansk_kupiansk_inland():
     for la, lo in ((50.29, 36.94), (49.71, 37.62)):
         b = Tracker._front_bearing(_gxy(la, lo))
         assert b is not None and 150 <= b <= 290
+
+
+def _hd(posts):
+    tr = Tracker(SOURCES, learn=False)
+    for txt, dt in posts:
+        tr.ingest(P.parse(txt, "M"), "M", T0 + dt)
+    return [x for x in tr.snapshot(T0 + posts[-1][1] + 60)["tracks"] if x["status"] == "active"]
+
+
+def test_channel_course_to_city_beats_front_rule():
+    """12.11 (аудит): прямий курс каналу на місто перемагає правило «від фронту»: «над Мерефою курсом на Харків» — носом НА Харків."""
+    from app.geo import bearing
+    for posts, city in (([("Шахед над Мерефою", 0), ("Шахед над Мерефою курсом на Харків", 300)], (49.9935, 36.2304)),
+                        ([("Шахед над Козельцем курсом на Чернігів", 0)], (51.4982, 31.2893))):
+        xs = _hd(posts)
+        assert xs
+        for x in xs:
+            want = bearing(to_xy(x["lat"], x["lon"]), to_xy(*city))
+            assert x["hd"] is not None and ang_diff(x["hd"], want) <= 35, (posts[-1][0], x["hd"], want)
+
+
+def test_zi_storony_is_origin_not_target():
+    o = P.parse("Шахед зі сторони Харкова на Мерефу", "M")
+    assert [(r.place.name, r.role) for r in o.places] == [("Харків", "f"), ("Мерефа", "t")]

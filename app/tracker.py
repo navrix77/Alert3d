@@ -1063,6 +1063,22 @@ class Tracker:
         return {"poly": out + [out[0]], "km": round(rem)}
 
     @staticmethod
+    def _belarus_side(pt) -> bool:
+        """Найближча ділянка лінії — білоруський кордон (а не кордон РФ/фронт)."""
+        from .parser import BELARUS_PTS, FRONT_PTS
+
+        def _d(pts):
+            best = 1e9
+            for (lo1, la1), (lo2, la2) in zip(pts, pts[1:]):
+                a, b = _gxy(la1, lo1), _gxy(la2, lo2)
+                dx, dy = b[0] - a[0], b[1] - a[1]
+                l2 = dx * dx + dy * dy
+                u = max(0.0, min(1.0, ((pt[0] - a[0]) * dx + (pt[1] - a[1]) * dy) / l2)) if l2 else 0.0
+                best = min(best, dist_km((a[0] + u * dx, a[1] + u * dy), pt))
+            return best
+        return _d(BELARUS_PTS) < _d(FRONT_PTS)
+
+    @staticmethod
     def _front_dist(pt) -> float:
         """Відстань (км) до найближчої точки лінії фронту/кордону."""
         from .parser import FRONT_FULL as FRONT_PTS
@@ -1528,9 +1544,13 @@ class Tracker:
             if tr.type in ("shahed", "uav", "molniya", "jet") and rest:
                 # 11.11 власник: на Харківщині цілі йдуть ВІД кордону вглиб, а не назад до нього («Курс → Слатине» з Дергачів вів у РФ).
                 # Пункт «курсу» ближчий до фронту/кордону, ніж ціль зараз, — вважаємо назвою місця, а не призначенням: у напрямок не беремо
+                # 12.11 (аудит): правило перебивало прямий курс каналу — «над Мерефою курсом на Харків» малювалось носом ВІД Харкова,
+                # «Козелець курсом на Чернігів» — на південний схід. Місто (≥20 тис. або велике) як названа ціль лишається в маршруті;
+                # біля білоруського кордону правило не діє (звідти не запускають, а цілі туди справді виходять)
                 _d1 = self._front_dist((ex, ey))
-                if _d1 <= 120:
-                    rest = [q for q in rest if self._front_dist(q) >= _d1 - 3]
+                if _d1 <= 120 and not self._belarus_side((ex, ey)):
+                    _big = {p.xy for p in tr.route if (getattr(p, "pop", 0) or 0) >= 20000 or p.name in _BIG_CITIES}
+                    rest = [q for q in rest if q in _big or self._front_dist(q) >= _d1 - 3]
             names = [p.name for p in tr.route if dist_km(p.xy, (ex, ey)) > 2 and p.xy in rest] or []
             pred_src, pred_p = ("channels" if rest else tr.pred_src), None
             pred_next = None
@@ -1591,7 +1611,7 @@ class Tracker:
                 # 11.11: на Харківщині цілі йдуть З боку кордону/окупованих територій вглиб. Курс, що вказує до лінії фронту
                 # (пункт «курсу» ближчий до кордону, ніж ціль, відфільтровано вище, але tr.heading ще міг його нести), — носом від неї
                 _fd = self._front_dist((ex, ey))
-                if 15 <= _fd <= 120:
+                if 15 <= _fd <= 120 and not rest and not self._belarus_side((ex, ey)):  # 12.11: курс до названого каналом пункту (rest) не перебиваємо
                     _fb3 = self._front_bearing((ex, ey))
                     if _fb3 is not None and ang_diff(hd, _fb3) > 120:
                         hd = _fb3
@@ -1620,7 +1640,7 @@ class Tracker:
                 "ev": {k: v for k, v in self._ev_out(tr, now, (ex, ey)).items() if k != "items"},  # докази — /api/track/{id}
                 "from": tr.from_place.name if tr.from_place else None, "ts": now,
                 "entry": [round(from_xy(tr.obs[0].x, tr.obs[0].y)[1], 4), round(from_xy(tr.obs[0].x, tr.obs[0].y)[0], 4),
-                          (f"ціль: {tr.obs[0].label}, не місце пуску" if dest_only else tr.obs[0].label), int(tr.obs[0].t)],
+                          (f"невідомо; ціль — {tr.obs[0].label}" if dest_only else tr.obs[0].label), int(tr.obs[0].t)],
                 # останній пункт, який назвали самі канали (не оцінка SKY): «де ціль зараз» у картці
                 "at": next(([o.label, int(o.t)] for o in reversed(tr.obs) if not o.est and o.label), None),
                 "at_ll": next(([round(from_xy(o.x, o.y)[1], 4), round(from_xy(o.x, o.y)[0], 4)] for o in reversed(tr.obs) if not o.est), None),
