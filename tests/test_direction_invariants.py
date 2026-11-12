@@ -38,7 +38,7 @@ def _check_dir(x):
     pos = to_xy(x["lat"], x["lon"])
     fd, fb = _front(pos)
     # 12.11: курс до названого каналом пункту (є маршрут) правило «від фронту» не перебиває
-    if x["hd"] is not None and fb is not None and 15 <= fd <= 120 and not x["route"]:
+    if x["hd"] is not None and fb is not None and 15 <= fd <= 120 and not x["route"] and not x.get("next"):
         assert ang_diff(x["hd"], fb) <= 120, (x["id"], x["hd"], fb)
     if 15 <= fd <= 120 and x.get("type") != "banderol":  # бандероль (повітряний пуск) може йти й до пункту ближче до фронту
         for r in x["route"]:
@@ -186,3 +186,16 @@ def test_channel_course_to_city_beats_front_rule():
 def test_zi_storony_is_origin_not_target():
     o = P.parse("Шахед зі сторони Харкова на Мерефу", "M")
     assert [(r.place.name, r.role) for r in o.places] == [("Харків", "f"), ("Мерефа", "t")]
+
+
+def test_saltivka_dafi_nose_into_city_not_east():
+    """12.11 (скрін): шахед від кордону на Салтівку, «→ ТРЦ Дафі»; ніс/пунктир ішли на схід (навчений курс 102°) — має бути вглиб міста."""
+    for posts in ([("2 БпЛА над Салтівкою 520, курс на Дафі", 0)], [("БпЛА мкр Салтівка 520–535 курсом на ТРЦ Дафі", 0)]):
+        tr = Tracker(SOURCES, learn=False)
+        for txt, dt in posts:
+            tr.ingest(P.parse(txt, "R"), "R", T0 + dt)
+        t0 = tr.tracks[0]
+        t0.heading, t0.hd_src = 102.0, "learned"  # як на сервері: навчений курс на схід
+        for x in tr.snapshot(T0 + 120)["tracks"]:
+            fb = Tracker._front_bearing(to_xy(x["lat"], x["lon"]))
+            assert x["hd"] is not None and ang_diff(x["hd"], fb) <= 60, (posts[0][0], x["hd"], fb)

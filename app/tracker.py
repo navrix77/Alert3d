@@ -1613,8 +1613,14 @@ class Tracker:
                 _fd = self._front_dist((ex, ey))
                 if 15 <= _fd <= 120 and not rest and not self._belarus_side((ex, ey)):  # 12.11: курс до названого каналом пункту (rest) не перебиваємо
                     _fb3 = self._front_bearing((ex, ey))
-                    if _fb3 is not None and ang_diff(hd, _fb3) > 120:
+                    # 12.11 (скрін: шахед від кордону на Салтівку, «→ ТРЦ Дафі», а ніс і пунктир на схід, hd_src=learned 102°):
+                    # «навчений» курс — здогад (на журналі наступний пункт вгадує у 17%), тож для нього поріг суворіший
+                    if _fb3 is not None and ang_diff(hd, _fb3) > (60 if tr.hd_src == "learned" else 120):
                         hd = _fb3
+            # 12.11: канал назвав пункт призначення («→ ТРЦ Дафі»), маршруту на мапі немає — ніс і пунктир ведуть у цей пункт
+            if (status == "active" and not rest and tr.course_to and tr.course_xy and tr.type in ("shahed", "uav", "molniya", "jet")
+                    and tr.hd_src not in ("course", "movement") and 5 < dist_km((ex, ey), tr.course_xy) <= 60):  # ближче 5 км (райони одного міста) кут між центроїдами — шум
+                hd = bearing((ex, ey), tr.course_xy)
             # 11.11: ракета, про яку відомий лише пункт призначення («Бандероль на Полтаву»): перша точка — ціль, а не місце пуску;
             # «Звідки летить» не показує її як пуск і не оцінює пуск від неї
             dest_only = tr.type in ("banderol", "ballistic", "cruise", "geran5") and all(o.est for o in tr.obs) and not tr.from_place
