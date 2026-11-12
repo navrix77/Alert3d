@@ -1514,7 +1514,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 497,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 498,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
@@ -1849,13 +1849,43 @@ fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const b
         setTimeout(()=>{try{closeFn();}catch(_){}el.style.transition='';el.style.transform='';el.style.animation='';},200);}
       else{el.style.transform='';setTimeout(()=>{el.style.transition='';el.style.animation='';},230);}};
     el.addEventListener('touchend',end,{passive:true});el.addEventListener('touchcancel',end,{passive:true});}
+  // нижня картка цілі: короткий свайп вниз — ЗГОРНУТИ (лишається смужка із заголовком), довгий або різкий — ЗАКРИТИ; свайп угору по смужці — розгорнути.
+  // Ловимо жест і за ручку зверху (touch-action:none, працює завжди), і за вміст, коли він прокручений до верху.
+  function sheetSwipe(el){
+    if(!el||el._swc)return;el._swc=1;
+    const grab=document.createElement('div');grab.className='sh-grab';el.insertBefore(grab,el.firstChild);
+    let y0=0,x0=0,t0=0,mode=0,dy=0,fromGrab=false;
+    const peeked=()=>el.classList.contains('peek');
+    const unpeek=()=>{el.classList.remove('peek');};
+    new MutationObserver(()=>{if(el.hidden)unpeek();}).observe(el,{attributes:true,attributeFilter:['hidden']});
+    el.addEventListener('click',e=>{if(peeked()&&!e.target.closest('button,a'))unpeek();});
+    el.addEventListener('touchstart',e=>{if(e.touches.length!==1){mode=-1;return;}const t=e.touches[0];y0=t.clientY;x0=t.clientX;t0=Date.now();dy=0;
+      fromGrab=!!e.target.closest('.sh-grab');
+      mode=(fromGrab||peeked())?0:((el.scrollTop>0||scrollableAncestor(e.target,el,'y')||scrollableAncestor(e.target,el,'x'))?-1:0);},{passive:true});
+    el.addEventListener('touchmove',e=>{if(mode<0)return;const t=e.touches[0];dy=t.clientY-y0;const dx=t.clientX-x0;
+      if(mode===0){if(Math.abs(dy)<5&&Math.abs(dx)<5)return;
+        const ok=(fromGrab||peeked())?Math.abs(dy)>Math.abs(dx):(dy>0&&dy>Math.abs(dx)*1.2);
+        if(!ok){mode=-1;return;}mode=1;el.style.animation='none';el.style.transition='none';}
+      if(e.cancelable)e.preventDefault();el.style.transform='translateY('+Math.max(0,dy)+'px)';},{passive:false});
+    const end=()=>{if(mode!==1){mode=0;return;}mode=0;const v=dy/Math.max(1,Date.now()-t0),H=el.offsetHeight;
+      el.style.transition='transform .22s ease-out';
+      const reset=()=>{el.style.transition='';el.style.transform='';el.style.animation='';};
+      if(peeked()){
+        if(dy<-40){unpeek();el.style.transform='';setTimeout(reset,230);}
+        else if(dy>90){el.style.transform='translateY(110%)';setTimeout(()=>{const b=document.getElementById('sh-close');if(b)b.click();reset();},200);}
+        else{el.style.transform='';setTimeout(reset,230);}
+        return;}
+      if(dy>Math.max(230,H*0.55)||(v>0.9&&dy>110)){el.style.transform='translateY(110%)';setTimeout(()=>{const b=document.getElementById('sh-close');if(b)b.click();reset();},200);}
+      else if(dy>60){el.classList.add('peek');el.style.transform='';setTimeout(reset,230);}
+      else{el.style.transform='';setTimeout(reset,230);}};
+    el.addEventListener('touchend',end,{passive:true});el.addEventListener('touchcancel',end,{passive:true});}
   window.swipeClose=swipeClose;
   const btn=id=>()=>{const b=document.getElementById(id);if(b)b.click();};
   function wire(){
     swipeClose(document.getElementById('settings'),'right',btn('st-close'));
     swipeClose(document.getElementById('arsenal'),'right',btn('ars-close'));
     swipeClose(document.getElementById('drawer'),'right',btn('dr-close'));
-    swipeClose(document.getElementById('sheet'),'down',btn('sh-close'));
+    sheetSwipe(document.getElementById('sheet'));
   }
   wire();
   // картки, що створюються на льоту (підказка встановлення, картка сповіщень): свайп вниз = «Пізніше»
