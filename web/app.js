@@ -1514,7 +1514,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 489,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 490,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
@@ -1593,6 +1593,19 @@ async function pushEnable(){
     try{const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
       if(sub)fetch('/api/webpush/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint})});}catch(e){}
     toast('Готово. Зараз прийде тестове сповіщення');};}
+/* підказка встановлення для iPhone: у Facebook/Instagram спершу «Відкрити в Safari», потім «Поділитися» → «На початковий екран»; без цього пуші на iPhone неможливі */
+function installHint(){if(document.getElementById('inst-hint'))return;
+  const ua=navigator.userAgent,ios=/iPhone|iPad/.test(ua);if(!ios||matchMedia('(display-mode: standalone)').matches||navigator.standalone)return;
+  const inapp=/FBAN|FBAV|Instagram|Messenger|Line\/|Telegram/i.test(ua);let n=0,last=0;
+  try{n=+localStorage.getItem('inst_n')||0;last=+localStorage.getItem('inst_t')||0;}catch(e){return;}
+  if(n>=4||(last&&Date.now()-last<864e5))return;
+  const steps=inapp?['Натисніть <b>⋯</b> (або іконку компаса) → <b>«Відкрити в Safari»</b>','У Safari: <b>«Поділитися» ⬆︎ → «На початковий екран»</b>']:['Натисніть <b>«Поділитися»</b> ⬆︎ внизу екрана','Оберіть <b>«На початковий екран»</b> → «Додати»'];
+  const el=document.createElement('div');el.id='inst-hint';el.className='inst-hint';
+  el.innerHTML='<b>📲 Встановіть SKY на iPhone</b><span>Так він відкривається одним дотиком і єдиний може присилати сповіщення про тривогу при закритому екрані.</span><ol><li>'+steps[0]+'</li><li>'+steps[1]+'</li></ol><div><button class="pill primary" id="ih-ok">Зрозуміло</button><button class="pill" id="ih-x">Пізніше</button></div>';
+  document.body.appendChild(el);
+  const done=()=>{try{localStorage.setItem('inst_n',String(n+1));localStorage.setItem('inst_t',String(Date.now()));}catch(e){}el.remove();};
+  $('#ih-ok').onclick=done;$('#ih-x').onclick=done;}
+setTimeout(()=>{try{installHint();}catch(e){}},9000);
 setTimeout(pushCard,6000);setInterval(()=>{try{pushCard();}catch(e){}},60000);// під час тривоги з'являється компактний банер
 // облік встановлень: запуск з іконки (встановлений застосунок) і подія встановлення; без cookies, сервер не зберігає IP
 try{if(matchMedia('(display-mode: standalone)').matches||navigator.standalone)fetch('/api/visits/app?k=app',{method:'POST'}).catch(()=>{});
