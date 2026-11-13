@@ -1,12 +1,16 @@
 // Кеш оболонки застосунку; дані про цілі завжди з мережі (застарілі цілі гірші за відсутні).
-const C='tryvoga-v507';const SHELL=['/','/vendor/maplibre-gl.js','/vendor/maplibre-gl.css','/vendor/three.min.js','/index.html','/style.css','/app.js','/perf.js','/sound.js','/arsenal.js','/live.js','/skyradio.js','/widget.js','/cine.js','/fx.js','/icons.js','/models3d.js','/sprites/t-shahed.png','/sprites/t-jet.png','/sprites/t-cruise.png','/sprites/t-ballistic.png','/sprites/t-kab.png','/sprites/afld.png','/brand/logo-a.png','/brand/lp-gold.png','/brand/lp-blue.png','/brand/lp-star.png','/brand/lp-t1.png','/brand/lp-t2.png','/sprites/s-tu95.png','/sprites/s-tu160.png','/sprites/s-tu22.png','/sprites/s-mig31.png','/sprites/t-molniya.png','/manifest.webmanifest','/brand/emblem.png','/brand/icon-192.png','/brand/badge-96.png','/data/oblasts.geojson','/data/raions.geojson'];
+const C='tryvoga-v508';const SHELL=['/','/vendor/maplibre-gl.js','/vendor/maplibre-gl.css','/vendor/three.min.js','/index.html','/style.css','/app.js','/perf.js','/sound.js','/arsenal.js','/live.js','/skyradio.js','/widget.js','/cine.js','/fx.js','/icons.js','/models3d.js','/sprites/t-shahed.png','/sprites/t-jet.png','/sprites/t-cruise.png','/sprites/t-ballistic.png','/sprites/t-kab.png','/sprites/afld.png','/brand/logo-a.png','/brand/lp-gold.png','/brand/lp-blue.png','/brand/lp-star.png','/brand/lp-t1.png','/brand/lp-t2.png','/sprites/s-tu95.png','/sprites/s-tu160.png','/sprites/s-tu22.png','/sprites/s-mig31.png','/sprites/t-molniya.png','/manifest.webmanifest','/brand/emblem.png','/brand/icon-192.png','/brand/badge-96.png','/data/oblasts.geojson','/data/raions.geojson'];
 // Кешуємо кожен файл окремо й не валимо встановлення через один збій: addAll відхиляє ВСЕ при дублікаті чи 404,
 // і тоді служба не стартує зовсім (03.11: дубль icon-192 у списку → push не працював, «служба сповіщень не запустилась»).
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>Promise.all([...new Set(SHELL)].map(u=>c.add(u).catch(()=>{})))));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))));self.clients.claim();});
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);
   if(u.origin!==location.origin||u.pathname.startsWith('/api')||u.pathname==='/ws')return;
-  e.respondWith(fetch(e.request,{cache:'no-cache'}).then(r=>{const cp=r.clone();caches.open(C).then(c=>c.put(e.request,cp));return r;}).catch(()=>caches.match(e.request)));});
+  if(e.request.method!=='GET')return;
+  // 13.11 «довгий запуск»: раніше кожен файл (мапа 1 МБ, 3D 0,6 МБ, геодані) щоразу йшов через мережу. Тепер оболонка
+  // віддається одразу з кешу, а свіжа копія тягнеться у фоні; нова збірка приходить новою службою (інша назва кешу) і перезавантажує сторінку
+  const net=fetch(e.request,{cache:'no-cache'}).then(r=>{if(r&&r.ok){const cp=r.clone();caches.open(C).then(c=>c.put(e.request,cp));}return r;});
+  e.respondWith(caches.match(e.request,{ignoreSearch:u.pathname.startsWith('/vendor/')}).then(hit=>{if(hit){e.waitUntil(net.catch(()=>{}));return hit;}return net.catch(()=>caches.match('/index.html'));}));});
 
 // Web Push: сповіщення сервера навіть із закритим сайтом / заблокованим екраном
 self.addEventListener('push',e=>{let d={};try{d=e.data?e.data.json():{};}catch(x){d={title:'NAVRYX SKY',body:e.data?e.data.text():''};}
