@@ -1008,3 +1008,6 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 .az-x{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;font-size:28px;line-height:1;cursor:pointer;opacity:0;transition:opacity .25s}
 .az-cap{margin-top:18px;color:#dfe6f3;font-weight:700;font-size:17px;text-align:center;opacity:0;transition:opacity .25s}
 .ars-zoom.on .az-x,.ars-zoom.on .az-cap{opacity:1}
+
+/* 13.11: Android — розмиття під панелями дуже дороге для слабких GPU; замінюємо щільнішим фоном */
+.andr *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}

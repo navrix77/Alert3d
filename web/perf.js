@@ -5,7 +5,9 @@
   const P={saver:false,auto:false,last:0,timer:0};
   try{P.saver=localStorage.getItem('saver')==='1';}catch(e){}
   function fps(){if(document.hidden)return 0;const busy=(window.FX&&window.FX.length)||document.body.classList.contains('intro');
-    if(P.saver||P.auto)return busy?15:3;return busy?30:4;}
+    if(P.saver||P.auto)return busy?15:3;
+    // 13.11: на Android з цілями в кадрі 20 кадр/с замість 30 — плавно для людини, удвічі легше для слабкого GPU
+    if(/Android/i.test(navigator.userAgent))return busy?20:3;return busy?30:4;}
   window.NXPERF={fps,get saver(){return P.saver||P.auto;},setSaver(v){P.saver=!!v;try{localStorage.setItem('saver',v?'1':'0');}catch(e){}document.dispatchEvent(new Event('nxsaver'));}};
   window.nxRepaint=function(map){if(P.timer)return;const f=fps();if(!f)return;const gap=1000/f,el=performance.now()-P.last;
     P.timer=setTimeout(()=>{P.timer=0;P.last=performance.now();map.triggerRepaint();},Math.max(0,gap-el));};
