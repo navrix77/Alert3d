@@ -2988,3 +2988,13 @@ def test_day_1113_balalaika_slang():
     assert P.parse("1 реаетивна балалайка на Нову Одесу (Миколаївська обл)", "korabely_media", None).type == "jet"
     o = P.parse("всьо, тепер у нас чисто по балалайкам", "korabely_media", None)
     assert o.type is None
+
+
+def test_aiu_regional_threat_is_not_a_target():
+    from app import alerts
+    cls = next(c for c in vars(alerts).values() if isinstance(c, type) and hasattr(c, "THREAT"))
+    a = cls.__new__(cls)
+    a._seen_threats = set()
+    a.DIRS = getattr(cls, "DIRS", ())
+    md = "## 4. THREAT ACTIVITY\n- **18:49 — Guided bomb threat** over Харківський район (Kharkivskyi raion) — The threat of missile strikes on the Kharkiv region has been identified\n## 5."
+    assert a.threats(md) == []

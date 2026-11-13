@@ -114,6 +114,10 @@ class OfficialAlerts:
                 continue
             self._seen_threats.add(key)
             w, d = what.lower(), desc.lower()
+            # 13.11: «The threat of missile strikes on the Kharkiv region has been identified» — загальне попередження про
+            # загрозу для області, а не ціль у конкретному місці. Раніше «bomb» у заголовку робив із нього КАБ біля центру району
+            if re.search(r"\bthreat of\b", d) and re.search(r"\b(region|oblast|area)\b", d):
+                continue
             if "bomb" in w:
                 typ = "kab"
             elif "ballistic" in w or "ballistic" in d:
