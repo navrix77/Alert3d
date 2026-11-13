@@ -592,12 +592,13 @@ function selRep(serverT){const tr=sel&&SNAP.tracks.find(t=>t.id===sel),d=sel&&DI
    */
 function posAt(tr,serverT){const r=posAt0(tr,serverT);
   if(tr.status!=='active'||isBal(tr)||REPLAY)return r;
-  try{const tn=performance.now()/1000,ph=(tr.id%97)*0.37,P=xy(r.p);
+  try{const tn=performance.now()/1000,sid=String(tr.id);let hsh=0;for(let i=0;i<sid.length;i++)hsh=(hsh*31+sid.charCodeAt(i))%9973;const ph=hsh*0.37,P=xy(r.p);
     const idle=Math.max(0,serverT-(tr.ts||tr.last))/3600,creep=Math.min(0.4,2*idle);
     let x=P[0],y=P[1];
     if(r.hd!=null){const a=r.hd*D2R;x+=Math.sin(a)*creep;y+=Math.cos(a)*creep;const w=0.07*Math.sin(tn*0.9+ph);x+=Math.cos(a)*w;y-=Math.sin(a)*w;}
     else{x+=0.06*Math.cos(tn*0.6+ph);y+=0.06*Math.sin(tn*0.6+ph);}
-    return {p:ll([x,y]),hd:r.hd};}catch(e){return r;}}
+    const q=ll([x,y]);if(!isFinite(q[0])||!isFinite(q[1]))return r;// будь-який збій імітації не має ховати ціль
+    return {p:q,hd:r.hd};}catch(e){return r;}}
 function posAt0(tr,serverT){
   // балістика: канали не дають координат, висоти й часу виявлення. Значок стоїть на території, яку назвали
   // («на Харків» = загроза Харкову, а не ракета над центром міста), без руху й домальованої траєкторії (03.11)
@@ -1530,7 +1531,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 513,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 514,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
