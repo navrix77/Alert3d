@@ -2444,8 +2444,10 @@ def test_course_direction_word_not_village():
 def test_jet_map_displacement_flattens_after_10min():
     # 08.11: бектест 05–08.11 — реактивні після 10 хв без повідомлення просуваються повільніше (розвороти, кружляння)
     from app.tracker import map_disp
-    assert abs(map_disp("jet", 450, 600) - 450 * 10 / 60 * 0.6) < 0.1  # до 10 хв — як і було (k=0.6)
-    assert abs(map_disp("jet", 450, 1200) - 45 * 2 ** 0.3) < 0.1  # 20 хв — лише ×1.23 від 10 хв
+    # 13.11: k10 0.6 → 1.0 (бектест, денна сесія 13.11); після 10 хв так само повільніше (×2^0.3 за 20 хв)
+    assert abs(map_disp("jet", 450, 600) - 450 * 10 / 60 * 1.0) < 0.1
+    assert abs(map_disp("jet", 450, 1200) - 75 * 2 ** 0.3) < 0.1
+    assert abs(map_disp("shahed", 170, 600) - 170 * 10 / 60 * 0.7) < 0.1  # шахеди без змін
 
 
 def test_two_word_genitive_plural_kinski_rozdory():
@@ -2924,3 +2926,65 @@ def test_morning_1113_poltavka_village_is_not_poltava_oblast():
     # справжня підказка області лишається
     assert near("Реактивний БпЛА курсом на Рівне (Полтавщина)", "KL", "Рівне") == [(50.23, 32.43)]
     assert near("Шахед над Полтавою", "PL", "Полтава") == [(49.6, 34.55)]
+
+
+def test_day_1113_bomber_repositioning_is_not_kab():
+    """13.11 день: «бомбардувальник» / «бомбардування» не тип КАБ (tryvoga_chomu 02.11 13:42 і 11.11: передислокація Ту-22М3 / Ту-160
+    між аеродромами давала зону КАБ; KOVA: «бомбардування Ірану» в новині давало відбій КАБ)."""
+    o = P.parse("✈️Стратегічний бомбардувальник Ту-160 виконує передислокацію з аеродрому Енгельс на аеродрому Українка.", "tryvoga_chomu", None)
+    assert o.type != "kab" and o.kind != "zone"
+    o = P.parse("✈️1х дальній бомбардувальник Ту-22м3 виконує передислокацію з аеродрому Оленья на аеродром Дягилево.", "tryvoga_chomu", None)
+    assert o.type != "kab"
+    # справжні КАБ і бомби лишаються
+    assert P.parse("Пуски КАБ на Харківщину", "KH", None).type == "kab"
+    assert P.parse("Бомбардировщики сбрасывают бомбы на Купянск", "KH", None).type == "kab"
+
+
+def test_day_1113_kh22_kh32_is_ballistic():
+    """13.11 день: Х-22/Х-32 за ПС (Ігнат, 24.01.2026, LIGA.net) «атакує по балістичній траєкторії, як «Кинджал» чи «Іскандер-М»»,
+    ~4000 км/год: тривога «балістика», а не повільна крилата. Множник «x32» біля шахедів не ракета; Х-101/Х-59 лишаються крилатими."""
+    assert P.parse("Пуск Х-22 з Ту-22М3, ракета курсом на Одесу", "KL", None).type == "ballistic"
+    assert P.parse("Х-32 на Київ", "KL", None).type == "ballistic"
+    assert P.parse("Шахеди x32 на Одещину", "KL", None).type == "shahed"
+    assert P.parse("Х-59 на Одесу", "KL", None).type == "cruise"
+    assert P.parse("Ракети Х-101 курсом на Київ", "KL", None).type == "cruise"
+
+
+def test_day_1113_peresyp_russian_form():
+    """13.11 день: рос. «Пересыпь» = Пересип (Одеса); самоперевірка сервера: 15 разів невідома назва (odessa_knight 12.11 08:52)."""
+    o = P.parse("1х Шахед курс Порт/Пересыпь.", "odessa_knight", None)
+    assert "Пересип (Одеса)" in [r.place.name for r in o.places]
+    o = P.parse("❗️Пересыпь, Бандероль через вас на Усатово", "odessaveter", None)
+    assert "Пересип (Одеса)" in [r.place.name for r in o.places]
+
+
+def test_day_1113_ordinary_means_shahed():
+    """13.11 день: «звичайний» у моніторів = звичайний (не реактивний) шахед (radar_sich 13.11 13:01 «Звичайний  курсом на Прилуки»
+    сервер записав реактивним, бо тип успадкувався з попереднього поста). Відбій без змін; «звич. дрон», «звичайні КАБи»,
+    «звичайні підстанції» своїх типів."""
+    o = P.parse("Звичайний  курсом на Прилуки", "radar_sich", None)
+    assert o.type == "shahed" and [r.place.name for r in o.places] == ["Прилуки"]
+    assert P.parse("2 звичайних на Конотоп (Сумщина)", "radar_sich", None).type == "shahed"
+    assert P.parse("В море 4 обычных, курс Ланжерон/Порт", "xydessa_live", None).type == "shahed"
+    assert P.parse("Звичайний не фіксується", "shovnebi", None).type is None
+    assert P.parse("звич.дрон на/повз Прилуки!", "PhantomChe", None).type == "uav"
+    assert P.parse("Тягові та звичайні підстанції у Шарівці", "krop_vanek", None).type is None
+    assert P.parse("Реактивний на Решетилівку", "KL", None).type == "jet"
+
+
+def test_day_1113_primorsko_akhtarsk_is_not_primorske():
+    """13.11 день: «з Приморсько-Ахтарська» (пуски шахедів у РФ) не с. Приморське в Україні (UkraineRadar_24_7, odessa_knight)."""
+    o = P.parse("‼️ Відмічені пуски Шахедів: 3 гр. з Приморсько-Ахтарська.", "UkraineRadar_24_7", None)
+    assert "Приморське" not in [r.place.name for r in o.places]
+    o = P.parse("🤬Зафиксированы пуски ударных БпЛА типа «Shahed 131/136» с Приморско-Ахтарска.", "odessa_knight", None)
+    assert "Приморське" not in [r.place.name for r in o.places]
+    assert "Приморське" in [r.place.name for r in P.parse("Шахед на Приморське (Запорізька)", "zaborzp", None).places]
+
+
+def test_day_1113_balalaika_slang():
+    """13.11 день: korabely_media «балалайка» = шахед, «реактивна (і з одруківкою «реаетивна») балалайка» = реактивний;
+    «чисто по балалайкам» гасить усі цілі каналу, як раніше."""
+    assert P.parse("1 балалайка на Рибаківку (Миколаївська обл)", "korabely_media", None).type == "shahed"
+    assert P.parse("1 реаетивна балалайка на Нову Одесу (Миколаївська обл)", "korabely_media", None).type == "jet"
+    o = P.parse("всьо, тепер у нас чисто по балалайкам", "korabely_media", None)
+    assert o.type is None
