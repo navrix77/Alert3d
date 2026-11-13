@@ -1001,3 +1001,10 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 /* 13.11: зображення в Арсеналі не виходять за рамку; рамка більша */
 .ars-img{overflow:hidden;box-sizing:border-box}.ars-img img{width:100%!important;height:100%!important;object-fit:contain;padding:8px;box-sizing:border-box}
 @media (max-width:560px){.ars-card{grid-template-columns:96px minmax(0,1fr)}.ars-img{width:96px!important;height:96px!important;flex-basis:96px}}
+#arsenal img{cursor:zoom-in}
+.ars-zoom{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(4,6,10,0);transition:background .3s;touch-action:none;padding:max(56px,env(safe-area-inset-top)) 16px max(32px,env(safe-area-inset-bottom))}
+.ars-zoom.on{background:rgba(4,6,10,.92)}
+.ars-zoom img{width:min(88vw,560px);max-height:68vh;height:auto;object-fit:contain;transform-origin:50% 50%;filter:drop-shadow(0 18px 40px rgba(0,0,0,.6));will-change:transform}
+.az-x{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;font-size:28px;line-height:1;cursor:pointer;opacity:0;transition:opacity .25s}
+.az-cap{margin-top:18px;color:#dfe6f3;font-weight:700;font-size:17px;text-align:center;opacity:0;transition:opacity .25s}
+.ars-zoom.on .az-x,.ars-zoom.on .az-cap{opacity:1}

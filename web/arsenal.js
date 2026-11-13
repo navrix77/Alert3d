@@ -82,3 +82,35 @@ function liveBtns(){const S=window.NX?NX.snap():null;
 window.openArsenal=function(){build();liveBtns();document.getElementById('arsenal').hidden=false;const s=document.getElementById('settings');if(s)s.hidden=true;};
 document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('b-ars');if(b)b.onclick=window.openArsenal;const c=document.getElementById('ars-close');if(c)c.onclick=()=>document.getElementById('arsenal').hidden=true;});
 })();
+
+/* 13.11: перегляд зображення з Арсеналу — плавне збільшення з мініатюри; закриття хрестиком, дотиком по фону, свайпом вниз або Esc */
+(function(){
+  let ov=null,src=null,busy=false;
+  function rectOf(e){const r=e.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,w:r.width,h:r.height};}
+  function close(){if(!ov||busy)return;busy=true;const im=ov.querySelector('img');const a=src&&document.body.contains(src)?rectOf(src):null,b=rectOf(im);
+    ov.classList.remove('on');
+    if(a){im.style.transition='transform .28s cubic-bezier(.2,.8,.2,1)';im.style.transform=`translate(${a.x-b.x}px,${a.y-b.y}px) scale(${a.w/b.w})`;}
+    else{im.style.transition='transform .22s ease-in,opacity .22s';im.style.transform='translateY(60px)';im.style.opacity='0';}
+    setTimeout(()=>{ov.remove();ov=null;busy=false;},290);}
+  function open(img,caption){if(ov)return;src=img;
+    ov=document.createElement('div');ov.className='ars-zoom';
+    ov.innerHTML='<button class="az-x" aria-label="Закрити">×</button><img alt=""><div class="az-cap"></div>';
+    const im=ov.querySelector('img');im.src=img.currentSrc||img.src;ov.querySelector('.az-cap').textContent=caption||'';
+    document.body.appendChild(ov);
+    const go=()=>{const a=rectOf(img),b=rectOf(im);im.style.transition='none';im.style.transform=`translate(${a.x-b.x}px,${a.y-b.y}px) scale(${a.w/Math.max(1,b.w)})`;
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ov.classList.add('on');im.style.transition='transform .34s cubic-bezier(.2,.8,.2,1)';im.style.transform='';}));};
+    im.complete?go():im.onload=go;
+    ov.querySelector('.az-x').onclick=e=>{e.stopPropagation();close();};
+    ov.onclick=e=>{if(e.target===ov)close();};
+    // свайп вниз: картинка їде за пальцем, фон тьмяніє; відпустили далеко або різко — закриваємо
+    let y0=0,t0=0,dy=0,drag=false;
+    ov.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;y0=e.touches[0].clientY;t0=Date.now();dy=0;drag=true;im.style.transition='none';},{passive:true});
+    ov.addEventListener('touchmove',e=>{if(!drag)return;dy=Math.max(0,e.touches[0].clientY-y0);if(e.cancelable)e.preventDefault();im.style.transform=`translateY(${dy}px) scale(${1-Math.min(.25,dy/1200)})`;ov.style.background=`rgba(4,6,10,${.92*(1-Math.min(1,dy/400))})`;},{passive:false});
+    ov.addEventListener('touchend',()=>{if(!drag)return;drag=false;const v=dy/Math.max(1,Date.now()-t0);if(dy>110||(v>.6&&dy>40)){ov.style.background='';close();}else{im.style.transition='transform .22s ease-out';im.style.transform='';ov.style.background='';}});
+  }
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ov)close();});
+  document.addEventListener('click',e=>{const img=e.target.closest&&e.target.closest('#arsenal img');if(!img||img.style.visibility==='hidden')return;
+    const card=img.closest('.ars-card');const sub=img.closest('figure,div')&&img.parentElement.querySelector('span,figcaption,small');
+    const cap=(card&&card.querySelector('h4')?card.querySelector('h4').textContent:'')+(sub&&sub.textContent&&!img.closest('.ars-img')?' · '+sub.textContent:'');
+    e.preventDefault();open(img,cap);},true);
+})();
