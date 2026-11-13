@@ -56,13 +56,13 @@ function liteMode(fallback){
   const poll=()=>fetch('/api/state',{cache:'no-store'}).then(r=>r.json()).then(draw).catch(()=>{el.innerHTML='<h1>NAVRYX SKY</h1><div class=n>Немає звʼязку з сервером. Це не відбій.</div>';});
   try{const ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws');ws.onmessage=m=>{try{draw(JSON.parse(m.data));}catch(x){}};}catch(x){}
   poll();setInterval(()=>{if(Date.now()-last>25000)poll();},15000);}
-// старт (03.11, ревізія візуалу): кадр 0 — 2D, північ угорі, вся Україна по центру екрана; перехід у 3D — коли прийдуть цілі (introFly).
-// повторний запуск протягом 5 хв — камера там, де її закрили, без прольоту
+// старт (03.11, ревізія візуалу): кадр 0 - 2D, північ угорі, вся Україна по центру екрана; перехід у 3D - коли прийдуть цілі (introFly).
+// повторний запуск протягом 5 хв - камера там, де її закрили, без прольоту
 const UA_BOUNDS=[[22.1,44.2],[40.3,52.45]];
 const REDUCE=(()=>{try{return matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){return false;}})();
 const LASTCAM=null; // 03.11: старт завжди однаковий (2D по центру → 3D), без «там, де закрили»
 let map;try{map=new maplibregl.Map({container:'map',pixelRatio:Math.min(window.devicePixelRatio||1,3),fadeDuration:150,maxTileCacheSize:200,style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#03050A'}}]},center:LASTCAM?LASTCAM.c:[31.2,48.4],zoom:LASTCAM?LASTCAM.z:(innerWidth<640?3.9:5.2),pitch:LASTCAM?LASTCAM.p:0,bearing:0,attributionControl:{compact:true},maxPitch:65,minZoom:2.8,maxBounds:[[2,28],[62,74]]});}catch(err){console.warn('map init',err);liteMode();return;}window.tryvogaMap=map;
-// центр країни між верхніми плашками й нижньою панеллю; цю ж камеру тримає й перехід у 3D (03.11: «не по центру» — камера їхала на дім, Харків біля краю)
+// центр країни між верхніми плашками й нижньою панеллю; цю ж камеру тримає й перехід у 3D (03.11: «не по центру» - камера їхала на дім, Харків біля краю)
 let START_CAM=null,introDone=false;
 // Україна у верхній половині екрана (відступ знизу більший: там панель дому й док); перераховуємо після load/resize,
 // бо на телефоні розмір вікна в момент створення мапи ще не остаточний (03.11: мапа сиділа внизу)
@@ -128,7 +128,7 @@ function tacScale(v){TACF.scale=v;if(v!=='oblast')TACF.obl='';tacSave();const H=
   tacBarSync();}
 function tacBarSync(){const bar=$('#tac-bar');if(!bar)return;bar.hidden=!TAC;setTimeout(()=>tacPad(true),60);tacOblFill();const so=$('#tac-ob');if(so)so.value=TACF.obl||'';bar.querySelectorAll('[data-sc]').forEach(b=>b.classList.toggle('on',b.dataset.sc===TACF.scale));
   const n=TACF.hide.length+(TACF.fresh?1:0)+(TACF.src?1:0)+(TACF.alerts?0:1)+(TACF.enemy?0:1)+(TACF.reach?0:1);const f=$('#tac-f');if(f)f.textContent='Фільтри'+(n?' · '+n:'');}
-// у тактичному режимі центр мапи — вільна зона між верхньою панеллю й нижньою докою
+// у тактичному режимі центр мапи - вільна зона між верхньою панеллю й нижньою докою
 function tacPad(anim){try{if(window.__padLock)return;let t=0,b=0;if(TAC){const bar=$('#tac-bar');if(bar&&!bar.hidden){let y=0,e=bar;while(e&&e!==document.body){y+=e.offsetTop;e=e.offsetParent;}t=Math.max(0,Math.round(y+bar.offsetHeight-(map.getContainer().getBoundingClientRect().top||0)));}b=96;}
   const o={top:t,bottom:b,left:0,right:0},c=map.getPadding();if(Math.abs(c.top-o.top)<2&&Math.abs(c.bottom-o.bottom)<2)return;
   if(anim&&window.__introAt&&Date.now()-window.__introAt>7000)map.easeTo({padding:o,duration:450});else map.setPadding(o);}catch(e){}}
@@ -182,7 +182,7 @@ function tacLegend(){const pn=$('#tac-legend'),A=window.App06;if(!pn)return;tacP
   h+='<h5>Типи на мапі зараз</h5>'+([...used].length?[...used].map(([t,a])=>{const e=A.entryOf(t);return row({type:t,affiliation:a},(A.MODEL[t]||t),e.std+(e.exact?'':' (найближча сутність)'));}).join(''):'<p class="lg-n">Активних цілей немає.</p>');
   h+='<h5>Поля символу</h5>'+row({type:'tu95',affiliation:'hostile',hd:60,count:4},'Напрямок і кількість','лінія від рамки: напрямок руху, лише коли відомий; число: кількість');
   h+='<h5>Поля SKY (не частина символу)</h5><p class="lg-n">«N хв»: вік повідомлення. Біла точка: назване місце. Пунктир і коло: оцінка SKY. Блідість: давність, а не знищення. Рамка й знак не змінюються від давності, оцінки чи невідомого типу.</p>';
-  h+='<h5>Інше на мапі</h5><p class="lg-n">Позначки ворога: аеродроми з OpenStreetMap (ODbL), позначка — стандартний знак аеродрому. Кола 30 і 60 хв: найбільша відстань за швидкістю цілі, розрахунок SKY, а не прогноз маршруту. Лінійка: відстань у км і NM та істинний азимут.</p><p class="lg-n"><b>Дані з відкритих джерел</b>: надходять із затримкою, можуть бути неповними чи помилковими. Відсутність позначки не означає відсутності загрози.</p>';h+='<p class="lg-n">Координати: WGS-84, система цілевказання MGRS (сітка UTM). Масштабні лінійки в км і морських милях (NM). Точність MGRS відповідає точності місця: ≥10 км — 10 км, ≥1 км — 1 км, краще — 100 м.</p><p class="lg-n">Знаки малює milsymbol 3.0.5 (MIT).</p>';pn.innerHTML=h;pn.hidden=false;}
+  h+='<h5>Інше на мапі</h5><p class="lg-n">Позначки ворога: аеродроми з OpenStreetMap (ODbL), позначка - стандартний знак аеродрому. Кола 30 і 60 хв: найбільша відстань за швидкістю цілі, розрахунок SKY, а не прогноз маршруту. Лінійка: відстань у км і NM та істинний азимут.</p><p class="lg-n"><b>Дані з відкритих джерел</b>: надходять із затримкою, можуть бути неповними чи помилковими. Відсутність позначки не означає відсутності загрози.</p>';h+='<p class="lg-n">Координати: WGS-84, система цілевказання MGRS (сітка UTM). Масштабні лінійки в км і морських милях (NM). Точність MGRS відповідає точності місця: ≥10 км - 10 км, ≥1 км - 1 км, краще - 100 м.</p><p class="lg-n">Знаки малює milsymbol 3.0.5 (MIT).</p>';pn.innerHTML=h;pn.hidden=false;}
 // лінійний масштаб у кілометрах і морських милях
 function tacScaleBars(){try{if(TAC&&!map._tacScale){map._tacScale=[new maplibregl.ScaleControl({unit:'metric',maxWidth:90}),new maplibregl.ScaleControl({unit:'nautical',maxWidth:90})];map._tacScale.forEach(c=>map.addControl(c,'bottom-left'));}
   else if(!TAC&&map._tacScale){map._tacScale.forEach(c=>map.removeControl(c));map._tacScale=null;}}catch(e){}}
@@ -400,7 +400,7 @@ function addOverlays(){
   map.addLayer({id:'tg-named',type:'circle',source:'trails',filter:['==',['get','nm'],1],paint:{'circle-radius':3.6,'circle-color':'#FFFFFF','circle-opacity':['get','o'],'circle-stroke-color':'rgba(0,0,0,.75)','circle-stroke-width':1,'circle-stroke-opacity':['get','o']}});
   map.addLayer({id:'ticks-c',type:'circle',source:'ticks',paint:{'circle-radius':4,'circle-color':['get','c'],'circle-stroke-color':'#0B0F17','circle-stroke-width':2,'circle-pitch-alignment':'map'}});
   map.addLayer({id:'ticks-t',type:'symbol',source:'ticks',layout:{'text-field':['get','l'],'text-font':['Noto Sans Bold'],'text-size':12,'text-offset':[0,-1.1],'text-allow-overlap':true},paint:{'text-color':'#fff','text-halo-color':'rgba(0,0,0,.9)','text-halo-width':1.6}});
-  // «жива» мапа без вигаданих позицій: напрямок руху — біжучими штрихами на ~8 хв уперед (лише де курс відомий),
+  // «жива» мапа без вигаданих позицій: напрямок руху - біжучими штрихами на ~8 хв уперед (лише де курс відомий),
   // а нерухомі цілі (місце невідоме або лише оцінене) «дихають» кільцем: рухати їх бектест не дозволяє (03.11: точність гірша)
   if(!map.getSource('flow'))map.addSource('flow',{type:'geojson',data:EMPTY});
   if(!map.getSource('pulse'))map.addSource('pulse',{type:'geojson',data:EMPTY});
@@ -462,7 +462,7 @@ function addOverlays(){
       if(follow&&sel===id){stopFollow('Стеження вимкнено');}else{sel=id;startFollow();}
       try{const b=$('#sh-follow');if(b){b.classList.toggle('on',follow);b.textContent=follow?'Зупинити':'Стежити';}}catch(_){}return;}
     lastTap={id,t:now};openSheet(id);});
-  // 08.11: довге натискання на короткодальню ціль (FPV/«Молнія»/«Ланцет») — зона ризику: віяло вперед на залишок дальності від лінії пуску
+  // 08.11: довге натискання на короткодальню ціль (FPV/«Молнія»/«Ланцет») - зона ризику: віяло вперед на залишок дальності від лінії пуску
   {let lpT=null,lpP=null;const cancel=()=>{clearTimeout(lpT);lpT=null;};
    const start=e=>{cancel();lpP=e.point;lpT=setTimeout(()=>{lpT=null;const fs=map.queryRenderedFeatures([[lpP.x-24,lpP.y-24],[lpP.x+24,lpP.y+24]],{layers:['tg-hit']});if(!fs.length||!SNAP)return;
       const tr=SNAP.tracks.find(t=>t.id===fs[0].properties.id);if(!tr||!tr.zone){toast('Зона ризику є лише для FPV, «Молнії» та «Ланцета»');return;}
@@ -494,7 +494,7 @@ map.on('style.load',addOverlays);
 let introT0=Date.now();if(INTRO)document.body.classList.add('intro');
 function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setItem('intro','1');const el=$('#intro');
   const mob=innerWidth<640;
-  // кінцевий стан: 3D з наближенням до дому; без дому — до геопозиції (визначається під час паузи); без обох — центр країни з нахилом
+  // кінцевий стан: 3D з наближенням до дому; без дому - до геопозиції (визначається під час паузи); без обох - центр країни з нахилом
   const sc=START_CAM||{center:map.getCenter(),zoom:map.getZoom()};
   const camFor=()=>{if(TAC)return {center:[31.5,48.5],zoom:uaZoom(),pitch:0,bearing:0};// тактичний режим стартує з огляду всієї України
     const tgt=home||window.__GEOPOS||null;return tgt?{center:tgt,zoom:mob?7.2:7.8,pitch:mob?45:52,bearing:0}:{center:sc.center,zoom:sc.zoom+0.3,pitch:mob?45:52,bearing:0};};
@@ -513,7 +513,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
   const finish=()=>{tacPad(false);document.body.classList.remove('intro');document.body.classList.add('intro-in');setTimeout(()=>document.body.classList.remove('intro-in'),2500);
     ['lsites-t','tg-n','tg-course','ru-t','hits'].forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});};
   // переліт у 3D. 03.11: раніше залежав від INTRO (sessionStorage): після повторного відкриття застосунку мапа лишалася у 2D назавжди
-  const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу — не смикаємо
+  const go=()=>{if(Date.now()-(window.__touch||0)<5000){finish();return;}  // користувач уже сам рухає мапу - не смикаємо
     const c=camFor();if(TAC){if(!window.__tacCam)map.jumpTo(c);}else smoothCam(c,4500);window.__introAt=Date.now();tilt=!TAC;setTimeout(finish,30);
     if(TAC){// огляд України, потім плавно на точку «Дім», а без неї на геопозицію
       const t0=Date.now(),tryZoom=()=>{if(Date.now()-(window.__touch||0)<5000)return;const tg=home||window.__GEOPOS;
@@ -534,7 +534,7 @@ function introFly(skip){if(introDone)return;introDone=true;sessionStorage.setIte
 {let n=0;const st=$('#intro-st');const tick=setInterval(()=>{if(introDone||!st){clearInterval(tick);return;}n++;
   if(SNAP){const h=SNAP.health||{},c=(h.channels||{});const act=SNAP.tracks.filter(t=>t.status==='active').length;// так само, як лічильники вгорі: треки, без ×N
     st.textContent=(c.channels?c.live+' з '+c.channels+' джерел наживо · ':'')+(act?'цілей у повітрі: '+act:'небо поки чисте');}else st.textContent=['Підключаюсь до джерел…','Читаю монітори…','Збираю картину неба…'][n%3];},450);}
-// перехід запускається, коли прийшли дані (перший знімок) і карта готова, а не за таймером; 7 с — запобіжник, якщо дані не йдуть
+// перехід запускається, коли прийшли дані (перший знімок) і карта готова, а не за таймером; 7 с - запобіжник, якщо дані не йдуть
 map.once('idle',()=>{if(SNAP)introFly(false);});
 setTimeout(()=>introFly(false),7000);
 {const el=$('#intro');if(el){if(!INTRO)el.remove();else el.onclick=()=>introFly(true);}}map.on('styledata',()=>{if(map.isStyleLoaded()&&!map.getSource('obl'))addOverlays();if(map.getSource('obl')&&!lastLv)syncLevels();});
@@ -647,7 +647,7 @@ function frame(now){
       let d=DISP.get(tr.id);
       if(!d||Math.abs(d.p[0]-p[0])+Math.abs(d.p[1]-p[1])>1.2){d={p:[...p],hd:hd??0};DISP.set(tr.id,d);}
       else{const k=Math.min(1,dt*3);d.p[0]+=(p[0]-d.p[0])*k;d.p[1]+=(p[1]-d.p[1])*k;if(hd!=null){let a=hd-d.hd;while(a>180)a-=360;while(a<-180)a+=360;d.hd+=a*Math.min(1,dt*2.5);}}
-      const active=tr.status==='active',still=!!(tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next)),weak0=tr.conf<0.5,weak=weak0||still;// still: місце не назвали або лише оцінка без нового пункту — на мапі стоїть і напівпрозора, щоб не вдавати рух
+      const active=tr.status==='active',still=!!(tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next)),weak0=tr.conf<0.5,weak=weak0||still;// still: місце не назвали або лише оцінка без нового пункту - на мапі стоїть і напівпрозора, щоб не вдавати рух
       const rel=active&&!weak0?homeRel(tr,d.p):null;
       if(rel&&rel.rel)threats.push({tr,rel});
       // кут на ЕКРАНІ: проєктуємо точку і точку на 3 км уздовж курсу, враховує нахил і поворот карти
@@ -667,13 +667,13 @@ function frame(now){
         fx.push({id:tr.id,est:!!(tr.pos_est||tr.nopos),age:((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),spd:tr.speed,p:d.p,sa,hd:d.hd,type:tr.type,col:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],weak,thr:!!(rel&&rel.rel),sel:sel===tr.id,sng:(tr.srcs||[]).length<2,tail:dots});}
       const c=TYPE_COLOR[tr.type];
       if(active&&!BAL&&tr.trail&&tr.trail.length){const q=tr.trail[tr.trail.length-1],ag=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now);if(dist(xy([q[0],q[1]]),xy(d.p))>1.5)trails.push({type:'Feature',properties:{nm:1,o:Math.max(0.35,1-ag/1800)},geometry:{type:'Point',coordinates:[q[0],q[1]]}});}
-      // ціль без названого місця (позиція — оцінка по пункту призначення): слабкий хвіст у бік, звідки вона летить (від фронту/кордону); лише для вибраної й тих, що летять до вас
+      // ціль без названого місця (позиція - оцінка по пункту призначення): слабкий хвіст у бік, звідки вона летить (від фронту/кордону); лише для вибраної й тих, що летять до вас
       if(active&&!BAL&&tr.hd!=null&&(tr.pos_est||tr.nopos)&&!(tr.trail&&tr.trail.length>1)&&(sel===tr.id||(rel&&rel.rel))){const P0=xy(d.p),r0=(d.hd+180)*D2R;
         trails.push({type:'Feature',properties:{c,o:0.55},geometry:{type:'LineString',coordinates:[d.p,ll([P0[0]+Math.sin(r0)*25,P0[1]+Math.cos(r0)*25])]}});}
       // пройдений шлях, крапками за позиціями, які назвали канали; лише для вибраної цілі й тих, що летять до вас (інакше «каша»)
       if(active&&!BAL&&tr.trail&&tr.trail.length){const hi=sel===tr.id||(rel&&rel.rel);trails.push({type:'Feature',properties:{c:hi?c:'#E8ECF4',o:hi?0.95:0.22},geometry:{type:'LineString',coordinates:[...tr.trail.map(t=>[t[0],t[1]]),d.p]}});}
       const nearT=['fpv','fpvf','rszv'].includes(tr.type);// ближні цілі: завжди показуємо лінію до пункту призначення і сам пункт
-      if(active&&!BAL&&(sel===tr.id||(rel&&rel.rel)||nearT)&&tr.route.length){const far=!nearT||dist(xy(d.p),xy(tr.route[0]))>3;// ближня ціль уже біля пункту — лінію не малюємо, лише мітку
+      if(active&&!BAL&&(sel===tr.id||(rel&&rel.rel)||nearT)&&tr.route.length){const far=!nearT||dist(xy(d.p),xy(tr.route[0]))>3;// ближня ціль уже біля пункту - лінію не малюємо, лише мітку
         if(far)preds.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:nearT?[d.p,tr.route[0]]:[d.p,...tr.route]}});
         if(tr.next)preds.push({type:'Feature',properties:{c,l:tr.next},geometry:{type:'Point',coordinates:tr.route[0]}});}
       if(active&&!BAL&&(sel===tr.id||(rel&&rel.rel))&&tr.lpath&&tr.lpath.length&&!tr.route.length){const L=tr.lpath;lpf.push({type:'Feature',properties:{c},geometry:{type:'LineString',coordinates:[d.p,...L.map(x=>[x[0],x[1]])]}});
@@ -703,7 +703,7 @@ function frame(now){
     if(slow&&map.getSource('tac')){const TF=[];
       const A6=TAC?window.App06:null;const RAIL=[];
       if(TAC)for(const f of feats){const tr=SNAP.tracks.find(x=>x.id===f.properties.id);if(!tr)continue;
-        const ageS=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),mins=Math.floor(ageS/60),o=ageS>=(((SNAP.counts&&SNAP.counts.live_min)||{})[tr.type]||10)*60?0.3:1,c=f.properties.c,P=f.geometry.coordinates;// те саме правило, що в лічильнику: старша за час життя типу — напівпрозора «тінь», і в лічильник не входить
+        const ageS=((tr.ev&&tr.ev.age)||0)+Math.max(0,serverT-SNAP.now),mins=Math.floor(ageS/60),o=ageS>=(((SNAP.counts&&SNAP.counts.live_min)||{})[tr.type]||10)*60?0.3:1,c=f.properties.c,P=f.geometry.coordinates;// те саме правило, що в лічильнику: старша за час життя типу - напівпрозора «тінь», і в лічильник не входить
         TF.push({type:'Feature',properties:{k:'age',l:mins<1?'<1 хв':mins+' хв',o,c},geometry:{type:'Point',coordinates:P}});
         if(A6&&f.properties.active)RAIL.push({id:tr.id,aff:tacAff(tr),type:A6.MAP[tr.type]?tr.type:'unknown',n:f.properties.count,m:mins,hd:null});
         if(A6){const still=tr.nopos||(tr.pos_est&&!tr.route.length&&!tr.next);// напрямок у символі лише коли він відомий
@@ -726,14 +726,14 @@ function frame(now){
         FL.push({type:'Feature',properties:{c:TYPE_COLOR[tr.type]},geometry:{type:'LineString',coordinates:[a,b]}});}
       map.getSource('flow').setData({type:'FeatureCollection',features:FL});map.getSource('pulse').setData({type:'FeatureCollection',features:PU});}
     {const k=Math.floor(now/90)%FLOW_DASH.length;if(k!==frame.fk&&map.getLayer('flow')){frame.fk=k;map.setPaintProperty('flow','line-dasharray',FLOW_DASH[k]);}
-     const ph=(now%2400)/2400;if(map.getLayer('pulse')&&now-(frame.pk||0)>60){frame.pk=now;map.setPaintProperty('pulse','circle-radius',8+ph*22);map.setPaintProperty('pulse','circle-stroke-opacity',0.7*(1-ph));}}}catch(e){}// «жива» мапа — лише оздоблення: її помилка не має зупиняти малювання цілей
+     const ph=(now%2400)/2400;if(map.getLayer('pulse')&&now-(frame.pk||0)>60){frame.pk=now;map.setPaintProperty('pulse','circle-radius',8+ph*22);map.setPaintProperty('pulse','circle-stroke-opacity',0.7*(1-ph));}}}catch(e){}// «жива» мапа - лише оздоблення: її помилка не має зупиняти малювання цілей
     if(false){const thr=new Set(threats.map(x=>x.tr.id)),z=map.getZoom(),sz=Math.max(18,Math.min(70,10+z*5));
      window.GLOW=feats.map(f=>{const h=TYPE_COLOR[f.properties.type]||'#ffffff',n=parseInt(h.slice(1),16);const t=thr.has(f.properties.id);
        return {p:f.geometry.coordinates,c:t?[1,0.23,0.27]:[(n>>16&255)/255,(n>>8&255)/255,(n&255)/255],a:f.properties.weak?0.3:0.7,s:t?sz*1.9:sz,ring:t};});}
     if(slow&&map.getSource('chains')){frame.ch=now;const ch=[],ls=new Map();
       for(const L of (SNAP.launches||[])){const w=launchWhat(L);ls.set(L.site,{type:'Feature',properties:{est:false,lid:L.id,l:(isTO(L)?'НОСІЇ В ПОВІТРІ'+(L.count?' · '+cntL(L):''):'ПУСК: '+w.short+(L.count?' ×'+L.count:''))+'\nз '+L.site.replace(/ \(.*\)/,'')+(L.carrier?' ('+L.carrier+')':'')+' · '+fmt(L.t)},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
       for(const tr of SNAP.tracks){const L=tr.launch;if(!L||tr.status==='closed')continue;const isSel=sel===tr.id,d=DISP.get(tr.id);if(!d)continue;
-        // звʼязок «пуск → ціль» — оцінка SKY, а не факт: лише для вибраної цілі. Віялом до всіх цілей це виглядало як «190 пусків з однієї точки»
+        // звʼязок «пуск → ціль» - оцінка SKY, а не факт: лише для вибраної цілі. Віялом до всіх цілей це виглядало як «190 пусків з однієї точки»
         if(!isSel||tr.status!=='active')continue;
         ch.push({type:'Feature',properties:{c:isSel?(L.est?'#FF8A8A':'#FF3B3B'):'#E8ECF4',o:isSel?0.95:0.1,s:isSel},geometry:{type:'LineString',coordinates:[[L.lon,L.lat],[tr.entry[0],tr.entry[1]],...tr.trail.map(t=>[t[0],t[1]]),d.p]}});
         if(!ls.has(L.site))ls.set(L.site,{type:'Feature',properties:{est:true,l:'ймовірно · '+L.site.replace(/ \(.*\)/,'')},geometry:{type:'Point',coordinates:[L.lon,L.lat]}});}
@@ -833,7 +833,7 @@ function aviaInfo(a){const nm=k=>(SNAP.sources&&SNAP.sources[k]&&SNAP.sources[k]
    '<div class="kp-r"><span>Позиція</span><b>типовий район пусків (оцінка), не точне місце літака</b></div>'+
    ((a.ev||[]).length?'<div class="kp-ev">'+a.ev.slice(-3).reverse().map(e=>'<div><i>'+hm(e.t)+' · '+esc(nm(e.src))+'</i>'+esc(e.text||'')+'</div>').join('')+'</div>':'')+'</div>';}
 // що саме пустили: тип з повідомлення → типи цілей, які вже привʼязані до цього пуску → типове для місця (позначено як припущення)
-// носії стратегічної авіації в повітрі (stage=takeoff) — не пуск: кількість — борти, ракет ще не повідомлено
+// носії стратегічної авіації в повітрі (stage=takeoff) - не пуск: кількість - борти, ракет ще не повідомлено
 const isTO=L=>L&&L.stage==='takeoff';const cntL=L=>L.count?(isTO(L)?L.count+' борт.':'×'+L.count):'';
 function launchWhat(L){const N={uav:'БпЛА невизначеного типу',shahed:'шахеди',jet:'реактивні БпЛА',molniya:'«Молнії»',cruise:'крилаті ракети',ballistic:'балістика',kab:'КАБи',geran5:'«Герань-5»',banderol:'«Бандеролі»'};
   if(L.type)return {short:N[L.type]||L.type,full:(N[L.type]||L.type)+' (так написали канали)'};
@@ -911,7 +911,7 @@ function syncStrat(){if(!SNAP||!stratEnsure())return;STRAT=SNAP.strat||[];const 
       const key=tacImg({type:mk,affiliation:A6.affiliationOf({indep:(g.srcs||[]).length}),hd:mv?g.hd:null,count:g.n||null});
       P.push({type:'Feature',properties:{gid:g.id,img:key,o:act?1:0.6*ageF+0.2,l:(g.name||A6.MODEL[mk]||'')+' · '+(STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)},geometry:{type:'Point',coordinates:[g.lon,g.lat]}});}
     else o.forEach((off,i)=>P.push({type:'Feature',properties:{gid:g.id,ic:g.icon,tc:stratCombat(g)?'#FF3B3B':undefined,r:stratRot(g),off,o:act?1:0.6*ageF+0.2,l:i===0?(g.name+(g.n>9?' ×'+g.n:'')+'\n'+(STRAT_TAG[g.stage]||STRAT_STAGE[g.stage]||'')+(g.n===null?' · кількість невідома':'')+'\n'+hm(g.t)):''},geometry:{type:'Point',coordinates:[g.lon,g.lat]}}));
-    if(g.path&&g.path.length>1){// маршрут перельоту: пройдене — суцільна лінія (trail), попереду — пунктир до аеродрому призначення, з підписом уздовж лінії й назвами кінців
+    if(g.path&&g.path.length>1){// маршрут перельоту: пройдене - суцільна лінія (trail), попереду - пунктир до аеродрому призначення, з підписом уздовж лінії й назвами кінців
       const rem=g.stage==='transit'?[[g.lon,g.lat],g.path[1]]:g.path,lbl=(g.name||'Літак')+(g.stage==='transit'?' · передислокація, не бойовий виліт':'')+': '+(g.origin||'?')+' → '+(g.dest||'?')+' (розрахунок)';
       L.push({type:'Feature',properties:{k:'route'},geometry:{type:'LineString',coordinates:rem}});
       L.push({type:'Feature',properties:{k:'rlabel',l:lbl},geometry:{type:'LineString',coordinates:rem}});
@@ -956,7 +956,7 @@ function renderCounters(){
   // Цілі, про які не писали 10+ хв, у лічильник не входять (на мапі вони напівпрозорі)
   const nowS=Date.now()/1000+offset;const LM=(SNAP.counts&&SNAP.counts.live_min)||{};const fresh=t=>(((t.ev&&t.ev.age)||0)+Math.max(0,nowS-SNAP.now))<(LM[t.type]||10)*60;// той самий час життя за типом, що й на мапі й в аналітиці (app/count.py)
   const act=SNAP.tracks.filter(t=>t.status==='active');const by={};act.forEach(t=>by[t.type]=(by[t.type]||0)+1);
-  // компроміс: велике число — оцінка кількості одиниць (як на мапі: той самий тип і пункт призначення = одна група, береться найбільша названа кількість, різні пункти додаються); дрібно — скільки це груп/цілей
+  // компроміс: велике число - оцінка кількості одиниць (як на мапі: той самий тип і пункт призначення = одна група, береться найбільша названа кількість, різні пункти додаються); дрібно - скільки це груп/цілей
   const UN={};{const g={};act.forEach(t=>{const k=t.type+'|'+((t.next||'').trim()||t.id);g[k]=Math.max(g[k]||0,t.count||1);});for(const k in g){const ty=k.split('|')[0];UN[ty]=(UN[ty]||0)+g[k];}}
   const order=['uav','shahed','jet','geran5','cruise','banderol','ballistic','rszv','molniya','recon','lancet','fpv','fpvf'];
   $('#counters').innerHTML='';
@@ -990,7 +990,7 @@ function homeOfficial(ob){const O=SNAP.official||{};const ra=homeObl.r;
   // офіційне зведення застаріло (джерело не відповідає): чесно кажемо, а не показуємо старий стан як поточний
   const age=O.updated?(Date.now()/1000+offset-O.updated)/60:999;const st=age>3?' · дані тривог '+(age>120?'недоступні':Math.round(age)+' хв тому'):'';
   if((SNAP.levels||{})[ob])return {on:1,t:'тривога в усій області'+st};
-  // 04.11: місто з власним офіційним статусом (м. Харків): для дому в ньому статус району не діє — лише статус міста
+  // 04.11: місто з власним офіційним статусом (м. Харків): для дому в ньому статус району не діє - лише статус міста
   const hh=homeHrom(),sep=hh!=null&&(O.sep||[]).includes(hh);
   if(sep){const H0=O.hromadas||{};if(H0[hh]||H0[String(hh)])return {on:1,t:'тривога у вашій громаді'+st};
     if(ra&&(O.raion_levels||{})[ra])return {on:2,t:'тривога в районі, у вашій громаді тривоги немає'+st};}
@@ -1072,7 +1072,7 @@ function renderMe(threats){
   const mb=near.filter(x=>!x.r.rel&&x.r.maybe).sort((a,b)=>b.r.p-a.r.p)[0];
   // «може наблизитися» лише в межах 40 км, як і push (калібрування 03.11: показаний відсоток завищений ~10 разів, тому без чисел)
   if(!first&&mb&&mb.r.d<=40){cls='me watch';word='Ціль неподалік';sub=offL+esc(TYPE_NAME[mb.tr.type])+' · '+Math.round(mb.r.d)+' км '+mb.r.from+' · може наблизитися';}
-  // ціль поруч — загроза незалежно від курсу (03.11: дві цілі за 3–6 км від дому, а панель писала «Цілей у ваш бік немає»)
+  // ціль поруч - загроза незалежно від курсу (03.11: дві цілі за 3–6 км від дому, а панель писала «Цілей у ваш бік немає»)
   const HX=xy(home);const close=SNAP.tracks.filter(t=>t.status==='active'&&!t.nopos).map(t=>{const d=DISP.get(t.id);return d?{tr:t,d:dist(HX,xy(d.p)),side:FROM[Math.round(brg(HX,xy(d.p))/45)%8]}:null;}).filter(x=>x&&x.d<=15).sort((a,b)=>a.d-b.d);
   autoFrame(close,first);
   if(!first&&close.length){const c0=close[0],n=close.reduce((a,x)=>a+(x.tr.count||1),0);cls=c0.d<=8?'me danger':'me watch';word=n>1?'Цілі поруч: '+n:'Ціль поруч';
@@ -1190,7 +1190,7 @@ function fillSheet(first){
    E.items=got||[];const nm=k=>esc(SNAP.sources[k]?.name||k);const ind=E.prim.length;
    const head=E.pubs+' '+(E.pubs===1?'публікація':E.pubs<5?'публікації':'публікацій')+' · '+ind+' '+(ind===1?'першоджерело':ind<5?'першоджерела':'першоджерел')+' · '+(ind>=2?'<b class=ok>незалежне підтвердження є</b>':'<b class=warn>незалежного підтвердження немає</b>');
    const age=E.age;const ageTxt=age<120?'щойно':age<3600?Math.round(age/60)+' хв тому':'понад годину тому';
-   // дві різні певності (04.11): чи ціль справді є — і наскільки точно відомо, де вона зараз
+   // дві різні певності (04.11): чи ціль справді є - і наскільки точно відомо, де вона зараз
    const qm=tr.pos_lvl==='невідоме'?'<b class=warn>невідоме</b>: канали назвали лише курс чи район':tr.pos_km!=null?'<b class='+(tr.pos_lvl==='точне'?'ok':tr.pos_lvl==='приблизне'?'mid':'warn')+'>'+esc(tr.pos_lvl)+'</b>, ±'+tr.pos_km+' км'+(tr.fix_age!=null?' · назване '+(tr.fix_age<120?'щойно':Math.round(tr.fix_age/60)+' хв тому'):''):'';
    const qi=tr.id_lvl?'<b class='+(tr.id_lvl==='висока'?'ok':tr.id_lvl==='середня'?'mid':'warn')+'>'+esc(tr.id_lvl)+'</b> · '+(tr.n_indep||0)+' '+((tr.n_indep||0)===1?'незалежне джерело':'незалежних джерел'):'';
    const qb=(qi||qm)?'<div class=q2>'+(qi?'<div><span>Що ціль є</span><em>'+qi+'</em></div>':'')+(qm?'<div><span>Де вона зараз</span><em>'+qm+'</em></div>':'')+'</div>':'';
@@ -1297,7 +1297,7 @@ $('#b-feed').onclick=()=>{$('#drawer').hidden=false;renderFeed();};
 $('#dr-close').onclick=()=>$('#drawer').hidden=true;
 
 /* ---------- живий потік ---------- */
-// 08.11: ціль збито/вибухнула — на її місці коротка анімація вибуху, значок зникає (сервер віддає s.fx)
+// 08.11: ціль збито/вибухнула - на її місці коротка анімація вибуху, значок зникає (сервер віддає s.fx)
 const BOOMED=new Set();
 function showBooms(s){for(const b of (s.fx||[])){if(BOOMED.has(b.id+':'+b.t))continue;BOOMED.add(b.id+':'+b.t);if(Date.now()/1000-b.t>40)continue;
   try{const el=document.createElement('div');el.className='boom';el.innerHTML='<i></i><i></i><b>💥</b>';
@@ -1354,7 +1354,7 @@ async function showChanges(force){
     (j.events.some(e=>e.from||e.to)?'<button class="pill chg-go">Показати '+(j.events.filter(e=>e.from||e.to).length)+' змін на карті →</button>':'');
   el.querySelector('.chg-x').onclick=()=>{el.hidden=true;clearChg();};
   const go=el.querySelector('.chg-go');if(go)go.onclick=()=>{clearTimeout(showChanges.t);el.hidden=true;playChanges(j.events);};
-  // 07.11: на старті — згорнутий рядок (не закриває екран), висить 4 с і зникає; дотик розгортає і лишає
+  // 07.11: на старті - згорнутий рядок (не закриває екран), висить 4 с і зникає; дотик розгортає і лишає
   el.classList.add('min');el.insertAdjacentHTML('afterbegin','<div class="chg-sum">'+j.total+' змін біля вас, поки вас не було · торкніться</div>');
   clearTimeout(showChanges.t);showChanges.t=setTimeout(()=>{if(!el.hidden){el.hidden=true;clearChg();}},4000);
   el.onclick=ev=>{if(el.classList.contains('min')&&!ev.target.closest('.chg-x')){el.classList.remove('min');clearTimeout(showChanges.t);
@@ -1500,7 +1500,7 @@ setInterval(syncRu,5000);
 let HITS=[];
 function syncHits(){if(!SNAP||!map.getSource('hits'))return;
   const nowS=Date.now()/1000+offset,t24=nowS-86400;// лише свіжі (за добу), вчорашні влучання не про сьогоднішню ніч
-  const seen=new Map();// одна подія = один вогник: ключ — пост, місце й об'єкт (два уражені об'єкти в одному місті дають два вогники)
+  const seen=new Map();// одна подія = один вогник: ключ - пост, місце й об'єкт (два уражені об'єкти в одному місті дають два вогники)
   for(const h of (SNAP.hits||[]).filter(h=>h.t>=t24).sort((a,b)=>b.t-a.t)){const k=(h.link||h.t)+'|'+h.place+'|'+h.what;if(!seen.has(k))seen.set(k,h);}
   HITS=[...seen.values()];
   // кілька подій в одній точці: розводимо віялом (~2 км), щоб кожен вогник було видно й можна було торкнутись
@@ -1514,7 +1514,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 509,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 510,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
@@ -1542,8 +1542,8 @@ async function webPushSync(loud){const H0=realHome();
       if(loud&&PREF.sys&&!H0)toast('Позначте своє місце, тоді сервер стежитиме за загрозами для нього');
       wpStatus(null,!H0?'не позначено дім':Notification.permission==='denied'?'телефон заборонив: Налаштування iPhone → Сповіщення → NAVRYX SKY':!PREF.sys?'вимкнено':'немає дозволу');return;}
     if(!sub){const {key}=await fetch('/api/webpush/key').then(r=>r.json());sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(key)});}
-    // обрані області й громади (явно, не автоматична «область дому») — сервер шле по них зведення навіть із закритим застосунком
-    const MZ=myZones(),zones=!MZ.auto&&((MZ.obl&&MZ.obl.length)||(MZ.hrom&&MZ.hrom.length))?{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)}:null;// область дому «автоматично» не шлемо: зведення по всій області засмічує// без явного вибору — область дому
+    // обрані області й громади (явно, не автоматична «область дому») - сервер шле по них зведення навіть із закритим застосунком
+    const MZ=myZones(),zones=!MZ.auto&&((MZ.obl&&MZ.obl.length)||(MZ.hrom&&MZ.hrom.length))?{obl:MZ.obl||[],hrom:(MZ.hrom||[]).map(h=>h.id)}:null;// область дому «автоматично» не шлемо: зведення по всій області засмічує// без явного вибору - область дому
     const hk=H0.map(v=>v.toFixed(2)).join(',')+'|'+sub.endpoint.slice(-24)+'|'+(PREF.pre!==false)+'|'+JSON.stringify(zones);let prev=null;try{prev=localStorage.getItem('wp_home');}catch(e){}
     if(prev!==hk||loud){const r=await fetch('/api/webpush/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sub:sub.toJSON(),lon:+H0[0].toFixed(2),lat:+H0[1].toFixed(2),pre:PREF.pre!==false,zones})});
       if(r.ok){try{localStorage.setItem('wp_home',hk);}catch(e){}if(loud)toast('Сповіщення на заблокований екран увімкнено');}}
@@ -1575,7 +1575,7 @@ function pushCard(){if(document.getElementById('push-card'))return;
   if(!can&&ios&&!standalone){txt='Щоб SKY попереджав навіть із закритим телефоном: «Поділитися» → «На початковий екран», і відкрийте SKY звідти.';btn=null;}
   else if(can){txt=H0?'Попереджати про загрози для вашого дому й області навіть із закритим застосунком?':'Позначте свій дім, і SKY попереджатиме про загрози для нього навіть із закритим застосунком.';btn=H0?'Увімкнути сповіщення':'Позначити дім';}
   else return;
-  let alarm=false;try{const ho=homeObl();alarm=!!(ho&&typeof SNAP!=='undefined'&&SNAP&&SNAP.levels&&SNAP.levels[ho]);}catch(e){}// 12.11: лише область користувача — десь в Україні тривога є майже завжди
+  let alarm=false;try{const ho=homeObl();alarm=!!(ho&&typeof SNAP!=='undefined'&&SNAP&&SNAP.levels&&SNAP.levels[ho]);}catch(e){}// 12.11: лише область користувача - десь в Україні тривога є майже завжди
   const el=document.createElement('div');el.id='push-card';el.className='push-card'+(alarm?' compact':'');
   el.innerHTML=alarm?'<span>🔔 Триває тривога. '+esc(btn?'Увімкніть сповіщення, щоб не пропустити наступну.':txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>'
     :'<b>🔔 Сповіщення</b><span>'+esc(txt)+'</span><div>'+(btn?'<button class="pill primary" id="pc-on">'+btn+'</button>':'')+'<button class="pill" id="pc-x">Пізніше</button></div>';
@@ -1609,7 +1609,7 @@ function installHint(){if(document.getElementById('inst-hint'))return;
   $('#ih-ok').onclick=done;$('#ih-x').onclick=done;}
 setTimeout(()=>{try{installHint();}catch(e){}},9000);
 setTimeout(pushCard,6000);
-/* 13.11: «Перешли рідним» — з третього дня користування, не частіше раз на 7 днів, максимум 2 рази. Охоплення росте через людей */
+/* 13.11: «Перешли рідним» - з третього дня користування, не частіше раз на 7 днів, максимум 2 рази. Охоплення росте через людей */
 function shareCard(){if(document.getElementById('share-card')||document.getElementById('inst-hint')||document.getElementById('push-card'))return;
   let days=[],n=0,last=0;try{days=JSON.parse(localStorage.getItem('use_days')||'[]');const d=new Date().toISOString().slice(0,10);if(!days.includes(d)){days.push(d);days=days.slice(-30);localStorage.setItem('use_days',JSON.stringify(days));}
     n=+localStorage.getItem('share_n')||0;last=+localStorage.getItem('share_t')||0;}catch(e){return;}
@@ -1832,7 +1832,7 @@ setInterval(()=>{
 fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const box=$('#ai-box');if(!box)return;$('#ai-ask').hidden=false;
   const aiHide=()=>{const a=$('#ai-ans');a.hidden=true;a.innerHTML='';clearTimeout(aiHide.t);};
   $('#ai-ans').onclick=e=>{e.stopPropagation();if(e.target.closest('.ai-x'))aiHide();};
-  $('#ai-ask').onclick=async e=>{e.stopPropagation();const a=$('#ai-ans');if(!a.hidden){aiHide();return;}// друге торкання — сховати
+  $('#ai-ask').onclick=async e=>{e.stopPropagation();const a=$('#ai-ans');if(!a.hidden){aiHide();return;}// друге торкання - сховати
     const ob=homeObl();a.hidden=false;clearTimeout(aiHide.t);aiHide.t=setTimeout(aiHide,90000);// саме зникає за 1,5 хв
     if(!ob){a.innerHTML='Спершу позначте дім кнопкою ⌂';return;}
     a.innerHTML='<small>Аналізую дані SKY…</small>';
@@ -1841,7 +1841,7 @@ fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const b
     catch(x){a.innerHTML='Не вдалося отримати відповідь';}};}).catch(()=>{});
 })();
 
-/* 12.11: закриття свайпом. Бічні панелі (налаштування, арсенал, стрічка) — вправо; нижня картка цілі й картки-підказки — вниз.
+/* 12.11: закриття свайпом. Бічні панелі (налаштування, арсенал, стрічка) - вправо; нижня картка цілі й картки-підказки - вниз.
    Свайп ігнорується, якщо палець почав рух на прокручуваному списку, що ще не доскролений до краю, на повзунку або у стрічці з горизонтальним скролом. */
 (function(){
   function scrollableAncestor(t,root,axis){for(let n=t;n&&n!==root;n=n.parentElement){if(!n||n.nodeType!==1)break;const cs=getComputedStyle(n);
@@ -1864,7 +1864,7 @@ fetch('/api/llm').then(r=>r.json()).then(st=>{if(!st||!st.enabled)return;const b
         setTimeout(()=>{try{closeFn();}catch(_){}el.style.transition='';el.style.transform='';el.style.animation='';},200);}
       else{el.style.transform='';setTimeout(()=>{el.style.transition='';el.style.animation='';},230);}};
     el.addEventListener('touchend',end,{passive:true});el.addEventListener('touchcancel',end,{passive:true});}
-  // нижня картка цілі: короткий свайп вниз — ЗГОРНУТИ (лишається смужка із заголовком), довгий або різкий — ЗАКРИТИ; свайп угору по смужці — розгорнути.
+  // нижня картка цілі: короткий свайп вниз - ЗГОРНУТИ (лишається смужка із заголовком), довгий або різкий - ЗАКРИТИ; свайп угору по смужці - розгорнути.
   // Ловимо жест і за ручку зверху (touch-action:none, працює завжди), і за вміст, коли він прокручений до верху.
   function sheetSwipe(el){
     if(!el||el._swc)return;el._swc=1;

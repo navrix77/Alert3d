@@ -1,5 +1,5 @@
 // Кеш оболонки застосунку; дані про цілі завжди з мережі (застарілі цілі гірші за відсутні).
-const C='tryvoga-v509';const SHELL=['/','/vendor/maplibre-gl.js','/vendor/maplibre-gl.css','/vendor/three.min.js','/index.html','/style.css','/app.js','/perf.js','/sound.js','/arsenal.js','/live.js','/skyradio.js','/widget.js','/cine.js','/fx.js','/icons.js','/models3d.js','/sprites/t-shahed.png','/sprites/t-jet.png','/sprites/t-cruise.png','/sprites/t-ballistic.png','/sprites/t-kab.png','/sprites/afld.png','/brand/logo-a.png','/brand/lp-gold.png','/brand/lp-blue.png','/brand/lp-star.png','/brand/lp-t1.png','/brand/lp-t2.png','/sprites/s-tu95.png','/sprites/s-tu160.png','/sprites/s-tu22.png','/sprites/s-mig31.png','/sprites/t-molniya.png','/manifest.webmanifest','/brand/emblem.png','/brand/icon-192.png','/brand/badge-96.png','/data/oblasts.geojson','/data/raions.geojson'];
+const C='tryvoga-v510';const SHELL=['/','/vendor/maplibre-gl.js','/vendor/maplibre-gl.css','/vendor/three.min.js','/index.html','/style.css','/app.js','/perf.js','/sound.js','/arsenal.js','/live.js','/skyradio.js','/widget.js','/cine.js','/fx.js','/icons.js','/models3d.js','/sprites/t-shahed.png','/sprites/t-jet.png','/sprites/t-cruise.png','/sprites/t-ballistic.png','/sprites/t-kab.png','/sprites/afld.png','/brand/logo-a.png','/brand/lp-gold.png','/brand/lp-blue.png','/brand/lp-star.png','/brand/lp-t1.png','/brand/lp-t2.png','/sprites/s-tu95.png','/sprites/s-tu160.png','/sprites/s-tu22.png','/sprites/s-mig31.png','/sprites/t-molniya.png','/manifest.webmanifest','/brand/emblem.png','/brand/icon-192.png','/brand/badge-96.png','/data/oblasts.geojson','/data/raions.geojson'];
 // Кешуємо кожен файл окремо й не валимо встановлення через один збій: addAll відхиляє ВСЕ при дублікаті чи 404,
 // і тоді служба не стартує зовсім (03.11: дубль icon-192 у списку → push не працював, «служба сповіщень не запустилась»).
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>Promise.all([...new Set(SHELL)].map(u=>c.add(u).catch(()=>{})))));});
@@ -14,7 +14,7 @@ self.addEventListener('fetch',e=>{const u=new URL(e.request.url);
 
 // Web Push: сповіщення сервера навіть із закритим сайтом / заблокованим екраном
 self.addEventListener('push',e=>{let d={};try{d=e.data?e.data.json():{};}catch(x){d={title:'NAVRYX SKY',body:e.data?e.data.text():''};}
-  // рівень з першого символу заголовка: 🔴 — укриття (тримається на екрані, довга вібрація), 🟠 — курс на вас, 🟡 — можлива загроза, 🟢 — віддалились
+  // рівень з першого символу заголовка: 🔴 - укриття (тримається на екрані, довга вібрація), 🟠 - курс на вас, 🟡 - можлива загроза, 🟢 - віддалились
   const t=d.title||'NAVRYX SKY',red=t.startsWith('🔴'),org=t.startsWith('🟠');
   e.waitUntil(self.registration.showNotification(t,{body:d.body||'',tag:d.tag||'navryx',renotify:red||org,icon:'/brand/icon-192.png',badge:'/brand/badge-96.png',
     timestamp:Date.now(),data:{url:d.url||'/'},...(d.image?{image:d.image}:{}),silent:false,requireInteraction:red||org,

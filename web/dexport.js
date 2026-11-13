@@ -1,4 +1,4 @@
-/* Мапа доби: експорт PDF (A4, з лого) і короткого відео (4:5, з лого) — 04.11.
+/* Мапа доби: експорт PDF (A4, з лого) і короткого відео (4:5, з лого) - 04.11.
    Мапу на час експорту рендеримо у фіксованому розмірі, щоб результат був однаковий з телефона і з комп'ютера.
    Користується глобальними map, D, DAY, OBL, VB, VS, T, ORDER, MAJOR, draw, bounds, OBLN, fd, hm з daily.html. */
 (function () {
@@ -59,7 +59,7 @@
 
   // спільне: шапка з лого
   function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
-  function brand(g, x, y, s) {// єдине лого (з назвою) + слоган; s — висота лого
+  function brand(g, x, y, s) {// єдине лого (з назвою) + слоган; s - висота лого
     if (LOGO) g.drawImage(LOGO, x, y, s * 1.3, s * 1.3);
     g.textAlign = 'left'; g.textBaseline = 'alphabetic';
     g.font = '600 ' + Math.round(s * 0.2) + 'px ' + FONT; g.fillStyle = MUTE; g.fillText('Розумій, що відбувається в небі', x + s * 1.45, y + s * 0.78);
@@ -105,7 +105,7 @@
       // права колонка
       const rx = M + MW + 36, rw = W - M - rx; let y = my;
       const cards = [['Маршрутів', D.tracks.filter(t => t.inO).length, '#F2F5FA'], ['Місць з вибухами', VB.length, '#FF8A5B'],
-        ['Місць пусків', VS.length, '#FF3D55'], [OBL ? 'Збито по Україні' : 'Збито, ПС ЗСУ', D.official ? D.official.shot : '—', BLUE]];
+        ['Місць пусків', VS.length, '#FF3D55'], [OBL ? 'Збито по Україні' : 'Збито, ПС ЗСУ', D.official ? D.official.shot : '-', BLUE]];
       const cw = (rw - 16) / 2, ch = 112;
       cards.forEach(([l, v, col], i) => {
         const x = rx + (i % 2) * (cw + 16), yy = y + Math.floor(i / 2) * (ch + 16);

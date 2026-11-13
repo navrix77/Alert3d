@@ -41,7 +41,7 @@ def _nm(tr: dict) -> str:
 COMPASS = ["на північ", "на північний схід", "на схід", "на південний схід", "на південь", "на південний захід", "на захід", "на північний захід"]
 
 
-ZONE_GAP = 300  # не частіше одного зонального зведення на пристрій за 5 хв (масована атака — не спам)
+ZONE_GAP = 300  # не частіше одного зонального зведення на пристрій за 5 хв (масована атака - не спам)
 ZONE_AHEAD = (5, 10, 15)  # хв: ціль, що за цей час увійде в зону, теж «у зоні»
 _HROM = None
 
@@ -120,7 +120,7 @@ def official_home(area: tuple, off: dict, levels: dict) -> str | None:
 from . import radio_spec as _spec  # noqa: E402
 
 # 12.11 (скрін: наш «Відбій» прийшов на хвилину пізніше за офіційний застосунок): було 45 с очікування в обидва боки.
-# Тривога — негайно (безпека важливіша за можливе зайве сповіщення); відбій — після підтвердження другим опитуванням (хибний
+# Тривога - негайно (безпека важливіша за можливе зайве сповіщення); відбій - після підтвердження другим опитуванням (хибний
 # «відбій» через збій зведення небезпечніший за 10 с затримки)
 OFF_STABLE_ON = 0
 OFF_STABLE_OFF = 10
@@ -191,9 +191,9 @@ def _move(tr: dict) -> str:
     return f"ймовірно {COMPASS[round(hd / 45) % 8]}" if hd is not None else ""
 
 VAPID_KEY = DB.parent / "vapid_private.pem"  # ключ сервера для Web Push (браузер/PWA/iPhone з початкового екрана)
-REARM = 600  # повтор по тій самій цілі — не раніше ніж за 10 хв після зникнення загрози
+REARM = 600  # повтор по тій самій цілі - не раніше ніж за 10 хв після зникнення загрози
 
-# Розподіл похибки курсу (град., 20 квантилів) за джерелом курсу — бектест журналу 26.10–02.11: курс, що показувала мапа,
+# Розподіл похибки курсу (град., 20 квантилів) за джерелом курсу - бектест журналу 26.10–02.11: курс, що показувала мапа,
 # проти того, куди ціль назвали далі (через 3–40 хв). Старе правило «курс ±18° на дім» ловило лише 42% реальних
 # наближень; ймовірність із цього розподілу відкалібрована на відкладеній половині даних (0.48 проти 0.51, 0.19/0.14, 0.10/0.08).
 HD_Q = {"channels": [0, 0, 0, 0, 0, 5, 7, 10, 14, 19, 22, 28, 32, 42, 50, 56, 63, 82, 93, 145],
@@ -219,9 +219,9 @@ class Push:
     def __init__(self, path: Path = DB) -> None:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.execute("CREATE TABLE IF NOT EXISTS subs(token TEXT PRIMARY KEY, lon REAL, lat REAL, t REAL)")
-        # Web Push: сайт і PWA (Android Chrome, Windows, iPhone з «На початковий екран») — сповіщення навіть із закритим браузером
+        # Web Push: сайт і PWA (Android Chrome, Windows, iPhone з «На початковий екран») - сповіщення навіть із закритим браузером
         self.db.execute("CREATE TABLE IF NOT EXISTS websubs(endpoint TEXT PRIMARY KEY, sub TEXT, lon REAL, lat REAL, t REAL)")
-        try:  # «лише курс на ваш район» — без ранніх «можлива загроза» (менше сповіщень)
+        try:  # «лише курс на ваш район» - без ранніх «можлива загроза» (менше сповіщень)
             self.db.execute("ALTER TABLE websubs ADD COLUMN pre INTEGER DEFAULT 1")
         except sqlite3.OperationalError:
             pass
@@ -236,9 +236,9 @@ class Push:
         self.armed: dict[str, dict[str, float]] = {}  # телефон → цілі, про які вже була «загроза» (для явного відбою)
         self.zseen: dict[tuple, float] = {}  # (пристрій, ціль) → коли сповістили про ціль у його зоні
         self.zlast: dict[str, float] = {}  # пристрій → коли надіслали останнє зональне зведення
-        # офіційна тривога для дому: (стан, з якого моменту стабільний, чи вже повідомили) — як застосунок «Повітряна тривога»
+        # офіційна тривога для дому: (стан, з якого моменту стабільний, чи вже повідомили) - як застосунок «Повітряна тривога»
         self.offst: dict[str, list] = {}
-        self.home_area: dict[str, tuple] = {}  # пристрій → (громада idx, район, область) — рахується раз
+        self.home_area: dict[str, tuple] = {}  # пристрій → (громада idx, район, область) - рахується раз
         self.sent = 0
 
     def register(self, token: str, lon: float, lat: float) -> bool:
@@ -252,7 +252,7 @@ class Push:
     # ---------- Web Push ----------
     def vapid(self):
         if self._vapid is None:
-            from py_vapid import Vapid02 as Vapid01  # RFC 8292 «vapid t=…, k=…» — потрібно Apple й іншим
+            from py_vapid import Vapid02 as Vapid01  # RFC 8292 «vapid t=…, k=…» - потрібно Apple й іншим
             if VAPID_KEY.exists():
                 self._vapid = Vapid01.from_file(str(VAPID_KEY))
             else:
@@ -326,7 +326,7 @@ class Push:
         P = to_xy(tr["lat"], tr["lon"])
         d = dist_km(H, P)
         if tr.get("nopos"):
-            # канали назвали лише курс («на Харків»): де ціль — невідомо. Загроза — лише якщо названий пункт біля дому,
+            # канали назвали лише курс («на Харків»): де ціль - невідомо. Загроза - лише якщо названий пункт біля дому,
             # без вигаданих «N км» і хвилин
             pts = [to_xy(la, lo) for lo, la in tr.get("route") or []] or [P]
             if any(dist_km(H, q) <= NEAR_KM for q in pts):
@@ -335,7 +335,7 @@ class Push:
         if d > 150:
             return None
         side = FROM[round(bearing(H, P) / 45) % 8]
-        if d <= NEAR_KM:  # ціль уже поруч — загроза незалежно від курсу (03.11: шахеди за 3–6 км, курс невідомий → push не було)
+        if d <= NEAR_KM:  # ціль уже поруч - загроза незалежно від курсу (03.11: шахеди за 3–6 км, курс невідомий → push не було)
             return {"d": d, "eta": None, "side": side, "p": 1.0, "stage": "threat"}
         base = Push.threat(tr, H)
         if base and base[1] is not None and tr.get("route"):
@@ -379,7 +379,7 @@ class Push:
     async def run(self, get_state) -> None:
         async with httpx.AsyncClient(timeout=15) as cli:
             while True:
-                await asyncio.sleep(2)  # 12.11: було 5 с — офіційна тривога/відбій мають іти без зайвих секунд
+                await asyncio.sleep(2)  # 12.11: було 5 с - офіційна тривога/відбій мають іти без зайвих секунд
                 try:
                     await self.tick(cli, get_state())
                 except Exception as e:  # noqa: BLE001
@@ -490,7 +490,7 @@ class Push:
                 gone, silent = [], []
                 for tid in list(arm):
                     tr = tracks.get(tid)
-                    # «зникла з повідомлень» (lost) — НЕ відбій: шахед може летіти мовчки між постами каналів.
+                    # «зникла з повідомлень» (lost) - НЕ відбій: шахед може летіти мовчки між постами каналів.
                     # Відбій лише з доказом: канали написали «збито / не фіксується» (closed) або ціль явно віддаляється.
                     if tr is None or tr["status"] == "lost":
                         silent.append(tid)
@@ -502,7 +502,7 @@ class Push:
                     if a is not None and a["stage"] is None and a.get("delta", 0) > 90:
                         gone.append(tid)
                 if silent and len(silent) + len(gone) == len(arm) and now - max(arm.values()) > 1800:
-                    self.armed.pop(token, None)  # пів години без новин — тихо забуваємо, але «відбою» не обіцяємо
+                    self.armed.pop(token, None)  # пів години без новин - тихо забуваємо, але «відбою» не обіцяємо
                 elif gone and len(gone) == len(arm) and now - max(arm.values()) > 120:
                     self.armed.pop(token, None)
                     out.append({"to": token, "title": "🟢 Цілі, що йшли до вас, віддалились",
@@ -552,7 +552,7 @@ class Push:
         """Одне повідомлення на телефон за тік. Заголовок: рівень, силует типу (емодзі), що і коли.
         Тіло: 📍 де, ➡️ куди, «+ ще N», дія. Без службових слів, кожен рядок коротший за ширину екрана."""
         if thr:
-            # першою — найнебезпечніша: уже поруч, далі найменший час підльоту, далі найближча
+            # першою - найнебезпечніша: уже поруч, далі найменший час підльоту, далі найближча
             thr.sort(key=lambda x: (0 if x[1].get("d") is not None and x[1]["d"] <= NEAR_KM else 1,
                                     x[1]["eta"] if x[1]["eta"] is not None else 999, x[1]["d"] if x[1]["d"] is not None else 999))
             tr, a = thr[0]

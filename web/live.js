@@ -99,7 +99,7 @@
 
   // ---------- дії мапи
   function bboxOf(pts) { let b = [180, 90, -180, -90]; for (const p of pts) if (p) b = [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])]; return b[0] <= b[2] ? b : null; }
-  // 04.11 власник: озвучена ціль — у центрі видимої частини мапи (смуга ефіру її не закриває), з наближенням
+  // 04.11 власник: озвучена ціль - у центрі видимої частини мапи (смуга ефіру її не закриває), з наближенням
   function pad() { const r = box.hidden ? null : box.getBoundingClientRect(); let top = 80, bottom = 60;
     if (r && r.height) { if (r.top < innerHeight / 2) top = Math.max(top, r.bottom + 24); else bottom = Math.max(bottom, innerHeight - r.top + 24); }
     return { top: Math.min(top, innerHeight * 0.5), bottom: Math.min(bottom, innerHeight * 0.5), left: 40, right: 40 }; }
@@ -142,20 +142,20 @@
       if (stop) break;
       say.textContent = s.say || ''; act(s);
       const t0 = Date.now(); await speak(s.say, 'radio', pre[k]);
-      const rest = audioOn ? (steps[k + 1] && steps[k + 1].say === s.say ? 0 : 600) : Math.max(0, Math.min(6500, 1800 + (s.say || '').length * 45) - (Date.now() - t0));  // з голосом — без зайвих пауз
+      const rest = audioOn ? (steps[k + 1] && steps[k + 1].say === s.say ? 0 : 600) : Math.max(0, Math.min(6500, 1800 + (s.say || '').length * 45) - (Date.now() - t0));  // з голосом - без зайвих пауз
       for (let k = 0; k < rest && !stop; k += 200) await wait(200);
       while (paused && !stop) await wait(200);
     }
     playing = false;
     if (!stop) autoClose();
   }
-  // 04.11 власник: немає новин і змін — ефір сам вимикається (як радіо мовчить); є зміни — панель зникає за 30 с,
+  // 04.11 власник: немає новин і змін - ефір сам вимикається (як радіо мовчить); є зміни - панель зникає за 30 с,
   // якщо людина не відкрила питання (⋯) і не взаємодіє з нею
   let acT = null;
   function autoClose() {
     clearTimeout(acT);
     const c = curDiff && curDiff.counts, quiet = !c || (!c.new && !c.changed && !c.gone && !(curDiff.bal || []).length);
-    // 04.11 власник: «після фрази відключай ефір» — остання репліка прозвучала, ефір закривається (якщо людина не читає подробиці)
+    // 04.11 власник: «після фрази відключай ефір» - остання репліка прозвучала, ефір закривається (якщо людина не читає подробиці)
     acT = setTimeout(() => { if (!playing && !box.hidden && !box.classList.contains('full') && !shelter && document.activeElement !== $('#lv-in')) $('#lv-close').click(); }, quiet ? 1500 : 2500);
   }
   box.addEventListener('pointerdown', () => clearTimeout(acT));
@@ -190,8 +190,8 @@
   $('#lv-in').onkeydown = e => { if (e.key === 'Enter') ask($('#lv-in').value.trim()); };
 
   // ---------- голосове питання (де браузер уміє розпізнавати мову)
-  // iPhone/iPad (і PWA на них): вбудоване розпізнавання браузера ненадійне — записуємо голос і розпізнаємо на сервері
-  // (Whisper через OpenAI/Groq, українська). На Android Chrome — вбудоване розпізнавання браузера, з тим самим запасним шляхом.
+  // iPhone/iPad (і PWA на них): вбудоване розпізнавання браузера ненадійне - записуємо голос і розпізнаємо на сервері
+  // (Whisper через OpenAI/Groq, українська). На Android Chrome - вбудоване розпізнавання браузера, з тим самим запасним шляхом.
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const canRec = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
@@ -199,7 +199,7 @@
   let rec = null;
   async function recordAndAsk() {
     const mic = $('#lv-mic');
-    if (rec) { try { rec.stop(); } catch (e) {} return; }  // друге торкання — стоп
+    if (rec) { try { rec.stop(); } catch (e) {} return; }  // друге торкання - стоп
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
     catch (e) { say.textContent = 'Немає доступу до мікрофона. Дозвольте його в Налаштуваннях → Safari (або для застосунку) → Мікрофон.'; return; }
@@ -271,7 +271,7 @@
   };
 
   // ---------- Sky Radio (04.11, переробка): говорить, коли біля вас щось змінилось; без змін мовчить (раз на 8 хв коротко
-  // нагадує обстановку); уся Україна — на початку й раз на 15 хв. Звуки як на радіо: позивний, сигнал новин, тривожний сигнал,
+  // нагадує обстановку); уся Україна - на початку й раз на 15 хв. Звуки як на радіо: позивний, сигнал новин, тривожний сигнал,
   // тиха фонова підкладка, що стихає під голос. Усе синтезовано тут же (власні звуки, не чужа музика).
   let idleSince = 0, radioLast = 0, radioBusy2 = false, radioSid = '', radioOn = false, radioT = null, radioSeen = 0, radioBusy = false, lastCountry = 0;
   const RA = { ctx: null, bed: null, bedGain: null, master: null };
@@ -287,8 +287,8 @@
     o.connect(g).connect(dest || RA.master); o.start(t0); o.stop(t0 + dur + 0.05);
   }
   // звукове оформлення за концепцією SKY Radio (04.11): фірмовий мотив із трьох чистих «скляних» нот з теплою основою, моно;
-  // звичайне оновлення — один м'який тон; важливе — два виразні тони (інший ритм і тембр, не гучніше); збій — нейтральний звук;
-  // завершення зведення — скорочений мотив. Без сирен, вибухів, радарних і військових ефектів
+  // звичайне оновлення - один м'який тон; важливе - два виразні тони (інший ритм і тембр, не гучніше); збій - нейтральний звук;
+  // завершення зведення - скорочений мотив. Без сирен, вибухів, радарних і військових ефектів
   function glass(freq, t0, dur, vol) {  // скляна нота: синус + тихий обертон, м'яка атака, короткий хвіст
     const c = raCtx(), g = c.createGain(), o1 = c.createOscillator(), o2 = c.createOscillator(), g2 = c.createGain();
     o1.type = 'sine'; o1.frequency.value = freq; o2.type = 'sine'; o2.frequency.value = freq * 2.756; g2.gain.value = 0.12;
@@ -299,7 +299,7 @@
     o.type = 'triangle'; o.frequency.value = freq; lp.type = 'lowpass'; lp.frequency.value = 700;
     g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(lp).connect(g).connect(RA.master); o.start(t0); o.stop(t0 + dur + 0.05); }
-  // 04.11 власник: «звуки жахливі, потрібно щось приємне мелодійне» — короткі мелодійні джингли (живі інструменти: steel-drum
+  // 04.11 власник: «звуки жахливі, потрібно щось приємне мелодійне» - короткі мелодійні джингли (живі інструменти: steel-drum
   // і піцикато, ліцензія CC0, Kenney), зведені за гучністю; тональність фа мажор для позивного й новин, мінор для важливого
   const SURL = { ident: 'snd/ident.mp3', news: 'snd/news.mp3', calm: 'snd/calm.mp3', urgent: 'snd/urgent.mp3', outro: 'snd/outro.mp3', outage: 'snd/outage.mp3' }, SB = {};
   function sLoad() { const c = raCtx(); return Promise.all(Object.keys(SURL).map(k => SB[k] ? 0 : fetch(SURL[k]).then(r => r.arrayBuffer())
@@ -314,9 +314,9 @@
   // сповіщення поверх радіо: фон приглушується, голос радіо ставить на паузу sound.js
   addEventListener('sky-alert', e => duck(e.detail.on));
   // «Атмосфера ефіру» (налаштування): тиха синтезаторна підкладка між повідомленнями, без мелодії, пульсацій і наростання;
-  // під голосом стихає приблизно на 20+ дБ; для важливого, виправлення й збою вимикається. За замовчуванням — «Лише повідомлення»
+  // під голосом стихає приблизно на 20+ дБ; для важливого, виправлення й збою вимикається. За замовчуванням - «Лише повідомлення»
   // 05.11: фон був майже нечутним (гучність 4%) і в багатьох лишився «Тиша»: один раз скидаємо на «Атмосфера» з помітною гучністю
-  if (LS.get('radio_bed_v') !== '4') { LS.set('radio_bed_v', '4'); LS.set('radio_mode', 'music'); }  // 07.11: синтезована «атмосфера» прибрана, замість неї готова музика + джингл SKY RADIO  // 05.11: гучний варіант звучав жахливо — повернено «Тиша» і тиху гучність
+  if (LS.get('radio_bed_v') !== '4') { LS.set('radio_bed_v', '4'); LS.set('radio_mode', 'music'); }  // 07.11: синтезована «атмосфера» прибрана, замість неї готова музика + джингл SKY RADIO  // 05.11: гучний варіант звучав жахливо - повернено «Тиша» і тиху гучність
   function bedStart() {}  // синтезований фон прибрано (07.11)
   function bedStop() {}
   function duck(on) { try { window.SKYRADIO && window.SKYRADIO.duck(on); } catch (e) {} }
@@ -331,7 +331,7 @@
     if (sg) { sg.checked = LS.get('radio_sig') !== '0'; sg.onchange = () => LS.set('radio_sig', sg.checked ? '1' : '0'); }
     if (vol) { vol.value = Math.round((+(LS.get('radio_atmo_vol') || 0.04)) * 100); vol.oninput = () => { LS.set('radio_atmo_vol', String(vol.value / 100)); duck(false); }; }
     sync();
-    // охоплення: «Поруч зі мною» (радіус) / «Моя область» / «Вся Україна»; перемикання — нове зведення в новому режимі
+    // охоплення: «Поруч зі мною» (радіус) / «Моя область» / «Вся Україна»; перемикання - нове зведення в новому режимі
     const sc = document.getElementById('rad-scope'), rr = document.getElementById('rad-radius');
     const syncS = () => { sc && sc.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === (LS.get('radio_scope') || 'near')));
       rr && rr.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === String(LS.get('radio_radius') || 25))); };
@@ -352,7 +352,7 @@
       const r = pre ? await pre : await radioReq(scope, false, scope === 'country' && mode !== 'country');  // «Далі головні зміни по Україні»
       if (scope === 'country' || r.kind === 'brief') lastCountry = now;
       if (!radioOn) return;
-      // 04.11 власник: новин і змін немає — радіо, як і ефір, вимикається само (через 10 хв без жодного оновлення)
+      // 04.11 власник: новин і змін немає - радіо, як і ефір, вимикається само (через 10 хв без жодного оновлення)
       // 04.11 власник: радіо не вимикається, поки є тривога в області або цілі до 300 км; лише 15 хв повного затишшя → вимкнення
       if (!r.idle) idleSince = 0; else if (!idleSince) idleSince = NX().now();
       if (!r.text || r.level === 'calm') {
@@ -365,7 +365,7 @@
       } else radioLast = NX().now();
       if (scope === 'near') radioSeen = NX().now();
       const hard = r.level === 'urgent' || r.level === 'outage' || r.kind === 'correction';
-      if (hard) bedStop(); else bedStart();  // важливе, виправлення, збій — без фону
+      if (hard) bedStop(); else bedStart();  // важливе, виправлення, збій - без фону
       if (r.level === 'urgent' && window.SKYVOICE) window.SKYVOICE.stop();  // важливе перериває поточне
       const sp = r.speech || r.text || '', vp = r.voice || (r.audio ? preUrl(r.audio) : preVoice(sp, 'radio'));  // голос генерується, поки грає сигнал
       await (r.level === 'urgent' ? SND.urgent() : r.level === 'outage' ? SND.outage() : r.level === 'calm' ? SND.calm() : SND.news());
@@ -378,16 +378,16 @@
   const rshow = () => { rbtn.classList.toggle('on', radioOn); rbtn.innerHTML = '<span class=ri>📻</span><span class=rl>Sky Radio</span>'; rbtn.setAttribute('aria-label', radioOn ? 'Sky Radio в ефірі, вимкнути' : 'Увімкнути Sky Radio'); };
   rshow(); document.body.appendChild(rbtn);
   // під рядком лічильників цілей (він може перенестись у два рядки), щоб нічого не перекривати
-  // варіант А (власник 03.11): Ефір і Радіо в одному ряду з «Що зараз?» у картці «Мій дім»; без картки — зліва вгорі
+  // варіант А (власник 03.11): Ефір і Радіо в одному ряду з «Що зараз?» у картці «Мій дім»; без картки - зліва вгорі
   const row = document.getElementById('ai-row');
   const mh = document.querySelector('#me .me-head');
-  if (row) { if (mh) { btn.classList.add('in-head'); mh.insertBefore(btn, document.getElementById('me-share') || null); } else row.appendChild(btn); row.appendChild(rbtn); }  // 07.11: Ефір — прямо в смузі картки
+  if (row) { if (mh) { btn.classList.add('in-head'); mh.insertBefore(btn, document.getElementById('me-share') || null); } else row.appendChild(btn); row.appendChild(rbtn); }  // 07.11: Ефір - прямо в смузі картки
   else {
     const place = () => { const c = document.getElementById('counters'); const b = c && c.getBoundingClientRect();
       const y = b && b.height ? Math.round(b.bottom + 8) : 60; rbtn.style.top = y + 'px'; btn.style.top = (y + 48) + 'px'; };
     addEventListener('resize', place); setInterval(place, 3000); place();
   }
-  // Ефір: сірий і без світла, поки не активний; відкрито — червона точка світиться (власник 04.11)
+  // Ефір: сірий і без світла, поки не активний; відкрито - червона точка світиться (власник 04.11)
   const syncOn = () => btn.classList.toggle('on', !box.hidden);
   try { new MutationObserver(syncOn).observe(box, { attributes: true, attributeFilter: ['hidden'] }); } catch (e) {}
   syncOn();
@@ -415,9 +415,9 @@
       await id; await speak(IDT, 'radio', hi);
     }
     await radioIssue(null, pre);         // зведення в обраному режимі охоплення
-    // 04.11 власник: «де зведення по Україні?» — за концепцією: на початку й раз на 15 хв, у будь-якому режимі (із заготовок, безкоштовно)
+    // 04.11 власник: «де зведення по Україні?» - за концепцією: на початку й раз на 15 хв, у будь-якому режимі (із заготовок, безкоштовно)
     if (radioOn && sc0 !== 'country' && !lastCountry) await radioIssue('country');
-    // «Поруч зі мною» на заготовках дешеве й миттєве — перевіряємо кожні 15 с; область і Україна (через модель) — раз на 40 с
+    // «Поруч зі мною» на заготовках дешеве й миттєве - перевіряємо кожні 15 с; область і Україна (через модель) - раз на 40 с
     let tick = 0; radioT = setInterval(() => { tick++; const md = LS.get('radio_scope') || 'near';
       if (md !== 'country' && NX().now() - lastCountry > 900) radioIssue('country');
       else if (md === 'near' || tick % 3 === 0) radioIssue(); }, 15000);

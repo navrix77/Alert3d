@@ -1,6 +1,6 @@
 /* Налаштування віджета SKY для Windows і міні-вікна (04.11): що показувати, тема, прозорість, розмір тексту, компактний вигляд.
    Діє лише в міні-режимі (?mini=1, віджет Windows і «картинка в картинці»). Зберігається на пристрої. Розмір вікна, кут екрана,
-   «поверх усіх вікон» і автозапуск — у меню значка біля годинника (їх задає сама програма Windows). */
+   «поверх усіх вікон» і автозапуск - у меню значка біля годинника (їх задає сама програма Windows). */
 (function () {
   'use strict';
   if (!new URLSearchParams(location.search).has('mini') && !document.body.classList.contains('mini')) return;
@@ -75,7 +75,7 @@
     });
     panel.querySelectorAll('input[data-c]').forEach(i => i.onchange = () => { C[i.dataset.c] = i.checked; save(); apply(); });
   };
-  // повна версія сама перемикає день/ніч — у віджеті перевага за вибором власника
+  // повна версія сама перемикає день/ніч - у віджеті перевага за вибором власника
   try { new MutationObserver(() => { if (C.theme !== 'auto') apply(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); } catch (e) {}
   apply();
 })();

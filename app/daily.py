@@ -19,7 +19,7 @@ log = logging.getLogger("daily")
 VER = 6
 OUT = (Path(__import__("os").environ["PERSIST_DIR"]) / "daily") if __import__("os").environ.get("PERSIST_DIR") else Path(__file__).resolve().parent.parent / "data" / "daily"
 BOOM = re.compile(r"вибух|взрыв|прил[іеё]т|влучан|попадан|детонац|пожеж|уламк|обломк|пошкодж|поврежд|руйнув|зруйн|постраждал|пострадал|загинул|загибл|поранен")
-# лише робота ППО без жодних наслідків — не «приліт»
+# лише робота ППО без жодних наслідків - не «приліт»
 PPO_ONLY = re.compile(r"збит|сбит|мінус|минус|ппо|пво|не фіксу|відбій|історі|рік тому|роковин")
 DAMAGE = re.compile(r"уламк|обломк|пошкодж|поврежд|руйнув|зруйн|постраждал|пострадал|загинул|загибл|поранен|пожеж|влучан|приліт|прил[её]т|попадан")
 NOT_BOOM = PPO_ONLY  # сумісність
@@ -103,8 +103,8 @@ async def crawl_impacts(t0: float, t1: float, parser, max_pages: int = 40) -> li
                 continue
             base = p.name.split(" (")[0]
             stem = base[:max(3, len(base) - 2)]
-            # назва має стояти в тексті з великої літери не на початку речення — інакше це звичайне слово
-            # («українці», «зелень», «Слава Україні»); виняток — місто каналу, підставлене без згадки
+            # назва має стояти в тексті з великої літери не на початку речення - інакше це звичайне слово
+            # («українці», «зелень», «Слава Україні»); виняток - місто каналу, підставлене без згадки
             if p.kind != "D" and not CAPMID(stem).search(text) and p.name not in (CHANNEL_CITY.get(key), CAPITAL.get(reg_of.get(key, ""))):
                 continue
             b = booms.setdefault(p.name, {"n": p.name, "lat": p.lat, "lon": p.lon, "c": 0, "t": int(ts), "last": 0, "srcs": set(), "links": [], "pop": p.pop})
@@ -114,7 +114,7 @@ async def crawl_impacts(t0: float, t1: float, parser, max_pages: int = 40) -> li
             b["srcs"].add(key)
             if len(b["links"]) < 3:
                 b["links"].append(link)
-    # село з одним джерелом — надто ненадійно (тезки, загальні слова); місто або ≥2 незалежні канали — так
+    # село з одним джерелом - надто ненадійно (тезки, загальні слова); місто або ≥2 незалежні канали - так
     return [{"n": b["n"], "lat": b["lat"], "lon": b["lon"], "c": b["c"], "t": b["t"], "src": len(b["srcs"]), "links": b["links"]}
             for b in booms.values() if b["pop"] >= 20000 or len(b["srcs"]) >= 2]
 SHOT = re.compile(r"збито/подавлено\s+(\d+)")
@@ -178,7 +178,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
                 continue
             k = f"{tr['id']}@{int(tr['first'])}"
             e = traj.setdefault(k, {"type": tr["type"], "count": tr["count"] or 1, "pts": [], "obs": {}, "launch": None, "next": None})
-            for q in tr.get("trail") or []:  # справжні фіксації каналів — основа маршруту (без «зигзагів» оцінки)
+            for q in tr.get("trail") or []:  # справжні фіксації каналів - основа маршруту (без «зигзагів» оцінки)
                 e["obs"][int(q[2])] = [round(q[0], 4), round(q[1], 4), int(q[2])]
             e["count"] = max(e["count"], tr["count"] or 1)
             if tr.get("launch") and not tr["launch"].get("est"):
@@ -198,7 +198,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
             if kind == "filtered" and ts >= t0 and text and is_impact(text.lower()):
                 o = parser.parse(text, src)
                 pl = [r.place for r in o.places[:2]]
-                if not pl and src in CHANNEL_CITY:  # «Вибух» у міському каналі — це його місто
+                if not pl and src in CHANNEL_CITY:  # «Вибух» у міському каналі - це його місто
                     ids = parser.gaz.lookup(CHANNEL_CITY[src])
                     if ids:
                         pl = [max((parser.gaz.places[i] for i in ids), key=lambda q: q.pop)]
@@ -206,7 +206,7 @@ async def build(day: str, brain, feed, parser, make_tracker, ctx_dicts) -> dict:
                     if not (44 <= p.lat <= 52.5 and 22 <= p.lon <= 40.3):
                         continue
                     b = booms.setdefault(p.name, {"n": p.name, "lat": p.lat, "lon": p.lon, "c": 0, "t": int(ts), "last": 0})
-                    if ts - b["last"] > 120:  # серія повідомлень про той самий вибух — один епізод
+                    if ts - b["last"] > 120:  # серія повідомлень про той самий вибух - один епізод
                         b["c"] += 1
                     b["last"] = ts
             if link and (link, text) in seen_links:
@@ -334,7 +334,7 @@ class Daily:
         return d if d and d.get("v") == VER else None
 
     def _save(self, d: dict) -> None:
-        """Одразу на диск — і чернетку, і без вибухів з історії: перезапуск сервера не змушує людей чекати перебудови."""
+        """Одразу на диск - і чернетку, і без вибухів з історії: перезапуск сервера не змушує людей чекати перебудови."""
         try:
             (OUT / f"{d['day']}.json").write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         except OSError:
@@ -354,7 +354,7 @@ class Daily:
         return d
 
     async def get(self, day: str) -> dict:
-        """Ніколи не змушуємо чекати, якщо є хоч якась зібрана версія: віддаємо її, а оновлення — у фоні."""
+        """Ніколи не змушуємо чекати, якщо є хоч якась зібрана версія: віддаємо її, а оновлення - у фоні."""
         c = self.cache.get(day) or self._disk(day)
         if c:
             self.cache[day] = c
@@ -390,8 +390,8 @@ class Daily:
 
     async def run(self) -> None:
         """Мапа доби готова до 09:05 без очікування в застосунку:
-        08:50 — чернетка поточної доби на диск; одразу після 09:00 — повна доба; далі оновлення, поки не стане остаточною
-        (підсумок Повітряних сил або +4 год). Після перезапуску сервера — з диска, без перебудови."""
+        08:50 - чернетка поточної доби на диск; одразу після 09:00 - повна доба; далі оновлення, поки не стане остаточною
+        (підсумок Повітряних сил або +4 год). Після перезапуску сервера - з диска, без перебудови."""
         await asyncio.sleep(30)
         pushed: set[str] = set()
         while True:

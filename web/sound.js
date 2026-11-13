@@ -16,7 +16,7 @@
   function vaPlay(url,vol,rate){return new Promise(res=>{let done=false;const fin=ok=>{if(done)return;done=true;if(VA.onended&&vaEnd===fin){VA.onended=VA.onerror=null;}res(ok);};
     if(vaEnd)vaEnd(true);vaEnd=fin;try{VA.pause();}catch(e){}VA.onended=()=>fin(true);VA.onerror=()=>fin(false);try{VA.preservesPitch=true;VA.defaultPlaybackRate=rate||1;}catch(e){}VA.src=url;VA.volume=vol==null?1:vol;try{VA.playbackRate=rate||1;}catch(e){}
     const p=VA.play();if(p)p.catch(()=>fin(false));
-    // сторож від зависання: лише якщо звук справді не грає (довге зведення радіо триває й 60+ с — не обриваємо)
+    // сторож від зависання: лише якщо звук справді не грає (довге зведення радіо триває й 60+ с - не обриваємо)
     const dog=()=>{if(done)return;if((held&&held.fin===fin)||(vaEnd===fin&&!VA.paused&&!VA.ended)){setTimeout(dog,5000);return;}fin(true);};setTimeout(dog,30000);});}
   // 04.11 власник: сповіщення важливіше за радіо й ефір: їхній голос ставиться на паузу, звучить сповіщення, потім продовжується з того ж місця
   function hold(){if(held||alerting>1)return;try{if(vaEnd&&!VA.paused&&!VA.ended){held={src:VA.src,t:VA.currentTime,fin:vaEnd,vol:VA.volume,rate:VA.defaultPlaybackRate};vaEnd=null;VA.onended=VA.onerror=null;VA.pause();}}catch(e){held=null;}}
@@ -39,7 +39,7 @@
   let curA=null;
   // speak повертає Promise, що завершується, коли голос договорив (потрібно, щоб знати, коли продовжити радіо)
   function speak(text){if(!text)return Promise.resolve(false);
-    // 04.11: спершу із заготовок (фрази з кешу, без нових витрат), якщо ні — озвучка цілим текстом, далі голос пристрою
+    // 04.11: спершу із заготовок (фрази з кешу, без нових витрат), якщо ні - озвучка цілим текстом, далі голос пристрою
     if(S.voice&&S.voice!=='device'){try{const q='voice='+encodeURIComponent(S.voice)+'&rate='+S.rate+'&text='+encodeURIComponent(text);
       return vaPlay('/api/voice/alert?'+q,S.vol).then(ok=>ok||vaPlay('/api/tts?v=3&'+q,S.vol)).then(ok=>ok||sysSpeak(text));}catch(e){}}
     return sysSpeak(text);}
