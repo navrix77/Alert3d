@@ -16,6 +16,7 @@ from pathlib import Path
 
 _DIR = Path(os.getenv("PERSIST_DIR") or Path(__file__).resolve().parent.parent / "data")
 PAGES = {"/", "/index.html", "/analysis.html", "/daily.html", "/ar.html"}
+PAGES |= {"/jak.html", "/about.html"} | {f"/oblast/{s}.html" for s in ("kharkiv", "kyiv", "sumy", "dnipro", "zaporizhzhia", "odesa", "poltava", "chernihiv", "mykolaiv", "kherson", "lviv", "kryvyi-rih")}  # 13.11: сторінки для пошуку теж рахуємо
 BOTS = ("bot", "spider", "crawl", "preview", "curl", "python-requests", "httpx", "uptime", "monitor", "headless")
 
 
