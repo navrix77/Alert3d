@@ -1514,7 +1514,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 508,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 509,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
@@ -1564,7 +1564,8 @@ function pushCard(){if(document.getElementById('push-card'))return;
   const ios=/iPhone|iPad/.test(navigator.userAgent),standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
   const can='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
   // не частіше за раз на 3 дні, максимум 3 рази; лічильник росте лише від натискання кнопки (автозникнення відмовою не вважається)
-  const DAY=864e5,GAP=3*DAY,MAX=3;let n=0,last=0;
+  // 13.11: у встановленому застосунку (там пуш реально працює) питаємо частіше: раз на добу, до 5 разів
+  const DAY=864e5,GAP=(standalone?1:3)*DAY,MAX=standalone?5:3;let n=0,last=0;
   try{n=+localStorage.getItem('push_card_n')||0;last=+localStorage.getItem('push_card_t')||0;
     if(!n&&(localStorage.getItem('push_card_once')||localStorage.getItem('push_card_x'))){n=1;last=+localStorage.getItem('push_card_once')||Date.now();}}catch(e){return;}
   if(n>=MAX||(last&&Date.now()-last<GAP))return;
@@ -1607,7 +1608,21 @@ function installHint(){if(document.getElementById('inst-hint'))return;
   const done=()=>{try{localStorage.setItem('inst_n',String(n+1));localStorage.setItem('inst_t',String(Date.now()));}catch(e){}el.remove();};
   $('#ih-ok').onclick=done;$('#ih-x').onclick=done;}
 setTimeout(()=>{try{installHint();}catch(e){}},9000);
-setTimeout(pushCard,6000);setInterval(()=>{try{pushCard();}catch(e){}},60000);// під час тривоги з'являється компактний банер
+setTimeout(pushCard,6000);
+/* 13.11: «Перешли рідним» — з третього дня користування, не частіше раз на 7 днів, максимум 2 рази. Охоплення росте через людей */
+function shareCard(){if(document.getElementById('share-card')||document.getElementById('inst-hint')||document.getElementById('push-card'))return;
+  let days=[],n=0,last=0;try{days=JSON.parse(localStorage.getItem('use_days')||'[]');const d=new Date().toISOString().slice(0,10);if(!days.includes(d)){days.push(d);days=days.slice(-30);localStorage.setItem('use_days',JSON.stringify(days));}
+    n=+localStorage.getItem('share_n')||0;last=+localStorage.getItem('share_t')||0;}catch(e){return;}
+  if(days.length<3||n>=2||(last&&Date.now()-last<7*864e5))return;
+  const el=document.createElement('div');el.id='share-card';el.className='inst-hint';
+  el.innerHTML='<b>🤝 SKY корисний?</b><span>Перешліть рідним і сусідам: що летить і куди, видно на мапі, безкоштовно.</span><div><button class="pill primary" id="sc-ok">Поділитися</button><button class="pill" id="sc-x">Пізніше</button></div>';
+  document.body.appendChild(el);
+  const done=()=>{try{localStorage.setItem('share_n',String(n+1));localStorage.setItem('share_t',String(Date.now()));}catch(e){}el.remove();};
+  $('#sc-x').onclick=done;
+  $('#sc-ok').onclick=async()=>{const url='https://sky.navryx.com.ua/?s=share',text='Мапа повітряних загроз наживо: що летить і куди. Безкоштовно.';
+    done();if(navigator.share){try{await navigator.share({title:'NAVRYX SKY',text,url});}catch(_){}}else{try{await navigator.clipboard.writeText(text+' '+url);toast('Посилання скопійовано');}catch(_){}}};}
+setTimeout(()=>{try{shareCard();}catch(e){}},45000);
+setInterval(()=>{try{pushCard();}catch(e){}},60000);// під час тривоги з'являється компактний банер
 // облік встановлень: запуск з іконки (встановлений застосунок) і подія встановлення; без cookies, сервер не зберігає IP
 try{if(matchMedia('(display-mode: standalone)').matches||navigator.standalone)fetch('/api/visits/app?k=app',{method:'POST'}).catch(()=>{});
   addEventListener('appinstalled',()=>fetch('/api/visits/app?k=install',{method:'POST'}).catch(()=>{}));}catch(e){}
