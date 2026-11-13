@@ -24,16 +24,16 @@ jobs:
         run: |
           mkdir -p /tmp/snap
           U=https://sky.navryx.com.ua
-          for p in selfcheck daily fusion; do curl -s --max-time 120 "$U/api/$p" -o /tmp/snap/$p.json; done
+          for p in selfcheck daily fusion; do curl -s --retry 4 --retry-connrefused --retry-delay 30 --max-time 120 "$U/api/$p" -o /tmp/snap/$p.json; done
           # лічильник відвідувань: лише агреговані числа по днях (без IP і хешів), публічна адреса /api/visits
-          curl -s --max-time 60 "$U/api/visits?days=60" -o /tmp/snap/visits.json
+          curl -s --retry 4 --retry-connrefused --retry-delay 30 --max-time 60 "$U/api/visits?days=60" -o /tmp/snap/visits.json
           # журнал: API віддає щонайбільше 5000 найновіших, тож беремо ще й вибірки за видом
-          curl -s --max-time 120 "$U/api/journal?hours=$H&limit=5000&key=$AK" -o /tmp/snap/journal.json
-          for k in track zone close filtered avia; do curl -s --max-time 120 "$U/api/journal?hours=$H&limit=5000&kind=$k&key=$AK" -o /tmp/snap/journal_$k.json; done
+          curl -s --retry 4 --retry-connrefused --retry-delay 30 --max-time 120 "$U/api/journal?hours=$H&limit=5000&key=$AK" -o /tmp/snap/journal.json
+          for k in track zone close filtered avia; do curl -s --retry 4 --retry-connrefused --retry-delay 30 --max-time 120 "$U/api/journal?hours=$H&limit=5000&kind=$k&key=$AK" -o /tmp/snap/journal_$k.json; done
           # повідомлення за кожним каналом окремо: ліміт 5000 на запит, а за масовану добу лише track більше (07.11: track лише за 11 год із 72)
           mkdir -p /tmp/snap/src
           python3 -c "import json,glob;print('\n'.join(sorted({i['src'] for f in glob.glob('/tmp/snap/journal*.json') for i in json.load(open(f)).get('items',[])})))" > /tmp/srcs.txt || true
-          while read -r s; do [ -n "$s" ] && curl -s --max-time 60 -G "$U/api/journal" --data-urlencode "src=$s" --data-urlencode "key=$AK" -d "hours=$H" -d limit=5000 -o "/tmp/snap/src/$s.json"; done < /tmp/srcs.txt
+          while read -r s; do [ -n "$s" ] && curl -s --retry 4 --retry-connrefused --retry-delay 30 --max-time 60 -G "$U/api/journal" --data-urlencode "src=$s" --data-urlencode "key=$AK" -d "hours=$H" -d limit=5000 -o "/tmp/snap/src/$s.json"; done < /tmp/srcs.txt
           cp scripts/journal_archive.py /tmp/journal_archive.py  # архів по днях: скрипт із main, бо далі перемикаємось на night-data
           date -u +%FT%TZ > /tmp/snap/taken.txt
           ls -la /tmp/snap
