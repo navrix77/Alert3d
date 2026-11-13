@@ -1530,7 +1530,7 @@ class Tracker:
             life = self.life(tr)
             age = now - tr.last.t
             status = "closed" if tr.closed else ("lost" if age > life else "active")
-            if status != "active" and age > life + 900:
+            if status != "active" and age > life + 300:  # 13.11 скарги «цілі стоять на місці»: втрачену ціль тримаємо 5 хв, не 15
                 continue
             mk = MAP_K.get(tr.type, 1.0)
             ex, ey = map_xy(tr, now, self.brain) if status == "active" else (tr.last.x, tr.last.y)

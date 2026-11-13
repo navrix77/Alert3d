@@ -594,13 +594,15 @@ function posAt(tr,serverT){
   if(tr.status!=='active')return {p:[tr.lon,tr.lat],hd:tr.hd};
   if(!tr.speed)return {p:[tr.lon,tr.lat],hd:tr.hd};// кадр машини часу: позиція вже на той момент
   // місце лише оцінене («курсом на X», і вже в X), а нового пункту немає: далі не «ведемо» ціль навмання
-  if(tr.pos_est&&!tr.route.length&&!tr.next)return {p:[tr.lon,tr.lat],hd:tr.hd};
+  // 13.11: якщо курс відомий, оцінена ціль не стоїть: коротко ведемо її далі тим самим курсом (шахед до 8 хв), далі зупиняємо
+  const ESTMIN=(tr.pos_est&&!tr.route.length&&!tr.next)?({shahed:8,uav:8,jet:3,molniya:3,lancet:3,recon:6}[tr.type]||0):-1;
+  if(ESTMIN===0||(ESTMIN>0&&tr.hd==null))return {p:[tr.lon,tr.lat],hd:tr.hd};
   // зміщення за час від останньої названої позиції, та сама модель, що на сервері (map_disp, бектест):
   // шахед ≈ паспортна×0.7 перші 10 хв, далі повільніше (√часу); сервер уже просунув ціль до моменту ts
   const dm=tr.dm||[ (tr.vmap||tr.speed)/tr.speed,1];const D=sec=>{const h=Math.max(0,sec)/60;return (h<=10||dm[1]===1)?tr.speed*h/60*dm[0]:tr.speed*10/60*dm[0]*Math.pow(h/10,dm[1]);};
   const done=D(tr.ts-tr.last);
   let km=Math.max(0,D(serverT-tr.last)-done);
-  const SHOW={shahed:25,molniya:4,fpv:2,fpvf:3,lancet:4,jet:6,cruise:2,ballistic:1}[tr.type]??25;// хв: ціль рухається курсом, доки не прийде нове повідомлення (зона «де може бути» росте)
+  const SHOW0={shahed:25,molniya:4,fpv:2,fpvf:3,lancet:4,jet:6,cruise:2,ballistic:1}[tr.type]??25,SHOW=ESTMIN>0?Math.min(ESTMIN,SHOW0):SHOW0;// хв: ціль рухається курсом, доки не прийде нове повідомлення (зона «де може бути» росте)
   const cap=Math.max(0,D(SHOW*60)-done);
   if(!tr.route.length)km=Math.min(km,cap);
   const pts=[xy([tr.lon,tr.lat]),...tr.route.map(xy)];
@@ -1517,7 +1519,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 511,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 512,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
