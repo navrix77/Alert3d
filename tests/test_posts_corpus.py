@@ -517,3 +517,14 @@ def test_fresh_sample_1211_fixes():
     assert not [r for r in o.places if r.place.name == "Вороніж"]
     o = p.parse("Найкращі показники впровадження — на Івано-Франківщині та Закарпатті, де наглядові ради є в усіх коледжах. У Запорізькій області вони працюють у 81% закладів, Полтавській — у 79%, Рівненській — у 71%.", "TRK")
     assert o.no_target or not o.places or o.kind == "info"
+
+
+def test_reply_with_own_type_ignores_quote():
+    """14.11: monitor1654 відповів «Ударний на Лісне/Місто❗️» на свій «Ударний на Борщову/Руські Тишки❗️»; цитата
+    поверталась у текст, ціль стрибала назад на Руські Тишки й розверталась носом до кордону."""
+    from app import tg_web
+    page = ('<div class="tgme_widget_message_wrap"><div class="tgme_widget_message js-widget_message" data-post="monitor1654/2">'
+            '<a class="tgme_widget_message_reply js-message_reply" href="x"><div class="tgme_widget_message_text js-message_reply_text">Ударний на Борщову/Руські Тишки❗️</div></a>'
+            '<div class="tgme_widget_message_text js-message_text" dir="auto">Ударний на Лісне/Місто❗️</div>'
+            '<time datetime="2026-11-14T12:13:51+02:00"></time></div></div>')
+    assert [x[2] for x in tg_web.parse_page(page)] == ["Ударний на Лісне/Місто❗️"]
