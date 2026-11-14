@@ -22,6 +22,14 @@ jobs:
           for f in out/*.json; do python3 - "$f" <<'PY' || true
           import json,sys
           d=json.load(open(sys.argv[1]))
+          def near(t): return t.get('lat') and 49.5<t['lat']<50.5 and 36.0<t['lon']<37.6
+          if isinstance(d,dict) and 'tracks' in d and 'history' in sys.argv[1]: pass
+          items=d.get('tracks') if isinstance(d,dict) else d
+          if isinstance(d,dict) and 'tracks' not in d:
+              for k,v in d.items():
+                  if isinstance(v,list):
+                      for t in v:
+                          if isinstance(t,dict) and near(t): print('H',k,json.dumps(t,ensure_ascii=False)[:900])
           if isinstance(d,dict) and 'tracks' in d:
               print('KEYS', sorted(d['tracks'][0].keys()) if d['tracks'] else [])
               for t in d['tracks']:
