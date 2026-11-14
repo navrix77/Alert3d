@@ -3094,3 +3094,17 @@ def test_national_uav_echo_merges_into_local_shahed_group():
     m.feed(trk, "Харківщина: 5 БпЛА біля Кочетка", "rozvidkaneba", now - 150, None, log=False)
     act = [t for t in trk.snapshot(now)["tracks"] if t["status"] == "active"]
     assert len(act) == 1 and act[0]["raw_type"] == "shahed" and act[0]["count"] == 6
+
+
+def test_day_1114_new_target_adjective_is_not_village():
+    """14.11 день (журнал 09–14.11): «Новий/Нова/Нові/Новые» перед типом, кількістю чи рухом означає «нова ціль», а не
+    с. Новий/Нова/Нове (radar_sich, UkraineRadar_24_7, my_safety_Chernigiv, sumyliketop, odessa_infonews). Село лишається
+    після стрілки або через «/»."""
+    names = lambda t, s: [r.place.name for r in P.parse(t, s, None).places]
+    assert names("Ⓜ️⚒️ Кр.Ріг : Новые и новые лезут так же есть Реактивный", "radar_sich") == []
+    assert names("⚠️ Новий курсом на Городню.", "UkraineRadar_24_7") == ["Городня"]
+    assert names("Нова пара з Брянська", "my_safety_Chernigiv") == []
+    assert names("Нові шахи", "sumyliketop") == []
+    assert names("Новые с моря — Снова 2х рБПЛА курс Пересыпь", "odessa_infonews") == ["Пересип (Одеса)"]
+    assert "Нове" in names("1 →Нове", "krop_vanek")
+    assert "Нове" in names("Біля Кропивницького- Обознівка/Нове", "krop_vanek")
