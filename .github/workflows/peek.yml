@@ -25,6 +25,7 @@ jobs:
           def near(t): return t.get('lat') and 49.5<t['lat']<50.5 and 36.0<t['lon']<37.6
           print('TOP', type(d).__name__, list(d.keys())[:20] if isinstance(d,dict) else len(d))
           if isinstance(d,dict) and isinstance(d.get('frames'),list):
+              print('FR0', len(d['frames']), json.dumps(d['frames'][-1]['tracks'][:1],ensure_ascii=False)[:1500] if d['frames'] else '')
               seen={}
               for f in d['frames']:
                   for t in f.get('tracks',[]):
