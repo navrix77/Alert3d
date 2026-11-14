@@ -3062,3 +3062,18 @@ def test_morning_1114_zaporizhzhia_header_districts_and_repeats():
     # «Верхня/Нижня Хортиця» — не точка острова; «с. Перемога» — село, а не житломасив Дніпра
     assert "о. Хортиця (Запоріжжя)" not in [n for n, a, b in _pl("на Верхню Хортицю.", "zaborzp")]
     assert "Перемога (Дніпро)" not in [n for n, a, b in _pl("Шахед повз Новомосковськ на с. Перемога", "Radar_Dnipra")]
+
+
+def test_header_region_beats_channel_region():
+    """14.11: на сервері автопошук записав radar_sich як «Дніпропетровська», і заголовок «Зпрж:» ігнорувався
+    (Піски йшли на Донеччину; тест проходив лише там, де немає sources_auto.json)."""
+    from app import config
+    old = config.CHANNEL_REGION.get("radar_sich")
+    config.CHANNEL_REGION["radar_sich"] = "Дніпропетровська"
+    try:
+        assert [(n, a) for n, a, b in _pl("Ⓜ️⚔️ Зпрж: Реактив на Піски", "radar_sich")] == [("Піски (Запоріжжя)", 47.77)]
+    finally:
+        if old is None:
+            config.CHANNEL_REGION.pop("radar_sich", None)
+        else:
+            config.CHANNEL_REGION["radar_sich"] = old

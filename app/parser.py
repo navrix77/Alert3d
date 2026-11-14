@@ -1072,7 +1072,7 @@ class Parser:
         tl = norm(text)
         from .config import CHANNEL_REGION
         creg = CHANNEL_REGION.get(channel or "", "")
-        hreg = hdr_region(text) if not creg else ""
+        hreg = hdr_region(text)  # 14.11: заголовок допису («Зпрж:») важливіший за область каналу (radar_sich автопошук записав як Дніпропетровську)
         # райони міста свого каналу — першими: «Над Подільським районом…» (PL) — Подільський район Полтави, а не київський Поділ
         own = [e for e in DISTRICT_RX if creg and creg in CITY_CFG.get(e[1][e[1].rfind("(") + 1:-1], ((),))[0]]
         for rx, dn, la, lo in own + [e for e in DISTRICT_RX if e not in own]:
