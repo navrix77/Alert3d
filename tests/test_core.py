@@ -3077,3 +3077,20 @@ def test_header_region_beats_channel_region():
             config.CHANNEL_REGION.pop("radar_sich", None)
         else:
             config.CHANNEL_REGION["radar_sich"] = old
+
+
+def test_national_uav_echo_merges_into_local_shahed_group():
+    """14.11: «6 ударних на Печеніги» (Радар Харків, monitor 1654) і «5 БпЛА біля Кочетка на Печеніги» (загальноукраїнські
+    канали) лишались двома групами, а на мапі значки складались у «×11»."""
+    import time
+    import app.main as m
+    from app import config
+    from app.tracker import Tracker
+    trk = Tracker(config.SOURCES, m.brain)
+    now = time.time()
+    m.feed(trk, "+ 5 Ударных БпЛА на Печенеги", "R", now - 300, None, log=False)
+    m.feed(trk, "Наразі в області: 🔻 6 Ударних БПЛА на Печеніги ❗️", "M", now - 240, None, log=False)
+    m.feed(trk, "5 БпЛА в районі Кочетка, курсом на Печеніги", "KL", now - 200, None, log=False)
+    m.feed(trk, "Харківщина: 5 БпЛА біля Кочетка", "rozvidkaneba", now - 150, None, log=False)
+    act = [t for t in trk.snapshot(now)["tracks"] if t["status"] == "active"]
+    assert len(act) == 1 and act[0]["raw_type"] == "shahed" and act[0]["count"] == 6

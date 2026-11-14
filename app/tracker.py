@@ -1319,6 +1319,11 @@ class Tracker:
                 elif {a.type, b.type} <= {"fpv", "fpvf", "shahed", "uav"} and {a.type, b.type} & {"fpv", "fpvf"}:
                     # 07.11 власник: «це напевно 1 і те ж» — FPV і шахед в одній точці (≤5 км) від різних каналів: той самий об'єкт
                     lim = 5
+                elif ({a.type, b.type} == {"shahed", "uav"} and not (a.srcs & b.srcs) and abs(a.last.t - b.last.t) <= 600
+                      and abs((a.count or 1) - (b.count or 1)) <= max(2, 0.4 * max(a.count or 1, b.count or 1))):
+                    # 14.11 (×11 біля Печеніг): «6 ударних на Печеніги» від місцевих моніторів і «5 БпЛА біля Кочетка на Печеніги»
+                    # від загальноукраїнських каналів — той самий рій. Тип без назви вливається в названий, кількість — більша
+                    lim = 15
                 elif {a.type, b.type} == {"jet", "shahed"}:
                     # «реактивний» і «шахед» в одній точці одним курсом — найчастіше той самий об'єкт, різні канали
                     lim = 8
@@ -1349,9 +1354,11 @@ class Tracker:
                 keep, drop = (a, b) if rank(a) >= rank(b) else (b, a)
                 if a.type != b.type and keep.type == "jet" and len(drop.srcs) >= len(keep.srcs):
                     keep, drop = drop, keep
+                if {keep.type, drop.type} == {"shahed", "uav"} and keep.type == "uav":
+                    keep, drop = drop, keep  # названий тип головніший за «БпЛА без типу»
                 drop.merged = keep.id
                 keep.srcs |= drop.srcs
-                if (drop.count or 1) > (keep.count or 1) and drop.type == keep.type:
+                if (drop.count or 1) > (keep.count or 1) and (drop.type == keep.type or {drop.type, keep.type} == {"shahed", "uav"}):
                     keep.count = drop.count
                 if drop is a:
                     break
