@@ -3038,3 +3038,27 @@ def test_night_1114_forecast_in_days_is_not_live_ballistic():
     # жива балістика лишається
     assert P.parse("Балістика з Брянська на Київ!", "kiev_nebo", None).type == "ballistic"
     assert P.parse("Балістика з Брянська на Київ!", "kiev_nebo", None).kind == "track"
+
+
+def test_morning_1114_instrumental_region_is_not_village():
+    """14.11 ранок: «по межі з Черкащиною» (admiralbukhta, KL, rozvidkaneba, ppo_poltava, kyiv_airdef) ставило с. Черкащани
+    (Полтавщина), «по перетину з Харківщиною на Перещепине» (nikalert) — с. Харківщина на Сумщині."""
+    names = [n for n, a, b in _pl("Бандероль курсом на Градизьк по межі з Черкащиною (Полтавщина)", "KL")]
+    assert "Градизьк" in names and "Черкащани" not in names
+    names = [n for n, a, b in _pl("2 по перетину з Харківщиною на Перещепине", "nikalert")]
+    assert "Перещепине" in names and "Харківщина" not in names
+    # область у інших відмінках і справжнє село Сахновщина лишаються як були
+    assert "Сахновщина" in [n for n, a, b in _pl("⚠️над  Сахновщиной на Зачепиловку", "D")]
+
+
+def test_morning_1114_zaporizhzhia_header_districts_and_repeats():
+    """14.11 ранок: «Ⓜ️⚔️ Зпрж: Реактив на Піски» (radar_sich, 27 постів) і повтор «Повз Піски» в каналах міста
+    (operatyvnohlep, eyes_everywhere_ua, gnilayachereha) ставили с. Піски на фронті Донеччини (≈180 км)."""
+    assert [(n, a) for n, a, b in _pl("Ⓜ️⚔️ Зпрж: Реактив на Піски", "radar_sich")] == [("Піски (Запоріжжя)", 47.77)]
+    names = [n for n, a, b in _pl("Реактив над руслом в бік Пісків/Космосу — Реактив на Піски", "gnilayachereha")]
+    assert "Піски (Запоріжжя)" in names and "Піски" not in names
+    # без заголовка агрегатор (інші області) не отримує районів Запоріжжя
+    assert "Піски (Запоріжжя)" not in [n for n, a, b in _pl("реактивний далі до Анисів/Піски.", "PhantomChe")]
+    # «Верхня/Нижня Хортиця» — не точка острова; «с. Перемога» — село, а не житломасив Дніпра
+    assert "о. Хортиця (Запоріжжя)" not in [n for n, a, b in _pl("на Верхню Хортицю.", "zaborzp")]
+    assert "Перемога (Дніпро)" not in [n for n, a, b in _pl("Шахед повз Новомосковськ на с. Перемога", "Radar_Dnipra")]
