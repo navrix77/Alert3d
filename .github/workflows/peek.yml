@@ -16,6 +16,6 @@ jobs:
         env: { P: "${{ github.event.inputs.paths }}" }
         run: |
           mkdir -p out; i=0
-          for p in $P; do i=$((i+1)); curl -s --max-time 60 "https://sky.navryx.com.ua$p" -o "out/$i.json"; echo "$p -> $(wc -c < out/$i.json)"; [ "$(wc -c < out/$i.json)" -lt 4000 ] && { echo "BODY: $(cat out/$i.json)"; }; done
+          for p in $P; do i=$((i+1)); curl -s --max-time 60 "https://sky.navryx.com.ua$p" -o "out/$i.json"; echo "$p -> $(wc -c < out/$i.json)"; [ "$(wc -c < out/$i.json)" -lt 4000 ] && { echo "BODY: $(cat out/$i.json)"; } || true; done
       - uses: actions/upload-artifact@v4
         with: { name: peek, path: out, retention-days: 2 }
