@@ -22,6 +22,12 @@ jobs:
           for f in out/*.json; do python3 - "$f" <<'PY' || true
           import json,sys
           d=json.load(open(sys.argv[1]))
+          if isinstance(d,dict) and 'accepted_n' in d:
+              import time as _t
+              print('SA last', d.get('last'), 'ago_h', round((_t.time()-(d.get('last') or 0))/3600,1), 'acc', d['accepted_n'], 'rej', d['rejected_n'])
+              for a in d['accepted']: print('ACC', json.dumps(a,ensure_ascii=False)[:300])
+              for c in (d.get('checked') or [])[:40]: print('CHK', json.dumps(c,ensure_ascii=False)[:300])
+              for k,v in d['rejected_recent']: print('REJ', k, json.dumps(v,ensure_ascii=False)[:250])
           def near(t): return t.get('lat') and 49.5<t['lat']<50.5 and 36.0<t['lon']<37.6
           print('TOP', type(d).__name__, list(d.keys())[:20] if isinstance(d,dict) else len(d))
           if isinstance(d,dict) and isinstance(d.get('frames'),list):
