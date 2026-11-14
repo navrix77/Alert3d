@@ -17,5 +17,17 @@ jobs:
         run: |
           mkdir -p out; i=0
           for p in $P; do i=$((i+1)); curl -s --max-time 60 "https://sky.navryx.com.ua$p" -o "out/$i.json"; echo "$p -> $(wc -c < out/$i.json)"; [ "$(wc -c < out/$i.json)" -lt 4000 ] && { echo "BODY: $(cat out/$i.json)"; } || true; done
+      - shell: bash
+        run: |
+          for f in out/*.json; do python3 - "$f" <<'PY' || true
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          if isinstance(d,dict) and 'tracks' in d:
+              print('KEYS', sorted(d['tracks'][0].keys()) if d['tracks'] else [])
+              for t in d['tracks']:
+                  if t.get('status')!='active': continue
+                  print('TRK', json.dumps({k:t.get(k) for k in ('id','type','count','status','srcs','dest','to','name','label','lat','lon','est','merged','why')},ensure_ascii=False)[:600])
+          PY
+          done
       - uses: actions/upload-artifact@v4
         with: { name: peek, path: out, retention-days: 2 }
