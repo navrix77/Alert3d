@@ -24,6 +24,15 @@ jobs:
           d=json.load(open(sys.argv[1]))
           def near(t): return t.get('lat') and 49.5<t['lat']<50.5 and 36.0<t['lon']<37.6
           print('TOP', type(d).__name__, list(d.keys())[:20] if isinstance(d,dict) else len(d))
+          if isinstance(d,dict) and isinstance(d.get('frames'),list):
+              seen={}
+              for f in d['frames']:
+                  for t in f.get('tracks',[]):
+                      if near(t) and t.get('type') in ('jet','shahed') and t.get('status')=='active':
+                          k=(t['id'],t.get('type'),t.get('count'))
+                          if k not in seen: seen[k]=(f['t'],t)
+              for (i,ty,c),(ft,t) in sorted(seen.items(),key=lambda x:x[1][0]):
+                  print('F', ft, json.dumps({k:t.get(k) for k in ('id','type','raw_type','count','srcs','name','lat','lon','route_names','ev')},ensure_ascii=False)[:1200])
           if isinstance(d,dict) and isinstance(d.get('tracks'),list):
               for t in d['tracks']:
                   if near(t) or (t.get('count') or 0)>=8: print('N', json.dumps({k:t.get(k) for k in ('id','type','raw_type','count','status','srcs','name','lat','lon','first','last','route_names','ev')},ensure_ascii=False)[:1500])
