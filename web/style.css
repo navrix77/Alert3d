@@ -1011,3 +1011,7 @@ body:not(.tac) .counters .cnt{flex:0 0 auto!important;justify-content:flex-start
 
 /* 13.11: Android — розмиття під панелями дуже дороге для слабких GPU; замінюємо щільнішим фоном */
 .andr *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+
+/* заголовок панелі з ✕ не зникає при прокрутці (відгук користувача 14.11) */
+.settings{padding-top:0!important}.settings>.st-head{position:sticky;top:0;z-index:6;margin:0 -18px 6px;padding:calc(14px + env(safe-area-inset-top)) 18px 10px;background:#0E1219;border-bottom:1px solid rgba(255,255,255,.08)}
+:root[data-theme="day"] .settings>.st-head{background:#F4F6FA;border-bottom-color:rgba(10,20,40,.08)}

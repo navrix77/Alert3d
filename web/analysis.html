@@ -41,11 +41,11 @@ td.n{text-align:right}
 footer{color:var(--mute);font-size:12px;margin-top:16px;line-height:1.5}
 </style>
 </head>
-<body><a id="nx-back" href="/" onclick="if(history.length>1&&document.referrer.indexOf(location.host)>-1){history.back();return false}">← До мапи</a><style>#nx-back{position:fixed;z-index:99;top:calc(10px + env(safe-area-inset-top));left:12px;padding:9px 14px;border-radius:999px;background:rgba(20,24,34,.88);color:#e8eefc;font:600 14px/1 system-ui,-apple-system,sans-serif;text-decoration:none;border:1px solid rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}body{padding-top:calc(58px + env(safe-area-inset-top))!important}</style>
+<body><a id="nx-back" href="/" onclick="if(history.length>1&&document.referrer.indexOf(location.host)>-1){history.back();return false}" aria-label="Закрити й повернутися до мапи" title="До мапи">✕</a><style>#nx-back{position:fixed;z-index:2147483000;top:calc(10px + env(safe-area-inset-top));right:12px;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:rgba(20,24,34,.9);color:#e8eefc;font:600 18px/1 system-ui,-apple-system,sans-serif;text-decoration:none;border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 16px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transform:translateZ(0)}body{padding-top:calc(58px + env(safe-area-inset-top))!important}</style>
 <main>
 <header>
   <div><h1>Аналітика</h1><div class="sub" id="asof">завантаження…</div></div>
-  <a href="/">← Мапа</a>
+  
 </header>
 <section class="brief"><h2>Аналітична довідка</h2><ol id="summary"><li class="mute">…</li></ol></section>
 <section class="kpis" id="kpis"></section>
@@ -92,7 +92,7 @@ function render(a){
   $('nights').innerHTML=!n?'<div class="empty">Журнал ще збирається</div>':(
     '<p style="margin:0 0 8px;font-size:13px">Зараз: <b>'+n.tonight_n+'</b> треків, '+n.channels_now+' каналів. '+(n.avg_same_time!=null?'Схожі за охопленням періоди на цю годину: в середньому <b>'+n.avg_same_time+'</b>.':'<span class="mute">Попередні періоди мали значно менше каналів ('+(n.past_channels||[]).join(', ')+'), пряме порівняння було б нечесним.</span>')+'</p>'+
     table(['Період','На цю годину','За весь','Каналів'],(n.past_same_time||[]).map((v,i)=>[(i+1)+' '+(n.period==='ніч'?pl(i+1,['ніч','ночі','ночей']):pl(i+1,['день','дні','днів']))+' тому',v,(n.past_full||[])[i],(n.past_channels||[])[i]])));
-  $('src').innerHTML=table(['Канал','Першим','Відстає','Перепости','Спільних'],(a.sources||[]).map(s=>[esc(s.src),Math.round(s.first_share*100)+'%',s.lag_med_s?(s.lag_med_s/60).toFixed(1)+' хв':'-',Math.round(s.copy_share*100)+'%',s.shared]));
+  $('src').innerHTML=table(['Канал','Першим','Відстає','Перепости','Спільних'],(a.sources||[]).map(s=>[esc(s.name||s.src),Math.round(s.first_share*100)+'%',s.lag_med_s?(s.lag_med_s/60).toFixed(1)+' хв':'-',Math.round(s.copy_share*100)+'%',s.shared]));
   const pa=(a.self||{}).pred_acc||{},ha=(a.self||{}).hd_acc||{};
   $('self').innerHTML=table(['Тип','Напрямок ≤45°','«Ймовірно далі»','Наївний'],[...new Set([...Object.keys(ha),...Object.keys(pa)])].map(t=>[esc(TY[t]||t),ha[t]?Math.round(ha[t].acc*100)+'% <span class="mute">з '+ha[t].n+'</span>':'-',pa[t]?Math.round(pa[t].acc*100)+'% <span class="mute">з '+pa[t].n+'</span>':'-',pa[t]&&pa[t].naive!=null?Math.round(pa[t].naive*100)+'%':'-']))+
     '<p class="mute" style="font-size:12px;margin:8px 0 0">Напрямок: курс, що показувала мапа після останньої названої позиції, проти того, куди ціль назвали далі (через 3–40 хв). </p>'+

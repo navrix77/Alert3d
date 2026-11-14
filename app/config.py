@@ -43,7 +43,7 @@ _C = [
     ("KHL", "kharkivlife", "Kharkiv Life", 0.60, False, "Харківська", True),
     ("KM", "kharkov_media", "Харьков INFO", 0.75, False, "Харківська", True),
     ("ND", "NochnojDozorKh", "Ночной Дозор Харків", 0.75, False, "Харківська", True),
-    ("CX", "cxidua", "СХІD", 0.65, False, "Харківська", True),
+    ("CX", "cxidua", "СХІД Харків", 0.65, False, "Харківська", True),
     ("SG", "synegubov", "Синєгубов (Харківська ОВА)", 0.90, True, "Харківська", True),
     ("KLB", "vitaliy_klitschko", "Кличко (мер Києва)", 0.85, True, "Київська", False),
     ("KMDA", "KyivCityOfficial", "КМДА", 0.85, True, "Київська", False),

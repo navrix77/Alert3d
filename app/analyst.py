@@ -330,7 +330,12 @@ def analyze(snap: dict, hist: list[dict], brain=None, now: float | None = None) 
         except Exception:  # noqa: BLE001
             jr = jr or (now, {"sources": [], "nights": None})
     jd = jr[1] if jr else {"sources": [], "nights": None}
-    res["sources"] = jd["sources"][:24]
+    try:
+        from . import config as _cfg
+        _nm = lambda k: (_cfg.SOURCES[k].name if k in _cfg.SOURCES else k)
+    except Exception:  # noqa: BLE001
+        _nm = lambda k: k
+    res["sources"] = [{**x, "name": _nm(x["src"])} for x in jd["sources"][:24]]
     res["nights"] = jd["nights"]
     res["self"] = {"count_acc": count_acc(),
                    "pred_acc": brain.pred_acc() if brain is not None and hasattr(brain, "pred_acc") else {},
@@ -424,7 +429,7 @@ def summary(r: dict) -> list[str]:
     fast = [x for x in r["sources"] if x["shared"] >= 20]
     if fast:
         s = fast[0]
-        out.append(f"Найшвидше джерело за добу: {s['src']}, першим у {round(s['first_share'] * 100)}% із {s['shared']} спільних цілей"
+        out.append(f"Найшвидше джерело за добу: {s.get('name') or s['src']}, першим у {round(s['first_share'] * 100)}% із {s['shared']} спільних цілей"
                    + (f"; коли не перший, відстає в середньому на {round(s['lag_med_s'] / 60, 1)} хв" if s["lag_med_s"] else "") + ".")
     if r["sources"]:
         cp = [x for x in r["sources"] if x["copy_share"] >= 0.5]
