@@ -44,3 +44,11 @@ def test_discover_bans_press_services():
     from app.discover import is_banned
     assert is_banned("BrigadeNGU11") and is_banned("ab3army") and is_banned("ovmbr125")
     assert not is_banned("sigshostka") and not is_banned("radar_sich") and not is_banned("monitor1654")
+
+
+def test_social_status_has_no_token(monkeypatch):
+    from app import social
+    monkeypatch.setenv("THREADS_TOKEN", "SECRET123")
+    t = social.Threads()
+    st = social.status()
+    assert st["threads"] is True and "SECRET123" not in str(st) and t is social.STATUS

@@ -1267,6 +1267,12 @@ def api_state():
     return JSONResponse(state())
 
 
+@app.get("/api/social")
+def api_social():
+    from .social import status
+    return status()
+
+
 @app.get("/api/config")
 def api_config():
     return {"vectorStyle": config.MAP_STYLE_VECTOR, "maptilerKey": config.MAPTILER_KEY or None, "gtilesKey": config.GOOGLE_TILES_KEY or None}

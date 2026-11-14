@@ -71,6 +71,17 @@ def alert_text(obl: str, hhmm: str, by_type: dict) -> str | None:
             f"Куди летять - на мапі наживо: {SITE}\n{TAIL}")
 
 
+STATUS = None  # поточний екземпляр для /api/social
+
+
+def status() -> dict:
+    """Публічний стан автопостів без жодних ключів: увімкнено, профіль, час і результат останнього посту."""
+    t = STATUS
+    if t is None:
+        return {"threads": False}
+    return {"threads": bool(t.on), "account": t.account, "last_post": int(t.last_post_t) or None, "last_ok": t.last_ok}
+
+
 class Threads:
     def __init__(self, daily=None) -> None:
         self.daily = daily
@@ -81,6 +92,11 @@ class Threads:
         self.gap = float(os.getenv("SOCIAL_MIN_GAP", "45")) * 60
         self.last_alert_t = 0.0
         self.last_sig: tuple | None = None
+        self.account: str | None = None  # ім'я профілю, якщо ключ дійсний
+        self.last_post_t = 0.0
+        self.last_ok: bool | None = None
+        global STATUS
+        STATUS = self
         st = _store()
         st.mkdir(parents=True, exist_ok=True)
         tf = st / "threads_token.txt"  # оновлений довгостроковий токен переживає перезапуск
@@ -101,10 +117,22 @@ class Threads:
                 r = await cli.post(f"{API}/{self.user}/threads_publish", data={"creation_id": cid, "access_token": self.token})
                 ok = bool(r.json().get("id"))
                 log.info("threads: %s", "опубліковано" if ok else r.text[:300])
+                self.last_post_t, self.last_ok = time.time(), ok
                 return ok
         except Exception:  # noqa: BLE001
             log.exception("threads post")
             return False
+
+    async def check(self) -> bool:
+        """Перевірка ключа без публікації: ім'я профілю Threads або None."""
+        try:
+            async with httpx.AsyncClient(timeout=20) as cli:
+                r = await cli.get(f"{API}/me", params={"fields": "username", "access_token": self.token})
+            self.account = r.json().get("username")
+        except Exception:  # noqa: BLE001
+            self.account = None
+        log.info("threads: ключ %s", f"дійсний, профіль @{self.account}" if self.account else "недійсний або немає зв'язку")
+        return bool(self.account)
 
     async def refresh(self) -> None:
         """Довгостроковий токен Threads живе 60 днів; оновлюємо раз на тиждень."""
@@ -166,6 +194,7 @@ class Threads:
             log.info("threads: автопости вимкнено (немає THREADS_TOKEN або SOCIAL_AUTOPOST=0)")
             return
         log.info("threads: автопости увімкнено, область %s, інтервал %d хв", self.obl, self.gap // 60)
+        await self.check()
         await asyncio.sleep(60)
         last_ref = 0.0
         while True:
