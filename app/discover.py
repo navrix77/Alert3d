@@ -29,12 +29,29 @@ FILE = Path(os.getenv("PERSIST_DIR") or Path(__file__).resolve().parent.parent /
 FWD = re.compile(r'tgme_widget_message_forwarded_from_name"[^>]*href="https://t\.me/([A-Za-z0-9_]{5,32})')
 LINK = re.compile(r'href="https://t\.me/([A-Za-z0-9_]{5,32})(?:/\d+)?"')
 MENTION = re.compile(r'(?<![\w@])@([A-Za-z][A-Za-z0-9_]{4,31})\b')
+# пресслужби бригад і корпусів пишуть «БпЛА» й назви міст, але це не монітори (14.11: BrigadeNGU11, ab3army пройшли перевірку)
+BAN_RE = re.compile(r"(?i)brigad|bryhad|ovmbr|army|corps|korpus|_ngu|ngu\d|press_?service|pres_?sluzhb")
+
+
+def banned_set() -> set:
+    try:
+        bp = Path(__file__).resolve().parent.parent / "data" / "source_ban.txt"
+        return {x.strip().lstrip("@").lower() for x in bp.read_text(encoding="utf-8").splitlines() if x.strip() and not x.startswith("#")}
+    except Exception:
+        return set()
+
+
+def is_banned(user: str, ban: set | None = None) -> bool:
+    return user.lower() in (banned_set() if ban is None else ban) or bool(BAN_RE.search(user))
+
+
 SKIP = {"share", "joinchat", "addstickers", "proxy", "iv", "s", "c", "boost", "contact", "addlist", "telegram", "durov", "botfather"}
 
 
 def load() -> list[dict]:
     try:
-        return json.loads(FILE.read_text(encoding="utf-8")).get("accepted", [])
+        ban = banned_set()
+        return [r for r in json.loads(FILE.read_text(encoding="utf-8")).get("accepted", []) if not is_banned(r.get("user", ""), ban)]
     except Exception:
         return []
 
@@ -105,6 +122,7 @@ class Discover:
 
     async def run_once(self) -> dict:
         have = {u.lower() for _k, u, *_ in config.CHANNELS}
+        ban = banned_set()
         refs: dict[str, set] = collections.defaultdict(set)
         fwd_from: set = set()  # кандидати, з яких відомі монітори ПЕРЕСИЛАЛИ (а не лише згадали)
         chans = [(k, u) for k, u, *_ in config.CHANNELS]
@@ -128,7 +146,7 @@ class Discover:
                     fw = set(FWD.findall(r.text))
                     for c in fw | set(LINK.findall(r.text)) | set(MENTION.findall(r.text)):
                         cl = c.lower()
-                        if cl not in have and cl not in SKIP and not cl.endswith("bot"):
+                        if cl not in have and cl not in SKIP and not cl.endswith("bot") and not is_banned(c, ban):
                             refs[c].add(k)
                             if c in fw:
                                 fwd_from.add(c)
@@ -136,7 +154,7 @@ class Discover:
                     pass
                 await asyncio.sleep(0.4)
             for sd in seeds:
-                if sd.lower() not in have:
+                if sd.lower() not in have and not is_banned(sd, ban):
                     refs[sd].add("seed")
             cands = sorted([c for c, s in refs.items() if (len(s) >= 2 or c in fwd_from or "seed" in s) and retry_ok(c)],
                            key=lambda c: (-("seed" in refs[c]), -(c in fwd_from), -len(refs[c])))[:40]

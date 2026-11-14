@@ -1,2 +1,22 @@
 # Підказки для автопошуку джерел: по одному @username публічного Telegram-каналу на рядок.
 # Канал буде прийнято лише якщо його дописи проходять перевірку парсером (свіжі, ≥5 цілей з місцем, ≥25% дописів).
+# 14.11: області з малою кількістю джерел. Імена-кандидати: несправжні або новинні канали автопошук сам відкине.
+slavkram247
+kramatorsk_monitor
+slavyansk_radar
+donbas_radar
+radar_donbas
+pokrovsk_radar
+kherson_radar
+radar_kherson
+kherson_trevoga
+khersonmonitor
+chernivtsi_radar
+radar_chernivtsi
+cv_radar
+if_radar
+radar_if
+frankivsk_radar
+zakarpattia_radar
+uzhgorod_radar
+radar_zakarpattia

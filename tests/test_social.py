@@ -38,3 +38,9 @@ def test_alert_tick_rate_limit_and_change(monkeypatch, tmp_path):
 def test_off_without_token(monkeypatch):
     monkeypatch.delenv("THREADS_TOKEN", raising=False)
     assert not social.Threads().on
+
+
+def test_discover_bans_press_services():
+    from app.discover import is_banned
+    assert is_banned("BrigadeNGU11") and is_banned("ab3army") and is_banned("ovmbr125")
+    assert not is_banned("sigshostka") and not is_banned("radar_sich") and not is_banned("monitor1654")
