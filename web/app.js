@@ -1233,6 +1233,35 @@ function fillSheet(first){
   const link=tr.links[tr.links.length-1];const a=$('#sh-post');if(link){a.href=link;a.hidden=false;}else a.hidden=true;
 }
 if($('#sh-split'))$('#sh-split').onclick=e=>{const c=e.target.closest('.sp-c');if(!c||!c.dataset.ll)return;const p=c.dataset.ll.split(',').map(Number);TACHL={p,until:Date.now()+6000};map.easeTo({center:p,zoom:Math.max(map.getZoom(),8.5),duration:600});};
+/* 14.11 «Поділитися ціллю»: картка-картинка (знімок мапи + що летить, куди, скільки до вас) для пересилання рідним */
+function mapShot(){return new Promise(res=>{let done=0;const fin=v=>{if(!done){done=1;res(v);}};try{map.once('render',()=>{try{fin(map.getCanvas().toDataURL('image/jpeg',0.85));}catch(e){fin(null);}});map.triggerRepaint();}catch(e){fin(null);}setTimeout(()=>fin(null),1500);});}
+function loadImg(src){return new Promise(r=>{if(!src)return r(null);const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src=src;});}
+async function shareTrack(){const tr=SNAP&&SNAP.tracks.find(t=>t.id===sel);if(!tr)return;
+  const url='https://sky.navryx.com.ua/?s=trk',T=id=>{const e=$(id);return e?e.textContent.replace(/\s+/g,' ').trim():'';};
+  const name=T('#sh-name'),course=T('#sh-course'),now=T('#sh-now'),me=(T('#sh-dist')+' '+T('#sh-eta')).trim(),hm=new Date().toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+  const text=name+(course?' · '+course:'')+(now&&now!=='-'?'\nЗараз: '+now:'')+'\nДивись наживо: ';
+  let file=null;
+  try{const [shot,logo]=await Promise.all([mapShot().then(loadImg),loadImg('brand/icon-192.png')]);
+    const W=1080,H=1350,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+    g.fillStyle='#0B0F17';g.fillRect(0,0,W,H);const MH=780;
+    if(shot){const sc=Math.max(W/shot.width,MH/shot.height),sw=W/sc,sh=MH/sc;g.drawImage(shot,(shot.width-sw)/2,(shot.height-sh)/2,sw,sh,0,0,W,MH);}
+    const gr=g.createLinearGradient(0,MH-220,0,MH);gr.addColorStop(0,'rgba(11,15,23,0)');gr.addColorStop(1,'#0B0F17');g.fillStyle=gr;g.fillRect(0,MH-220,W,220);
+    g.fillStyle='rgba(11,15,23,.72)';g.fillRect(40,40,250,64);g.fillStyle='#fff';g.font='700 34px "Inter Tight",system-ui,sans-serif';g.fillText('🔴 '+hm,62,84);
+    const fit=(t,max,sz,w)=>{let s=sz;do{g.font=w+' '+s+'px "Inter Tight",system-ui,sans-serif';s-=2;}while(g.measureText(t).width>max&&s>20);return t;};
+    let y=MH+40;g.fillStyle='#fff';fit(name,W-120,84,800);g.fillText(name,60,y+40);y+=110;
+    if(course){g.fillStyle='#FFB020';fit(course,W-120,48,700);g.fillText(course,60,y);y+=74;}
+    if(now&&now!=='-'){g.fillStyle='#C9D2E3';fit('Зараз: '+now,W-120,40,600);g.fillText('Зараз: '+now,60,y);y+=64;}
+    if(me){g.fillStyle='#7FB6FF';fit('Для мене: '+me,W-120,40,600);g.fillText('Для мене: '+me,60,y);}
+    g.fillStyle='rgba(255,255,255,.08)';g.fillRect(0,H-150,W,150);
+    if(logo)g.drawImage(logo,60,H-125,100,100);
+    g.fillStyle='#fff';g.font='800 44px "Inter Tight",system-ui,sans-serif';g.fillText('NAVRYX SKY',185,H-82);
+    g.fillStyle='#9FB0CC';g.font='600 32px "Inter Tight",system-ui,sans-serif';g.fillText('sky.navryx.com.ua · безкоштовно',185,H-38);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.9));if(blob)file=new File([blob],'navryx-sky.jpg',{type:'image/jpeg'});}catch(e){}
+  try{if(file&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:text+url});return;}
+    if(navigator.share){await navigator.share({title:'NAVRYX SKY',text,url});return;}}catch(e){if(e&&e.name==='AbortError')return;}
+  if(file){const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download='navryx-sky.jpg';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);}
+  try{await navigator.clipboard.writeText(text+url);toast('Картинку збережено, текст скопійовано');}catch(_){}}
+{const b=$('#sh-share');if(b)b.onclick=e=>{e.stopPropagation();shareTrack();};}
 $('#sh-close').onclick=()=>{$('#sheet').hidden=true;if(!follow)sel=null;};
 // «Стежити за ціллю»: камера веде ціль, картка ховається, зверху, компактна плашка з живими даними і «Зупинити»
 let followPrev=null,followSayT=0,followThr=false;
@@ -1532,7 +1561,7 @@ $('#b-set').onclick=()=>{$('#settings').hidden=false;syncSettingsUI();loadLan();
   {const dl=$('#fb-dlg'),msg=$('#fb-msg');$('#st-fb-open')&&($('#st-fb-open').onclick=()=>{msg.textContent='';dl.showModal?dl.showModal():dl.setAttribute('open','')});$('#fb-close')&&($('#fb-close').onclick=()=>dl.close?dl.close():dl.removeAttribute('open'));
     $('#fb-send')&&($('#fb-send').onclick=async()=>{const t=$('#fb-text').value.trim();if(t.length<3){msg.textContent='Напишіть хоча б кілька слів.';return}msg.textContent='Надсилаю…';try{const r=await fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,contact:$('#fb-contact').value,v:(($('#st-ver')||{}).textContent||'').slice(0,40)})});let j={};try{j=await r.json()}catch(e){msg.textContent='Помилка сервера '+r.status+'. Спробуйте пізніше.';return}if(j.ok){msg.textContent='Дякуємо! Повідомлення надіслано.';$('#fb-text').value='';setTimeout(()=>dl.close&&dl.close(),1500)}else msg.textContent=j.why==='rate'?'Зачекайте хвилину й спробуйте ще.':'Не вдалося надіслати.'}catch(e){msg.textContent='Немає зв’язку. Спробуйте пізніше.'}})}
   const so=$('#st-online');if(so){const upd=async()=>{try{const j=await (await fetch('/api/online',{cache:'no-store'})).json();if(typeof j.online==='number'){so.hidden=false;so.textContent='Зараз онлайн: '+j.online;}}catch(e){}};upd();setInterval(upd,30000);}
-  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 519,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
+  const sv=$('#st-ver');if(sv){const show=b=>{const AV = 520,dd=Math.max(0,Math.floor((Date.now()-Date.UTC(2026,10,1))/864e5)),bb=b?(Math.floor(b/100)+'.'+String(b%100).padStart(2,'0')):'';sv.textContent='Версія '+Math.floor(dd/7)+'.'+(dd%7)+(bb?' · збірка '+bb:'');};show(window.__SKYBUILD);if(!window.__SKYBUILD)fetch('/sw.js').then(r=>r.text()).then(t=>{const m=t.match(/tryvoga-v(\d+)/);window.__SKYBUILD=m?m[1]:'';show(window.__SKYBUILD);}).catch(()=>{});}};
 $('#st-close').onclick=()=>$('#settings').hidden=true;
 if($('#st-widget'))$('#st-widget').onclick=()=>window.__openWidget&&window.__openWidget();
 if($('#st-widget-sec'))$('#st-widget-sec').hidden=new URLSearchParams(location.search).get('app')==='widget'||!/Windows NT/.test(navigator.userAgent);// лише на комп'ютерах з Windows
